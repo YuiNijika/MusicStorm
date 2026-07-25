@@ -1,7 +1,7 @@
 # MusicStorm
 
 <p align="center">
-    <img alt="Logo Icon" src="/public/icon.png">
+    <img alt="Logo Icon" src="/public/icon.png" style="max-width: 20%;" />
 </p>
 
 基于 `Rust` + `TypeScript` 开发的高颜值音乐播放器，支持本地和网易云音乐
