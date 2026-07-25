@@ -1,0 +1,610 @@
+import {
+    AudioLines,
+    ChevronDown,
+    Heart,
+    LayoutTemplate,
+    Pause,
+    Play,
+    Repeat,
+    Repeat1,
+    Shuffle,
+    SkipBack,
+    SkipForward,
+    Volume2,
+    VolumeX,
+} from "lucide-react"
+import { useEffect, useState, type ReactNode } from "react"
+
+import { Cover } from "@/components/music/cover"
+import { LyricsView } from "@/components/music/lyrics-view"
+import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
+import { SourceBadge } from "@/components/music/source-badge"
+import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
+import { Button } from "@/components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { useLiked } from "@/hooks/use-liked"
+import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlayer } from "@/hooks/use-player"
+import {
+    QUALITY_OPTIONS,
+    getNeteaseQualityBr,
+    labelForQualityBr,
+    setNeteaseQualityBr,
+    type QualityBr,
+} from "@/lib/netease/quality"
+import {
+    FULL_PLAYER_LAYOUTS,
+    LAYOUT_EVENT,
+    getFullPlayerLayout,
+    setFullPlayerLayout,
+    type FullPlayerLayout,
+} from "@/lib/player/full-player-prefs"
+import { cn } from "@/lib/utils"
+
+type FullPlayerProps = {
+    open: boolean
+    onClose: () => void
+}
+
+function FullPlayer({ open, onClose }: FullPlayerProps) {
+    const {
+        currentTrack,
+        isPlaying,
+        positionMs,
+        durationMs,
+        volume,
+        isMuted,
+        shuffle,
+        repeat,
+        togglePlay,
+        next,
+        previous,
+        seek,
+        setVolume,
+        toggleMute,
+        toggleShuffle,
+        cycleRepeat,
+        reloadCurrent,
+    } = usePlayer()
+    const { loggedIn } = useNeteaseSession()
+    const { isTrackLiked, toggleTrackLiked } = useLiked()
+    const { openArtist, openAlbum } = useMusicNavigation()
+
+    const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
+    const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
+
+    useEffect(() => {
+        function onLayout() {
+            setLayout(getFullPlayerLayout())
+        }
+        window.addEventListener(LAYOUT_EVENT, onLayout)
+        return () => {
+            window.removeEventListener(LAYOUT_EVENT, onLayout)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!open) {
+            return
+        }
+        function onKey(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                event.preventDefault()
+                onClose()
+            }
+        }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
+    }, [open, onClose])
+
+    if (!open || !currentTrack) {
+        return null
+    }
+
+    const totalMs = durationMs > 0 ? durationMs : currentTrack.durationMs
+    const showQuality = currentTrack.source === "netease"
+    const canLike =
+        loggedIn && currentTrack.source === "netease" && Boolean(currentTrack.id)
+    const liked = isTrackLiked(currentTrack.id)
+    const primaryArtist = currentTrack.artists?.find((item) => item.id)
+    const canOpenArtist =
+        currentTrack.source === "netease" && Boolean(primaryArtist?.id)
+    const canOpenAlbum =
+        currentTrack.source === "netease" && Boolean(currentTrack.albumId)
+
+    function navigateArtist() {
+        if (!primaryArtist?.id) {
+            return
+        }
+        openArtist(primaryArtist.id)
+        onClose()
+    }
+
+    function navigateAlbum() {
+        if (!currentTrack.albumId) {
+            return
+        }
+        openAlbum(currentTrack.albumId)
+        onClose()
+    }
+
+    function handleQualityChange(next: QualityBr) {
+        setNeteaseQualityBr(next)
+        setQualityBr(next)
+        reloadCurrent()
+    }
+
+    function handleLayoutChange(next: FullPlayerLayout) {
+        setFullPlayerLayout(next)
+        setLayout(next)
+    }
+
+    async function handleToggleLike() {
+        if (!canLike) {
+            return
+        }
+        try {
+            await toggleTrackLiked(currentTrack.id)
+        } catch {
+            // store 已回滚
+        }
+    }
+
+    const transport = (
+        <TransportBar
+            isPlaying={isPlaying}
+            shuffle={shuffle}
+            repeat={repeat}
+            showQuality={showQuality}
+            canLike={canLike}
+            liked={liked}
+            qualityBr={qualityBr}
+            isMuted={isMuted}
+            volume={volume}
+            onTogglePlay={togglePlay}
+            onPrevious={previous}
+            onNext={next}
+            onToggleShuffle={toggleShuffle}
+            onCycleRepeat={cycleRepeat}
+            onToggleMute={toggleMute}
+            onVolume={(v) => setVolume(v)}
+            onQuality={handleQualityChange}
+            onToggleLike={() => void handleToggleLike()}
+        />
+    )
+
+    const progressRow = (
+        <SeekElasticSlider
+            positionMs={positionMs}
+            durationMs={totalMs}
+            onSeek={seek}
+        />
+    )
+
+    const meta = (
+        <div className="space-y-1.5 text-center">
+            <div className="flex items-center justify-center gap-2">
+                <h2 className="truncate text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px]">
+                    {currentTrack.title}
+                </h2>
+                <SourceBadge source={currentTrack.source} />
+            </div>
+            <p className="truncate text-[14px] text-muted-foreground sm:text-[15px]">
+                {canOpenArtist ? (
+                    <button
+                        type="button"
+                        onClick={navigateArtist}
+                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                        {currentTrack.artist}
+                    </button>
+                ) : (
+                    <span>{currentTrack.artist}</span>
+                )}
+                {currentTrack.album ? (
+                    <>
+                        <span className="mx-1 text-muted-foreground/50">·</span>
+                        {canOpenAlbum ? (
+                            <button
+                                type="button"
+                                onClick={navigateAlbum}
+                                className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                            >
+                                {currentTrack.album}
+                            </button>
+                        ) : (
+                            <span>{currentTrack.album}</span>
+                        )}
+                    </>
+                ) : null}
+            </p>
+        </div>
+    )
+
+    return (
+        <div
+            className="fixed inset-0 z-[80] flex flex-col animate-in fade-in duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="正在播放"
+        >
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                {currentTrack.coverUrl ? (
+                    <img
+                        src={currentTrack.coverUrl}
+                        alt=""
+                        aria-hidden
+                        className="size-full scale-110 object-cover opacity-40 blur-3xl dark:opacity-30"
+                    />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background/90 dark:from-black/50 dark:via-background/80 dark:to-background/95" />
+            </div>
+
+            <div className="glass-sheet relative flex h-full min-h-0 flex-col">
+                <div
+                    data-tauri-drag-region
+                    className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                >
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className={cn(
+                            "glass-chip flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
+                            "text-[13px] font-medium text-foreground/90",
+                            "transition-transform duration-100 active:scale-[0.97]",
+                        )}
+                    >
+                        <ChevronDown className="size-4 opacity-70" />
+                        收起
+                    </button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger
+                            className={cn(
+                                "glass-chip flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
+                                "text-[12px] font-medium text-foreground/90 outline-none",
+                                "transition-transform duration-100 active:scale-[0.97]",
+                            )}
+                            title="播放样式"
+                        >
+                            <LayoutTemplate className="size-3.5 opacity-70" />
+                            {FULL_PLAYER_LAYOUTS.find((item) => item.id === layout)?.label ??
+                                "样式"}
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="min-w-[160px]">
+                            {FULL_PLAYER_LAYOUTS.map((item) => (
+                                <DropdownMenuItem
+                                    key={item.id}
+                                    className="cursor-pointer flex-col items-start gap-0.5"
+                                    onClick={() => handleLayoutChange(item.id)}
+                                >
+                                    <span className="text-[13px] font-medium">
+                                        {item.label}
+                                        {layout === item.id ? " · 当前" : ""}
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {item.description}
+                                    </span>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <div className="w-[72px]" aria-hidden />
+                </div>
+
+                {/* 主区：按模板 */}
+                {layout === "classic" ? (
+                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
+                        <div className="flex min-h-0 flex-col items-center justify-center gap-6">
+                            <div className="w-full max-w-[min(400px,78vw)]">
+                                <Cover
+                                    src={currentTrack.coverUrl}
+                                    alt={currentTrack.title}
+                                    size="xl"
+                                    className={cn(
+                                        "rounded-[28px] shadow-[0_24px_64px_rgba(15,23,42,0.28)]",
+                                        "ring-1 ring-white/20 dark:shadow-[0_24px_64px_rgba(0,0,0,0.55)] dark:ring-white/10",
+                                        isPlaying &&
+                                            "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                    )}
+                                />
+                            </div>
+                            <div className="w-full max-w-[min(400px,78vw)] space-y-3">
+                                {meta}
+                            </div>
+                        </div>
+                        <LyricsView
+                            variant="full"
+                            active={open}
+                            className="min-h-0 flex-1"
+                            listClassName="h-full"
+                        />
+                    </div>
+                ) : null}
+
+                {layout === "cover" ? (
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
+                        <div className="w-full max-w-[min(440px,82vw)]">
+                            <Cover
+                                src={currentTrack.coverUrl}
+                                alt={currentTrack.title}
+                                size="xl"
+                                className={cn(
+                                    "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                    "ring-1 ring-white/20 dark:ring-white/10",
+                                    isPlaying &&
+                                        "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                )}
+                            />
+                        </div>
+                        <div className="w-full max-w-[min(440px,82vw)] space-y-2">{meta}</div>
+                    </div>
+                ) : null}
+
+                {layout === "lyrics" ? (
+                    <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pb-3 pt-1">
+                        <div className="flex shrink-0 items-center gap-3">
+                            <Cover
+                                src={currentTrack.coverUrl}
+                                alt={currentTrack.title}
+                                size="md"
+                                className="rounded-2xl shadow-md ring-1 ring-white/15"
+                            />
+                            <div className="min-w-0 flex-1 text-left">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <p className="truncate text-[16px] font-semibold tracking-[-0.02em]">
+                                        {currentTrack.title}
+                                    </p>
+                                    <SourceBadge source={currentTrack.source} />
+                                </div>
+                                <p className="truncate text-[13px] text-muted-foreground">
+                                    {canOpenArtist ? (
+                                        <button
+                                            type="button"
+                                            onClick={navigateArtist}
+                                            className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                        >
+                                            {currentTrack.artist}
+                                        </button>
+                                    ) : (
+                                        <span>{currentTrack.artist}</span>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                        <LyricsView
+                            variant="full"
+                            active={open}
+                            className="min-h-0 flex-1"
+                            listClassName="h-full"
+                        />
+                    </div>
+                ) : null}
+
+                {/* 底栏播放条：进度 + 传输 + 音量/音质 */}
+                <div className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8">
+                    <div className="mx-auto flex max-w-3xl flex-col gap-2.5">
+                        {progressRow}
+                        {transport}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function TransportBar({
+    isPlaying,
+    shuffle,
+    repeat,
+    showQuality,
+    canLike,
+    liked,
+    qualityBr,
+    isMuted,
+    volume,
+    onTogglePlay,
+    onPrevious,
+    onNext,
+    onToggleShuffle,
+    onCycleRepeat,
+    onToggleMute,
+    onVolume,
+    onQuality,
+    onToggleLike,
+}: {
+    isPlaying: boolean
+    shuffle: boolean
+    repeat: "off" | "all" | "one"
+    showQuality: boolean
+    canLike: boolean
+    liked: boolean
+    qualityBr: QualityBr
+    isMuted: boolean
+    volume: number
+    onTogglePlay: () => void
+    onPrevious: () => void
+    onNext: () => void
+    onToggleShuffle: () => void
+    onCycleRepeat: () => void
+    onToggleMute: () => void
+    onVolume: (v: number) => void
+    onQuality: (br: QualityBr) => void
+    onToggleLike: () => void
+}) {
+    return (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            {/* 左 喜欢 */}
+            <div className="flex items-center justify-start">
+                {canLike ? (
+                    <IconBtn
+                        title={liked ? "取消喜欢" : "喜欢"}
+                        active={liked}
+                        onClick={onToggleLike}
+                    >
+                        <Heart
+                            className={cn("size-4", liked && "fill-current")}
+                        />
+                    </IconBtn>
+                ) : (
+                    <span className="size-10" aria-hidden />
+                )}
+            </div>
+
+            {/* 中 传输 */}
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5">
+                <IconBtn title="随机" active={shuffle} onClick={onToggleShuffle}>
+                    <Shuffle className="size-4" />
+                </IconBtn>
+                <IconBtn title="上一首" onClick={onPrevious}>
+                    <SkipBack className="size-5 fill-current" />
+                </IconBtn>
+                <Button
+                    type="button"
+                    size="icon"
+                    className="size-12 cursor-pointer rounded-full active:scale-[0.96] sm:size-14"
+                    onClick={onTogglePlay}
+                    title={isPlaying ? "暂停" : "播放"}
+                    aria-label={isPlaying ? "暂停" : "播放"}
+                >
+                    {isPlaying ? (
+                        <Pause className="size-5 fill-current sm:size-6" />
+                    ) : (
+                        <Play className="size-5 fill-current sm:size-6" />
+                    )}
+                </Button>
+                <IconBtn title="下一首" onClick={onNext}>
+                    <SkipForward className="size-5 fill-current" />
+                </IconBtn>
+                <IconBtn
+                    title={
+                        repeat === "off"
+                            ? "循环：关"
+                            : repeat === "all"
+                              ? "循环：列表"
+                              : "循环：单曲"
+                    }
+                    active={repeat !== "off"}
+                    onClick={onCycleRepeat}
+                >
+                    {repeat === "one" ? (
+                        <Repeat1 className="size-4" />
+                    ) : (
+                        <Repeat className="size-4" />
+                    )}
+                </IconBtn>
+            </div>
+
+            {/* 右 音量 音质 */}
+            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                <Popover>
+                    <PopoverTrigger
+                        className={cn(
+                            "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                            "text-muted-foreground transition-colors duration-100",
+                            "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
+                            "dark:hover:bg-white/[0.08]",
+                        )}
+                        title="音量"
+                        aria-label="音量"
+                    >
+                        {isMuted || volume === 0 ? (
+                            <VolumeX className="size-4" />
+                        ) : (
+                            <Volume2 className="size-4" />
+                        )}
+                    </PopoverTrigger>
+                    <PopoverContent side="top" className="w-56 gap-2 p-3">
+                        <VolumeElasticSlider
+                            volume={volume}
+                            muted={isMuted}
+                            onVolume={onVolume}
+                            onToggleMute={onToggleMute}
+                            showValue
+                            showIcons
+                            fluid
+                        />
+                    </PopoverContent>
+                </Popover>
+
+                {showQuality ? (
+                    <Popover>
+                        <PopoverTrigger
+                            className={cn(
+                                "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                "text-muted-foreground transition-colors duration-100",
+                                "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
+                                "dark:hover:bg-white/[0.08]",
+                            )}
+                            title={`音质 · ${labelForQualityBr(qualityBr)}`}
+                            aria-label={`音质 · ${labelForQualityBr(qualityBr)}`}
+                        >
+                            <AudioLines className="size-4" />
+                        </PopoverTrigger>
+                        <PopoverContent side="top" className="w-44 gap-1 p-1.5">
+                            {QUALITY_OPTIONS.map((option) => (
+                                <button
+                                    key={option.br}
+                                    type="button"
+                                    onClick={() => onQuality(option.br)}
+                                    className={cn(
+                                        "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
+                                        qualityBr === option.br
+                                            ? "bg-foreground text-background"
+                                            : "text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]",
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </PopoverContent>
+                    </Popover>
+                ) : null}
+            </div>
+        </div>
+    )
+}
+
+function IconBtn({
+    children,
+    title,
+    onClick,
+    active = false,
+}: {
+    children: ReactNode
+    title: string
+    onClick: () => void
+    active?: boolean
+}) {
+    return (
+        <button
+            type="button"
+            title={title}
+            aria-label={title}
+            onClick={onClick}
+            className={cn(
+                "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                "text-muted-foreground transition-colors duration-100",
+                "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
+                "dark:hover:bg-white/[0.08]",
+                active && "text-rose-600 dark:text-rose-300",
+            )}
+        >
+            {children}
+        </button>
+    )
+}
+
+export { FullPlayer }

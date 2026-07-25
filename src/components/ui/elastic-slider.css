@@ -1,0 +1,164 @@
+/* ElasticSlider */
+
+.ms-elastic-slider {
+    --ms-elastic-track: color-mix(in oklab, var(--muted-foreground) 28%, transparent);
+    --ms-elastic-fill: var(--foreground);
+    --ms-elastic-icon: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+    --ms-elastic-value: var(--muted-foreground);
+
+    position: relative;
+    display: flex;
+    width: 12rem;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.ms-elastic-slider--fluid {
+    width: 100%;
+    min-width: 0;
+}
+
+.ms-elastic-slider--compact {
+    width: 7.5rem;
+    max-width: 100%;
+    gap: 0;
+}
+
+.ms-elastic-slider--disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.ms-elastic-slider__wrapper {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    touch-action: none;
+    user-select: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+.ms-elastic-slider--compact .ms-elastic-slider__wrapper {
+    gap: 0.35rem;
+}
+
+.ms-elastic-slider__icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--ms-elastic-icon);
+}
+
+.ms-elastic-slider__icon > svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.ms-elastic-slider--compact .ms-elastic-slider__icon > svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.ms-elastic-slider__icon--pulse {
+    animation: ms-elastic-icon-pulse 0.28s ease;
+}
+
+@keyframes ms-elastic-icon-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    45% {
+        transform: scale(1.18);
+    }
+}
+
+.ms-elastic-slider__root {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 200px;
+    flex: 1 1 auto;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    align-items: center;
+    padding: 0.65rem 0;
+    overflow: hidden;
+}
+
+.ms-elastic-slider--fluid .ms-elastic-slider__root {
+    max-width: none;
+    padding: 0.5rem 0;
+}
+
+.ms-elastic-slider--compact .ms-elastic-slider__root {
+    padding: 0.4rem 0;
+}
+
+.ms-elastic-slider__root:active {
+    cursor: grabbing;
+}
+
+/* 裁剪轨道变形，防止 scale 溢出 */
+.ms-elastic-slider__track-clip {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-grow: 1;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 9999px;
+}
+
+.ms-elastic-slider__track-wrapper {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-grow: 1;
+    will-change: transform, height;
+}
+
+.ms-elastic-slider__track {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    flex-grow: 1;
+    overflow: hidden;
+    border-radius: 9999px;
+    background-color: var(--ms-elastic-track);
+}
+
+.ms-elastic-slider__range {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    max-width: 100%;
+    border-radius: 9999px;
+    background-color: var(--ms-elastic-fill);
+}
+
+.ms-elastic-slider__value {
+    color: var(--ms-elastic-value);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    min-height: 0.875rem;
+}
+
+.ms-elastic-slider--compact .ms-elastic-slider__value {
+    display: none;
+}

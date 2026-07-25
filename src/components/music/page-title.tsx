@@ -1,0 +1,38 @@
+import type { ReactNode } from "react"
+
+import { cn } from "@/lib/utils"
+
+/** 页级标题：与资料库 Section 同量级，避免 34px 过重 */
+type PageTitleProps = {
+    title: string
+    subtitle?: string
+    trailing?: ReactNode
+    className?: string
+}
+
+function PageTitle({ title, subtitle, trailing, className }: PageTitleProps) {
+    return (
+        <header
+            className={cn(
+                "flex items-end justify-between gap-3 border-b border-black/[0.06] pb-3 dark:border-white/[0.08]",
+                className,
+            )}
+        >
+            <div className="min-w-0 space-y-0.5">
+                <h1 className="truncate text-[22px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
+                    {title}
+                </h1>
+                {subtitle ? (
+                    <p className="truncate text-[13px] text-muted-foreground">
+                        {subtitle}
+                    </p>
+                ) : null}
+            </div>
+            {trailing ? (
+                <div className="flex shrink-0 items-center gap-2">{trailing}</div>
+            ) : null}
+        </header>
+    )
+}
+
+export { PageTitle }

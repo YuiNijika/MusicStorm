@@ -1,0 +1,207 @@
+import { useEffect, useState } from "react"
+
+import { Cover } from "@/components/music/cover"
+import { PlaylistGridSkeleton } from "@/components/music/loading-skeletons"
+import { Section } from "@/components/music/section"
+import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
+import { useLibraryLayout } from "@/hooks/use-library-layout"
+import { useLiked } from "@/hooks/use-liked"
+import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import { fetchUserPlaylists } from "@/lib/netease/user"
+import { notifyError } from "@/lib/notify"
+import type { Playlist } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+function LibraryPage() {
+    const { openPlaylist } = useMusicNavigation()
+    const { ready, loggedIn, profile } = useNeteaseSession()
+    const { likedSongPlaylistId } = useLiked()
+    const { playlistView } = useLibraryLayout()
+    const { count: skeletonCount, gridClass, gridStyle, gridRef } =
+        usePlaylistGrid()
+
+    const [playlists, setPlaylists] = useState<Playlist[]>([])
+    const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+        "idle",
+    )
+    const [retry, setRetry] = useState(0)
+
+    useEffect(() => {
+        if (!ready) {
+            return
+        }
+        if (!loggedIn || !profile) {
+            setPlaylists([])
+            setStatus("idle")
+            return
+        }
+
+        let cancelled = false
+        setStatus("loading")
+        void fetchUserPlaylists(profile.userId)
+            .then((items) => {
+                if (cancelled) {
+                    return
+                }
+                setPlaylists(items)
+                setStatus("ready")
+            })
+            .catch((error: unknown) => {
+                if (cancelled) {
+                    return
+                }
+                setPlaylists([])
+                setStatus("error")
+                notifyError("歌单加载失败", {
+                    description:
+                        error instanceof Error
+                            ? error.message
+                            : "请检查网络与 API 后重试",
+                })
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [ready, loggedIn, profile, retry])
+
+    return (
+        <div className="space-y-6">
+            <Section
+                title="我的歌单"
+                description={
+                    !ready
+                        ? "正在同步账号…"
+                        : !loggedIn
+                          ? "来自网易云"
+                          : status === "ready"
+                            ? `${playlists.length} 个歌单`
+                            : "来自网易云账号"
+                }
+            >
+                {!ready || status === "loading" ? (
+                    playlistView === "card" ? (
+                        <PlaylistGridSkeleton
+                            count={skeletonCount}
+                            style={gridStyle}
+                            gridRef={gridRef}
+                        />
+                    ) : (
+                        <div className="space-y-1 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-14 animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.06]"
+                                />
+                            ))}
+                        </div>
+                    )
+                ) : !loggedIn ? (
+                    <StateHero
+                        variant="auth"
+                        title="登录后同步歌单"
+                        description="在侧栏头像菜单或设置中登录网易云"
+                    />
+                ) : status === "error" ? (
+                    <StateHero
+                        variant="error"
+                        title="歌单加载失败"
+                        description="请检查网络与 API 后重试"
+                        action={
+                            <HeroRetryButton onClick={() => setRetry((n) => n + 1)} />
+                        }
+                    />
+                ) : playlists.length === 0 ? (
+                    <StateHero
+                        variant="empty"
+                        title="暂无歌单"
+                        description="在网易云创建或收藏歌单后会出现在这里"
+                    />
+                ) : playlistView === "list" ? (
+                    <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                        {playlists.map((playlist) => {
+                            const isLikedFolder =
+                                playlist.id === likedSongPlaylistId
+                            return (
+                                <button
+                                    key={playlist.id}
+                                    type="button"
+                                    onClick={() => openPlaylist(playlist.id)}
+                                    className={cn(
+                                        "flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors",
+                                        "hover:bg-black/[0.05] active:scale-[0.995] dark:hover:bg-white/[0.07]",
+                                        isLikedFolder &&
+                                            "bg-primary/[0.06] ring-1 ring-primary/20 dark:bg-primary/[0.12]",
+                                    )}
+                                >
+                                    <Cover
+                                        src={playlist.coverUrl}
+                                        alt={playlist.title}
+                                        size="sm"
+                                        className="size-12 rounded-xl"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
+                                            {playlist.title}
+                                        </p>
+                                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                            {isLikedFolder
+                                                ? "我喜欢的音乐"
+                                                : playlist.trackCount
+                                                  ? `${playlist.trackCount} 首`
+                                                  : playlist.description || "歌单"}
+                                        </p>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div ref={gridRef} className={gridClass} style={gridStyle}>
+                        {playlists.map((playlist) => {
+                            const isLikedFolder =
+                                playlist.id === likedSongPlaylistId
+                            return (
+                                <button
+                                    key={playlist.id}
+                                    type="button"
+                                    onClick={() => openPlaylist(playlist.id)}
+                                    className={cn(
+                                        "group flex cursor-pointer flex-col gap-3 rounded-[22px] p-3 text-left",
+                                        "bg-black/[0.03] transition-[background-color,transform] duration-150",
+                                        "hover:bg-black/[0.05] active:scale-[0.98]",
+                                        "dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
+                                        isLikedFolder &&
+                                            "ring-1 ring-primary/25 bg-primary/[0.06] dark:bg-primary/[0.12]",
+                                    )}
+                                >
+                                    <Cover
+                                        src={playlist.coverUrl}
+                                        alt={playlist.title}
+                                        size="xl"
+                                        className="transition-transform duration-200 ease-out group-hover:scale-[1.02] group-active:scale-[0.98]"
+                                    />
+                                    <div className="min-w-0 px-0.5">
+                                        <p className="truncate text-[14px] font-semibold tracking-[-0.02em]">
+                                            {playlist.title}
+                                        </p>
+                                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                            {isLikedFolder
+                                                ? "我喜欢的音乐"
+                                                : playlist.trackCount
+                                                  ? `${playlist.trackCount} 首`
+                                                  : playlist.description || "歌单"}
+                                        </p>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+            </Section>
+        </div>
+    )
+}
+
+export { LibraryPage }
