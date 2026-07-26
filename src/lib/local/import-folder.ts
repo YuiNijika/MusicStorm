@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 
 import { upsertLibraryFolder, upsertLibraryTracks } from "@/lib/db/play-stats"
+import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import {
     createEmptyAlbum,
     loadLocalLibrary,
@@ -46,7 +47,8 @@ function commitCreateAlbum(draft: AlbumDraft): CommitAlbumResult {
 }
 
 /**
- * 确认导入：扫描（含内嵌元数据）→ 本地库 + SQLite
+ * 确认导入：扫描元数据写入本地库与 SQLite
+ * 标题艺人可空，merge 内从标签多数表决
  */
 async function commitFolderAlbum(input: CommitAlbumInput): Promise<CommitAlbumResult> {
     const folderPath = input.folderPath?.trim()
@@ -60,7 +62,6 @@ async function commitFolderAlbum(input: CommitAlbumInput): Promise<CommitAlbumRe
 
     const scanned = await scanMusicFolder(folderPath)
     const prev = loadLocalLibrary()
-    // 标题/艺人可空：merge 内从内嵌标签多数表决
     const draft: AlbumDraft = {
         title: input.title.trim(),
         artist: input.artist.trim(),
@@ -81,7 +82,7 @@ async function commitFolderAlbum(input: CommitAlbumInput): Promise<CommitAlbumRe
 }
 
 /**
- * 对已有专辑文件夹重新扫描元数据（封面/歌词/时长），不改用户手动封面
+ * 对已有专辑文件夹重新扫描封面、歌词、时长，不改用户手动封面
  */
 async function rescanLocalLibraryMeta(
     prev: LocalLibraryState = loadLocalLibrary(),
@@ -125,8 +126,12 @@ function libraryNeedsMetaRescan(state: LocalLibraryState): boolean {
     if (state.tracks.length === 0) {
         return false
     }
-    // 旧导入：无 coverPath 且无 lrcPath 占多数
-    const missing = state.tracks.filter((t) => !t.coverPath && !t.lrcPath && !t.lyricText)
+    // 旧导入：无封面/歌词，或缺少内容指纹
+    const missing = state.tracks.filter(
+        (t) =>
+            (!t.coverPath && !t.lrcPath && !t.lyricText) ||
+            !t.contentHash,
+    )
     return missing.length >= Math.max(1, Math.floor(state.tracks.length * 0.5))
 }
 
@@ -160,6 +165,11 @@ function dualWriteToSqlite(
                 filePath: item.path,
                 folderPath,
                 lrcPath: item.lrcPath ?? null,
+                fileName:
+                    stripExtension(item.fileName?.trim() || "") ||
+                    fileStemFromPath(item.path) ||
+                    null,
+                contentHash: item.contentHash?.trim().toLowerCase() || null,
             })),
         ),
     )

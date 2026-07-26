@@ -1,4 +1,4 @@
-/** 网易云音质 br（bps）偏好 */
+/** 网易云音质 br 偏好，单位 bps */
 
 const QUALITY_BR_KEY = "musicstorm-netease-quality-br"
 

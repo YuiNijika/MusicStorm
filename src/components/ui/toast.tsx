@@ -28,8 +28,8 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
         <ToastPrimitive.Viewport
             data-slot="toast-viewport"
             className={cn(
-                // 播放栏 / 全屏播放器之上；固定右下角
-                "pointer-events-none fixed inset-x-4 bottom-24 z-[200] mx-auto flex w-auto max-w-sm flex-col outline-none",
+                // 播放栏之上，流式堆叠
+                "pointer-events-none fixed inset-x-4 bottom-24 z-[200] mx-auto flex w-auto max-w-sm flex-col-reverse gap-2 outline-none",
                 "sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
                 className,
             )}
@@ -39,21 +39,17 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
 }
 
 /**
- * 可见性优先：不用依赖未测量高度的 h-(--height)（常为 0）。
- * 内容自然撑开；堆叠用简单 translate。
+ * 相对定位 + 内容撑高；不依赖 --toast-height / absolute 叠放。
  */
 function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
     return (
         <ToastPrimitive.Root
             data-slot="toast"
             className={cn(
-                "group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(200-var(--toast-index,0))] w-full origin-bottom",
+                "group/toast pointer-events-auto relative w-full origin-bottom",
                 "rounded-2xl border border-black/[0.08] bg-popover text-popover-foreground shadow-lg outline-none",
-                "dark:border-white/[0.1]",
-                // 内容撑高，避免 height CSS 变量未就绪时高度为 0
-                "min-h-[3.25rem]",
-                "[transform:translateY(calc(var(--toast-index,0)*-0.65rem))]",
-                "transition-transform duration-300 ease-out",
+                "dark:border-white/[0.1] dark:bg-zinc-900/95",
+                "min-h-[3.25rem] backdrop-blur-xl",
                 "data-limited:opacity-0 data-limited:pointer-events-none",
                 className,
             )}

@@ -10,14 +10,13 @@ type SeekElasticSliderProps = {
     onSeek: (ms: number) => void
     disabled?: boolean
     className?: string
-    /** 两侧时间文案（默认开启） */
+    /** 两侧时间文案，默认开启 */
     showTime?: boolean
 }
 
-const SEEK_THROTTLE_MS = 64
-
 /**
- * 播放进度：拖动中节流 seek + 松手精确 seek；左侧时间跟 displayMs
+ * 播放进度：拖动只改 UI 预览，松手再 seek。
+ * 本地 WASAPI 重解码 seek 很重，拖动中 thrash 会空 sink 误 ended → 卡住不播。
  */
 function SeekElasticSlider({
     positionMs,
@@ -31,49 +30,12 @@ function SeekElasticSlider({
     const external = Math.min(Math.max(0, positionMs), total)
     const draggingRef = useRef(false)
     const [displayMs, setDisplayMs] = useState(external)
-    const lastSeekAtRef = useRef(0)
-    const pendingSeekRef = useRef<number | null>(null)
-    const seekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     useEffect(() => {
         if (!draggingRef.current) {
             setDisplayMs(external)
         }
     }, [external])
-
-    useEffect(() => {
-        return () => {
-            if (seekTimerRef.current) {
-                clearTimeout(seekTimerRef.current)
-            }
-        }
-    }, [])
-
-    function flushSeek(ms: number) {
-        lastSeekAtRef.current = Date.now()
-        pendingSeekRef.current = null
-        onSeek(ms)
-    }
-
-    function scheduleSeek(ms: number) {
-        const now = Date.now()
-        const elapsed = now - lastSeekAtRef.current
-        if (elapsed >= SEEK_THROTTLE_MS) {
-            flushSeek(ms)
-            return
-        }
-        pendingSeekRef.current = ms
-        if (seekTimerRef.current) {
-            return
-        }
-        seekTimerRef.current = setTimeout(() => {
-            seekTimerRef.current = null
-            const pending = pendingSeekRef.current
-            if (pending != null) {
-                flushSeek(pending)
-            }
-        }, SEEK_THROTTLE_MS - elapsed)
-    }
 
     return (
         <div className={cn("flex w-full min-w-0 items-center gap-2", className)}>
@@ -96,15 +58,10 @@ function SeekElasticSlider({
                 onValueChange={(next) => {
                     draggingRef.current = true
                     setDisplayMs(next)
-                    scheduleSeek(next)
                 }}
                 onValueCommit={(next) => {
-                    if (seekTimerRef.current) {
-                        clearTimeout(seekTimerRef.current)
-                        seekTimerRef.current = null
-                    }
                     setDisplayMs(next)
-                    flushSeek(next)
+                    onSeek(next)
                     draggingRef.current = false
                 }}
             />

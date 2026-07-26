@@ -4,6 +4,13 @@ import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { NeteaseAuthDialog } from "@/components/auth/netease-auth-dialog"
 import { Section } from "@/components/music/section"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
@@ -14,14 +21,20 @@ import {
     type ViewMode,
 } from "@/lib/library/layout-prefs"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
-import {
-    applyApiPreset,
-    getApiPresetId,
-    NETEASE_API_PRESETS,
-    speedTestApi,
-    type ApiPresetId,
-} from "@/lib/netease/api-presets"
 import { apiCacheClear } from "@/lib/netease/api-cache"
+import {
+    API_SETTINGS_EVENT,
+    DEFAULT_BASE_URL,
+    EXTERNAL_SOURCES,
+    getApiSettings,
+    getNeteaseBaseUrl,
+    resolveEffectiveBaseUrl,
+    setApiMode,
+    setExternalSource,
+    speedTestApi,
+    type ApiMode,
+    type ExternalSourceId,
+} from "@/lib/netease/api-settings"
 import {
     AUTO_PURGE_EVENT,
     DEFAULT_TTL_MS,
@@ -32,7 +45,7 @@ import {
     setApiCacheAutoPurge,
     setApiCacheTtlMs,
 } from "@/lib/netease/cache-prefs"
-import { DEFAULT_BASE_URL, getNeteaseBaseUrl } from "@/lib/netease/client"
+import { probeNativeApi } from "@/lib/netease/integrated-api"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import {
     QUALITY_OPTIONS,
@@ -56,11 +69,17 @@ import {
     setFadeEnabled,
 } from "@/lib/player/fade-prefs"
 import {
+    CHROME_EVENT,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
+    LYRICS_ALIGNS,
+    getFullPlayerChrome,
     getFullPlayerLayout,
+    setFullPlayerChrome,
     setFullPlayerLayout,
+    type FullPlayerChrome,
     type FullPlayerLayout,
+    type LyricsAlign,
 } from "@/lib/player/full-player-prefs"
 import {
     getAudioOutputMode,
@@ -70,6 +89,7 @@ import {
     type AudioDeviceInfo,
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { cn } from "@/lib/utils"
 
@@ -142,9 +162,12 @@ function SettingsPage({ titleBarStyle, onTitleBarStyleChange }: SettingsPageProp
 }
 
 function SourceTab() {
-    const [presetId, setPresetId] = useState<ApiPresetId>(() => getApiPresetId())
-    const [apiBase, setApiBase] = useState(() => getNeteaseBaseUrl())
+    const [settings, setSettings] = useState(() => getApiSettings())
+    const [customDraft, setCustomDraft] = useState(
+        () => getApiSettings().customUrl || DEFAULT_BASE_URL,
+    )
     const [savedHint, setSavedHint] = useState<string | null>(null)
+    const [nativeHint, setNativeHint] = useState<string | null>(null)
     const [speedHint, setSpeedHint] = useState<string | null>(null)
     const [speedLoading, setSpeedLoading] = useState(false)
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
@@ -153,7 +176,19 @@ function SourceTab() {
     const [cacheHint, setCacheHint] = useState<string | null>(null)
     const [storagePaths, setStoragePaths] = useState<Awaited<
         ReturnType<typeof getStoragePaths>
-    >>(null)
+    > | null>(null)
+
+    useEffect(() => {
+        function sync() {
+            const next = getApiSettings()
+            setSettings(next)
+            if (next.source === "custom" && next.customUrl) {
+                setCustomDraft(next.customUrl)
+            }
+        }
+        window.addEventListener(API_SETTINGS_EVENT, sync)
+        return () => window.removeEventListener(API_SETTINGS_EVENT, sync)
+    }, [])
 
     useEffect(() => {
         function onTtl() {
@@ -182,89 +217,229 @@ function SourceTab() {
         }
     }, [])
 
-    function selectPreset(id: ApiPresetId) {
-        const next = applyApiPreset(id, apiBase)
-        setPresetId(id)
-        setApiBase(next)
-        setSavedHint(id === "custom" ? null : "已切换")
+    useEffect(() => {
+        if (settings.mode !== "integrated") {
+            setNativeHint(null)
+            return
+        }
+        let cancelled = false
+        setNativeHint("正在检测内置 API…")
+        void probeNativeApi().then((status) => {
+            if (!cancelled) {
+                setNativeHint(status.message)
+            }
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [settings.mode])
+
+    function flash(text: string) {
+        setSavedHint(text)
         window.setTimeout(() => setSavedHint(null), 1600)
     }
 
+    function handleMode(mode: ApiMode) {
+        const next = setApiMode(mode)
+        setSettings(next)
+        const title = mode === "integrated" ? "已切换内置 API" : "已切换对接 API"
+        flash(title)
+        notifySuccess(title, {
+            description:
+                mode === "integrated"
+                    ? "加密在应用内完成，桌面代理发请求"
+                    : "将使用下方外部源",
+        })
+    }
+
+    function handleSource(source: ExternalSourceId | null) {
+        if (!source) {
+            return
+        }
+        if (source === "custom") {
+            const next = setExternalSource("custom", customDraft)
+            setSettings(next)
+            flash("已选自定义，请确认 URL 后保存")
+            notifyInfo("已选自定义源", { description: "确认 URL 后点保存" })
+            return
+        }
+        const next = setExternalSource(source)
+        setSettings(next)
+        flash("已切换 API 源")
+        notifySuccess("已切换 API 源", {
+            description:
+                EXTERNAL_SOURCES.find((item) => item.id === source)?.label ?? source,
+        })
+    }
+
     function handleSaveCustom() {
-        const next = applyApiPreset("custom", apiBase.trim() || DEFAULT_BASE_URL)
-        setPresetId("custom")
-        setApiBase(next)
-        setSavedHint("已保存")
-        window.setTimeout(() => setSavedHint(null), 1600)
+        const next = setExternalSource(
+            "custom",
+            customDraft.trim() || DEFAULT_BASE_URL,
+        )
+        setSettings(next)
+        const url = resolveEffectiveBaseUrl(next)
+        setCustomDraft(url)
+        flash("已保存自定义源")
+        notifySuccess("已保存自定义源", { description: url })
     }
 
     async function handleSpeedTest() {
         setSpeedLoading(true)
         setSpeedHint(null)
-        const result = await speedTestApi(apiBase.trim() || getNeteaseBaseUrl())
+        if (settings.mode === "integrated") {
+            const status = await probeNativeApi()
+            setSpeedLoading(false)
+            setSpeedHint(status.ready ? "内置就绪" : status.message)
+            if (!status.ready) {
+                notifyError("内置 API 未就绪", { description: status.message })
+            }
+            return
+        }
+        const result = await speedTestApi(getNeteaseBaseUrl())
         setSpeedLoading(false)
         setSpeedHint(result.ok ? `${result.ms} ms` : result.message)
+        if (!result.ok) {
+            notifyError("测速失败", { description: result.message })
+        }
     }
 
     async function handleClearCache() {
-        await apiCacheClear()
-        setCacheHint("已清空")
-        window.setTimeout(() => setCacheHint(null), 1600)
+        try {
+            await apiCacheClear()
+            setCacheHint("已清空")
+            window.setTimeout(() => setCacheHint(null), 1600)
+            notifySuccess("已清空 API 缓存")
+        } catch (error) {
+            notifyError("清空缓存失败", {
+                description:
+                    error instanceof Error ? error.message : "请重试",
+            })
+        }
     }
 
+    const sourceLabel =
+        EXTERNAL_SOURCES.find((item) => item.id === settings.source)?.label ??
+        "API 源"
+
     return (
-        <Section title="音源" description="API 源、缓存与网易云音质">
+        <Section title="音源" description="内置 API 或对接外部 NCM 源 · 缓存与音质">
             <div className="space-y-3">
-                <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
-                    <div>
-                        <p className="text-[14px] font-medium tracking-[-0.01em]">API 源</p>
-                        <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            默认官方源，可切换公共服务或自定义
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {NETEASE_API_PRESETS.map((preset) => (
+                <div className="material-panel space-y-4 rounded-[20px] px-4 py-3.5">
+                    <div className="space-y-3">
+                        <div>
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                API 模式
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                默认应用内置（TS 加密直连网易云）；也可对接远程 API
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
                             <ChoiceChip
-                                key={preset.id}
-                                label={preset.label}
-                                active={presetId === preset.id}
-                                onClick={() => selectPreset(preset.id)}
+                                label="应用内置"
+                                active={settings.mode === "integrated"}
+                                onClick={() => handleMode("integrated")}
                             />
-                        ))}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <input
-                            value={apiBase}
-                            disabled={presetId !== "custom"}
-                            onChange={(event) => setApiBase(event.currentTarget.value)}
-                            placeholder={DEFAULT_BASE_URL}
-                            className={cn(
-                                "material-field h-9 min-w-[240px] flex-1 rounded-xl px-3 text-[13px] outline-none",
-                                presetId !== "custom" && "opacity-60",
-                            )}
-                        />
-                        {presetId === "custom" ? (
-                            <button
-                                type="button"
-                                onClick={handleSaveCustom}
-                                className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
-                            >
-                                保存
-                            </button>
+                            <ChoiceChip
+                                label="对接 API"
+                                active={settings.mode === "external"}
+                                onClick={() => handleMode("external")}
+                            />
+                        </div>
+                        {settings.mode === "integrated" ? (
+                            <p className="text-[12px] text-muted-foreground">
+                                {nativeHint ??
+                                    "内置运行时：加密在应用内完成，桌面代理发请求"}
+                            </p>
                         ) : null}
+                    </div>
+
+                    {settings.mode === "external" ? (
+                        <div className="space-y-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                            <div>
+                                <p className="text-[13px] font-medium">外部 API 源</p>
+                                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                    官方 / 社区预设，或自定义 Base URL
+                                </p>
+                            </div>
+                            <Select
+                                value={settings.source}
+                                onValueChange={(value) =>
+                                    handleSource(value as ExternalSourceId | null)
+                                }
+                            >
+                                <SelectTrigger className="h-9 w-full min-w-[240px] max-w-md rounded-xl">
+                                    <SelectValue placeholder={sourceLabel}>
+                                        {sourceLabel}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {EXTERNAL_SOURCES.map((preset) => (
+                                        <SelectItem
+                                            key={preset.id}
+                                            value={preset.id}
+                                        >
+                                            {preset.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {settings.source === "custom" ? (
+                                <div className="space-y-2">
+                                    <p className="text-[12px] font-medium text-muted-foreground">
+                                        自定义 URL
+                                    </p>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <input
+                                            value={customDraft}
+                                            onChange={(event) =>
+                                                setCustomDraft(
+                                                    event.currentTarget.value,
+                                                )
+                                            }
+                                            placeholder={DEFAULT_BASE_URL}
+                                            className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveCustom}
+                                            className="h-9 shrink-0 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
+                                        >
+                                            保存
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="truncate text-[12px] text-muted-foreground">
+                                    {getNeteaseBaseUrl()}
+                                </p>
+                            )}
+                        </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
                         <button
                             type="button"
                             disabled={speedLoading}
                             onClick={() => void handleSpeedTest()}
                             className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] disabled:opacity-50 dark:bg-white/[0.08]"
                         >
-                            {speedLoading ? "测速中" : "测速"}
+                            {speedLoading
+                                ? "检测中"
+                                : settings.mode === "integrated"
+                                  ? "检测内置"
+                                  : "测速"}
                         </button>
                         {speedHint ? (
-                            <span className="text-[12px] text-muted-foreground">{speedHint}</span>
+                            <span className="text-[12px] text-muted-foreground">
+                                {speedHint}
+                            </span>
                         ) : null}
                         {savedHint ? (
-                            <span className="text-[12px] text-muted-foreground">{savedHint}</span>
+                            <span className="text-[12px] text-muted-foreground">
+                                {savedHint}
+                            </span>
                         ) : null}
                     </div>
                 </div>
@@ -360,13 +535,6 @@ function SourceTab() {
                         </p>
                     )}
                 </div>
-
-                <SettingsCard
-                    title="本地模式"
-                    description="桌面端可选文件夹导入音频，索引保存在本机"
-                >
-                    <span className="text-[12px] text-muted-foreground">已支持导入</span>
-                </SettingsCard>
             </div>
         </Section>
     )
@@ -706,6 +874,7 @@ function AppearanceTab({
         setGlassBlur,
     } = useTheme()
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
+    const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
     const { playlistView, playlistTracksView } = useLibraryLayout()
@@ -714,13 +883,25 @@ function AppearanceTab({
         function onLayout() {
             setLayout(getFullPlayerLayout())
         }
+        function onChrome() {
+            setChrome(getFullPlayerChrome())
+        }
         window.addEventListener(LAYOUT_EVENT, onLayout)
-        return () => window.removeEventListener(LAYOUT_EVENT, onLayout)
+        window.addEventListener(CHROME_EVENT, onChrome)
+        return () => {
+            window.removeEventListener(LAYOUT_EVENT, onLayout)
+            window.removeEventListener(CHROME_EVENT, onChrome)
+        }
     }, [])
 
     function handleLayoutPick(next: FullPlayerLayout) {
         setFullPlayerLayout(next)
         setLayout(next)
+    }
+
+    function handleLyricsAlign(next: LyricsAlign) {
+        setFullPlayerChrome({ lyricsAlign: next })
+        setChrome(getFullPlayerChrome())
     }
 
     function pickView(
@@ -966,7 +1147,8 @@ function AppearanceTab({
                             全屏播放模板
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            classic / cover / lyrics
+                            {FULL_PLAYER_LAYOUTS.find((item) => item.id === layout)
+                                ?.description ?? "播放样式"}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -979,6 +1161,24 @@ function AppearanceTab({
                             />
                         ))}
                     </div>
+                    {layout === "lyrics" ? (
+                        <div className="space-y-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                            <p className="text-[12px] text-muted-foreground">歌词对齐</p>
+                            <div className="flex flex-wrap gap-2">
+                                {LYRICS_ALIGNS.map((item) => (
+                                    <ChoiceChip
+                                        key={item.id}
+                                        active={chrome.lyricsAlign === item.id}
+                                        onClick={() => handleLyricsAlign(item.id)}
+                                        label={item.label}
+                                    />
+                                ))}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                                仅「歌词」模板：纯歌词，无封面
+                            </p>
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </Section>

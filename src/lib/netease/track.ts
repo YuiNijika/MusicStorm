@@ -1,11 +1,9 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import type { SongUrlItem } from "@/lib/netease/song-privilege"
 
 type SongUrlData = {
-    data?: Array<{
-        id: number
-        url: string | null
-        br?: number
-    }>
+    code?: number
+    data?: SongUrlItem[]
 }
 
 type SongDetailData = {
@@ -15,6 +13,7 @@ type SongDetailData = {
         ar?: Array<{ name: string }>
         al?: { name?: string; picUrl?: string }
         dt?: number
+        fee?: number
     }>
 }
 
@@ -22,6 +21,8 @@ async function fetchSongUrl(id: string | number, br = 320_000) {
     return neteaseRequest<SongUrlData>({
         path: NETEASE_PATHS.songUrl,
         params: { id, br },
+        // 播放地址必须实时
+        skipCache: true,
     })
 }
 
@@ -33,3 +34,4 @@ async function fetchSongDetail(ids: string) {
 }
 
 export { fetchSongDetail, fetchSongUrl }
+export type { SongUrlData, SongUrlItem }

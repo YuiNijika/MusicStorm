@@ -1,14 +1,24 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { PlaylistGridSkeleton } from "@/components/music/loading-skeletons"
 import { Section } from "@/components/music/section"
+import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
+import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import {
+    setPlaylistSort,
+    setPlaylistView,
+} from "@/lib/library/layout-prefs"
+import {
+    PLAYLIST_SORT_OPTIONS,
+    sortPlaylists,
+} from "@/lib/library/sort"
 import { fetchUserPlaylists } from "@/lib/netease/user"
 import { notifyError } from "@/lib/notify"
 import type { Playlist } from "@/lib/types"
@@ -18,7 +28,7 @@ function LibraryPage() {
     const { openPlaylist } = useMusicNavigation()
     const { ready, loggedIn, profile } = useNeteaseSession()
     const { likedSongPlaylistId } = useLiked()
-    const { playlistView } = useLibraryLayout()
+    const { playlistView, playlistSort } = useLibraryLayout()
     const { count: skeletonCount, gridClass, gridStyle, gridRef } =
         usePlaylistGrid()
 
@@ -27,6 +37,11 @@ function LibraryPage() {
         "idle",
     )
     const [retry, setRetry] = useState(0)
+
+    const sortedPlaylists = useMemo(
+        () => sortPlaylists(playlists, playlistSort),
+        [playlists, playlistSort],
+    )
 
     useEffect(() => {
         if (!ready) {
@@ -76,8 +91,23 @@ function LibraryPage() {
                         : !loggedIn
                           ? "来自网易云"
                           : status === "ready"
-                            ? `${playlists.length} 个歌单`
+                            ? `${sortedPlaylists.length} 个歌单`
                             : "来自网易云账号"
+                }
+                action={
+                    <div className="flex flex-wrap items-center gap-2">
+                        <SortSelect
+                            value={playlistSort}
+                            options={PLAYLIST_SORT_OPTIONS}
+                            onChange={setPlaylistSort}
+                            label="歌单排序"
+                        />
+                        <ViewModeToggle
+                            value={playlistView}
+                            onChange={setPlaylistView}
+                            label="歌单展示"
+                        />
+                    </div>
                 }
             >
                 {!ready || status === "loading" ? (
@@ -120,7 +150,7 @@ function LibraryPage() {
                     />
                 ) : playlistView === "list" ? (
                     <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
-                        {playlists.map((playlist) => {
+                        {sortedPlaylists.map((playlist) => {
                             const isLikedFolder =
                                 playlist.id === likedSongPlaylistId
                             return (
@@ -159,7 +189,7 @@ function LibraryPage() {
                     </div>
                 ) : (
                     <div ref={gridRef} className={gridClass} style={gridStyle}>
-                        {playlists.map((playlist) => {
+                        {sortedPlaylists.map((playlist) => {
                             const isLikedFolder =
                                 playlist.id === likedSongPlaylistId
                             return (

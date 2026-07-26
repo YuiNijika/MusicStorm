@@ -1,11 +1,14 @@
 import { Heart } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
+import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
+import { DragList } from "@/components/music/drag-list"
 import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { Section } from "@/components/music/section"
+import { SortSelect } from "@/components/music/sort-select"
 import { SourceBadge } from "@/components/music/source-badge"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
@@ -14,6 +17,17 @@ import { useLiked } from "@/hooks/use-liked"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import {
+    setPlaylistTracksView,
+    setTrackSort,
+} from "@/lib/library/layout-prefs"
+import { sortTracks, TRACK_SORT_OPTIONS } from "@/lib/library/sort"
+import {
+    ORDER_EVENT,
+    getPlaylistTrackOrder,
+    setPlaylistTrackOrder,
+} from "@/lib/library/track-order"
+import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import { fetchPlaylistDetail } from "@/lib/netease/playlist"
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
@@ -27,7 +41,7 @@ type PlaylistPageProps = {
 function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
     const { loggedIn } = useNeteaseSession()
-    const { playlistTracksView } = useLibraryLayout()
+    const { playlistTracksView, trackSort } = useLibraryLayout()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
     const {
         likedSongPlaylistId,
@@ -40,9 +54,30 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const [errorText, setErrorText] = useState<string | null>(null)
     const [subBusy, setSubBusy] = useState(false)
     const [retry, setRetry] = useState(0)
+    const [orderTick, setOrderTick] = useState(0)
 
     const isOwnLiked = playlistId === likedSongPlaylistId
     const subscribed = isPlaylistSubscribed(playlistId) || isOwnLiked
+    const customOrder = useMemo(() => {
+        void orderTick
+        return getPlaylistTrackOrder(playlistId)
+    }, [playlistId, orderTick])
+
+    const sortedTracks = useMemo(
+        () => sortTracks(tracks, trackSort, customOrder),
+        [tracks, trackSort, customOrder],
+    )
+
+    const dragEnabled =
+        trackSort === "custom" && playlistTracksView === "list"
+
+    useEffect(() => {
+        function onOrder() {
+            setOrderTick((n) => n + 1)
+        }
+        window.addEventListener(ORDER_EVENT, onOrder)
+        return () => window.removeEventListener(ORDER_EVENT, onOrder)
+    }, [])
 
     useEffect(() => {
         let cancelled = false
@@ -90,6 +125,13 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         }
     }
 
+    function handleReorder(next: Track[]) {
+        setPlaylistTrackOrder(
+            playlistId,
+            next.map((item) => item.id),
+        )
+    }
+
     return (
         <div className="space-y-6">
             <BackButton onClick={onBack} />
@@ -118,7 +160,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                             <div className="flex items-center gap-2">
                                 <SourceBadge source={playlist.source} />
                                 <span className="text-[12px] text-muted-foreground">
-                                    {playlist.trackCount ?? tracks.length} 首
+                                    {playlist.trackCount ?? sortedTracks.length} 首
                                 </span>
                             </div>
                             <h1 className="text-[28px] font-semibold tracking-[-0.04em]">
@@ -130,10 +172,15 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                 </p>
                             ) : null}
                             <div className="flex flex-wrap items-center gap-2 pt-1">
-                                {tracks[0] ? (
+                                {sortedTracks[0] ? (
                                     <button
                                         type="button"
-                                        onClick={() => playTrack(tracks[0], tracks)}
+                                        onClick={() => {
+                                            const first = sortedTracks[0]
+                                            if (first) {
+                                                playTrack(first, sortedTracks)
+                                            }
+                                        }}
                                         className="h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background active:scale-[0.97]"
                                     >
                                         播放全部
@@ -164,37 +211,80 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                         </div>
                     </header>
 
-                    <Section title="歌曲" description={`${tracks.length} 首`}>
-                        {tracks.length === 0 ? (
+                    <Section
+                        title="歌曲"
+                        description={`${sortedTracks.length} 首${
+                            dragEnabled ? " · 拖动手柄排序" : ""
+                        }`}
+                        action={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <SortSelect
+                                    value={trackSort}
+                                    options={TRACK_SORT_OPTIONS}
+                                    onChange={setTrackSort}
+                                    label="歌曲排序"
+                                />
+                                <ViewModeToggle
+                                    value={playlistTracksView}
+                                    onChange={setPlaylistTracksView}
+                                    label="歌曲展示"
+                                />
+                            </div>
+                        }
+                    >
+                        {sortedTracks.length === 0 ? (
                             <StateHero variant="empty" title="暂无歌曲" />
                         ) : playlistTracksView === "card" ? (
                             <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {tracks.map((track) => (
+                                {sortedTracks.map((track) => (
                                     <MediaCard
                                         key={track.id}
-                                        coverUrl={track.coverUrl}
+                                        coverUrl={resolveTrackCoverUrl(
+                                            track.id,
+                                            track.coverUrl,
+                                        )}
                                         title={track.title}
                                         subtitle={track.artist}
                                         widthClassName="w-full"
                                         active={currentTrack?.id === track.id}
-                                        onClick={() => playOrToggle(track, tracks)}
+                                        onClick={() =>
+                                            playOrToggle(track, sortedTracks)
+                                        }
                                     />
                                 ))}
                             </div>
                         ) : (
                             <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
-                                {tracks.map((track, index) => (
-                                    <TrackRow
-                                        key={track.id}
-                                        track={track}
-                                        index={index}
-                                        isActive={currentTrack?.id === track.id}
-                                        isPlaying={
-                                            currentTrack?.id === track.id && isPlaying
-                                        }
-                                        onPlay={(item) => playOrToggle(item, tracks)}
-                                    />
-                                ))}
+                                <DragList
+                                    items={sortedTracks}
+                                    enabled={dragEnabled}
+                                    onReorder={handleReorder}
+                                    renderItem={(track, index, handle) => (
+                                        <TrackRow
+                                            track={track}
+                                            index={index}
+                                            leading={handle}
+                                            isActive={currentTrack?.id === track.id}
+                                            isPlaying={
+                                                currentTrack?.id === track.id &&
+                                                isPlaying
+                                            }
+                                            playlistId={
+                                                isOwnLiked ? undefined : playlistId
+                                            }
+                                            onRemoved={(id) =>
+                                                setTracks((prev) =>
+                                                    prev.filter(
+                                                        (item) => item.id !== id,
+                                                    ),
+                                                )
+                                            }
+                                            onPlay={(item) =>
+                                                playOrToggle(item, sortedTracks)
+                                            }
+                                        />
+                                    )}
+                                />
                             </div>
                         )}
                     </Section>

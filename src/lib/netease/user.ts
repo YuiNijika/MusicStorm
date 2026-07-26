@@ -35,7 +35,7 @@ type UserPlaylistData = {
 
 type UserPlaylistsResult = {
     playlists: Playlist[]
-    /** 红心歌单 id（通常为列表第一项） */
+    /** 红心歌单 id，通常为列表第一项 */
     likedSongPlaylistId: string | null
     /** 用户收藏的他人歌单 id */
     subscribedIds: string[]

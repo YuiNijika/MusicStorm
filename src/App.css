@@ -173,7 +173,7 @@
         -webkit-user-drag: none;
     }
 
-    /* Apple 风格滚动条（WebKit） */
+    /* Apple 风格滚动条 */
     *::-webkit-scrollbar {
         width: 9px;
         height: 9px;

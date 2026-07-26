@@ -1,27 +1,36 @@
 import { convertFileSrc } from "@tauri-apps/api/core"
 
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
+import {
+    describeSongUrlFailure,
+    isSongUrlPlayable,
+    pickRicherSongUrlEntry,
+    type SongUrlItem,
+} from "@/lib/netease/song-privilege"
 import { fetchSongUrl } from "@/lib/netease/track"
 import type { Track } from "@/lib/types"
+
+export type ResolvePlayableResult =
+    | { ok: true; url: string }
+    | { ok: false; reason: string; entry?: SongUrlItem }
 
 /**
  * 解析可播放 URL。
  * - 本地 filePath：convertFileSrc → asset 协议
- * - netease：始终重新取链（会话里缓存的 CDN url 会过期）
- * - 其它已有 url：直接用
+ * - netease：始终重新取链；无 url / code≠200 / VIP 未购 → ok:false + 原因
  */
-async function resolvePlayableUrl(track: Track): Promise<string | null> {
+async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> {
     if (track.filePath && track.source === "local") {
         try {
-            return convertFileSrc(track.filePath)
+            return { ok: true, url: convertFileSrc(track.filePath) }
         } catch {
-            return null
+            return { ok: false, reason: "本地文件无法打开" }
         }
     }
 
     if (track.source === "netease") {
         if (!/^\d+$/.test(track.id)) {
-            return null
+            return { ok: false, reason: "无效的歌曲 id" }
         }
 
         const preferredBr = getNeteaseQualityBr()
@@ -29,34 +38,41 @@ async function resolvePlayableUrl(track: Track): Promise<string | null> {
             (br, index, list) => list.indexOf(br) === index,
         )
 
+        let bestEntry: SongUrlItem | undefined
+
         for (const br of tryOrder) {
             try {
                 const result = await fetchSongUrl(track.id, br)
-                const url = result.data?.[0]?.url
-                if (url) {
-                    return url
+                const entry = result.data?.[0]
+                bestEntry = pickRicherSongUrlEntry(bestEntry, entry)
+                if (isSongUrlPlayable(entry) && entry?.url) {
+                    return { ok: true, url: entry.url }
                 }
             } catch {
                 // 尝试下一档
             }
         }
 
-        return null
+        return {
+            ok: false,
+            reason: describeSongUrlFailure(bestEntry),
+            entry: bestEntry,
+        }
     }
 
     if (track.url) {
-        return track.url
+        return { ok: true, url: track.url }
     }
 
     if (track.filePath) {
         try {
-            return convertFileSrc(track.filePath)
+            return { ok: true, url: convertFileSrc(track.filePath) }
         } catch {
-            return null
+            return { ok: false, reason: "本地文件无法打开" }
         }
     }
 
-    return null
+    return { ok: false, reason: "没有可用的播放地址" }
 }
 
 export { resolvePlayableUrl }

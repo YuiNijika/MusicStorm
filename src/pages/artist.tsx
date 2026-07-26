@@ -22,7 +22,6 @@ import {
     type SimiArtistCard,
 } from "@/lib/netease/artist"
 import { formatError, notifyFromError } from "@/lib/notify"
-import { openExternalUrl } from "@/lib/open-external"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -58,7 +57,7 @@ function formatPlayCount(count?: number): string {
 
 function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
-    const { openAlbum, openArtist } = useMusicNavigation()
+    const { openAlbum, openArtist, openMv } = useMusicNavigation()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
 
     const [tab, setTab] = useState<ArtistTab>("songs")
@@ -114,91 +113,101 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         }
     }, [artistId, retry])
 
-    // Tab 懒加载：MV / 详情 / 相似
+    // Tab 懒加载：勿把 status 放进 deps，否则 set loading 会 cleanup 取消请求导致永久卡 loading
     useEffect(() => {
-        if (!profile) {
+        if (!profile || tab !== "mv") {
             return
         }
         let cancelled = false
-
-        if (tab === "mv" && mvs.status === "idle") {
-            setMvs({ status: "loading", data: [], error: null })
-            void fetchArtistMvs(artistId)
-                .then((items) => {
-                    if (!cancelled) {
-                        setMvs({ status: "ready", data: items, error: null })
-                    }
-                })
-                .catch((err: unknown) => {
-                    if (!cancelled) {
-                        setMvs({
-                            status: "error",
-                            data: [],
-                            error: formatError(err),
-                        })
-                        notifyFromError("MV 加载失败", err)
-                    }
-                })
-        }
-
-        if (tab === "detail" && desc.status === "idle") {
-            setDesc({
-                status: "loading",
-                data: { brief: profile.brief, sections: [] },
-                error: null,
+        setMvs({ status: "loading", data: [], error: null })
+        void fetchArtistMvs(artistId)
+            .then((items) => {
+                if (!cancelled) {
+                    setMvs({ status: "ready", data: items, error: null })
+                }
             })
-            void fetchArtistDesc(artistId)
-                .then((result) => {
-                    if (!cancelled) {
-                        setDesc({
-                            status: "ready",
-                            data: {
-                                brief: result.brief || profile.brief,
-                                sections: result.sections,
-                            },
-                            error: null,
-                        })
-                    }
-                })
-                .catch((err: unknown) => {
-                    if (!cancelled) {
-                        // 详情失败时仍展示 header brief
-                        setDesc({
-                            status: "ready",
-                            data: {
-                                brief: profile.brief,
-                                sections: [],
-                            },
-                            error: formatError(err),
-                        })
-                    }
-                })
-        }
-
-        if (tab === "similar" && similar.status === "idle") {
-            setSimilar({ status: "loading", data: [], error: null })
-            void fetchSimiArtists(artistId)
-                .then((items) => {
-                    if (!cancelled) {
-                        setSimilar({ status: "ready", data: items, error: null })
-                    }
-                })
-                .catch((err: unknown) => {
-                    if (!cancelled) {
-                        setSimilar({
-                            status: "error",
-                            data: [],
-                            error: formatError(err),
-                        })
-                        notifyFromError("相似艺人加载失败", err)
-                    }
-                })
-        }
-
+            .catch((err: unknown) => {
+                if (!cancelled) {
+                    setMvs({
+                        status: "error",
+                        data: [],
+                        error: formatError(err),
+                    })
+                    notifyFromError("MV 加载失败", err)
+                }
+            })
         return () => {
             cancelled = true
         }
-    }, [tab, profile, artistId, mvs.status, desc.status, similar.status])
+    }, [tab, artistId, profile?.id])
+
+    useEffect(() => {
+        if (!profile || tab !== "detail") {
+            return
+        }
+        let cancelled = false
+        const briefFallback = profile.brief
+        setDesc({
+            status: "loading",
+            data: { brief: briefFallback, sections: [] },
+            error: null,
+        })
+        void fetchArtistDesc(artistId)
+            .then((result) => {
+                if (!cancelled) {
+                    setDesc({
+                        status: "ready",
+                        data: {
+                            brief: result.brief || briefFallback,
+                            sections: result.sections,
+                        },
+                        error: null,
+                    })
+                }
+            })
+            .catch((err: unknown) => {
+                if (!cancelled) {
+                    setDesc({
+                        status: "ready",
+                        data: {
+                            brief: briefFallback,
+                            sections: [],
+                        },
+                        error: formatError(err),
+                    })
+                }
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [tab, artistId, profile?.id, profile?.brief])
+
+    useEffect(() => {
+        if (!profile || tab !== "similar") {
+            return
+        }
+        let cancelled = false
+        setSimilar({ status: "loading", data: [], error: null })
+        void fetchSimiArtists(artistId)
+            .then((items) => {
+                if (!cancelled) {
+                    setSimilar({ status: "ready", data: items, error: null })
+                }
+            })
+            .catch((err: unknown) => {
+                if (!cancelled) {
+                    setSimilar({
+                        status: "error",
+                        data: [],
+                        error: formatError(err),
+                    })
+                    notifyFromError("相似艺人加载失败", err)
+                }
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [tab, artistId, profile?.id])
 
     return (
         <div className="space-y-5">
@@ -376,11 +385,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                         <button
                                             key={mv.id}
                                             type="button"
-                                            onClick={() =>
-                                                void openExternalUrl(
-                                                    `https://music.163.com/#/mv?id=${mv.id}`,
-                                                )
-                                            }
+                                            onClick={() => openMv(mv.id)}
                                             className={cn(
                                                 "group flex cursor-pointer flex-col gap-2 text-left",
                                                 "transition-transform active:scale-[0.98]",

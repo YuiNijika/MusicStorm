@@ -10,8 +10,8 @@ import {
 import { isTauriRuntime } from "@/lib/storage/paths"
 
 /**
- * 按设置定时清理过期 API 缓存（DB + cache 目录）。
- * 启动时立即跑一轮；间隔随 TTL 变化。
+ * 按设置定时清理过期 API 缓存，含 DB 与 cache 目录。
+ * 启动时立即跑一轮，间隔随 TTL 变化。
  */
 function useApiCacheAutoPurge(): void {
     useEffect(() => {

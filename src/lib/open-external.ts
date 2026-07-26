@@ -1,4 +1,4 @@
-/** 在系统浏览器打开外链（Tauri opener → window.open 兜底） */
+/** 在系统浏览器打开外链，Tauri opener 失败则 window.open */
 
 async function openExternalUrl(url: string): Promise<void> {
     try {

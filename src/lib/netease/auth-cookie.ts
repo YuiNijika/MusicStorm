@@ -8,10 +8,24 @@ type NeteaseCredentials = {
     csrf: string | null
 }
 
+/**
+ * 写入登录 cookie。
+ * 兼容两种上游格式：
+ * - CloudMusicAPI / 外部源：`a=1;;b=2`，双分号分隔整条 Set-Cookie
+ * - 仅 `;` 分隔的 `name=value` 列表
+ */
 function setCookiesFromApi(cookieString: string): void {
-    const chunks = cookieString.split(";;")
-    for (const chunk of chunks) {
-        const pair = chunk.split(";")[0]?.trim()
+    const raw = cookieString.trim()
+    if (!raw) {
+        return
+    }
+
+    const segments = raw.includes(";;")
+        ? raw.split(";;")
+        : raw.split(/;(?=\s*[\w-]+=)/)
+
+    for (const segment of segments) {
+        const pair = segment.split(";")[0]?.trim()
         if (!pair) {
             continue
         }
@@ -25,7 +39,7 @@ function setCookiesFromApi(cookieString: string): void {
             continue
         }
         try {
-            document.cookie = pair
+            document.cookie = `${key}=${value}`
         } catch {
             // 非同源 document.cookie 可能写不进去，仍落 localStorage
         }
@@ -67,7 +81,7 @@ function clearNeteaseSession(): void {
     removeCookie("__csrf")
 }
 
-/** 当前活跃凭证快照（多账号切换用） */
+/** 当前活跃凭证快照，多账号切换用 */
 function snapshotNeteaseCredentials(): NeteaseCredentials | null {
     const musicU = getCookie("MUSIC_U")
     if (!musicU) {

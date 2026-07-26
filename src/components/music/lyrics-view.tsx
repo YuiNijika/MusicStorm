@@ -3,16 +3,25 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { usePlayer } from "@/hooks/use-player"
-import { findActiveLyricIndex, parseLrc, type LyricLine } from "@/lib/lyric/parse"
+import {
+    findActiveLyricIndex,
+    parseLyricText,
+    type LyricLine,
+} from "@/lib/lyric/parse"
+import { getLyricOverride, LYRIC_OVERRIDE_EVENT } from "@/lib/lyric/overrides"
 import { fetchLyricLines } from "@/lib/netease/lyric"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+type LyricsAlign = "left" | "center" | "right"
+
 type LyricsViewProps = {
-    /** compact：底栏条；full：全屏右栏 */
+    /** compact 底栏条，full 全屏右栏 */
     variant?: "compact" | "full"
-    /** 为 false 时不拉接口（面板关闭） */
+    /** false 时不拉接口，用于面板关闭 */
     active?: boolean
+    /** 歌词行对齐，默认 left */
+    align?: LyricsAlign
     className?: string
     listClassName?: string
 }
@@ -21,16 +30,22 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
+/** 任一步得到非空行即返回；空则继续下一条源 */
 async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
-    // 1) 扫描时写入的短文本
+    // 扫描写入的短文本
     if (track.lyricText?.trim()) {
-        return parseLrc(track.lyricText)
+        const lines = parseLyricText(track.lyricText)
+        if (lines.length > 0) {
+            return lines
+        }
     }
-    // 2) sidecar / 缓存 lrc 路径
+    // sidecar / 缓存路径
     if (track.lrcPath && isTauriRuntime()) {
         try {
-            const text = await invoke<string>("read_text_file", { path: track.lrcPath })
-            const lines = parseLrc(text)
+            const text = await invoke<string>("read_text_file", {
+                path: track.lrcPath,
+            })
+            const lines = parseLyricText(text)
             if (lines.length > 0) {
                 return lines
             }
@@ -38,13 +53,12 @@ async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
             // fall through
         }
     }
-    // 3) 同目录同名 .lrc（未入库时兜底）
+    // 同目录同名 .lrc
     if (track.filePath && isTauriRuntime()) {
-        const candidates = sidecarLrcCandidates(track.filePath)
-        for (const path of candidates) {
+        for (const path of sidecarLrcCandidates(track.filePath)) {
             try {
                 const text = await invoke<string>("read_text_file", { path })
-                const lines = parseLrc(text)
+                const lines = parseLyricText(text)
                 if (lines.length > 0) {
                     return lines
                 }
@@ -76,6 +90,7 @@ function sidecarLrcCandidates(filePath: string): string[] {
 function LyricsView({
     variant = "compact",
     active = true,
+    align = "left",
     className,
     listClassName,
 }: LyricsViewProps) {
@@ -84,12 +99,24 @@ function LyricsView({
     const [status, setStatus] = useState<"idle" | "loading" | "empty" | "error" | "ready">(
         "idle",
     )
+    const [overrideTick, setOverrideTick] = useState(0)
     const listRef = useRef<HTMLDivElement>(null)
     const activeIndex = useMemo(
         () => findActiveLyricIndex(lines, positionMs),
         [lines, positionMs],
     )
     const isFull = variant === "full"
+    const timedLyrics = lines.some((line) => line.timeMs > 0)
+    const textAlignClass =
+        align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"
+
+    useEffect(() => {
+        function onOverride() {
+            setOverrideTick((n) => n + 1)
+        }
+        window.addEventListener(LYRIC_OVERRIDE_EVENT, onOverride)
+        return () => window.removeEventListener(LYRIC_OVERRIDE_EVENT, onOverride)
+    }, [])
 
     useEffect(() => {
         if (!active || !currentTrack) {
@@ -102,6 +129,17 @@ function LyricsView({
 
         const load = async () => {
             try {
+                const override = getLyricOverride(currentTrack.id)
+                if (override) {
+                    const result = parseLyricText(override)
+                    if (cancelled) {
+                        return
+                    }
+                    setLines(result)
+                    setStatus(result.length > 0 ? "ready" : "empty")
+                    return
+                }
+
                 if (currentTrack.source === "local") {
                     const result = await loadLocalLyricLines(currentTrack)
                     if (cancelled) {
@@ -139,17 +177,25 @@ function LyricsView({
         return () => {
             cancelled = true
         }
-    }, [active, currentTrack?.id, currentTrack?.source, currentTrack?.lyricText, currentTrack?.lrcPath, currentTrack?.filePath])
+    }, [
+        active,
+        currentTrack?.id,
+        currentTrack?.source,
+        currentTrack?.lyricText,
+        currentTrack?.lrcPath,
+        currentTrack?.filePath,
+        overrideTick,
+    ])
 
     useEffect(() => {
-        if (!active || activeIndex < 0 || !listRef.current) {
+        if (!active || activeIndex < 0 || !listRef.current || !timedLyrics) {
             return
         }
         const node = listRef.current.querySelector<HTMLElement>(
             `[data-lyric-index="${activeIndex}"]`,
         )
         node?.scrollIntoView({ block: "center", behavior: "smooth" })
-    }, [activeIndex, active])
+    }, [activeIndex, active, timedLyrics])
 
     const showSkeleton = Boolean(currentTrack) && status === "loading"
     const message = !currentTrack
@@ -176,17 +222,31 @@ function LyricsView({
                 ) : message ? (
                     <p className="text-center text-[13px] text-muted-foreground">{message}</p>
                 ) : (
-                    <div className={cn("mx-auto w-full", isFull ? "max-w-lg space-y-4" : "space-y-2")}>
+                    <div
+                        className={cn(
+                            "mx-auto w-full",
+                            isFull ? "max-w-2xl space-y-4" : "space-y-2",
+                            textAlignClass,
+                        )}
+                    >
                         {lines.map((line, index) => {
-                            const isActive = index === activeIndex
+                            const isActive = timedLyrics && index === activeIndex
                             return (
                                 <button
                                     key={`${line.timeMs}-${index}`}
                                     type="button"
                                     data-lyric-index={index}
-                                    onClick={() => seek(line.timeMs)}
+                                    onClick={() => {
+                                        if (timedLyrics && line.timeMs > 0) {
+                                            seek(line.timeMs)
+                                        }
+                                    }}
                                     className={cn(
-                                        "block w-full cursor-pointer text-left transition-colors duration-150",
+                                        "block w-full transition-colors duration-150",
+                                        textAlignClass,
+                                        timedLyrics
+                                            ? "cursor-pointer"
+                                            : "cursor-default",
                                         isFull
                                             ? "rounded-xl px-3 py-1.5 text-[18px] leading-snug tracking-[-0.01em]"
                                             : "rounded-lg px-2 py-1 text-[13px] leading-snug",

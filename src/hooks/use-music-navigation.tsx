@@ -16,16 +16,24 @@ type MusicNavigationValue = {
     openArtist: (id: string) => void
     openAlbum: (id: string) => void
     openRadio: (id: string) => void
+    openRadioProgram: (programId: string, radioId?: string) => void
+    openMv: (id: string) => void
     /** 返回上一层；栈空则关闭详情 */
     back: () => void
-    /** 清空详情栈（侧栏切页时用） */
+    /** 清空详情栈，侧栏切页时用 */
     closeDetail: () => void
 }
 
 const MusicNavigationContext = createContext<MusicNavigationValue | null>(null)
 
 function sameDetail(a: MusicDetail, b: MusicDetail): boolean {
-    return a.type === b.type && a.id === b.id
+    if (a.type !== b.type || a.id !== b.id) {
+        return false
+    }
+    if (a.type === "radio-program" && b.type === "radio-program") {
+        return (a.radioId ?? "") === (b.radioId ?? "")
+    }
+    return true
 }
 
 function MusicNavigationProvider({ children }: { children: ReactNode }) {
@@ -85,6 +93,33 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
         [pushDetail],
     )
 
+    const openRadioProgram = useCallback(
+        (programId: string, radioId?: string) => {
+            const next = programId.trim()
+            if (!next || !/^\d+$/.test(next)) {
+                return
+            }
+            const rid = radioId?.trim()
+            pushDetail({
+                type: "radio-program",
+                id: next,
+                ...(rid && /^\d+$/.test(rid) ? { radioId: rid } : {}),
+            })
+        },
+        [pushDetail],
+    )
+
+    const openMv = useCallback(
+        (id: string) => {
+            const next = id.trim()
+            if (!next || !/^\d+$/.test(next)) {
+                return
+            }
+            pushDetail({ type: "mv", id: next })
+        },
+        [pushDetail],
+    )
+
     const back = useCallback(() => {
         setStack((prev) => (prev.length <= 1 ? [] : prev.slice(0, -1)))
     }, [])
@@ -102,6 +137,8 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             openArtist,
             openAlbum,
             openRadio,
+            openRadioProgram,
+            openMv,
             back,
             closeDetail,
         }),
@@ -111,6 +148,8 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             openArtist,
             openAlbum,
             openRadio,
+            openRadioProgram,
+            openMv,
             back,
             closeDetail,
         ],

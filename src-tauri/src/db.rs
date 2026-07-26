@@ -98,6 +98,26 @@ ALTER TABLE library_folder ADD COLUMN artist TEXT NOT NULL DEFAULT '';
 ALTER TABLE library_folder ADD COLUMN cover_data TEXT;
 "#;
 
+/// 听歌统计 v4：指纹、会话元数据、日去重，修正 unique_tracks
+const SCHEMA_V4: &str = r#"
+ALTER TABLE track ADD COLUMN content_hash TEXT;
+ALTER TABLE track ADD COLUMN file_name TEXT;
+ALTER TABLE play_session ADD COLUMN title TEXT;
+ALTER TABLE play_session ADD COLUMN artist TEXT;
+ALTER TABLE play_session ADD COLUMN album TEXT;
+ALTER TABLE play_session ADD COLUMN file_path TEXT;
+ALTER TABLE play_session ADD COLUMN file_name TEXT;
+ALTER TABLE play_session ADD COLUMN content_hash TEXT;
+CREATE TABLE IF NOT EXISTS listen_day_track (
+  day TEXT NOT NULL,
+  track_id TEXT NOT NULL,
+  PRIMARY KEY (day, track_id)
+);
+CREATE INDEX IF NOT EXISTS idx_session_track ON play_session(track_id);
+CREATE INDEX IF NOT EXISTS idx_track_hash ON track(content_hash);
+CREATE INDEX IF NOT EXISTS idx_track_file_name ON track(file_name);
+"#;
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -131,8 +151,8 @@ pub struct StoragePaths {
     pub database_path: String,
 }
 
-/// 运行目录 = 可执行文件所在目录（G2M 同款布局）
-/// 优先 Tauri PathResolver::executable_dir，失败再 fallback current_exe().parent()
+/// 运行目录取可执行文件所在目录
+/// 优先 executable_dir，失败再取 current_exe 父目录
 fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if let Ok(dir) = app.path().executable_dir() {
         return Ok(dir);
@@ -260,6 +280,44 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         conn.pragma_update(None, "user_version", 3)
             .map_err(|e| format!("set user_version: {e}"))?;
     }
+    let version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|e| format!("user_version: {e}"))?;
+    if version < 4 {
+        for stmt in SCHEMA_V4
+            .split(';')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            let _ = conn.execute_batch(&format!("{stmt};"));
+        }
+        // 从历史有效会话回填日去重
+        let _ = conn.execute_batch(
+            r#"
+            INSERT OR IGNORE INTO listen_day_track (day, track_id)
+            SELECT
+              printf('%04d-%02d-%02d',
+                CAST(strftime('%Y', ended_at / 1000, 'unixepoch') AS INTEGER),
+                CAST(strftime('%m', ended_at / 1000, 'unixepoch') AS INTEGER),
+                CAST(strftime('%d', ended_at / 1000, 'unixepoch') AS INTEGER)
+              ),
+              track_id
+            FROM play_session
+            WHERE ended_at IS NOT NULL
+              AND (completed = 1 OR listened_ms >= 30000);
+            "#,
+        );
+        // 校正 unique_tracks
+        let _ = conn.execute_batch(
+            r#"
+            UPDATE listen_daily SET unique_tracks = (
+              SELECT COUNT(*) FROM listen_day_track d WHERE d.day = listen_daily.day
+            );
+            "#,
+        );
+        conn.pragma_update(None, "user_version", 4)
+            .map_err(|e| format!("set user_version: {e}"))?;
+    }
     Ok(())
 }
 
@@ -286,6 +344,8 @@ pub struct UpsertTrackInput {
     pub file_path: Option<String>,
     pub folder_path: Option<String>,
     pub lrc_path: Option<String>,
+    pub file_name: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -296,6 +356,12 @@ pub struct PlaySessionStart {
     pub source: String,
     pub started_at: i64,
     pub quality_br: Option<i64>,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -309,6 +375,12 @@ pub struct PlaySessionEnd {
     pub listened_ms: i64,
     pub completed: bool,
     pub quality_br: Option<i64>,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -317,6 +389,23 @@ pub struct ListenStats {
     pub day: String,
     pub play_count: i64,
     pub unique_tracks: i64,
+    pub total_ms: i64,
+}
+
+/// 按 track_id 聚合的听歌行，前端再按 MD5 与文件名归类
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopTrackStat {
+    pub track_id: String,
+    pub source: String,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub cover_url: Option<String>,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub content_hash: Option<String>,
+    pub play_count: i64,
     pub total_ms: i64,
 }
 
@@ -391,8 +480,8 @@ pub fn db_upsert_tracks(
         };
 
         tx.execute(
-            "INSERT INTO track (id, source, title, artist, album, duration_ms, cover_url, file_path, folder_id, lrc_path, added_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+            "INSERT INTO track (id, source, title, artist, album, duration_ms, cover_url, file_path, folder_id, lrc_path, content_hash, file_name, added_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
              ON CONFLICT(id) DO UPDATE SET
                title = excluded.title,
                artist = excluded.artist,
@@ -402,6 +491,8 @@ pub fn db_upsert_tracks(
                file_path = excluded.file_path,
                folder_id = excluded.folder_id,
                lrc_path = excluded.lrc_path,
+               content_hash = COALESCE(excluded.content_hash, track.content_hash),
+               file_name = COALESCE(excluded.file_name, track.file_name),
                updated_at = excluded.updated_at",
             params![
                 track.id,
@@ -414,6 +505,8 @@ pub fn db_upsert_tracks(
                 track.file_path,
                 folder_id,
                 track.lrc_path,
+                track.content_hash,
+                track.file_name,
                 ts,
             ],
         )
@@ -431,14 +524,23 @@ pub fn db_start_play_session(
 ) -> Result<(), String> {
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     conn.execute(
-        "INSERT OR REPLACE INTO play_session (id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br)
-         VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5)",
+        "INSERT OR REPLACE INTO play_session (
+            id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br,
+            title, artist, album, file_path, file_name, content_hash
+         )
+         VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             input.id,
             input.track_id,
             input.source,
             input.started_at,
             input.quality_br,
+            input.title,
+            input.artist,
+            input.album,
+            input.file_path,
+            input.file_name,
+            input.content_hash,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -453,13 +555,22 @@ pub fn db_end_play_session(
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     let completed = if input.completed { 1 } else { 0 };
     conn.execute(
-        "INSERT INTO play_session (id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        "INSERT INTO play_session (
+            id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br,
+            title, artist, album, file_path, file_name, content_hash
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
            ended_at = excluded.ended_at,
            listened_ms = excluded.listened_ms,
            completed = excluded.completed,
-           quality_br = excluded.quality_br",
+           quality_br = excluded.quality_br,
+           title = COALESCE(excluded.title, play_session.title),
+           artist = COALESCE(excluded.artist, play_session.artist),
+           album = COALESCE(excluded.album, play_session.album),
+           file_path = COALESCE(excluded.file_path, play_session.file_path),
+           file_name = COALESCE(excluded.file_name, play_session.file_name),
+           content_hash = COALESCE(excluded.content_hash, play_session.content_hash)",
         params![
             input.id,
             input.track_id,
@@ -469,6 +580,12 @@ pub fn db_end_play_session(
             input.listened_ms,
             completed,
             input.quality_br,
+            input.title,
+            input.artist,
+            input.album,
+            input.file_path,
+            input.file_name,
+            input.content_hash,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -479,11 +596,30 @@ pub fn db_end_play_session(
         let day = chrono_day(input.ended_at);
         conn.execute(
             "INSERT INTO listen_daily (day, play_count, unique_tracks, total_ms)
-             VALUES (?1, 1, 1, ?2)
+             VALUES (?1, 1, 0, ?2)
              ON CONFLICT(day) DO UPDATE SET
                play_count = play_count + 1,
                total_ms = total_ms + excluded.total_ms",
             params![day, input.listened_ms],
+        )
+        .map_err(|e| e.to_string())?;
+
+        // 日去重：分别记录 track_id，再回写 unique_tracks
+        conn.execute(
+            "INSERT OR IGNORE INTO listen_day_track (day, track_id) VALUES (?1, ?2)",
+            params![day, input.track_id],
+        )
+        .map_err(|e| e.to_string())?;
+        let unique: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM listen_day_track WHERE day = ?1",
+                params![day],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE listen_daily SET unique_tracks = ?1 WHERE day = ?2",
+            params![unique, day],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -506,7 +642,7 @@ fn chrono_day(ms: i64) -> String {
 }
 
 fn format_ymd(epoch_days: i64) -> String {
-    // 简化公历换算（足够统计用途）
+    // 简化公历换算，统计够用
     let z = epoch_days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
@@ -544,6 +680,111 @@ pub fn db_get_listen_stats(
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
+}
+
+/// 近 N 日听歌日汇总，按 day 降序
+#[tauri::command]
+pub fn db_list_listen_stats(
+    state: State<'_, DbState>,
+    days: Option<i64>,
+) -> Result<Vec<ListenStats>, String> {
+    let days = days.unwrap_or(7).clamp(1, 90);
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let today_epoch = (now_ms() / 1000) / 86_400;
+    let from_day = format_ymd(today_epoch - (days - 1));
+    let mut stmt = conn
+        .prepare(
+            "SELECT day, play_count, unique_tracks, total_ms FROM listen_daily
+             WHERE day >= ?1 ORDER BY day DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![from_day], |row| {
+            Ok(ListenStats {
+                day: row.get(0)?,
+                play_count: row.get(1)?,
+                unique_tracks: row.get(2)?,
+                total_ms: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+/// 听得最多，按 track_id 聚合；本地归类在前端
+#[tauri::command]
+pub fn db_list_top_tracks(
+    state: State<'_, DbState>,
+    limit: Option<i64>,
+    days: Option<i64>,
+) -> Result<Vec<TopTrackStat>, String> {
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+
+    // days 为空或 0 表示全部时间，否则只取近 N 日 ended_at
+    let min_ended: Option<i64> = match days {
+        Some(d) if d > 0 => {
+            let d = d.clamp(1, 365);
+            Some(now_ms() - d * 86_400_000)
+        }
+        _ => None,
+    };
+
+    let sql = r#"
+        SELECT
+          s.track_id,
+          s.source,
+          COALESCE(
+            NULLIF(MAX(s.title), ''),
+            NULLIF(MAX(t.title), ''),
+            s.track_id
+          ) AS title,
+          COALESCE(NULLIF(MAX(s.artist), ''), NULLIF(MAX(t.artist), ''), '') AS artist,
+          COALESCE(NULLIF(MAX(s.album), ''), NULLIF(MAX(t.album), ''), '') AS album,
+          MAX(t.cover_url) AS cover_url,
+          COALESCE(NULLIF(MAX(s.file_path), ''), NULLIF(MAX(t.file_path), '')) AS file_path,
+          COALESCE(NULLIF(MAX(s.file_name), ''), NULLIF(MAX(t.file_name), '')) AS file_name,
+          COALESCE(NULLIF(MAX(s.content_hash), ''), NULLIF(MAX(t.content_hash), '')) AS content_hash,
+          COUNT(*) AS play_count,
+          COALESCE(SUM(s.listened_ms), 0) AS total_ms
+        FROM play_session s
+        LEFT JOIN track t ON t.id = s.track_id
+        WHERE s.ended_at IS NOT NULL
+          AND (s.completed = 1 OR s.listened_ms >= 30000)
+          AND (?1 IS NULL OR s.ended_at >= ?1)
+        GROUP BY s.track_id, s.source
+        ORDER BY play_count DESC, total_ms DESC
+        LIMIT ?2
+    "#;
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![min_ended, limit], |row| {
+            Ok(TopTrackStat {
+                track_id: row.get(0)?,
+                source: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                cover_url: row.get(5)?,
+                file_path: row.get(6)?,
+                file_name: row.get(7)?,
+                content_hash: row.get(8)?,
+                play_count: row.get(9)?,
+                total_ms: row.get(10)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
 }
 
 #[tauri::command]

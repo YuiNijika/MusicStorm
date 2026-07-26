@@ -69,7 +69,7 @@ async function fetchPlaylistDetail(id: string): Promise<{
     let tracks = (raw.tracks ?? []).map(mapNeteaseSongToTrack)
     const trackIds = raw.trackIds?.map((item) => item.id) ?? []
 
-    // 未登录 tracks 可能不完整，用 trackIds + song/detail 补齐（最多 80 首）
+    // 未登录 tracks 可能不完整，用 trackIds 与 song/detail 补齐最多 80 首
     if (trackIds.length > tracks.length) {
         const ids = trackIds.slice(0, 80).join(",")
         if (ids) {

@@ -1,4 +1,4 @@
-//! 本地音频内嵌元数据：lofty 解析 title/artist/album/duration/封面/歌词 + sidecar
+// 本地音频内嵌元数据：lofty 读 tag、封面、歌词；容器不支持时返回空 meta，扫描仍入库
 
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
@@ -19,25 +19,28 @@ pub struct FileMeta {
     pub duration_ms: u64,
     /// 落盘后的封面绝对路径
     pub cover_path: Option<String>,
-    /// 内嵌歌词全文（短文本；大段会写到 lrc 缓存）
+    /// 内嵌歌词全文，大段写入 lrc 缓存
     pub lyric_text: Option<String>,
-    /// sidecar / 缓存歌词路径
+    /// sidecar 或缓存歌词路径
     pub lrc_path: Option<String>,
 }
 
-/// `covers_dir` / `lyrics_dir` 均为 cache 下子目录
+/// covers_dir 与 lyrics_dir 均为 cache 下子目录
 pub fn read_audio_meta(path: &Path, covers_dir: &Path, lyrics_dir: &Path) -> FileMeta {
     let mut meta = FileMeta::default();
 
-    // 1) 同目录 sidecar 歌词（展示优先）
+    // sidecar 优先：有正文才占 lyric_text，空文件留给内嵌
     if let Some(lrc) = find_sidecar_lrc(path) {
         meta.lrc_path = Some(lrc.to_string_lossy().into_owned());
         if let Some(text) = read_text_flexible(&lrc) {
-            meta.lyric_text = Some(text);
+            let t = text.trim();
+            if !t.is_empty() {
+                meta.lyric_text = Some(t.to_string());
+            }
         }
     }
 
-    // 2) 同目录 / 父目录常见封面图
+    // 同目录或父目录常见封面图
     if let Some(cover) = find_sidecar_cover(path) {
         meta.cover_path = Some(cover.to_string_lossy().into_owned());
     }
@@ -59,7 +62,7 @@ pub fn read_audio_meta(path: &Path, covers_dir: &Path, lyrics_dir: &Path) -> Fil
         return meta;
     }
 
-    // 文本字段：primary → first 有值的
+    // 文本字段：primary 优先，否则取第一个有值
     let primary = tagged.primary_tag().or_else(|| tagged.first_tag());
     if let Some(tag) = primary {
         if meta.title.is_none() {
@@ -92,8 +95,13 @@ pub fn read_audio_meta(path: &Path, covers_dir: &Path, lyrics_dir: &Path) -> Fil
         }
     }
 
-    // 歌词：无 sidecar 时读内嵌；大段落盘避免 localStorage 爆
-    if meta.lyric_text.is_none() {
+    // 歌词：sidecar 已有有效文本则跳过，否则读内嵌
+    let need_embedded = meta
+        .lyric_text
+        .as_ref()
+        .map(|s| s.trim().is_empty())
+        .unwrap_or(true);
+    if need_embedded {
         if let Some(lyrics) = extract_lyrics_from_tags(&tags) {
             apply_embedded_lyrics(&mut meta, path, lyrics_dir, lyrics);
         }
@@ -135,14 +143,16 @@ fn extract_lyrics_from_tags(tags: &[&lofty::tag::Tag]) -> Option<String> {
                 return Some(text.to_string());
             }
         }
-        // 部分打标软件把歌词塞进 Comment
-        if let Some(text) = tag
-            .get_strings(&ItemKey::Comment)
-            .map(str::trim)
-            .find(|s| looks_like_lyrics(s))
-        {
-            if text.len() < 512 * 1024 {
-                return Some(text.to_string());
+        // 部分打标软件把歌词塞进 Comment / Description
+        for key in [ItemKey::Comment, ItemKey::Description] {
+            if let Some(text) = tag
+                .get_strings(&key)
+                .map(str::trim)
+                .find(|s| looks_like_lyrics(s))
+            {
+                if text.len() < 512 * 1024 {
+                    return Some(text.to_string());
+                }
             }
         }
     }
@@ -150,8 +160,12 @@ fn extract_lyrics_from_tags(tags: &[&lofty::tag::Tag]) -> Option<String> {
 }
 
 fn looks_like_lyrics(s: &str) -> bool {
-    // LRC 时间戳 或 多行较长文本
-    s.contains('[') && s.contains(']') && (s.contains(':') || s.lines().count() >= 4)
+    // LRC 时间戳，或多行较长纯文本
+    if s.contains('[') && s.contains(']') && s.contains(':') {
+        return true;
+    }
+    let lines = s.lines().filter(|l| !l.trim().is_empty()).count();
+    lines >= 3 || s.chars().count() >= 40
 }
 
 fn apply_embedded_lyrics(meta: &mut FileMeta, audio_path: &Path, lyrics_dir: &Path, text: String) {
@@ -268,7 +282,7 @@ fn path_hash(path: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// UTF-8 / UTF-8 BOM / UTF-16 / 有损回退（中文 GBK sidecar 尽量保留字节可见性）
+/// 按 UTF-8、BOM、UTF-16 解码文本，失败则有损回退
 fn read_text_flexible(path: &Path) -> Option<String> {
     let data = fs::read(path).ok()?;
     if data.is_empty() || data.len() > 1024 * 1024 {

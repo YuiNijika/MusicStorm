@@ -4,7 +4,7 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-/** 本地文件 → data URL（桌面 invoke；浏览器用 file input） */
+/** 本地文件转 data URL；桌面 invoke，浏览器用 file input */
 async function pickImageAsDataUrl(): Promise<string | null> {
     if (isTauriRuntime()) {
         return invoke<string | null>("pick_image_as_base64")
@@ -35,7 +35,7 @@ function pickImageViaFileInput(): Promise<string | null> {
     })
 }
 
-/** 远程封面 URL → data URL（写入本地库） */
+/** 远程封面 URL 转 data URL，写入本地库 */
 async function fetchImageAsDataUrl(url: string): Promise<string> {
     const trimmed = url.trim()
     if (!trimmed) {

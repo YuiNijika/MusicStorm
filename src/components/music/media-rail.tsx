@@ -26,7 +26,7 @@ function chunkItems<T>(items: T[], size: number): T[][] {
     return pages
 }
 
-/** 区头左右按钮（依赖外部 embla api，避免外侧绝对定位被裁切） */
+/** 区头左右按钮，依赖外部 embla api，避免外侧绝对定位被裁切 */
 function RailControls({
     api,
     className,
@@ -113,7 +113,7 @@ type CardsRailProps = {
     setApi?: (api: CarouselApi | undefined) => void
 }
 
-/** 单行卡片横滑（为你推荐 / 播客） */
+/** 单行卡片横滑，为你推荐与播客 */
 function CardsRail({
     children,
     cardWidthClassName = "w-[152px]",
@@ -132,7 +132,7 @@ function CardsRail({
                 {items.map((child, index) => (
                     <CarouselItem
                         key={index}
-                        className={cn("basis-auto pl-3", cardWidthClassName)}
+                        className={cn("min-w-0 basis-auto pl-3", cardWidthClassName)}
                     >
                         {child}
                     </CarouselItem>
@@ -151,7 +151,7 @@ type GridPageRailProps<T> = {
     setApi?: (api: CarouselApi | undefined) => void
 }
 
-/** 每页 cols 张的分页横滑（更多歌单） */
+/** 每页 cols 张的分页横滑，更多歌单 */
 function GridPageRail<T>({
     items,
     cols,

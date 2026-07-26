@@ -74,4 +74,65 @@ async function fetchAlbumDetail(albumId: string): Promise<AlbumDetailResult> {
     return { profile, tracks }
 }
 
-export { fetchAlbumDetail }
+type AlbumSublistData = {
+    code?: number
+    count?: number
+    data?: Array<{
+        id?: number
+        name?: string
+        picUrl?: string
+        size?: number
+        artists?: { id?: number; name?: string }[]
+        artist?: { id?: number; name?: string }
+    }>
+}
+
+export type AlbumCard = {
+    id: string
+    title: string
+    coverUrl: string
+    artistName: string
+    trackCount?: number
+}
+
+/** 已收藏专辑，需登录 */
+async function fetchAlbumSublist(limit = 1000, offset = 0): Promise<AlbumCard[]> {
+    const data = await neteaseRequest<AlbumSublistData>({
+        path: NETEASE_PATHS.albumSublist,
+        params: { limit, offset },
+        skipCache: true,
+    })
+    return (data.data ?? [])
+        .map((item) => {
+            if (item.id == null) {
+                return null
+            }
+            const artists = item.artists ?? (item.artist ? [item.artist] : [])
+            return {
+                id: String(item.id),
+                title: item.name?.trim() || "未知专辑",
+                coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
+                artistName:
+                    artists
+                        .map((a) => a.name)
+                        .filter(Boolean)
+                        .join(" / ") || "未知艺人",
+                trackCount: item.size,
+            } satisfies AlbumCard
+        })
+        .filter((item): item is AlbumCard => item != null)
+}
+
+async function subscribeAlbum(albumId: string, subscribe: boolean): Promise<void> {
+    const id = albumId.trim()
+    if (!/^\d+$/.test(id)) {
+        throw new Error("无效专辑 id")
+    }
+    await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.albumSub,
+        params: { id, t: subscribe ? 1 : 0 },
+        skipCache: true,
+    })
+}
+
+export { fetchAlbumDetail, fetchAlbumSublist, subscribeAlbum }

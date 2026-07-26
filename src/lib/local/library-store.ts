@@ -1,5 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core"
 
+import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import type { Track } from "@/lib/types"
 
 const STORAGE_KEY = "musicstorm.local.library"
@@ -8,7 +9,7 @@ export type LocalAlbum = {
     id: string
     title: string
     artist: string
-    /** data:image/...;base64,... 存入 localStorage + SQLite */
+    /** base64 封面，存入 localStorage 与 SQLite */
     coverDataUrl: string
     folderPath: string | null
     createdAt: number
@@ -26,10 +27,14 @@ export type StoredLocalTrack = {
     albumId: string | null
     /** 内嵌封面落盘绝对路径 */
     coverPath: string | null
-    /** 内嵌 / sidecar 歌词全文 */
+    /** 内嵌或 sidecar 歌词全文 */
     lyricText: string | null
-    /** sidecar .lrc 路径 */
+    /** sidecar lrc 路径 */
     lrcPath: string | null
+    /** 无扩展名文件名，统计归类 */
+    fileName: string | null
+    /** 内容 MD5 */
+    contentHash: string | null
 }
 
 export type LocalLibraryState = {
@@ -55,6 +60,8 @@ type ScanTrackDto = {
     coverPath?: string | null
     lyricText?: string | null
     lrcPath?: string | null
+    fileName?: string | null
+    contentHash?: string | null
 }
 
 function emptyLibrary(): LocalLibraryState {
@@ -65,7 +72,7 @@ function nowMs(): number {
     return Date.now()
 }
 
-/** localStorage 只保留短歌词；长文本走 lrcPath */
+/** localStorage 只保留短歌词，长文本走 lrcPath */
 function capLyricText(text: string | null | undefined): string | null {
     if (!text || typeof text !== "string") {
         return null
@@ -89,7 +96,7 @@ function folderDisplayName(folderPath: string): string {
     return parts[parts.length - 1] ?? folderPath
 }
 
-/** 从扫描结果多数表决专辑名 / 艺人 */
+/** 从扫描结果多数表决专辑名与艺人 */
 function majorityLabel(values: Array<string | undefined>, skip: string[]): string {
     const skipSet = new Set(skip.map((s) => s.toLowerCase()))
     const counts = new Map<string, number>()
@@ -127,12 +134,12 @@ function deriveAlbumFieldsFromScan(
     const title =
         draft.title.trim() || fromTagsTitle || folderDisplayName(folderPath)
     const artist = draft.artist.trim() || fromTagsArtist
-    // 手动封面优先；否则空，UI 用曲目内嵌封面兜底
+    // 手动封面优先，否则空，UI 用曲目内嵌封面兜底
     const coverDataUrl = draft.coverDataUrl.trim()
     return { title, artist, coverDataUrl }
 }
 
-/** 本地路径 → 可展示/可播放的 asset URL；data/http 原样返回 */
+/** 本地路径转可播放 asset URL；data 与 http 原样返回 */
 function toAssetUrl(path: string | null | undefined): string {
     if (!path) {
         return ""
@@ -147,7 +154,7 @@ function toAssetUrl(path: string | null | undefined): string {
         return path
     }
     try {
-        // Windows 路径保持原样交给 convertFileSrc；去掉 file:// 前缀
+        // Windows 路径交给 convertFileSrc，先去掉 file 协议前缀
         const normalized = path.replace(/^file:\/\//i, "").replace(/^\/([A-Za-z]:)/, "$1")
         return convertFileSrc(normalized)
     } catch {
@@ -177,18 +184,29 @@ function normalizeTrack(raw: Partial<StoredLocalTrack>): StoredLocalTrack | null
     if (!raw || typeof raw.id !== "string" || typeof raw.path !== "string") {
         return null
     }
+    const path = raw.path
+    // 旧库可能带后缀，统一 strip
+    const fileName =
+        typeof raw.fileName === "string" && raw.fileName.trim()
+            ? stripExtension(raw.fileName.trim())
+            : fileStemFromPath(path)
     return {
         id: raw.id,
         title: typeof raw.title === "string" ? raw.title : "未知曲目",
         artist: typeof raw.artist === "string" ? raw.artist : "未知艺人",
         album: typeof raw.album === "string" ? raw.album : "本地文件",
-        path: raw.path,
+        path,
         durationMs: typeof raw.durationMs === "number" ? raw.durationMs : 0,
         folderPath: typeof raw.folderPath === "string" ? raw.folderPath : "",
         albumId: typeof raw.albumId === "string" ? raw.albumId : null,
         coverPath: typeof raw.coverPath === "string" && raw.coverPath ? raw.coverPath : null,
         lyricText: typeof raw.lyricText === "string" && raw.lyricText ? raw.lyricText : null,
         lrcPath: typeof raw.lrcPath === "string" && raw.lrcPath ? raw.lrcPath : null,
+        fileName: fileName || null,
+        contentHash:
+            typeof raw.contentHash === "string" && raw.contentHash.trim()
+                ? raw.contentHash.trim().toLowerCase()
+                : null,
     }
 }
 
@@ -412,7 +430,7 @@ function mergeFolderScan(
             item.artist && item.artist !== "未知艺人"
                 ? item.artist
                 : album.artist || item.artist || "未知艺人",
-        // 有内嵌专辑名时保留；否则用专辑名
+        // 有内嵌专辑名时保留，否则用专辑名
         album: item.album && item.album !== "本地文件" ? item.album : album.title,
         path: item.path,
         durationMs: item.durationMs ?? 0,
@@ -422,6 +440,11 @@ function mergeFolderScan(
         // 大段歌词不进 localStorage，靠 lrcPath 读文件
         lyricText: capLyricText(item.lyricText),
         lrcPath: item.lrcPath ?? null,
+        fileName:
+            stripExtension(item.fileName?.trim() || "") ||
+            fileStemFromPath(item.path) ||
+            null,
+        contentHash: item.contentHash?.trim().toLowerCase() || null,
     }))
 
     const byId = new Map<string, StoredLocalTrack>()
@@ -516,6 +539,8 @@ function storedToTrack(
         filePath: item.path,
         lyricText: item.lyricText ?? undefined,
         lrcPath: item.lrcPath ?? undefined,
+        fileName: item.fileName ?? undefined,
+        contentHash: item.contentHash ?? undefined,
     }
 }
 

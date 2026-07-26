@@ -20,7 +20,7 @@ type ElasticSliderProps = {
     value?: number
     defaultValue?: number
     onValueChange?: (value: number) => void
-    /** 拖拽结束时回调（适合 seek 提交） */
+    /** 拖拽结束时提交，适合 seek */
     onValueCommit?: (value: number) => void
     startingValue?: number
     maxValue?: number
@@ -32,7 +32,7 @@ type ElasticSliderProps = {
     showValue?: boolean
     formatValue?: (value: number) => string
     disabled?: boolean
-    /** 铺满父宽（进度条） */
+    /** 铺满父宽，进度条用 */
     fluid?: boolean
     /** 底栏紧凑音量 */
     compact?: boolean
@@ -42,7 +42,7 @@ type ElasticSliderProps = {
 type Region = "left" | "middle" | "right"
 
 /**
- * ElasticSlider：轨道内弹性（压扁/回弹），不向容器外溢出。
+ * 轨道内压扁回弹，不向容器外溢出。
  */
 function ElasticSlider({
     value: valueProp,
@@ -145,6 +145,7 @@ function ElasticSlider({
         draggingRef.current = false
         const next = dragValueRef.current
         setDragging(false)
+        // pointerup / lostpointercapture 谁先到都要能提交，避免 seek 丢提交
         if (commit) {
             onValueCommit?.(next)
         }
@@ -253,7 +254,8 @@ function ElasticSlider({
                     onPointerDown={handlePointerDown}
                     onPointerUp={() => endDrag(true)}
                     onPointerCancel={() => endDrag(true)}
-                    onLostPointerCapture={() => endDrag(false)}
+                    // 与 pointerup 二选一触发；都走 commit，endDrag 幂等
+                    onLostPointerCapture={() => endDrag(true)}
                     onKeyDown={(event) => {
                         if (disabled) {
                             return

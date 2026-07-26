@@ -1,6 +1,6 @@
 /**
  * 网易云多账号保险库
- * - 活跃 cookie 仍走 auth-cookie（API 请求）
+ * - 活跃 cookie 仍走 auth-cookie，供 API 请求
  * - 本模块只负责多账号快照与切换
  */
 
@@ -103,7 +103,7 @@ function getActiveUserId(): number | null {
     return readVault().activeUserId
 }
 
-/** 将当前 cookie + 资料写入保险库并标为活跃（不派发事件，由调用方 setState） */
+/** 将当前 cookie 与资料写入保险库并标为活跃，不派发事件由调用方 setState */
 function upsertActiveAccount(profile: NeteaseProfile): void {
     const credentials = snapshotNeteaseCredentials()
     if (!credentials) {
@@ -130,7 +130,7 @@ function upsertActiveAccount(profile: NeteaseProfile): void {
 
 /**
  * 切换到已保存账号。
- * 先把当前活跃 cookie 回写保险库（若仍登录），再应用目标凭证。
+ * 若仍登录则先把当前活跃 cookie 回写保险库，再应用目标凭证。
  */
 function switchNeteaseAccount(userId: number): boolean {
     const vault = readVault()
@@ -161,7 +161,7 @@ function switchNeteaseAccount(userId: number): boolean {
     return true
 }
 
-/** 仅清当前 cookie，账号仍留在列表（可再切换） */
+/** 仅清当前 cookie，账号仍留在列表可再切换 */
 function deactivateNeteaseSession(): void {
     clearNeteaseSession()
     const vault = readVault()

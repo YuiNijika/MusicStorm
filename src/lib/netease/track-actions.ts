@@ -1,0 +1,97 @@
+import { invoke } from "@tauri-apps/api/core"
+
+import { resolvePlayableUrl } from "@/lib/music/resolve-url"
+import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { setLyricOverride } from "@/lib/lyric/overrides"
+import { notifyInfo, notifySuccess } from "@/lib/notify"
+import type { Track } from "@/lib/types"
+
+function isTauriRuntime(): boolean {
+    return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+}
+
+/** 从歌单移除歌曲 op=del */
+async function removeTracksFromPlaylist(
+    playlistId: string,
+    trackIds: string[],
+): Promise<void> {
+    const ids = trackIds.filter((id) => /^\d+$/.test(id))
+    if (!ids.length) {
+        throw new Error("无效歌曲 id")
+    }
+    const data = await neteaseRequest<{ code?: number; message?: string }>({
+        path: NETEASE_PATHS.playlistTracks,
+        method: "POST",
+        params: {
+            op: "del",
+            pid: playlistId,
+            tracks: ids.join(","),
+            timestamp: Date.now(),
+        },
+        skipCache: true,
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(data.message || `移出失败 code=${data.code}`)
+    }
+}
+
+function guessExtFromUrl(url: string): string {
+    try {
+        const path = new URL(url).pathname
+        const match = /\.([a-z0-9]{2,5})$/i.exec(path)
+        if (match) {
+            return match[1].toLowerCase()
+        }
+    } catch {
+        // ignore
+    }
+    return "mp3"
+}
+
+async function downloadNeteaseTrack(track: Track): Promise<void> {
+    if (track.source !== "netease" || !/^\d+$/.test(track.id)) {
+        throw new Error("仅支持网易云歌曲下载")
+    }
+    if (!isTauriRuntime()) {
+        throw new Error("请在桌面应用中下载")
+    }
+
+    const resolved = await resolvePlayableUrl(track)
+    if (!resolved.ok) {
+        throw new Error(resolved.reason)
+    }
+
+    const ext = guessExtFromUrl(resolved.url)
+    const base = `${track.artist || "未知"} - ${track.title || track.id}`.slice(0, 80)
+    const saved = await invoke<string | null>("save_url_to_file", {
+        url: resolved.url,
+        defaultName: `${base}.${ext}`,
+    })
+    if (!saved) {
+        notifyInfo("已取消下载")
+        return
+    }
+    notifySuccess("下载完成", { description: track.title })
+}
+
+async function overrideTrackLyric(track: Track): Promise<void> {
+    if (!isTauriRuntime()) {
+        throw new Error("请在桌面应用中选择歌词文件")
+    }
+    const text = await invoke<string | null>("pick_text_file")
+    if (text == null) {
+        notifyInfo("已取消")
+        return
+    }
+    if (!text.trim()) {
+        throw new Error("歌词文件为空")
+    }
+    setLyricOverride(track.id, text)
+    notifySuccess("已覆盖歌词", { description: track.title })
+}
+
+export {
+    downloadNeteaseTrack,
+    overrideTrackLyric,
+    removeTracksFromPlaylist,
+}

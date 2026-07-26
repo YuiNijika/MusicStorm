@@ -18,7 +18,24 @@
         "height": 800,
         "minWidth": 960,
         "minHeight": 640,
-        "decorations": false
+        "decorations": false,
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "splashscreen",
+        "title": "MusicStorm",
+        "url": "splashscreen.html",
+        "width": 440,
+        "height": 420,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "shadow": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

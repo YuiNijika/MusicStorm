@@ -1,4 +1,4 @@
-//! rodio 播放内核：仅本地 path（远程由前端 H5 处理）
+// rodio 本地播放内核；远程 URL 由前端 H5 处理
 
 use crate::audio::{emit_tick, AudioTickPayload};
 use rodio::{Decoder, OutputStream, Sink, Source};
@@ -40,7 +40,7 @@ struct SharedPlayback {
 impl PlayerHandle {
     pub fn load(&self, source: String, remote: bool) -> Result<(), String> {
         if remote || is_remote_source(&source) {
-            return Err("原生引擎仅支持本地文件".into());
+            return Err("仅支持本地文件".into());
         }
         let (tx, rx) = mpsc::channel();
         self.send(PlayerCmd::Load { source, reply: tx })?;
@@ -50,7 +50,7 @@ impl PlayerHandle {
 
     pub fn play(&self, source: String, remote: bool) -> Result<(), String> {
         if remote || is_remote_source(&source) {
-            return Err("原生引擎仅支持本地文件".into());
+            return Err("仅支持本地文件".into());
         }
         let (tx, rx) = mpsc::channel();
         self.send(PlayerCmd::Play { source, reply: tx })?;
@@ -134,7 +134,7 @@ fn run_worker(
 
     let mut last_volume = -1.0_f32;
     let mut current_source: Option<String> = None;
-    // sink 内是否已有可恢复的缓冲（同 path 的 play 只 resume）
+    // sink 内是否已有可恢复缓冲；同 path 的 play 只 resume
     let mut has_buffer = false;
 
     let app_tick = app.clone();
@@ -166,39 +166,15 @@ fn run_worker(
                 let _ = reply.send(result);
             }
             Ok(PlayerCmd::Play { source, reply }) => {
-                let same = current_source.as_ref() == Some(&source);
-                let result = if same && has_buffer && !sink.empty() {
-                    // 同曲 resume：不重置进度
-                    if let Ok(v) = volume.lock() {
-                        sink.set_volume(*v);
-                        last_volume = *v;
-                    }
-                    sink.play();
-                    shared.playing.store(true, Ordering::Relaxed);
-                    shared.ended.store(false, Ordering::Relaxed);
-                    Ok(())
-                } else {
-                    match start_playback_from(&sink, &source, &shared, 0.0) {
-                        Ok(()) => {
-                            current_source = Some(source);
-                            has_buffer = true;
-                            if let Ok(v) = volume.lock() {
-                                sink.set_volume(*v);
-                                last_volume = *v;
-                            }
-                            sink.play();
-                            shared.playing.store(true, Ordering::Relaxed);
-                            shared.ended.store(false, Ordering::Relaxed);
-                            Ok(())
-                        }
-                        Err(error) => {
-                            eprintln!("[audio] play error: {error}");
-                            has_buffer = false;
-                            shared.playing.store(false, Ordering::Relaxed);
-                            Err(error)
-                        }
-                    }
-                };
+                let result = apply_play(
+                    &sink,
+                    &shared,
+                    &volume,
+                    &mut last_volume,
+                    &mut has_buffer,
+                    &mut current_source,
+                    source,
+                );
                 let _ = reply.send(result);
             }
             Ok(PlayerCmd::Pause) => {
@@ -206,46 +182,70 @@ fn run_worker(
                 shared.playing.store(false, Ordering::Relaxed);
             }
             Ok(PlayerCmd::Seek(ms)) => {
-                let target = ms.max(0.0);
-                let Some(source) = current_source.clone() else {
-                    shared
-                        .position_ms
-                        .store(target.to_bits(), Ordering::Relaxed);
-                    continue;
-                };
-                let was_playing = shared.playing.load(Ordering::Relaxed);
+                // 合并连续 Seek，只落地最后一次，避免拖动 thrash
+                let mut target = ms.max(0.0);
+                let mut deferred: Vec<PlayerCmd> = Vec::new();
+                while let Ok(cmd) = rx.try_recv() {
+                    match cmd {
+                        PlayerCmd::Seek(next_ms) => target = next_ms.max(0.0),
+                        other => deferred.push(other),
+                    }
+                }
 
-                // 优先 try_seek（格式支持时即时跳转）
-                let seeked = if has_buffer && !sink.empty() {
-                    sink.try_seek(Duration::from_millis(target as u64)).is_ok()
-                } else {
-                    false
-                };
+                apply_seek(
+                    &sink,
+                    &shared,
+                    &volume,
+                    &mut last_volume,
+                    &mut has_buffer,
+                    &current_source,
+                    target,
+                );
 
-                if seeked {
-                    shared
-                        .position_ms
-                        .store(target.to_bits(), Ordering::Relaxed);
-                } else {
-                    // 回退：重开 decoder + skip_duration
-                    match start_playback_from(&sink, &source, &shared, target) {
-                        Ok(()) => {
-                            has_buffer = true;
-                            if let Ok(v) = volume.lock() {
-                                sink.set_volume(*v);
-                                last_volume = *v;
+                // 延迟的非 seek 命令按序处理
+                for cmd in deferred {
+                    match cmd {
+                        PlayerCmd::Load { source, reply } => {
+                            let result = validate_local_path(&source).map(|_| ());
+                            if result.is_ok() {
+                                current_source = Some(source);
                             }
-                            if was_playing {
-                                sink.play();
-                                shared.playing.store(true, Ordering::Relaxed);
-                            } else {
-                                sink.pause();
-                                shared.playing.store(false, Ordering::Relaxed);
-                            }
-                            shared.ended.store(false, Ordering::Relaxed);
+                            let _ = reply.send(result);
                         }
-                        Err(error) => {
-                            eprintln!("[audio] seek error: {error}");
+                        PlayerCmd::Play { source, reply } => {
+                            let result = apply_play(
+                                &sink,
+                                &shared,
+                                &volume,
+                                &mut last_volume,
+                                &mut has_buffer,
+                                &mut current_source,
+                                source,
+                            );
+                            let _ = reply.send(result);
+                        }
+                        PlayerCmd::Pause => {
+                            sink.pause();
+                            shared.playing.store(false, Ordering::Relaxed);
+                        }
+                        PlayerCmd::Stop => {
+                            sink.stop();
+                            has_buffer = false;
+                            shared.playing.store(false, Ordering::Relaxed);
+                            shared
+                                .position_ms
+                                .store(0f64.to_bits(), Ordering::Relaxed);
+                        }
+                        PlayerCmd::Seek(next_ms) => {
+                            apply_seek(
+                                &sink,
+                                &shared,
+                                &volume,
+                                &mut last_volume,
+                                &mut has_buffer,
+                                &current_source,
+                                next_ms.max(0.0),
+                            );
                         }
                     }
                 }
@@ -267,7 +267,8 @@ fn run_worker(
             }
         }
 
-        if shared.playing.load(Ordering::Relaxed) && sink.empty() {
+        // 仅在有缓冲且 sink 自然耗尽时 ended；seek 失败后 has_buffer=false 不会误触发
+        if shared.playing.load(Ordering::Relaxed) && has_buffer && sink.empty() {
             shared.playing.store(false, Ordering::Relaxed);
             shared.ended.store(true, Ordering::Relaxed);
             has_buffer = false;
@@ -290,9 +291,141 @@ fn run_worker(
     Ok(())
 }
 
+fn apply_play(
+    sink: &Sink,
+    shared: &SharedPlayback,
+    volume: &Arc<Mutex<f32>>,
+    last_volume: &mut f32,
+    has_buffer: &mut bool,
+    current_source: &mut Option<String>,
+    source: String,
+) -> Result<(), String> {
+    let same = current_source.as_ref() == Some(&source);
+    if same && *has_buffer && !sink.empty() {
+        // 同曲 resume：不重置进度
+        if let Ok(v) = volume.lock() {
+            sink.set_volume(*v);
+            *last_volume = *v;
+        }
+        sink.play();
+        shared.playing.store(true, Ordering::Relaxed);
+        shared.ended.store(false, Ordering::Relaxed);
+        return Ok(());
+    }
+
+    match start_playback_from(sink, &source, shared, 0.0) {
+        Ok(()) => {
+            *current_source = Some(source);
+            *has_buffer = true;
+            if let Ok(v) = volume.lock() {
+                sink.set_volume(*v);
+                *last_volume = *v;
+            }
+            sink.play();
+            shared.playing.store(true, Ordering::Relaxed);
+            shared.ended.store(false, Ordering::Relaxed);
+            Ok(())
+        }
+        Err(error) => {
+            eprintln!("[audio] play error: {error}");
+            *has_buffer = false;
+            shared.playing.store(false, Ordering::Relaxed);
+            shared.ended.store(false, Ordering::Relaxed);
+            Err(error)
+        }
+    }
+}
+
+fn apply_seek(
+    sink: &Sink,
+    shared: &SharedPlayback,
+    volume: &Arc<Mutex<f32>>,
+    last_volume: &mut f32,
+    has_buffer: &mut bool,
+    current_source: &Option<String>,
+    target: f64,
+) {
+    let Some(source) = current_source.clone() else {
+        shared
+            .position_ms
+            .store(target.to_bits(), Ordering::Relaxed);
+        return;
+    };
+    let was_playing = shared.playing.load(Ordering::Relaxed);
+
+    // 优先 try_seek，格式支持时即时跳转
+    let seeked = if *has_buffer && !sink.empty() {
+        sink.try_seek(Duration::from_millis(target as u64)).is_ok()
+    } else {
+        false
+    };
+
+    if seeked {
+        shared
+            .position_ms
+            .store(target.to_bits(), Ordering::Relaxed);
+        shared.ended.store(false, Ordering::Relaxed);
+        return;
+    }
+
+    // 回退：重开 decoder + skip_duration
+    // stop 后 sink 为空；失败时必须清 playing/has_buffer，否则误触发 ended
+    match start_playback_from(sink, &source, shared, target) {
+        Ok(()) => {
+            *has_buffer = true;
+            if let Ok(v) = volume.lock() {
+                sink.set_volume(*v);
+                *last_volume = *v;
+            }
+            if was_playing {
+                sink.play();
+                shared.playing.store(true, Ordering::Relaxed);
+            } else {
+                sink.pause();
+                shared.playing.store(false, Ordering::Relaxed);
+            }
+            shared.ended.store(false, Ordering::Relaxed);
+        }
+        Err(error) => {
+            eprintln!("[audio] seek error: {error}");
+            // 失败后 sink 已空；尽量恢复播放，避免前端 isPlaying 空转
+            if was_playing {
+                match start_playback_from(sink, &source, shared, 0.0) {
+                    Ok(()) => {
+                        *has_buffer = true;
+                        if let Ok(v) = volume.lock() {
+                            sink.set_volume(*v);
+                            *last_volume = *v;
+                        }
+                        sink.play();
+                        shared.playing.store(true, Ordering::Relaxed);
+                        shared.ended.store(false, Ordering::Relaxed);
+                    }
+                    Err(recover_err) => {
+                        eprintln!("[audio] seek recover error: {recover_err}");
+                        *has_buffer = false;
+                        shared.playing.store(false, Ordering::Relaxed);
+                        shared.ended.store(false, Ordering::Relaxed);
+                        shared
+                            .position_ms
+                            .store(target.to_bits(), Ordering::Relaxed);
+                    }
+                }
+            } else {
+                *has_buffer = false;
+                shared.playing.store(false, Ordering::Relaxed);
+                shared.ended.store(false, Ordering::Relaxed);
+                shared
+                    .position_ms
+                    .store(target.to_bits(), Ordering::Relaxed);
+            }
+        }
+    }
+}
+
 fn validate_local_path(source: &str) -> Result<std::path::PathBuf, String> {
     if is_remote_source(source) {
-        return Err("原生引擎仅支持本地文件".into());
+        return Err("仅支持本地文件".into());
     }
 
     let path = source
@@ -310,12 +443,12 @@ fn validate_local_path(source: &str) -> Result<std::path::PathBuf, String> {
     };
     let path = Path::new(path);
     if !path.exists() {
-        return Err(format!("文件不存在: {}", path.display()));
+        return Err("文件不可用".into());
     }
     Ok(path.to_path_buf())
 }
 
-/// 从 offset_ms 开始解码入 sink（skip_duration 兜底真 seek）
+/// 从 offset_ms 解码入 sink，skip_duration 作真 seek 兜底
 fn start_playback_from(
     sink: &Sink,
     source: &str,
@@ -327,7 +460,7 @@ fn start_playback_from(
     let path_buf = validate_local_path(source)?;
     let file = File::open(&path_buf).map_err(|e| format!("打开文件失败: {e}"))?;
     let reader = BufReader::new(file);
-    let decoder = Decoder::new(reader).map_err(|e| format!("解码失败: {e}"))?;
+    let decoder = Decoder::new(reader).map_err(|_| "此格式暂时无法播放".to_string())?;
 
     if let Some(total) = decoder.total_duration() {
         shared.duration_ms.store(
@@ -335,7 +468,7 @@ fn start_playback_from(
             Ordering::Relaxed,
         );
     } else {
-        // 保留扫描写入的 duration（前端已有则 tick 会用引擎值；此处不强制清 0）
+        // 保留扫描写入的 duration，不强制清零
     }
 
     let duration_ms = f64::from_bits(shared.duration_ms.load(Ordering::Relaxed));

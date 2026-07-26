@@ -1,6 +1,6 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
-import type { Radio, Track } from "@/lib/types"
+import type { Radio, RadioProgram, Track } from "@/lib/types"
 
 type DjRadioRaw = {
     id?: number
@@ -37,6 +37,7 @@ type DjProgramRaw = {
     coverUrl?: string
     coverImgUrl?: string
     description?: string
+    desc?: string
     duration?: number
     createTime?: number
     listenerCount?: number
@@ -47,7 +48,7 @@ type DjProgramRaw = {
         album?: { picUrl?: string; name?: string }
         artists?: { name?: string }[]
     }
-    radio?: { name?: string; picUrl?: string }
+    radio?: { id?: number; name?: string; picUrl?: string }
     dj?: { nickname?: string }
 }
 
@@ -55,6 +56,12 @@ type DjProgramListData = {
     code?: number
     programs?: DjProgramRaw[]
     count?: number
+}
+
+type DjProgramDetailData = {
+    code?: number
+    program?: DjProgramRaw
+    data?: DjProgramRaw
 }
 
 function mapRadio(item: DjRadioRaw): Radio | null {
@@ -70,6 +77,97 @@ function mapRadio(item: DjRadioRaw): Radio | null {
         programCount: item.programCount,
         djName: item.dj?.nickname || item.dj?.brand,
         category: item.category,
+    }
+}
+
+function programCover(program: DjProgramRaw): string {
+    const cover =
+        program.coverUrl ||
+        program.coverImgUrl ||
+        program.radio?.picUrl ||
+        program.mainSong?.album?.picUrl ||
+        ""
+    return cover ? `${cover}?param=480y480` : ""
+}
+
+function mapProgramToTrack(
+    program: DjProgramRaw,
+    radioTitle?: string,
+): Track | null {
+    const main = program.mainSong
+    const songId = main?.id ?? program.id
+    if (songId == null) {
+        return null
+    }
+
+    if (main && main.name) {
+        const track = mapNeteaseSongToTrack({
+            ...main,
+            id: Number(main.id ?? songId),
+            name: main.name,
+            dt: main.dt ?? main.duration ?? program.duration,
+        })
+        if (program.name?.trim()) {
+            track.title = program.name.trim()
+        }
+        if (!track.coverUrl) {
+            track.coverUrl = programCover(program)
+        }
+        if (radioTitle) {
+            track.album = radioTitle
+        }
+        return track
+    }
+
+    return {
+        id: String(songId),
+        title: program.name?.trim() || "未知节目",
+        artist: program.dj?.nickname || "播客",
+        album: radioTitle || program.radio?.name || "电台",
+        coverUrl: programCover(program),
+        durationMs: program.duration ?? 0,
+        source: "netease",
+    }
+}
+
+function mapProgram(
+    program: DjProgramRaw,
+    fallbackRadioId?: string,
+    fallbackRadioTitle?: string,
+): RadioProgram | null {
+    if (program.id == null) {
+        return null
+    }
+    const track = mapProgramToTrack(
+        program,
+        fallbackRadioTitle || program.radio?.name,
+    )
+    if (!track) {
+        return null
+    }
+    const radioId =
+        program.radio?.id != null
+            ? String(program.radio.id)
+            : fallbackRadioId
+
+    return {
+        id: String(program.id),
+        title: program.name?.trim() || track.title,
+        coverUrl: programCover(program) || track.coverUrl,
+        description:
+            program.description?.trim() ||
+            program.desc?.trim() ||
+            undefined,
+        durationMs: program.duration ?? track.durationMs,
+        radioId,
+        radioTitle: fallbackRadioTitle || program.radio?.name,
+        djName: program.dj?.nickname,
+        listenerCount: program.listenerCount,
+        createTime: program.createTime,
+        track: {
+            ...track,
+            album: track.album || fallbackRadioTitle || program.radio?.name || "电台",
+        },
     }
 }
 
@@ -137,87 +235,130 @@ async function fetchDjDetail(rid: string): Promise<Radio> {
     return mapped
 }
 
-function mapProgramToTrack(program: DjProgramRaw, radioTitle?: string): Track | null {
-    const main = program.mainSong
-    const songId = main?.id ?? program.id
-    if (songId == null) {
-        return null
-    }
-
-    if (main && main.name) {
-        const track = mapNeteaseSongToTrack({
-            ...main,
-            id: Number(main.id ?? songId),
-            name: main.name,
-            dt: main.dt ?? main.duration ?? program.duration,
-        })
-        // 节目名优先
-        if (program.name?.trim()) {
-            track.title = program.name.trim()
-        }
-        if (!track.coverUrl) {
-            const cover =
-                program.coverUrl ||
-                program.coverImgUrl ||
-                program.radio?.picUrl ||
-                main.album?.picUrl
-            track.coverUrl = cover ? `${cover}?param=400y400` : ""
-        }
-        if (radioTitle) {
-            track.album = radioTitle
-        }
-        return track
-    }
-
-    const cover =
-        program.coverUrl || program.coverImgUrl || program.radio?.picUrl || ""
-    return {
-        id: String(songId),
-        title: program.name?.trim() || "未知节目",
-        artist: program.dj?.nickname || "播客",
-        album: radioTitle || program.radio?.name || "电台",
-        coverUrl: cover ? `${cover}?param=400y400` : "",
-        durationMs: program.duration ?? 0,
-        source: "netease",
-    }
-}
-
-async function fetchDjPrograms(
+async function fetchDjProgramList(
     rid: string,
     limit = 50,
     offset = 0,
-): Promise<Track[]> {
+): Promise<RadioProgram[]> {
     const data = await neteaseRequest<DjProgramListData>({
         path: NETEASE_PATHS.djProgram,
         params: { rid, limit, offset, asc: false },
     })
     const programs = data.programs ?? []
     return programs
-        .map((item) => mapProgramToTrack(item))
-        .filter((item): item is Track => item != null)
+        .map((item) => mapProgram(item, rid))
+        .filter((item): item is RadioProgram => item != null)
+}
+
+/** @deprecated 用 fetchDjProgramList；保留曲目数组兼容 */
+async function fetchDjPrograms(
+    rid: string,
+    limit = 50,
+    offset = 0,
+): Promise<Track[]> {
+    const programs = await fetchDjProgramList(rid, limit, offset)
+    return programs.map((item) => item.track)
 }
 
 async function fetchDjDetailWithPrograms(rid: string): Promise<{
     radio: Radio
+    programs: RadioProgram[]
     tracks: Track[]
 }> {
-    const [radio, tracks] = await Promise.all([
+    const [radio, programs] = await Promise.all([
         fetchDjDetail(rid),
-        fetchDjPrograms(rid, 50, 0),
+        fetchDjProgramList(rid, 50, 0),
     ])
-    // 补专辑名为电台名
-    const withAlbum = tracks.map((track) => ({
-        ...track,
-        album: track.album || radio.title,
+    const withRadio = programs.map((item) => ({
+        ...item,
+        radioId: item.radioId || radio.id,
+        radioTitle: item.radioTitle || radio.title,
+        track: {
+            ...item.track,
+            album: item.track.album || radio.title,
+        },
     }))
-    return { radio, tracks: withAlbum }
+    return {
+        radio,
+        programs: withRadio,
+        tracks: withRadio.map((item) => item.track),
+    }
+}
+
+async function fetchDjProgramDetail(
+    programId: string,
+    radioId?: string,
+): Promise<RadioProgram> {
+    try {
+        const data = await neteaseRequest<DjProgramDetailData>({
+            path: NETEASE_PATHS.djProgramDetail,
+            params: { id: programId },
+            skipCache: false,
+        })
+        const raw = data.program ?? data.data
+        if (raw) {
+            const mapped = mapProgram(raw, radioId)
+            if (mapped) {
+                return mapped
+            }
+        }
+    } catch {
+        // 回落：从电台节目列表找
+    }
+
+    if (radioId) {
+        const list = await fetchDjProgramList(radioId, 100, 0)
+        const hit = list.find((item) => item.id === programId)
+        if (hit) {
+            return hit
+        }
+    }
+
+    throw new Error("节目不存在或无法加载")
+}
+
+type DjSublistData = {
+    code?: number
+    count?: number
+    djRadios?: DjRadioRaw[]
+    data?: DjRadioRaw[]
+}
+
+/** 已订阅电台列表，需登录 */
+async function fetchDjSublist(limit = 1000, offset = 0): Promise<Radio[]> {
+    const data = await neteaseRequest<DjSublistData>({
+        path: NETEASE_PATHS.djSublist,
+        params: { limit, offset },
+        skipCache: true,
+    })
+    const list = data.djRadios ?? data.data ?? []
+    return list
+        .map(mapRadio)
+        .filter((item): item is Radio => item != null)
+}
+
+/** t=true 订阅 / false 取消 */
+async function subscribeDjRadio(rid: string, subscribe: boolean): Promise<void> {
+    const id = rid.trim()
+    if (!/^\d+$/.test(id)) {
+        throw new Error("无效电台 id")
+    }
+    await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.djSub,
+        params: { rid: id, t: subscribe ? 1 : 0 },
+        skipCache: true,
+    })
 }
 
 export {
     fetchDjDetail,
     fetchDjDetailWithPrograms,
     fetchDjHot,
+    fetchDjProgramDetail,
+    fetchDjProgramList,
     fetchDjPrograms,
     fetchDjRecommend,
+    fetchDjSublist,
     fetchHomeRadios,
+    subscribeDjRadio,
 }

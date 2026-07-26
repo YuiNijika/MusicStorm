@@ -14,7 +14,7 @@ import {
     searchNeteaseAll,
     type NeteaseSearchBundle,
 } from "@/lib/netease/search"
-import { notifyError } from "@/lib/notify"
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -167,8 +167,30 @@ function SearchPage() {
         }
     }, [mode, submittedQuery])
 
-    function runRemoteSearch() {
-        setSubmittedQuery(query.trim())
+    function runSearch() {
+        const keyword = query.trim()
+        if (mode === "netease") {
+            setSubmittedQuery(keyword)
+            return
+        }
+
+        // 本地：即时过滤已生效；按钮/回车给出一次明确反馈
+        if (!keyword) {
+            notifyInfo("输入关键词筛选本地", {
+                description: `资料库共 ${localCatalog.length} 首`,
+            })
+            return
+        }
+        const songCount = localResults.length
+        const artistCount = localArtists.length
+        const albumCount = localAlbums.length
+        if (songCount === 0 && artistCount === 0 && albumCount === 0) {
+            notifyInfo("没有匹配的内容", { description: `关键词「${keyword}」` })
+            return
+        }
+        notifySuccess("已筛选本地", {
+            description: `歌曲 ${songCount} · 艺人 ${artistCount} · 专辑 ${albumCount}`,
+        })
     }
 
     function handleModeChange(next: SearchMode) {
@@ -211,9 +233,9 @@ function SearchPage() {
                             value={query}
                             onChange={(event) => setQuery(event.currentTarget.value)}
                             onKeyDown={(event) => {
-                                if (event.key === "Enter" && mode === "netease") {
+                                if (event.key === "Enter") {
                                     event.preventDefault()
-                                    runRemoteSearch()
+                                    runSearch()
                                 }
                             }}
                             placeholder={
@@ -224,19 +246,21 @@ function SearchPage() {
                             className="h-full w-full bg-transparent text-[14px] outline-none placeholder:text-muted-foreground"
                         />
                     </label>
-                    {mode === "netease" ? (
-                        <button
-                            type="button"
-                            onClick={runRemoteSearch}
-                            disabled={!query.trim() || isLoading}
-                            className={cn(
-                                "h-11 shrink-0 cursor-pointer rounded-2xl bg-foreground px-4 text-[13px] font-medium text-background",
-                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
-                            )}
-                        >
-                            {isLoading ? "搜索中…" : "搜索"}
-                        </button>
-                    ) : null}
+                    <button
+                        type="button"
+                        onClick={runSearch}
+                        disabled={
+                            mode === "netease"
+                                ? !query.trim() || isLoading
+                                : false
+                        }
+                        className={cn(
+                            "h-11 shrink-0 cursor-pointer rounded-2xl bg-foreground px-4 text-[13px] font-medium text-background",
+                            "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
+                        )}
+                    >
+                        {mode === "netease" && isLoading ? "搜索中…" : "搜索"}
+                    </button>
                 </div>
             </div>
 

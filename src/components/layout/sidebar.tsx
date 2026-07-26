@@ -1,9 +1,11 @@
 import {
+    BarChart3,
     FolderOpen,
     Home,
     Library,
     LogIn,
     LogOut,
+    Podcast,
     Search,
     Settings2,
     User,
@@ -29,8 +31,10 @@ import { cn } from "@/lib/utils"
 const ICONS: Record<AppRoute, LucideIcon> = {
     home: Home,
     library: Library,
+    radios: Podcast,
     search: Search,
     local: FolderOpen,
+    stats: BarChart3,
     settings: Settings2,
 }
 

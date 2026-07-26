@@ -19,6 +19,7 @@ import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import { cn } from "@/lib/utils"
 
 type PlayerBarProps = {
@@ -89,7 +90,10 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                 )}
                             >
                                 <Cover
-                                    src={currentTrack.coverUrl}
+                                    src={resolveTrackCoverUrl(
+                                        currentTrack.id,
+                                        currentTrack.coverUrl,
+                                    )}
                                     alt={currentTrack.title}
                                     size="md"
                                     className="shadow-[0_6px_16px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] transition-[box-shadow] group-hover:shadow-[0_10px_24px_rgba(15,23,42,0.22)] dark:ring-white/[0.08]"

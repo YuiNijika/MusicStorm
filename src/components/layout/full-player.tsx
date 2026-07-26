@@ -43,11 +43,15 @@ import {
     setNeteaseQualityBr,
     type QualityBr,
 } from "@/lib/netease/quality"
+import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import {
+    CHROME_EVENT,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
+    getFullPlayerChrome,
     getFullPlayerLayout,
     setFullPlayerLayout,
+    type FullPlayerChrome,
     type FullPlayerLayout,
 } from "@/lib/player/full-player-prefs"
 import { cn } from "@/lib/utils"
@@ -55,6 +59,18 @@ import { cn } from "@/lib/utils"
 type FullPlayerProps = {
     open: boolean
     onClose: () => void
+}
+
+/** closed → entering → open → exiting → closed */
+type Phase = "closed" | "entering" | "open" | "exiting"
+
+const DRAWER_MS = 420
+
+function prefersReducedMotion(): boolean {
+    if (typeof window === "undefined") {
+        return false
+    }
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
 }
 
 function FullPlayer({ open, onClose }: FullPlayerProps) {
@@ -83,19 +99,59 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
+    const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
+    const [phase, setPhase] = useState<Phase>("closed")
+    const [mountedTrack, setMountedTrack] = useState(currentTrack)
 
     useEffect(() => {
         function onLayout() {
             setLayout(getFullPlayerLayout())
         }
+        function onChrome() {
+            setChrome(getFullPlayerChrome())
+        }
         window.addEventListener(LAYOUT_EVENT, onLayout)
+        window.addEventListener(CHROME_EVENT, onChrome)
         return () => {
             window.removeEventListener(LAYOUT_EVENT, onLayout)
+            window.removeEventListener(CHROME_EVENT, onChrome)
         }
     }, [])
 
     useEffect(() => {
-        if (!open) {
+        if (open && currentTrack) {
+            setMountedTrack(currentTrack)
+            if (phase === "closed" || phase === "exiting") {
+                setPhase("entering")
+                const reduce = prefersReducedMotion()
+                const t = window.setTimeout(() => setPhase("open"), reduce ? 0 : 16)
+                return () => window.clearTimeout(t)
+            }
+        }
+        return undefined
+    }, [open, currentTrack, phase])
+
+    useEffect(() => {
+        if (!open && (phase === "open" || phase === "entering")) {
+            setPhase("exiting")
+            const reduce = prefersReducedMotion()
+            const t = window.setTimeout(
+                () => setPhase("closed"),
+                reduce ? 0 : DRAWER_MS,
+            )
+            return () => window.clearTimeout(t)
+        }
+        return undefined
+    }, [open, phase])
+
+    useEffect(() => {
+        if (open && currentTrack && phase !== "closed" && phase !== "exiting") {
+            setMountedTrack(currentTrack)
+        }
+    }, [currentTrack, open, phase])
+
+    useEffect(() => {
+        if (phase === "closed" || phase === "exiting") {
             return
         }
         function onKey(event: KeyboardEvent) {
@@ -106,22 +162,34 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [open, onClose])
+    }, [phase, onClose])
 
-    if (!open || !currentTrack) {
+    const displayTrack = mountedTrack ?? currentTrack
+    if (phase === "closed" || !displayTrack) {
         return null
     }
 
-    const totalMs = durationMs > 0 ? durationMs : currentTrack.durationMs
-    const showQuality = currentTrack.source === "netease"
+    const displayCover = resolveTrackCoverUrl(
+        displayTrack.id,
+        displayTrack.coverUrl,
+    )
+    const totalMs = durationMs > 0 ? durationMs : displayTrack.durationMs
+    const showQuality = displayTrack.source === "netease"
     const canLike =
-        loggedIn && currentTrack.source === "netease" && Boolean(currentTrack.id)
-    const liked = isTrackLiked(currentTrack.id)
-    const primaryArtist = currentTrack.artists?.find((item) => item.id)
+        loggedIn && displayTrack.source === "netease" && Boolean(displayTrack.id)
+    const liked = isTrackLiked(displayTrack.id)
+    const primaryArtist = displayTrack.artists?.find((item) => item.id)
     const canOpenArtist =
-        currentTrack.source === "netease" && Boolean(primaryArtist?.id)
+        displayTrack.source === "netease" && Boolean(primaryArtist?.id)
     const canOpenAlbum =
-        currentTrack.source === "netease" && Boolean(currentTrack.albumId)
+        displayTrack.source === "netease" && Boolean(displayTrack.albumId)
+    const lyricsActive = phase === "open" || phase === "entering"
+    const sheetMotion =
+        phase === "entering" || phase === "open"
+            ? "translate-y-0 opacity-100"
+            : "translate-y-full opacity-0"
+    const scrimMotion =
+        phase === "entering" || phase === "open" ? "opacity-100" : "opacity-0"
 
     function navigateArtist() {
         if (!primaryArtist?.id) {
@@ -132,10 +200,10 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     }
 
     function navigateAlbum() {
-        if (!currentTrack.albumId) {
+        if (!displayTrack.albumId) {
             return
         }
-        openAlbum(currentTrack.albumId)
+        openAlbum(displayTrack.albumId)
         onClose()
     }
 
@@ -155,7 +223,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             return
         }
         try {
-            await toggleTrackLiked(currentTrack.id)
+            await toggleTrackLiked(displayTrack.id)
         } catch {
             // store 已回滚
         }
@@ -196,9 +264,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         <div className="space-y-1.5 text-center">
             <div className="flex items-center justify-center gap-2">
                 <h2 className="truncate text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px]">
-                    {currentTrack.title}
+                    {displayTrack.title}
                 </h2>
-                <SourceBadge source={currentTrack.source} />
+                <SourceBadge source={displayTrack.source} />
             </div>
             <p className="truncate text-[14px] text-muted-foreground sm:text-[15px]">
                 {canOpenArtist ? (
@@ -207,12 +275,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         onClick={navigateArtist}
                         className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
                     >
-                        {currentTrack.artist}
+                        {displayTrack.artist}
                     </button>
                 ) : (
-                    <span>{currentTrack.artist}</span>
+                    <span>{displayTrack.artist}</span>
                 )}
-                {currentTrack.album ? (
+                {displayTrack.album ? (
                     <>
                         <span className="mx-1 text-muted-foreground/50">·</span>
                         {canOpenAlbum ? (
@@ -221,10 +289,10 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 onClick={navigateAlbum}
                                 className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
                             >
-                                {currentTrack.album}
+                                {displayTrack.album}
                             </button>
                         ) : (
-                            <span>{currentTrack.album}</span>
+                            <span>{displayTrack.album}</span>
                         )}
                     </>
                 ) : null}
@@ -234,15 +302,21 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     return (
         <div
-            className="fixed inset-0 z-[80] flex flex-col animate-in fade-in duration-200"
+            className="fixed inset-0 z-[80] flex flex-col"
             role="dialog"
             aria-modal="true"
             aria-label="正在播放"
         >
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                {currentTrack.coverUrl ? (
+            <div
+                className={cn(
+                    "pointer-events-none absolute inset-0 overflow-hidden transition-opacity ease-out",
+                    scrimMotion,
+                )}
+                style={{ transitionDuration: `${DRAWER_MS}ms` }}
+            >
+                {displayCover ? (
                     <img
-                        src={currentTrack.coverUrl}
+                        src={displayCover}
                         alt=""
                         aria-hidden
                         className="size-full scale-110 object-cover opacity-40 blur-3xl dark:opacity-30"
@@ -251,7 +325,14 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background/90 dark:from-black/50 dark:via-background/80 dark:to-background/95" />
             </div>
 
-            <div className="glass-sheet relative flex h-full min-h-0 flex-col">
+            <div
+                className={cn(
+                    "glass-sheet relative flex h-full min-h-0 flex-col ease-[cubic-bezier(0.32,0.72,0,1)]",
+                    "transition-[transform,opacity]",
+                    sheetMotion,
+                )}
+                style={{ transitionDuration: `${DRAWER_MS}ms` }}
+            >
                 <div
                     data-tauri-drag-region
                     className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
@@ -310,8 +391,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         <div className="flex min-h-0 flex-col items-center justify-center gap-6">
                             <div className="w-full max-w-[min(400px,78vw)]">
                                 <Cover
-                                    src={currentTrack.coverUrl}
-                                    alt={currentTrack.title}
+                                    src={displayCover}
+                                    alt={displayTrack.title}
                                     size="xl"
                                     className={cn(
                                         "rounded-[28px] shadow-[0_24px_64px_rgba(15,23,42,0.28)]",
@@ -327,7 +408,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         </div>
                         <LyricsView
                             variant="full"
-                            active={open}
+                            active={lyricsActive}
                             className="min-h-0 flex-1"
                             listClassName="h-full"
                         />
@@ -338,8 +419,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
                         <div className="w-full max-w-[min(440px,82vw)]">
                             <Cover
-                                src={currentTrack.coverUrl}
-                                alt={currentTrack.title}
+                                src={displayCover}
+                                alt={displayTrack.title}
                                 size="xl"
                                 className={cn(
                                     "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
@@ -354,41 +435,13 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 ) : null}
 
                 {layout === "lyrics" ? (
-                    <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pb-3 pt-1">
-                        <div className="flex shrink-0 items-center gap-3">
-                            <Cover
-                                src={currentTrack.coverUrl}
-                                alt={currentTrack.title}
-                                size="md"
-                                className="rounded-2xl shadow-md ring-1 ring-white/15"
-                            />
-                            <div className="min-w-0 flex-1 text-left">
-                                <div className="flex min-w-0 items-center gap-2">
-                                    <p className="truncate text-[16px] font-semibold tracking-[-0.02em]">
-                                        {currentTrack.title}
-                                    </p>
-                                    <SourceBadge source={currentTrack.source} />
-                                </div>
-                                <p className="truncate text-[13px] text-muted-foreground">
-                                    {canOpenArtist ? (
-                                        <button
-                                            type="button"
-                                            onClick={navigateArtist}
-                                            className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                        >
-                                            {currentTrack.artist}
-                                        </button>
-                                    ) : (
-                                        <span>{currentTrack.artist}</span>
-                                    )}
-                                </p>
-                            </div>
-                        </div>
+                    <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
                         <LyricsView
                             variant="full"
-                            active={open}
-                            className="min-h-0 flex-1"
-                            listClassName="h-full"
+                            active={lyricsActive}
+                            align={chrome.lyricsAlign}
+                            className="h-full min-h-0 flex-1"
+                            listClassName="h-full py-2"
                         />
                     </div>
                 ) : null}

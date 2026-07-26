@@ -10,8 +10,10 @@ import {
 } from "react"
 
 import { recordPlaySessionEnd, startPlaySession } from "@/lib/db/play-stats"
+import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
+import { notifyError, notifyWarning } from "@/lib/notify"
 import {
     createHtml5Engine,
     type AudioEngine,
@@ -67,8 +69,40 @@ function formatInvokeError(error: unknown): string {
     try {
         return JSON.stringify(error)
     } catch {
-        return "play failed"
+        return "无法播放"
     }
+}
+
+/** 技术错误转成用户短句，不暴露引擎名 */
+function friendlyPlayError(error: unknown, trackTitle?: string): string {
+    const raw = formatInvokeError(error).toLowerCase()
+    const prefix = trackTitle ? `${trackTitle} · ` : ""
+    if (
+        /decode|unsupported|format|codec|invalid|unknown|not support|无法|失败|no such|eof|probe/.test(
+            raw,
+        )
+    ) {
+        return `${prefix}此格式暂时无法播放`
+    }
+    if (/permission|access|denied|找不到|not found|no such file/.test(raw)) {
+        return `${prefix}文件不可用`
+    }
+    if (/timeout|超时/.test(raw)) {
+        return `${prefix}加载超时`
+    }
+    // 已是中文短句则直接用
+    const original = formatInvokeError(error)
+    if (/[\u4e00-\u9fff]/.test(original) && original.length < 80) {
+        return trackTitle ? `${trackTitle} · ${original}` : original
+    }
+    return `${prefix}暂时无法播放`
+}
+
+function sessionFileName(track: { fileName?: string; filePath?: string }): string | null {
+    if (track.fileName?.trim()) {
+        return stripExtension(track.fileName.trim()) || null
+    }
+    return fileStemFromPath(track.filePath ?? null)
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
@@ -169,7 +203,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         engineStatus,
     ])
 
-    // 播放会话落盘（进度节流）
+    // 播放会话落盘，进度节流
     useEffect(() => {
         if (queue.length === 0 || currentIndex < 0) {
             return
@@ -247,6 +281,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             return
         }
         const listenedMs = Math.max(0, Math.round(sessionListenedRef.current))
+        const fileName = sessionFileName(track)
         void recordPlaySessionEnd({
             id: sessionId,
             trackId: track.id,
@@ -256,6 +291,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             listenedMs,
             completed,
             qualityBr: track.source === "netease" ? getNeteaseQualityBr() : null,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            filePath: track.filePath ?? null,
+            fileName,
+            contentHash: track.contentHash ?? null,
         })
         sessionIdRef.current = null
         sessionTrackRef.current = null
@@ -282,12 +323,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             sessionStartedAtRef.current = Date.now()
             sessionListenedRef.current = 0
             lastTickPosRef.current = 0
+            const fileName = sessionFileName(track)
             void startPlaySession({
                 id,
                 trackId: track.id,
                 source: track.source,
                 startedAt: sessionStartedAtRef.current,
                 qualityBr: track.source === "netease" ? getNeteaseQualityBr() : null,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                filePath: track.filePath ?? null,
+                fileName,
+                contentHash: track.contentHash ?? null,
             })
         },
         [flushSession],
@@ -514,41 +562,53 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             engineStatusRef.current = status
             applyUserVolume()
 
-            const url =
+            const resolved =
                 usedNative && track.filePath
-                    ? track.filePath
+                    ? ({ ok: true as const, url: track.filePath })
                     : await resolvePlayableUrl(track)
 
             if (cancelled || gen !== loadGenRef.current) {
                 return
             }
-            if (!url) {
+            if (!resolved.ok) {
                 isPlayingRef.current = false
                 hardStopEngines()
                 setIsPlaying(false)
                 setDurationMs(track.durationMs)
+                // VIP、无版权、无链接：toast，勿静默
+                notifyWarning("无法播放", {
+                    description: `${track.title} · ${resolved.reason}`,
+                    id: `play-fail-${track.id}`,
+                })
                 return
             }
+            const url = resolved.url
 
             try {
                 engine.load(url)
             } catch (error) {
                 console.warn("[player] load failed", formatInvokeError(error))
-                // 原生 load 失败 → 回退 H5 同曲
+                // 原生 load 失败，回退 H5 同曲
                 if (usedNative && html5) {
                     activeRef.current = html5
                     setEngineStatus("degraded")
                     engineStatusRef.current = "degraded"
                     applyUserVolume()
-                    const fallbackUrl = await resolvePlayableUrl(track)
-                    if (!fallbackUrl || cancelled || gen !== loadGenRef.current) {
+                    const fallback = await resolvePlayableUrl(track)
+                    if (!fallback.ok || cancelled || gen !== loadGenRef.current) {
                         isPlayingRef.current = false
                         hardStopEngines()
                         setIsPlaying(false)
+                        if (!fallback.ok) {
+                            notifyWarning("无法播放", {
+                                description: `${track.title} · ${fallback.reason}`,
+                                id: `play-fail-${track.id}`,
+                            })
+                        }
                         return
                     }
                     try {
-                        html5.load(fallbackUrl)
+                        html5.load(fallback.url)
                         engine = html5
                         usedNative = false
                     } catch (fallbackError) {
@@ -559,12 +619,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                         isPlayingRef.current = false
                         hardStopEngines()
                         setIsPlaying(false)
+                        notifyError("无法播放", {
+                            description: friendlyPlayError(fallbackError, track.title),
+                        })
                         return
                     }
                 } else {
                     isPlayingRef.current = false
                     hardStopEngines()
                     setIsPlaying(false)
+                    notifyError("无法播放", {
+                        description: friendlyPlayError(error, track.title),
+                    })
                     return
                 }
             }
@@ -618,7 +684,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         applyUserVolume()
     }, [applyUserVolume, volume, isMuted])
 
-    // 唯一 play/pause 入口（装载完成后由 readyEpoch 触发）
+    // 唯一 play/pause 入口，装载完成后由 readyEpoch 触发
     useEffect(() => {
         if (!isPlaying) {
             hardStopEngines()
@@ -665,7 +731,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 if (cancelled || gen !== pauseGenRef.current) {
                     return
                 }
-                // 原生 play 失败 → 同曲 H5 一次
+                // 原生 play 失败，同曲 H5 一次
                 const html5 = html5Ref.current
                 const track = queueRef.current[indexRef.current]
                 if (
@@ -680,9 +746,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     )
                     try {
                         engine.pause()
-                        const fallbackUrl = await resolvePlayableUrl(track)
+                        const fallback = await resolvePlayableUrl(track)
                         if (
-                            !fallbackUrl ||
+                            !fallback.ok ||
                             cancelled ||
                             gen !== pauseGenRef.current ||
                             !isPlayingRef.current
@@ -690,12 +756,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                             isPlayingRef.current = false
                             hardStopEngines()
                             setIsPlaying(false)
+                            if (!fallback.ok) {
+                                notifyWarning("无法播放", {
+                                    description: `${track.title} · ${fallback.reason}`,
+                                    id: `play-fail-${track.id}`,
+                                })
+                            } else {
+                                notifyError("无法播放", {
+                                    description: friendlyPlayError(error, track.title),
+                                    id: `play-fail-${track.id}`,
+                                })
+                            }
                             return
                         }
                         activeRef.current = html5
                         setEngineStatus("degraded")
                         engineStatusRef.current = "degraded"
-                        html5.load(fallbackUrl)
+                        html5.load(fallback.url)
                         mediaReadyRef.current = true
                         applyUserVolume()
                         fadeRef.current.setGain(0)
@@ -715,12 +792,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                             "[player] h5 fallback failed",
                             formatInvokeError(fallbackError),
                         )
+                        isPlayingRef.current = false
+                        hardStopEngines()
+                        setIsPlaying(false)
+                        notifyError("无法播放", {
+                            description: friendlyPlayError(
+                                fallbackError,
+                                track.title,
+                            ),
+                            id: `play-fail-${track.id}`,
+                        })
+                        return
                     }
                 }
                 console.warn("[player] resume failed", formatInvokeError(error))
                 isPlayingRef.current = false
                 hardStopEngines()
                 setIsPlaying(false)
+                if (track) {
+                    notifyError("无法播放", {
+                        description: friendlyPlayError(error, track.title),
+                        id: `play-fail-${track.id}`,
+                    })
+                }
             }
         })()
 
@@ -807,6 +901,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setPositionMs(nextPosition)
         lastTickPosRef.current = nextPosition
         lastSessionWriteRef.current = 0
+        // 本地 native 重解码 seek 后偶发停在 pause；UI 仍 isPlaying 时补一次 play
+        if (isPlayingRef.current && mediaReadyRef.current) {
+            const engine = activeRef.current
+            if (engine) {
+                void engine.play().catch(() => {
+                    // ignore；resume effect / 用户可再点播放
+                })
+            }
+        }
     }, [])
 
     const setVolume = useCallback((nextVolume: number) => {

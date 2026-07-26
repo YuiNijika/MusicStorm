@@ -17,16 +17,20 @@ export type Track = {
     url?: string
     /** 本地绝对路径；播放时 convertFileSrc */
     filePath?: string
-    /** 可选码率（kbps）；扫描探针写入后用于高音质判定 */
+    /** 码率 kbps，扫描写入后用于高音质判定 */
     bitrateKbps?: number
-    /** 网易云艺人列表（可点进歌手页） */
+    /** 网易云艺人列表 */
     artists?: TrackArtist[]
     /** 网易云专辑 id */
     albumId?: string
-    /** 本地内嵌/sidecar 歌词全文 */
+    /** 本地内嵌或 sidecar 歌词全文 */
     lyricText?: string
-    /** 本地 sidecar .lrc 绝对路径 */
+    /** 本地 sidecar lrc 绝对路径 */
     lrcPath?: string
+    /** 本地无扩展名文件名，统计归类 */
+    fileName?: string
+    /** 本地内容 MD5，统计归类 */
+    contentHash?: string
 }
 
 export type Playlist = {
@@ -50,6 +54,22 @@ export type Radio = {
     /** 主播名 */
     djName?: string
     category?: string
+}
+
+/** 电台单期节目 */
+export type RadioProgram = {
+    id: string
+    title: string
+    coverUrl: string
+    description?: string
+    durationMs: number
+    radioId?: string
+    radioTitle?: string
+    djName?: string
+    listenerCount?: number
+    createTime?: number
+    /** 可播放曲目 */
+    track: Track
 }
 
 export type RepeatMode = "off" | "all" | "one"

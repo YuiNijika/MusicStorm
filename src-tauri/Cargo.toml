@@ -25,6 +25,7 @@ rodio = { version = "0.20", default-features = false, features = [
     "symphonia-flac",
     "symphonia-aac",
     "symphonia-isomp4",
+    "symphonia-vorbis",
 ] }
 reqwest = { version = "0.12", default-features = false, features = [
     "blocking",
@@ -34,3 +35,4 @@ cpal = "0.15"
 tempfile = "3"
 base64 = "0.22"
 lofty = "0.22"
+md-5 = "0.10"

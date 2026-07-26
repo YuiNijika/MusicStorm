@@ -1,5 +1,6 @@
 import { setCookiesFromApi } from "@/lib/netease/auth-cookie"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { qrTextToDataUrl } from "@/lib/qr-data-url"
 
 type QrKeyData = {
     code?: number
@@ -39,6 +40,19 @@ async function fetchQrKey(): Promise<string> {
     return key
 }
 
+/** 内置 create 只给 qrurl；对接源可能直接给 qrimg base64 */
+function resolveQrImage(qrimg: string, qrurl: string): string {
+    const img = qrimg.trim()
+    if (img) {
+        return img
+    }
+    const url = qrurl.trim()
+    if (!url) {
+        return ""
+    }
+    return qrTextToDataUrl(url)
+}
+
 async function createQrSession(): Promise<QrSession> {
     const key = await fetchQrKey()
     const data = await neteaseRequest<QrCreateData>({
@@ -49,9 +63,9 @@ async function createQrSession(): Promise<QrSession> {
             timestamp: Date.now(),
         },
     })
-    const qrimg = data.data?.qrimg ?? ""
     const qrurl = data.data?.qrurl ?? ""
-    if (!qrimg && !qrurl) {
+    const qrimg = resolveQrImage(data.data?.qrimg ?? "", qrurl)
+    if (!qrimg) {
         throw new Error("无法生成登录二维码")
     }
     return { key, qrimg, qrurl }

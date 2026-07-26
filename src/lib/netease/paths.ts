@@ -1,0 +1,42 @@
+/** 网易云 API 路径约定，内置与对接共用 */
+
+export const NETEASE_PATHS = {
+    songUrl: "/song/url",
+    songDetail: "/song/detail",
+    lyric: "/lyric",
+    search: "/cloudsearch",
+    playlistDetail: "/playlist/detail",
+    playlistSubscribe: "/playlist/subscribe",
+    personalized: "/personalized",
+    recommendSongs: "/recommend/songs",
+    loginQrKey: "/login/qr/key",
+    loginQrCreate: "/login/qr/create",
+    loginQrCheck: "/login/qr/check",
+    captchaSent: "/captcha/sent",
+    loginCellphone: "/login/cellphone",
+    userAccount: "/user/account",
+    userPlaylist: "/user/playlist",
+    likelist: "/likelist",
+    like: "/like",
+    artists: "/artists",
+    artistAlbum: "/artist/album",
+    artistMv: "/artist/mv",
+    artistDesc: "/artist/desc",
+    simiArtist: "/simi/artist",
+    album: "/album",
+    playlistTracks: "/playlist/tracks",
+    djHot: "/dj/hot",
+    djRecommend: "/dj/recommend",
+    djDetail: "/dj/detail",
+    djProgram: "/dj/program",
+    djProgramDetail: "/dj/program/detail",
+    djSublist: "/dj/sublist",
+    djSub: "/dj/sub",
+    albumSublist: "/album/sublist",
+    albumSub: "/album/sub",
+    mvUrl: "/mv/url",
+    mvDetail: "/mv/detail",
+} as const
+
+export type NeteasePath =
+    (typeof NETEASE_PATHS)[keyof typeof NETEASE_PATHS]

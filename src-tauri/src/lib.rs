@@ -1,7 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// 本地扫描 / 存储 / 播放 / 网易云代理入口
 mod audio;
 mod db;
 mod local_meta;
+mod netease_proxy;
 
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
@@ -9,17 +11,27 @@ use audio::{
 };
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
-    db_get_listen_stats, db_get_setting, db_set_setting, db_start_play_session, db_upsert_folder,
-    db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db, purge_expired_api_cache,
-    DbState,
+    db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks, db_set_setting,
+    db_start_play_session, db_upsert_folder, db_upsert_tracks, ensure_storage_paths,
+    get_storage_paths, open_db, purge_expired_api_cache, DbState,
 };
+use netease_proxy::netease_http_post;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 const AUDIO_EXTS: &[&str] = &[
-    "mp3", "flac", "wav", "m4a", "aac", "ogg", "opus", "wma", "aiff", "aif",
+    // 常用
+    "mp3", "wav", "aac", "m4a", "flac", "ogg", "wma",
+    // 无损与高保真，diff 与 dff 均收录
+    "aif", "aiff", "ape", "alac", "wv", "dsf", "dff", "diff", "tta",
+    // 有损
+    "mp2", "mp1", "ra", "rm", "ram", "m4p", "opus",
+    // 模块与合成
+    "mid", "midi", "mod", "xm", "s3m", "it",
+    // 其他
+    "au", "voc", "cda", "amr", "gsm", "raw", "pcm", "mpga", "3gp", "3g2",
 ];
 const MAX_TRACKS: usize = 2_000;
 const MAX_DEPTH: usize = 8;
@@ -33,12 +45,16 @@ struct LocalScanTrack {
     album: String,
     path: String,
     duration_ms: u64,
-    /// 内嵌封面落盘路径（绝对路径，前端 convertFileSrc）
+    /// 内嵌封面落盘绝对路径
     cover_path: Option<String>,
     /// 内嵌或 sidecar 歌词全文
     lyric_text: Option<String>,
-    /// sidecar .lrc 路径
+    /// sidecar lrc 路径
     lrc_path: Option<String>,
+    /// 无扩展名文件名，统计归类
+    file_name: Option<String>,
+    /// 内容 MD5，相同文件合并听歌统计
+    content_hash: Option<String>,
 }
 
 /// 系统文件夹选择器；取消时返回 null
@@ -50,7 +66,7 @@ fn pick_music_folder() -> Result<Option<String>, String> {
     Ok(folder.map(|path| path.to_string_lossy().into_owned()))
 }
 
-/// 选择本地封面图片并返回 data URL（base64）
+/// 选择本地封面图片并返回 data URL
 #[tauri::command]
 fn pick_image_as_base64() -> Result<Option<String>, String> {
     let file = rfd::FileDialog::new()
@@ -62,6 +78,68 @@ fn pick_image_as_base64() -> Result<Option<String>, String> {
         return Ok(None);
     };
     Ok(Some(read_image_as_data_url(&path)?))
+}
+
+/// 选择 .lrc / 文本并返回全文
+#[tauri::command]
+fn pick_text_file() -> Result<Option<String>, String> {
+    let file = rfd::FileDialog::new()
+        .set_title("选择歌词文件")
+        .add_filter("歌词", &["lrc", "txt", "LRC", "TXT"])
+        .pick_file();
+    let Some(path) = file else {
+        return Ok(None);
+    };
+    Ok(Some(read_text_file(path.to_string_lossy().into_owned())?))
+}
+
+/// 下载远程 URL 到用户选择的保存路径
+#[tauri::command]
+fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>, String> {
+    let url = url.trim();
+    if url.is_empty() {
+        return Err("下载地址为空".into());
+    }
+    let safe_name = default_name
+        .chars()
+        .map(|c| {
+            if r#"<>:"/\|?*"#.contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect::<String>();
+    let name = if safe_name.trim().is_empty() {
+        "track.mp3".into()
+    } else {
+        safe_name
+    };
+
+    let path = rfd::FileDialog::new()
+        .set_title("保存歌曲")
+        .set_file_name(&name)
+        .save_file();
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let bytes = reqwest::blocking::get(url)
+        .map_err(|e| format!("下载失败: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("下载失败: {e}"))?
+        .bytes()
+        .map_err(|e| format!("读取失败: {e}"))?;
+
+    if bytes.is_empty() {
+        return Err("文件为空".into());
+    }
+    if bytes.len() > 200 * 1024 * 1024 {
+        return Err("文件过大".into());
+    }
+
+    std::fs::write(&path, &bytes).map_err(|e| format!("写入失败: {e}"))?;
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 fn read_image_as_data_url(path: &Path) -> Result<String, String> {
@@ -92,7 +170,7 @@ fn read_image_as_data_url(path: &Path) -> Result<String, String> {
     Ok(format!("data:{mime_type};base64,{b64}"))
 }
 
-/// 读取本地文本（sidecar / 缓存歌词等；兼容 BOM）
+/// 读取本地文本，兼容 BOM 与常见编码
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     let path = PathBuf::from(path.trim());
@@ -123,7 +201,7 @@ fn read_text_file(path: String) -> Result<String, String> {
     }
 }
 
-/// 递归扫描音频：lofty 解析内嵌 tag / 封面 / 歌词 + sidecar
+/// 递归扫描音频：tag 失败仍入库；后缀见 AUDIO_EXTS
 #[tauri::command]
 fn scan_music_folder(app: AppHandle, path: String) -> Result<Vec<LocalScanTrack>, String> {
     let root = PathBuf::from(path.trim());
@@ -213,6 +291,16 @@ fn scan_dir(
 
         let file_meta = local_meta::read_audio_meta(&path, covers_dir, lyrics_dir);
         let absolute = path.to_string_lossy().into_owned();
+        // 归类键用 stem，不带后缀
+        let file_name = {
+            let s = stem.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        };
+        let content_hash = file_content_md5(&path);
 
         out.push(LocalScanTrack {
             id: format!("local:{absolute}"),
@@ -224,13 +312,33 @@ fn scan_dir(
             cover_path: file_meta.cover_path,
             lyric_text: file_meta.lyric_text,
             lrc_path: file_meta.lrc_path,
+            file_name,
+            content_hash,
         });
     }
 
     Ok(())
 }
 
-/// 支持 `艺人 - 曲名` / `艺人–曲名` 常见命名
+// 流式哈希：大文件不全量读入内存；失败不阻断扫描
+fn file_content_md5(path: &Path) -> Option<String> {
+    use md5::{Digest, Md5};
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Md5::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf).ok()?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+// 常见 `艺人 - 曲名` 命名；无分隔则整段当标题
 fn parse_filename(stem: &str) -> (String, String) {
     let separators = [" - ", " – ", " — ", " _ "];
     for sep in separators {
@@ -259,6 +367,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pick_music_folder,
             pick_image_as_base64,
+            pick_text_file,
+            save_url_to_file,
             read_text_file,
             scan_music_folder,
             get_storage_paths,
@@ -267,6 +377,8 @@ pub fn run() {
             db_start_play_session,
             db_end_play_session,
             db_get_listen_stats,
+            db_list_listen_stats,
+            db_list_top_tracks,
             db_get_setting,
             db_set_setting,
             api_cache_get,
@@ -284,6 +396,7 @@ pub fn run() {
             audio_seek,
             audio_set_volume,
             audio_stop,
+            netease_http_post,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

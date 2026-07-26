@@ -11,7 +11,7 @@ type MediaCardProps = {
     onClick?: () => void
     active?: boolean
     className?: string
-    /** 固定宽度（横向滚动条用） */
+    /** 固定宽度，横向滚动条用 */
     widthClassName?: string
     overlay?: ReactNode
 }
@@ -53,12 +53,14 @@ function MediaCard({
                 />
                 {overlay}
             </div>
-            <div className="min-w-0 px-0.5">
+            <div className="w-full min-w-0 max-w-full px-0.5">
                 <p className="truncate text-[13px] font-semibold tracking-[-0.02em] text-foreground">
                     {title}
                 </p>
                 {subtitle ? (
-                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{subtitle}</p>
+                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                        {subtitle}
+                    </p>
                 ) : null}
             </div>
         </button>

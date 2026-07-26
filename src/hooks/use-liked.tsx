@@ -9,6 +9,8 @@ import {
 } from "react"
 
 import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { fetchAlbumSublist, subscribeAlbum } from "@/lib/netease/album"
+import { fetchDjSublist, subscribeDjRadio } from "@/lib/netease/dj"
 import { fetchLikelist, setTrackLiked } from "@/lib/netease/like"
 import { subscribePlaylist } from "@/lib/netease/playlist"
 import { fetchUserPlaylistsDetailed } from "@/lib/netease/user"
@@ -24,10 +26,16 @@ type LikedContextValue = {
     likedSongIds: ReadonlySet<string>
     likedSongPlaylistId: string | null
     subscribedPlaylistIds: ReadonlySet<string>
+    subscribedRadioIds: ReadonlySet<string>
+    subscribedAlbumIds: ReadonlySet<string>
     isTrackLiked: (trackId: string) => boolean
     isPlaylistSubscribed: (playlistId: string) => boolean
+    isRadioSubscribed: (radioId: string) => boolean
+    isAlbumSubscribed: (albumId: string) => boolean
     toggleTrackLiked: (trackId: string) => Promise<boolean>
     togglePlaylistSubscribed: (playlistId: string) => Promise<boolean>
+    toggleRadioSubscribed: (radioId: string) => Promise<boolean>
+    toggleAlbumSubscribed: (albumId: string) => Promise<boolean>
     refresh: () => Promise<void>
 }
 
@@ -43,13 +51,38 @@ function LikedProvider({ children }: { children: ReactNode }) {
     const [subscribedPlaylistIds, setSubscribedPlaylistIds] = useState<Set<string>>(
         () => new Set(),
     )
+    const [subscribedRadioIds, setSubscribedRadioIds] = useState<Set<string>>(
+        () => new Set(),
+    )
+    const [subscribedAlbumIds, setSubscribedAlbumIds] = useState<Set<string>>(
+        () => new Set(),
+    )
 
     const clear = useCallback(() => {
         setLikedSongIds(new Set())
         setLikedSongPlaylistId(null)
         setSubscribedPlaylistIds(new Set())
+        setSubscribedRadioIds(new Set())
+        setSubscribedAlbumIds(new Set())
         setReady(true)
     }, [])
+
+    const applySync = useCallback(
+        async (userId: string) => {
+            const [ids, playlists, radios, albums] = await Promise.all([
+                fetchLikelist(userId),
+                fetchUserPlaylistsDetailed(userId),
+                fetchDjSublist().catch(() => [] as { id: string }[]),
+                fetchAlbumSublist().catch(() => [] as { id: string }[]),
+            ])
+            setLikedSongIds(new Set(ids))
+            setLikedSongPlaylistId(playlists.likedSongPlaylistId)
+            setSubscribedPlaylistIds(new Set(playlists.subscribedIds))
+            setSubscribedRadioIds(new Set(radios.map((item) => item.id)))
+            setSubscribedAlbumIds(new Set(albums.map((item) => item.id)))
+        },
+        [],
+    )
 
     const refresh = useCallback(async () => {
         if (!loggedIn || !profile) {
@@ -57,19 +90,13 @@ function LikedProvider({ children }: { children: ReactNode }) {
             return
         }
         try {
-            const [ids, playlists] = await Promise.all([
-                fetchLikelist(profile.userId),
-                fetchUserPlaylistsDetailed(profile.userId),
-            ])
-            setLikedSongIds(new Set(ids))
-            setLikedSongPlaylistId(playlists.likedSongPlaylistId)
-            setSubscribedPlaylistIds(new Set(playlists.subscribedIds))
+            await applySync(profile.userId)
         } catch {
-            // 保持旧数据，标记 ready 以免 UI 卡死
+            // 保持旧数据
         } finally {
             setReady(true)
         }
-    }, [clear, loggedIn, profile])
+    }, [applySync, clear, loggedIn, profile])
 
     useEffect(() => {
         if (!sessionReady) {
@@ -83,16 +110,7 @@ function LikedProvider({ children }: { children: ReactNode }) {
         setReady(false)
         void (async () => {
             try {
-                const [ids, playlists] = await Promise.all([
-                    fetchLikelist(profile.userId),
-                    fetchUserPlaylistsDetailed(profile.userId),
-                ])
-                if (cancelled) {
-                    return
-                }
-                setLikedSongIds(new Set(ids))
-                setLikedSongPlaylistId(playlists.likedSongPlaylistId)
-                setSubscribedPlaylistIds(new Set(playlists.subscribedIds))
+                await applySync(profile.userId)
             } catch {
                 // 保持旧数据
             } finally {
@@ -104,7 +122,7 @@ function LikedProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true
         }
-    }, [sessionReady, loggedIn, profile?.userId, clear, profile])
+    }, [sessionReady, loggedIn, profile?.userId, clear, profile, applySync])
 
     const isTrackLiked = useCallback(
         (trackId: string) => likedSongIds.has(trackId),
@@ -116,13 +134,22 @@ function LikedProvider({ children }: { children: ReactNode }) {
         [subscribedPlaylistIds],
     )
 
+    const isRadioSubscribed = useCallback(
+        (radioId: string) => subscribedRadioIds.has(radioId),
+        [subscribedRadioIds],
+    )
+
+    const isAlbumSubscribed = useCallback(
+        (albumId: string) => subscribedAlbumIds.has(albumId),
+        [subscribedAlbumIds],
+    )
+
     const toggleTrackLiked = useCallback(
         async (trackId: string) => {
             if (!loggedIn) {
                 return false
             }
             const next = !likedSongIds.has(trackId)
-            // 乐观更新
             setLikedSongIds((prev) => {
                 const copy = new Set(prev)
                 if (next) {
@@ -159,7 +186,6 @@ function LikedProvider({ children }: { children: ReactNode }) {
             if (!loggedIn) {
                 return false
             }
-            // 自己的红心歌单不可「取消收藏」
             if (playlistId === likedSongPlaylistId) {
                 return true
             }
@@ -194,16 +220,94 @@ function LikedProvider({ children }: { children: ReactNode }) {
         [likedSongPlaylistId, loggedIn, subscribedPlaylistIds],
     )
 
+    const toggleRadioSubscribed = useCallback(
+        async (radioId: string) => {
+            if (!loggedIn) {
+                return false
+            }
+            const next = !subscribedRadioIds.has(radioId)
+            setSubscribedRadioIds((prev) => {
+                const copy = new Set(prev)
+                if (next) {
+                    copy.add(radioId)
+                } else {
+                    copy.delete(radioId)
+                }
+                return copy
+            })
+            try {
+                await subscribeDjRadio(radioId, next)
+                notifySuccess(next ? "已订阅电台" : "已取消订阅")
+                return next
+            } catch (error) {
+                setSubscribedRadioIds((prev) => {
+                    const copy = new Set(prev)
+                    if (next) {
+                        copy.delete(radioId)
+                    } else {
+                        copy.add(radioId)
+                    }
+                    return copy
+                })
+                notifyFromError("电台订阅失败", error)
+                throw new Error(formatError(error) || "电台订阅失败")
+            }
+        },
+        [loggedIn, subscribedRadioIds],
+    )
+
+    const toggleAlbumSubscribed = useCallback(
+        async (albumId: string) => {
+            if (!loggedIn) {
+                return false
+            }
+            const next = !subscribedAlbumIds.has(albumId)
+            setSubscribedAlbumIds((prev) => {
+                const copy = new Set(prev)
+                if (next) {
+                    copy.add(albumId)
+                } else {
+                    copy.delete(albumId)
+                }
+                return copy
+            })
+            try {
+                await subscribeAlbum(albumId, next)
+                notifySuccess(next ? "已收藏专辑" : "已取消收藏")
+                return next
+            } catch (error) {
+                setSubscribedAlbumIds((prev) => {
+                    const copy = new Set(prev)
+                    if (next) {
+                        copy.delete(albumId)
+                    } else {
+                        copy.add(albumId)
+                    }
+                    return copy
+                })
+                notifyFromError("专辑收藏失败", error)
+                throw new Error(formatError(error) || "专辑收藏失败")
+            }
+        },
+        [loggedIn, subscribedAlbumIds],
+    )
+
     const value = useMemo<LikedContextValue>(
         () => ({
             ready,
             likedSongIds,
             likedSongPlaylistId,
             subscribedPlaylistIds,
+            subscribedRadioIds,
+            subscribedAlbumIds,
             isTrackLiked,
             isPlaylistSubscribed,
+            isRadioSubscribed,
+            isAlbumSubscribed,
             toggleTrackLiked,
             togglePlaylistSubscribed,
+            toggleRadioSubscribed,
+            toggleAlbumSubscribed,
             refresh,
         }),
         [
@@ -211,10 +315,16 @@ function LikedProvider({ children }: { children: ReactNode }) {
             likedSongIds,
             likedSongPlaylistId,
             subscribedPlaylistIds,
+            subscribedRadioIds,
+            subscribedAlbumIds,
             isTrackLiked,
             isPlaylistSubscribed,
+            isRadioSubscribed,
+            isAlbumSubscribed,
             toggleTrackLiked,
             togglePlaylistSubscribed,
+            toggleRadioSubscribed,
+            toggleAlbumSubscribed,
             refresh,
         ],
     )

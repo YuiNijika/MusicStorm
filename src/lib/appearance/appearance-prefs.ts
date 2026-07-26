@@ -31,7 +31,7 @@ type AccentOption = {
     hue: number
 }
 
-/** 默认色调（标题栏 / 设置共用） */
+/** 默认色调，标题栏与设置共用 */
 const ACCENT_OPTIONS: AccentOption[] = [
     { id: "neutral", label: "中性", hue: 260 },
     { id: "rose", label: "玫瑰", hue: 350 },
@@ -123,7 +123,7 @@ function isNeutralAccent(prefs: AppearancePrefs): boolean {
     return prefs.accent === "neutral"
 }
 
-/** 色点预览色（标题栏 / 设置） */
+/** 色点预览色，标题栏与设置共用 */
 function accentSwatch(hue: number, neutral = false): string {
     return neutral ? `oklch(0.72 0.02 ${hue})` : `oklch(0.62 0.14 ${hue})`
 }
@@ -131,7 +131,7 @@ function accentSwatch(hue: number, neutral = false): string {
 /**
  * 把色调 + 玻璃参数写到 :root。
  * 日间必须给背景 / 玻璃 / primary 上 chroma，否则「色调」几乎看不出来。
- * 浮层（popover）单独走高不透明度，保证菜单可读。
+ * 浮层单独走高不透明度，保证菜单可读。
  */
 function applyAppearanceToDom(prefs: AppearancePrefs): void {
     const root = document.documentElement

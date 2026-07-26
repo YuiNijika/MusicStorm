@@ -40,7 +40,7 @@ function setFadeDurationMs(durationMs: number): void {
     window.localStorage.setItem(FADE_MS_KEY, String(clampFadeMs(durationMs)))
 }
 
-/** 实际 ramp 时长：关闭或 0 → 瞬时 */
+/** 实际 ramp 时长，关闭或 0 为瞬时 */
 function resolveFadeDurationMs(prefs: FadePrefs = getFadePrefs()): number {
     if (!prefs.enabled || prefs.durationMs <= 0) {
         return 0

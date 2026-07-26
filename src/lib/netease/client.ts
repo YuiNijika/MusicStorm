@@ -1,47 +1,22 @@
 import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
 import { apiCacheGet, apiCacheSet, withInflight } from "@/lib/netease/api-cache"
+import {
+    DEFAULT_BASE_URL,
+    getApiSettings,
+    getNeteaseBaseUrl,
+} from "@/lib/netease/api-settings"
 import { getApiCacheTtlMs } from "@/lib/netease/cache-prefs"
+import { resolveRealIp } from "@/lib/netease/native/real-ip"
+import { nativeNeteaseRequest } from "@/lib/netease/native/request"
+import { NETEASE_PATHS } from "@/lib/netease/paths"
 
 /**
- * 网易云 API 路径约定
- * - 服务实现：项目内 CloudMusicAPI（NeteaseCloudMusicApi）
- * - 客户端调用形态：对齐 YesPlayMusic/src/api/*
+ * 网易云请求入口
+ * - integrated：应用内 TS 加密 + Tauri HTTP 代理，直连 music.163.com
+ * - external：HTTP 对接官方、锦木祈杰或自定义 NCM API
  */
-export const NETEASE_PATHS = {
-    songUrl: "/song/url",
-    songDetail: "/song/detail",
-    lyric: "/lyric",
-    search: "/cloudsearch",
-    playlistDetail: "/playlist/detail",
-    playlistSubscribe: "/playlist/subscribe",
-    personalized: "/personalized",
-    recommendSongs: "/recommend/songs",
-    loginQrKey: "/login/qr/key",
-    loginQrCreate: "/login/qr/create",
-    loginQrCheck: "/login/qr/check",
-    captchaSent: "/captcha/sent",
-    loginCellphone: "/login/cellphone",
-    userAccount: "/user/account",
-    userPlaylist: "/user/playlist",
-    likelist: "/likelist",
-    like: "/like",
-    artists: "/artists",
-    artistAlbum: "/artist/album",
-    artistMv: "/artist/mv",
-    artistDesc: "/artist/desc",
-    simiArtist: "/simi/artist",
-    album: "/album",
-    /** 播客 / 电台 */
-    djHot: "/dj/hot",
-    djRecommend: "/dj/recommend",
-    djDetail: "/dj/detail",
-    djProgram: "/dj/program",
-} as const
 
-const BASE_URL_KEY = "musicstorm-netease-base-url"
-const DEFAULT_BASE_URL = "https://cloud-music-api.miomoe.cn"
-
-/** 不走磁盘缓存的路径（登录/写操作/时效 URL） */
+/** 不走磁盘缓存的路径：登录/写操作/时效 URL */
 const NO_CACHE_PATHS = new Set<string>([
     NETEASE_PATHS.songUrl,
     NETEASE_PATHS.loginQrKey,
@@ -51,31 +26,15 @@ const NO_CACHE_PATHS = new Set<string>([
     NETEASE_PATHS.loginCellphone,
     NETEASE_PATHS.like,
     NETEASE_PATHS.playlistSubscribe,
+    NETEASE_PATHS.playlistTracks,
 ])
-
-function getNeteaseBaseUrl(): string {
-    if (typeof window === "undefined") {
-        return DEFAULT_BASE_URL
-    }
-    return window.localStorage.getItem(BASE_URL_KEY) || DEFAULT_BASE_URL
-}
-
-function setNeteaseBaseUrl(url: string): void {
-    window.localStorage.setItem(BASE_URL_KEY, url.replace(/\/$/, ""))
-}
 
 type RequestOptions = {
     path: string
     params?: Record<string, string | number | boolean | undefined>
-    /** 兼容旧写法；与 params 合并，params 优先 */
     query?: Record<string, string | number | boolean | undefined>
     method?: "GET" | "POST"
-    /** 强制跳过缓存 */
     skipCache?: boolean
-    /**
-     * 是否校验 body.code（默认 true）。
-     * 扫码轮询等「code 即状态」接口应关闭。
-     */
     checkCode?: boolean
 }
 
@@ -89,7 +48,6 @@ function mergeParams(
     return { ...(query ?? {}), ...(params ?? {}) }
 }
 
-/** 网易云 body.code：200 成功；登录扫码 800–803 为状态码而非错误 */
 function assertNeteasePayload(path: string, data: unknown): void {
     if (!data || typeof data !== "object") {
         return
@@ -105,7 +63,6 @@ function assertNeteasePayload(path: string, data: unknown): void {
     if (body.code === 200) {
         return
     }
-    // 扫码轮询：800 过期 / 801 待扫 / 802 已扫 / 803 成功
     if (path === NETEASE_PATHS.loginQrCheck) {
         return
     }
@@ -127,7 +84,6 @@ function buildCacheKey(
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => `${k}=${String(v)}`)
         .join("&")
-    // cookie 指纹：登录态不同缓存隔离；不落完整 cookie
     const cookieFp = cookie ? String(hashString(cookie)) : "guest"
     return `netease|${base}|${path}|${sorted}|${cookieFp}`
 }
@@ -151,15 +107,66 @@ function shouldCache(path: string, method: string): boolean {
     return getApiCacheTtlMs() > 0
 }
 
-async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
+async function fetchExternal<T>(
+    path: string,
+    method: string,
+    params: Record<string, string | number | boolean | undefined> | undefined,
+    cookie: string | null,
+): Promise<T> {
     const base = getNeteaseBaseUrl()
+    const url = new URL(path, base.endsWith("/") ? base : `${base}/`)
+
+    if (params) {
+        for (const [key, value] of Object.entries(params)) {
+            if (value === undefined) {
+                continue
+            }
+            url.searchParams.set(key, String(value))
+        }
+    }
+
+    if (!url.searchParams.has("realIP")) {
+        url.searchParams.set("realIP", resolveRealIp())
+    }
+    if (cookie && !url.searchParams.has("cookie")) {
+        url.searchParams.set("cookie", cookie)
+    }
+
+    const response = await fetch(url.toString(), {
+        method,
+        credentials: "include",
+    })
+
+    if (!response.ok) {
+        let detail = `HTTP ${response.status}`
+        try {
+            const errBody = (await response.json()) as {
+                msg?: string
+                message?: string
+            }
+            detail = errBody.msg?.trim() || errBody.message?.trim() || detail
+        } catch {
+            // ignore
+        }
+        throw new Error(`网易云接口失败: ${detail}`)
+    }
+
+    return (await response.json()) as T
+}
+
+async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
+    const settings = getApiSettings()
     const method = options.method ?? "GET"
     const cookie = getNeteaseCookieParam()
     const params = mergeParams(options.params, options.query)
     const checkCode = options.checkCode !== false
+    const modeKey =
+        settings.mode === "integrated"
+            ? "native"
+            : getNeteaseBaseUrl()
     const cacheable = !options.skipCache && shouldCache(options.path, method)
     const cacheKey = cacheable
-        ? buildCacheKey(base, options.path, params, cookie)
+        ? buildCacheKey(modeKey, options.path, params, cookie)
         : ""
 
     const run = async (): Promise<T> => {
@@ -173,52 +180,23 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
                     }
                     return cached
                 } catch {
-                    // 坏缓存 / 旧错误缓存忽略
+                    // ignore bad cache
                 }
             }
         }
 
-        const url = new URL(options.path, base.endsWith("/") ? base : `${base}/`)
-
-        if (params) {
-            for (const [key, value] of Object.entries(params)) {
-                if (value === undefined) {
-                    continue
-                }
-                url.searchParams.set(key, String(value))
-            }
+        let data: T
+        if (settings.mode === "integrated") {
+            data = await nativeNeteaseRequest<T>(options.path, params ?? {})
+        } else {
+            data = await fetchExternal<T>(
+                options.path,
+                method,
+                params,
+                cookie,
+            )
         }
 
-        if (!url.searchParams.has("realIP")) {
-            url.searchParams.set("realIP", "211.161.244.70")
-        }
-        if (cookie && !url.searchParams.has("cookie")) {
-            url.searchParams.set("cookie", cookie)
-        }
-
-        const response = await fetch(url.toString(), {
-            method,
-            credentials: "include",
-        })
-
-        if (!response.ok) {
-            let detail = `HTTP ${response.status}`
-            try {
-                const errBody = (await response.json()) as {
-                    msg?: string
-                    message?: string
-                }
-                detail =
-                    errBody.msg?.trim() ||
-                    errBody.message?.trim() ||
-                    detail
-            } catch {
-                // ignore parse
-            }
-            throw new Error(`网易云接口失败: ${detail}`)
-        }
-
-        const data = (await response.json()) as T
         if (checkCode) {
             assertNeteasePayload(options.path, data)
         }
@@ -237,10 +215,4 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
     return run()
 }
 
-export {
-    DEFAULT_BASE_URL,
-    getNeteaseBaseUrl,
-    neteaseRequest,
-    setNeteaseBaseUrl,
-    BASE_URL_KEY,
-}
+export { DEFAULT_BASE_URL, getNeteaseBaseUrl, neteaseRequest, NETEASE_PATHS }

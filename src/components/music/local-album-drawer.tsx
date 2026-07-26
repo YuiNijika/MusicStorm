@@ -18,7 +18,8 @@ import type { NeteaseAlbumHit } from "@/lib/netease/search"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
-export type LocalAlbumDrawerMode = "create" | "folder"
+/** 仅新建 / 编辑元数据；文件夹导入不经抽屉 */
+export type LocalAlbumDrawerMode = "create" | "edit"
 
 export type LocalAlbumDrawerProps = {
     open: boolean
@@ -83,11 +84,11 @@ function LocalAlbumDrawer({
             notifySuccess("已应用网易云专辑信息")
             setPickerOpen(false)
         } catch (error) {
-            // 名称艺人仍写入，封面失败单独提示
             setTitle(hit.title)
             setArtist(hit.artistName)
             notifyError("封面下载失败", {
-                description: error instanceof Error ? error.message : "名称与艺人已填入",
+                description:
+                    error instanceof Error ? error.message : "名称与艺人已填入",
             })
             setPickerOpen(false)
         } finally {
@@ -104,6 +105,8 @@ function LocalAlbumDrawer({
         })
     }
 
+    const isEdit = mode === "edit"
+
     return (
         <>
             <Drawer open={open} onOpenChange={onOpenChange}>
@@ -114,12 +117,12 @@ function LocalAlbumDrawer({
 
                     <DrawerHeader className="px-4 pb-3 text-left">
                         <DrawerTitle className="text-[20px] font-semibold tracking-[-0.03em]">
-                            {mode === "folder" ? "导入本地专辑" : "创建专辑"}
+                            {isEdit ? "编辑专辑" : "创建专辑"}
                         </DrawerTitle>
                         <DrawerDescription className="text-[13px] leading-relaxed">
-                            {mode === "folder"
-                                ? "确认专辑信息后开始扫描文件夹。将解析内嵌封面与歌词，也可手动指定封面。"
-                                : "创建专辑元数据，可稍后关联文件夹。支持手动封面或从网易云填入信息。"}
+                            {isEdit
+                                ? "修改名称、艺人或封面。关联文件夹可在详情页「再扫」。"
+                                : "创建专辑元数据，可稍后导入文件夹。支持手动封面或从网易云填入信息。"}
                         </DrawerDescription>
                     </DrawerHeader>
 
@@ -127,7 +130,7 @@ function LocalAlbumDrawer({
                         {folderPath ? (
                             <div className="rounded-2xl bg-black/[0.04] px-3.5 py-2.5 dark:bg-white/[0.05]">
                                 <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                                    文件夹
+                                    关联文件夹
                                 </p>
                                 <p className="mt-0.5 break-all text-[13px] text-foreground/90">
                                     {folderPath}
@@ -178,7 +181,9 @@ function LocalAlbumDrawer({
                                 <Field label="专辑名称">
                                     <Input
                                         value={title}
-                                        onChange={(event) => setTitle(event.currentTarget.value)}
+                                        onChange={(event) =>
+                                            setTitle(event.currentTarget.value)
+                                        }
                                         placeholder="例如：一周音乐精选"
                                         className="h-11 rounded-2xl border-border/70 bg-background/70"
                                     />
@@ -186,7 +191,9 @@ function LocalAlbumDrawer({
                                 <Field label="艺人 / 作者">
                                     <Input
                                         value={artist}
-                                        onChange={(event) => setArtist(event.currentTarget.value)}
+                                        onChange={(event) =>
+                                            setArtist(event.currentTarget.value)
+                                        }
                                         placeholder="可选"
                                         className="h-11 rounded-2xl border-border/70 bg-background/70"
                                     />
@@ -220,7 +227,7 @@ function LocalAlbumDrawer({
                             </button>
                             <button
                                 type="button"
-                                disabled={submitting || (mode === "folder" && !folderPath)}
+                                disabled={submitting}
                                 onClick={handleSubmit}
                                 className={cn(
                                     "flex h-10 cursor-pointer items-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background",
@@ -230,10 +237,10 @@ function LocalAlbumDrawer({
                                 {submitting ? (
                                     <>
                                         <Loader2 className="size-4 animate-spin" />
-                                        {mode === "folder" ? "扫描中…" : "保存中…"}
+                                        保存中…
                                     </>
-                                ) : mode === "folder" ? (
-                                    "确认导入"
+                                ) : isEdit ? (
+                                    "保存"
                                 ) : (
                                     "创建专辑"
                                 )}
@@ -256,7 +263,9 @@ function LocalAlbumDrawer({
 function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
         <label className="block space-y-1.5">
-            <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
+            <span className="text-[12px] font-medium text-muted-foreground">
+                {label}
+            </span>
             {children}
         </label>
     )

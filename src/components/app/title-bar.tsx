@@ -1,5 +1,5 @@
 import { MoonStar, Palette, SunMedium } from "lucide-react"
-import type { CSSProperties, MouseEvent, ReactNode } from "react"
+import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react"
 
 import { useTheme } from "@/components/app/theme-provider"
 import {
@@ -19,6 +19,18 @@ import {
     resolveAccentHue,
 } from "@/lib/appearance/appearance-prefs"
 import { GITHUB_REPO_URL, openExternalUrl } from "@/lib/open-external"
+import {
+    CHROME_EVENT,
+    FULL_PLAYER_LAYOUTS,
+    LAYOUT_EVENT,
+    LYRICS_ALIGNS,
+    getFullPlayerChrome,
+    getFullPlayerLayout,
+    setFullPlayerChrome,
+    setFullPlayerLayout,
+    type FullPlayerChrome,
+    type FullPlayerLayout,
+} from "@/lib/player/full-player-prefs"
 import { cn } from "@/lib/utils"
 
 type TitleBarStyle = "mac" | "windows"
@@ -48,6 +60,23 @@ function TitleBar({
     const isMacStyle = style === "mac"
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
+    const [fpLayout, setFpLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
+    const [fpChrome, setFpChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
+
+    useEffect(() => {
+        function onLayout() {
+            setFpLayout(getFullPlayerLayout())
+        }
+        function onChrome() {
+            setFpChrome(getFullPlayerChrome())
+        }
+        window.addEventListener(LAYOUT_EVENT, onLayout)
+        window.addEventListener(CHROME_EVENT, onChrome)
+        return () => {
+            window.removeEventListener(LAYOUT_EVENT, onLayout)
+            window.removeEventListener(CHROME_EVENT, onChrome)
+        }
+    }, [])
 
     const chromeIconBtn = cn(
         "flex size-8 cursor-pointer items-center justify-center rounded-full",
@@ -296,6 +325,75 @@ function TitleBar({
                                         />
                                     </label>
                                 </div>
+                            </DropdownMenuGroup>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuGroup>
+                                <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                                    播放样式
+                                </DropdownMenuLabel>
+                                <div className="flex flex-wrap gap-1.5 px-1 pb-1.5">
+                                    {FULL_PLAYER_LAYOUTS.map((item) => {
+                                        const active = fpLayout === item.id
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                title={item.description}
+                                                onClick={() => {
+                                                    setFullPlayerLayout(item.id)
+                                                    setFpLayout(item.id)
+                                                }}
+                                                className={cn(
+                                                    "h-7 cursor-pointer rounded-full px-2.5 text-[11px] font-medium transition-colors",
+                                                    active
+                                                        ? "bg-foreground text-background"
+                                                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08]",
+                                                )}
+                                            >
+                                                {item.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                                <p className="px-1 pb-1 text-[10px] leading-snug text-muted-foreground">
+                                    {FULL_PLAYER_LAYOUTS.find((item) => item.id === fpLayout)
+                                        ?.description ?? ""}
+                                </p>
+                                {fpLayout === "lyrics" ? (
+                                    <div className="space-y-1.5 px-1 pb-1.5">
+                                        <span className="text-[11px] text-muted-foreground">
+                                            歌词对齐
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {LYRICS_ALIGNS.map((item) => {
+                                                const active =
+                                                    fpChrome.lyricsAlign === item.id
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setFullPlayerChrome({
+                                                                lyricsAlign: item.id,
+                                                            })
+                                                            setFpChrome(getFullPlayerChrome())
+                                                        }}
+                                                        className={cn(
+                                                            "h-7 cursor-pointer rounded-full px-2.5 text-[11px] font-medium transition-colors",
+                                                            active
+                                                                ? "bg-foreground text-background"
+                                                                : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08]",
+                                                        )}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </DropdownMenuGroup>
                         </DropdownMenuContent>
                     </DropdownMenu>

@@ -334,11 +334,11 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                         description="稍后再来看看"
                     />
                 ) : (
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-3">
                         {dailyColumns.map((column, colIndex) => (
                             <div
                                 key={colIndex}
-                                className="rounded-[16px] border border-black/[0.05] bg-black/[0.02] p-1.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                                className="min-w-0 overflow-hidden rounded-[16px] border border-black/[0.05] bg-black/[0.02] p-1 dark:border-white/[0.06] dark:bg-white/[0.03]"
                             >
                                 {column.map((track, index) => {
                                     const globalIndex =
@@ -356,6 +356,10 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                                                 currentTrack?.id === track.id && isPlaying
                                             }
                                             showSource={false}
+                                            showAlbumColumn={false}
+                                            showAlbumMeta={false}
+                                            showActions={false}
+                                            dense
                                             onPlay={(item) => playOrToggle(item, daily)}
                                         />
                                     )

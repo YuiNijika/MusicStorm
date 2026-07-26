@@ -1,4 +1,4 @@
-/** 全屏播放器布局模板 + 封面/歌词高度比 */
+/** 全屏播放器布局模板 + 歌词对齐 */
 
 const LAYOUT_STORAGE_KEY = "musicstorm-full-player-layout"
 const CHROME_STORAGE_KEY = "musicstorm-full-player-chrome"
@@ -6,20 +6,25 @@ const LAYOUT_EVENT = "musicstorm:full-player-layout"
 const CHROME_EVENT = "musicstorm:full-player-chrome"
 
 type FullPlayerLayout = "classic" | "cover" | "lyrics"
+type LyricsAlign = "left" | "center" | "right"
 
-/** 主区垂直：封面区 / 歌词区 */
+/** 歌词模式对齐，不显示封面 */
 type FullPlayerChrome = {
-    coverPct: number
-    lyricsPct: number
+    lyricsAlign: LyricsAlign
 }
 
 const DEFAULT_CHROME: FullPlayerChrome = {
-    coverPct: 55,
-    lyricsPct: 45,
+    lyricsAlign: "center",
 }
 
-const COVER_PCT_MIN = 30
-const COVER_PCT_MAX = 75
+const LYRICS_ALIGNS: {
+    id: LyricsAlign
+    label: string
+}[] = [
+    { id: "left", label: "靠左" },
+    { id: "center", label: "居中" },
+    { id: "right", label: "靠右" },
+]
 
 const FULL_PLAYER_LAYOUTS: {
     id: FullPlayerLayout
@@ -28,27 +33,21 @@ const FULL_PLAYER_LAYOUTS: {
 }[] = [
     { id: "classic", label: "经典", description: "封面与歌词分栏" },
     { id: "cover", label: "封面", description: "大封面居中" },
-    { id: "lyrics", label: "歌词", description: "歌词为主" },
+    { id: "lyrics", label: "歌词", description: "纯歌词，可调对齐" },
 ]
 
 function isFullPlayerLayout(value: string): value is FullPlayerLayout {
     return value === "classic" || value === "cover" || value === "lyrics"
 }
 
-function clampCoverPct(value: number): number {
-    if (!Number.isFinite(value)) {
-        return DEFAULT_CHROME.coverPct
-    }
-    return Math.min(COVER_PCT_MAX, Math.max(COVER_PCT_MIN, Math.round(value)))
+function isLyricsAlign(value: unknown): value is LyricsAlign {
+    return value === "left" || value === "center" || value === "right"
 }
 
-function normalizeChrome(partial: Partial<FullPlayerChrome>): FullPlayerChrome {
-    const coverPct = clampCoverPct(
-        partial.coverPct ?? 100 - (partial.lyricsPct ?? DEFAULT_CHROME.lyricsPct),
-    )
+function normalizeChrome(partial: Partial<FullPlayerChrome> | Record<string, unknown>): FullPlayerChrome {
+    const raw = (partial as Partial<FullPlayerChrome>).lyricsAlign
     return {
-        coverPct,
-        lyricsPct: 100 - coverPct,
+        lyricsAlign: isLyricsAlign(raw) ? raw : DEFAULT_CHROME.lyricsAlign,
     }
 }
 
@@ -79,7 +78,7 @@ function getFullPlayerChrome(): FullPlayerChrome {
         if (!raw) {
             return DEFAULT_CHROME
         }
-        const parsed = JSON.parse(raw) as Partial<FullPlayerChrome>
+        const parsed = JSON.parse(raw) as Record<string, unknown>
         return normalizeChrome(parsed)
     } catch {
         return DEFAULT_CHROME
@@ -99,15 +98,14 @@ function resetFullPlayerChrome(): void {
 
 export {
     CHROME_EVENT,
-    COVER_PCT_MAX,
-    COVER_PCT_MIN,
     DEFAULT_CHROME,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
+    LYRICS_ALIGNS,
     getFullPlayerChrome,
     getFullPlayerLayout,
     resetFullPlayerChrome,
     setFullPlayerChrome,
     setFullPlayerLayout,
 }
-export type { FullPlayerChrome, FullPlayerLayout }
+export type { FullPlayerChrome, FullPlayerLayout, LyricsAlign }

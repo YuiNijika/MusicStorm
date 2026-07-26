@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { AppShell } from "@/components/app/app-shell"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { Toaster, toast } from "@/components/ui/toast"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
+import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import {
     MusicNavigationProvider,
     useMusicNavigation,
@@ -18,9 +19,13 @@ import { ArtistPage } from "@/pages/artist"
 import { HomePage } from "@/pages/home"
 import { LibraryPage } from "@/pages/library"
 import { LocalPage } from "@/pages/local"
+import { MvPage } from "@/pages/mv"
 import { PlaylistPage } from "@/pages/playlist"
 import { RadioPage } from "@/pages/radio"
+import { RadioProgramPage } from "@/pages/radio-program"
+import { RadiosPage } from "@/pages/radios"
 import { SearchPage } from "@/pages/search"
+import { StatsPage } from "@/pages/stats"
 import {
     readTitleBarStyle,
     SettingsPage,
@@ -54,6 +59,18 @@ function AppRoutes({
     if (detail?.type === "radio") {
         return <RadioPage radioId={detail.id} onBack={back} />
     }
+    if (detail?.type === "radio-program") {
+        return (
+            <RadioProgramPage
+                programId={detail.id}
+                radioId={detail.radioId}
+                onBack={back}
+            />
+        )
+    }
+    if (detail?.type === "mv") {
+        return <MvPage mvId={detail.id} onBack={back} />
+    }
 
     if (route === "home") {
         return (
@@ -66,8 +83,14 @@ function AppRoutes({
     if (route === "library") {
         return <LibraryPage />
     }
+    if (route === "radios") {
+        return <RadiosPage />
+    }
     if (route === "search") {
         return <SearchPage />
+    }
+    if (route === "stats") {
+        return <StatsPage />
     }
     if (route === "settings") {
         return (
@@ -96,6 +119,7 @@ function App() {
     return (
         <ThemeProvider>
             <Toaster toastManager={toast}>
+                <IntegratedApiBootEffect />
                 <NeteaseSessionProvider>
                     <LikedProvider>
                         <PlayerProvider>
@@ -115,6 +139,14 @@ function App() {
             </Toaster>
         </ThemeProvider>
     )
+}
+
+/** 挂在 Toaster 内，保证失败 toast 可展示 */
+function IntegratedApiBootEffect() {
+    useEffect(() => {
+        void bootIntegratedApiProbe()
+    }, [])
+    return null
 }
 
 function AppWithNav({
