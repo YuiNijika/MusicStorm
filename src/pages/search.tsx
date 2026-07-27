@@ -141,7 +141,7 @@ function SearchPage() {
         setErrorText(null)
 
         void searchNeteaseAll(keyword)
-            .then((bundle) => {
+            .then((bundle: NeteaseSearchBundle) => {
                 if (cancelled) {
                     return
                 }

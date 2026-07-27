@@ -330,9 +330,3 @@ export {
     searchNeteaseAll,
 }
 
-export type {
-    NeteaseAlbumHit,
-    NeteaseArtistHit,
-    NeteasePlaylistHit,
-    NeteaseSearchBundle,
-}
