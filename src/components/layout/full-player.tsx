@@ -200,7 +200,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     }
 
     function navigateAlbum() {
-        if (!displayTrack.albumId) {
+        if (!displayTrack?.albumId) {
             return
         }
         openAlbum(displayTrack.albumId)
@@ -219,7 +219,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     }
 
     async function handleToggleLike() {
-        if (!canLike) {
+        if (!canLike || !displayTrack) {
             return
         }
         try {

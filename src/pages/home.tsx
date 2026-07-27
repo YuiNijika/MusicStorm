@@ -56,7 +56,6 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
         cols,
         count: skeletonCount,
         gridStyle: playlistGridStyle,
-        gridRef: playlistGridRef,
     } = usePlaylistGrid()
 
     const forYouRail = useRailApi()

@@ -318,7 +318,7 @@ function StatsPage() {
                                                         {index + 1}
                                                     </span>
                                                     <Cover
-                                                        src={cluster.coverUrl}
+                                                        src={cluster.coverUrl ?? ""}
                                                         alt=""
                                                         size="sm"
                                                         className="size-11 shrink-0 rounded-[12px]"

@@ -103,12 +103,12 @@ async function fetchAlbumSublist(limit = 1000, offset = 0): Promise<AlbumCard[]>
         skipCache: true,
     })
     return (data.data ?? [])
-        .map((item) => {
+        .flatMap((item) => {
             if (item.id == null) {
-                return null
+                return []
             }
             const artists = item.artists ?? (item.artist ? [item.artist] : [])
-            return {
+            const card: AlbumCard = {
                 id: String(item.id),
                 title: item.name?.trim() || "未知专辑",
                 coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
@@ -118,9 +118,9 @@ async function fetchAlbumSublist(limit = 1000, offset = 0): Promise<AlbumCard[]>
                         .filter(Boolean)
                         .join(" / ") || "未知艺人",
                 trackCount: item.size,
-            } satisfies AlbumCard
+            }
+            return [card]
         })
-        .filter((item): item is AlbumCard => item != null)
 }
 
 async function subscribeAlbum(albumId: string, subscribe: boolean): Promise<void> {

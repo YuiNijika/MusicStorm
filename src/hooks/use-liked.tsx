@@ -68,7 +68,7 @@ function LikedProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const applySync = useCallback(
-        async (userId: string) => {
+        async (userId: number) => {
             const [ids, playlists, radios, albums] = await Promise.all([
                 fetchLikelist(userId),
                 fetchUserPlaylistsDetailed(userId),

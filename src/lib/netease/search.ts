@@ -1,6 +1,6 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
-import type { Playlist, Radio, Track } from "@/lib/types"
+import type { Radio, Track } from "@/lib/types"
 
 type CloudSearchData = {
     result?: {
@@ -322,15 +322,16 @@ async function searchNeteaseAll(
 }
 
 export {
+    searchNeteaseTracks,
     searchNeteaseAlbums,
-    searchNeteaseAll,
     searchNeteaseArtists,
     searchNeteasePlaylists,
     searchNeteaseRadios,
-    searchNeteaseTracks,
+    searchNeteaseAll,
 }
+
 export type {
-    NeteaseAlbumHit as NeteaseAlbumSearchHit,
+    NeteaseAlbumHit,
     NeteaseArtistHit,
     NeteasePlaylistHit,
     NeteaseSearchBundle,

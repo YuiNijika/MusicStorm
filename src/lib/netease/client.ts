@@ -1,4 +1,3 @@
-import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
 import { apiCacheGet, apiCacheSet, withInflight } from "@/lib/netease/api-cache"
 import {
     DEFAULT_BASE_URL,
@@ -157,7 +156,7 @@ async function fetchExternal<T>(
 async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
     const settings = getApiSettings()
     const method = options.method ?? "GET"
-    const cookie = getNeteaseCookieParam()
+    const cookieParam = null
     const params = mergeParams(options.params, options.query)
     const checkCode = options.checkCode !== false
     const modeKey =
@@ -166,7 +165,7 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
             : getNeteaseBaseUrl()
     const cacheable = !options.skipCache && shouldCache(options.path, method)
     const cacheKey = cacheable
-        ? buildCacheKey(modeKey, options.path, params, cookie)
+        ? buildCacheKey(modeKey, options.path, params, cookieParam)
         : ""
 
     const run = async (): Promise<T> => {
@@ -193,7 +192,7 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
                 options.path,
                 method,
                 params,
-                cookie,
+                cookieParam,
             )
         }
 
