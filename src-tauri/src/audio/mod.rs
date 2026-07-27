@@ -209,13 +209,17 @@ pub fn audio_pause(state: State<'_, AudioState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn audio_seek(state: State<'_, AudioState>, position_ms: f64) -> Result<(), String> {
+pub fn audio_seek(
+    state: State<'_, AudioState>,
+    position_ms: f64,
+    resume: Option<bool>,
+) -> Result<(), String> {
     let player = {
         let guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
         guard.as_ref().cloned()
     };
     if let Some(player) = player {
-        player.seek(position_ms);
+        player.seek(position_ms, resume.unwrap_or(false))?;
     }
     Ok(())
 }

@@ -169,14 +169,32 @@ function deactivateNeteaseSession(): void {
     writeVault(vault)
 }
 
-/** 从保险库移除；若是当前账号则同时清 cookie */
+/** 从保险库移除；命中活跃标记或当前 cookie 则一并清会话 */
 function removeNeteaseAccount(userId: number): void {
     const vault = readVault()
+    const removed = vault.accounts.find((a) => a.userId === userId)
     vault.accounts = vault.accounts.filter((a) => a.userId !== userId)
-    if (vault.activeUserId === userId) {
+
+    const musicU = getCookie("MUSIC_U")
+    const isActiveMarked = vault.activeUserId === userId
+    const isActiveCookie =
+        musicU != null &&
+        removed != null &&
+        removed.credentials.musicU === musicU
+
+    if (isActiveMarked || isActiveCookie) {
         clearNeteaseSession()
         vault.activeUserId = null
     }
+
+    // 指向已删账号的 active 归零
+    if (
+        vault.activeUserId != null &&
+        !vault.accounts.some((a) => a.userId === vault.activeUserId)
+    ) {
+        vault.activeUserId = null
+    }
+
     writeVault(vault)
 }
 

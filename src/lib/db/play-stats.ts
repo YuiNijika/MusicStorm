@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core"
 
 import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
+import { fetchSongDetail } from "@/lib/netease/track"
+import type { MusicSource, Track } from "@/lib/types"
 
 function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -37,6 +39,7 @@ type PlaySessionMeta = {
     filePath?: string | null
     fileName?: string | null
     contentHash?: string | null
+    coverUrl?: string | null
 }
 
 type PlaySessionStart = {
@@ -65,6 +68,12 @@ type ListenStats = {
     totalMs: number
 }
 
+type ListenSourceStat = {
+    source: string
+    playCount: number
+    totalMs: number
+}
+
 /** 后端按 track_id 聚合的一行 */
 type TopTrackStat = {
     trackId: string
@@ -78,6 +87,7 @@ type TopTrackStat = {
     contentHash?: string | null
     playCount: number
     totalMs: number
+    durationMs?: number
 }
 
 /** 默认展示：同 MD5 或同文件名归为一组 */
@@ -85,10 +95,12 @@ type TopTrackCluster = {
     key: string
     title: string
     artist: string
+    album: string
     source: string
     coverUrl?: string
     playCount: number
     totalMs: number
+    durationMs: number
     memberCount: number
     /** 分别记录，仅详情展开 */
     members: TopTrackStat[]
@@ -103,9 +115,90 @@ function fileBaseName(path: string | null | undefined): string | null {
     if (stem) {
         return stem
     }
-    // 已是 stem 或无路径分隔
     const trimmed = path.trim()
     return stripExtension(trimmed) || null
+}
+
+function needsNeteaseEnrich(row: TopTrackStat): boolean {
+    if (row.source !== "netease") {
+        return false
+    }
+    const title = row.title?.trim() ?? ""
+    const cover = row.coverUrl?.trim() ?? ""
+    const artist = row.artist?.trim() ?? ""
+    return !cover || !title || title === row.trackId || !artist
+}
+
+/** 历史网易云会话缺封面/歌名时批量 song/detail，并写回 track 表 */
+async function enrichTopTrackStats(rows: TopTrackStat[]): Promise<TopTrackStat[]> {
+    const need = rows.filter(needsNeteaseEnrich)
+    if (need.length === 0) {
+        return rows
+    }
+
+    const ids = [...new Set(need.map((r) => r.trackId).filter(Boolean))]
+    if (ids.length === 0) {
+        return rows
+    }
+
+    try {
+        const res = await fetchSongDetail(ids.join(","))
+        const songs = res.songs ?? []
+        if (songs.length === 0) {
+            return rows
+        }
+
+        const byId = new Map(
+            songs.map((s) => [
+                String(s.id),
+                {
+                    title: s.name || "",
+                    artist: s.ar?.map((a) => a.name).filter(Boolean).join(" / ") || "",
+                    album: s.al?.name || "",
+                    coverUrl: s.al?.picUrl || "",
+                    durationMs: typeof s.dt === "number" ? s.dt : 0,
+                },
+            ]),
+        )
+
+        const upserts: UpsertTrackInput[] = []
+        const next = rows.map((row) => {
+            if (!needsNeteaseEnrich(row)) {
+                return row
+            }
+            const hit = byId.get(row.trackId)
+            if (!hit) {
+                return row
+            }
+            const merged: TopTrackStat = {
+                ...row,
+                title: hit.title || row.title,
+                artist: hit.artist || row.artist,
+                album: hit.album || row.album,
+                coverUrl: hit.coverUrl || row.coverUrl,
+                durationMs: hit.durationMs || row.durationMs || 0,
+            }
+            if (hit.title) {
+                upserts.push({
+                    id: row.trackId,
+                    source: "netease",
+                    title: merged.title,
+                    artist: merged.artist,
+                    album: merged.album,
+                    durationMs: merged.durationMs ?? 0,
+                    coverUrl: merged.coverUrl ?? null,
+                })
+            }
+            return merged
+        })
+
+        if (upserts.length > 0) {
+            void upsertLibraryTracks(upserts)
+        }
+        return next
+    } catch {
+        return rows
+    }
 }
 
 /** 本地按 MD5 或无后缀文件名并集归类；网易云按 trackId */
@@ -188,10 +281,12 @@ function clusterTopTracks(rows: TopTrackStat[]): TopTrackCluster[] {
             key: root,
             title: primary.title,
             artist: primary.artist,
+            album: primary.album,
             source: primary.source,
             coverUrl: primary.coverUrl || undefined,
             playCount,
             totalMs,
+            durationMs: primary.durationMs ?? 0,
             memberCount: members.length,
             members,
         })
@@ -204,6 +299,24 @@ function clusterTopTracks(rows: TopTrackStat[]): TopTrackCluster[] {
             a.title.localeCompare(b.title, "zh-CN"),
     )
     return clusters
+}
+
+/** 统计行 → 可播放 Track */
+function clusterToTrack(cluster: TopTrackCluster): Track {
+    const primary = cluster.members[0]
+    const source = (cluster.source === "local" ? "local" : "netease") as MusicSource
+    return {
+        id: primary?.trackId ?? cluster.key,
+        title: cluster.title,
+        artist: cluster.artist || "未知艺人",
+        album: cluster.album || "",
+        coverUrl: cluster.coverUrl || "",
+        durationMs: cluster.durationMs || primary?.durationMs || 0,
+        source,
+        filePath: primary?.filePath || undefined,
+        fileName: primary?.fileName || undefined,
+        contentHash: primary?.contentHash || undefined,
+    }
 }
 
 async function upsertLibraryFolder(input: UpsertFolderInput): Promise<string | null> {
@@ -274,10 +387,24 @@ async function listListenStats(days = 7): Promise<ListenStats[]> {
     }
 }
 
+async function listListenSourceBreakdown(
+    days: number | null = null,
+): Promise<ListenSourceStat[]> {
+    if (!isTauriRuntime()) {
+        return []
+    }
+    try {
+        return await invoke<ListenSourceStat[]>("db_listen_source_breakdown", {
+            days: days && days > 0 ? days : null,
+        })
+    } catch {
+        return []
+    }
+}
+
 /**
  * 拉取 top tracks 并做本地归类。
- * @param limit 聚合后最多返回条数
- * @param days 近 N 日；null/0 = 全部
+ * 网易云缺元数据时批量补齐。
  */
 async function listTopTrackClusters(
     limit = 20,
@@ -287,13 +414,13 @@ async function listTopTrackClusters(
         return []
     }
     try {
-        // 多取一些再聚类，避免归并后名额浪费
         const fetchLimit = Math.min(200, Math.max(limit * 4, limit))
         const rows = await invoke<TopTrackStat[]>("db_list_top_tracks", {
             limit: fetchLimit,
             days: days && days > 0 ? days : null,
         })
-        return clusterTopTracks(rows).slice(0, limit)
+        const enriched = await enrichTopTrackStats(rows)
+        return clusterTopTracks(enriched).slice(0, limit)
     } catch {
         return []
     }
@@ -322,11 +449,13 @@ async function dbSetSetting(key: string, value: string): Promise<void> {
 }
 
 export {
+    clusterToTrack,
     clusterTopTracks,
     dbGetSetting,
     dbSetSetting,
     fileBaseName,
     getListenStats,
+    listListenSourceBreakdown,
     listListenStats,
     listTopTrackClusters,
     recordPlaySessionEnd,
@@ -335,6 +464,7 @@ export {
     upsertLibraryTracks,
 }
 export type {
+    ListenSourceStat,
     ListenStats,
     PlaySessionEnd,
     PlaySessionStart,

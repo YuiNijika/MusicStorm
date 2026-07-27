@@ -7,10 +7,12 @@ type AudioEngineHandlers = {
 }
 
 type AudioEngine = {
-    load: (url: string) => void
+    /** 可同步或异步；调用方应 await Promise.resolve(engine.load(...)) */
+    load: (url: string) => void | Promise<void>
     play: () => Promise<void>
     pause: () => void
-    seek: (positionMs: number) => void
+    /** opts.resume：本地 WASAPI 快进后是否继续播 */
+    seek: (positionMs: number, opts?: { resume?: boolean }) => void | Promise<void>
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
     getPositionMs: () => number
@@ -53,7 +55,7 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
         pause() {
             audio.pause()
         },
-        seek(positionMs) {
+        seek(positionMs, _opts) {
             if (!Number.isFinite(positionMs)) {
                 return
             }

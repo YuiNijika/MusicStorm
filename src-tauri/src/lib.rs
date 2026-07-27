@@ -11,9 +11,10 @@ use audio::{
 };
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
-    db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks, db_set_setting,
-    db_start_play_session, db_upsert_folder, db_upsert_tracks, ensure_storage_paths,
-    get_storage_paths, open_db, purge_expired_api_cache, DbState,
+    db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
+    db_listen_source_breakdown, db_set_setting, db_start_play_session, db_upsert_folder,
+    db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db, purge_expired_api_cache,
+    DbState,
 };
 use netease_proxy::netease_http_post;
 use serde::Serialize;
@@ -379,6 +380,7 @@ pub fn run() {
             db_get_listen_stats,
             db_list_listen_stats,
             db_list_top_tracks,
+            db_listen_source_breakdown,
             db_get_setting,
             db_set_setting,
             api_cache_get,

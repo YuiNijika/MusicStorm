@@ -22,6 +22,7 @@ fn build_client() -> Result<Client, String> {
 }
 
 /// 向 music.163.com / interface 域 POST form-urlencoded 体
+/// UA / Referer / Origin / X-Real-IP 对齐 CloudMusicAPI 风控绕过形态
 #[tauri::command]
 pub fn netease_http_post(
     url: String,
@@ -29,6 +30,7 @@ pub fn netease_http_post(
     cookie: Option<String>,
     user_agent: Option<String>,
     referer: Option<String>,
+    origin: Option<String>,
     real_ip: Option<String>,
 ) -> Result<NeteaseHttpResponse, String> {
     let url = url.trim();
@@ -59,11 +61,17 @@ pub fn netease_http_post(
             headers.insert(REFERER, v);
         }
     }
+    if let Some(origin_url) = origin.as_deref().filter(|s| !s.is_empty()) {
+        if let Ok(v) = HeaderValue::from_str(origin_url) {
+            headers.insert(HeaderName::from_static("origin"), v);
+        }
+    }
     if let Some(ck) = cookie.as_deref().filter(|s| !s.is_empty()) {
         if let Ok(v) = HeaderValue::from_str(ck) {
             headers.insert(COOKIE, v);
         }
     }
+    // 登录风控：伪造国内出口 IP，避免非 CN 出口被拦
     if let Some(ip) = real_ip.as_deref().filter(|s| !s.is_empty()) {
         if let Ok(v) = HeaderValue::from_str(ip) {
             headers.insert(HeaderName::from_static("x-real-ip"), v.clone());

@@ -168,11 +168,14 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
             const captcha = q(query, "captcha")
             const password = q(query, "password")
             const md5Password = q(query, "md5_password")
+            // 前端传 ctcode，上游字段是 countrycode
+            const countrycode =
+                q(query, "countrycode") || q(query, "ctcode", "86")
             const data: Record<string, unknown> = {
                 type: "1",
                 https: "true",
                 phone: q(query, "phone"),
-                countrycode: q(query, "countrycode", "86"),
+                countrycode,
                 remember: "true",
                 secureCaptcha: q(query, "sca"),
             }

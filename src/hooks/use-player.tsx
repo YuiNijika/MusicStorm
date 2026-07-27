@@ -161,6 +161,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const loadGenRef = useRef(0)
     const pauseGenRef = useRef(0)
     const skipFadeOutOnLoadRef = useRef(false)
+    /** seek 后短窗忽略过期 tick，避免进度条回跳/时长闪烁 */
+    const seekGuardUntilRef = useRef(0)
+    const seekSeqRef = useRef(0)
     /** 启动恢复进度，load 完成后 seek 一次 */
     const pendingSeekMsRef = useRef(
         restored && restored.positionMs > 0 ? restored.positionMs : null,
@@ -249,16 +252,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         engine.setVolume(perceptual * gain)
     }, [])
 
+    /** 双引擎都 pause，不改 fade / pauseGen；切 H5↔WASAPI 时用 */
+    const pauseBothEngines = useCallback(() => {
+        html5Ref.current?.pause()
+        nativeRef.current?.pause()
+        if (
+            activeRef.current &&
+            activeRef.current !== html5Ref.current &&
+            activeRef.current !== nativeRef.current
+        ) {
+            activeRef.current.pause()
+        }
+    }, [])
+
     /** 立即静音停引擎；与 isPlaying 状态无关，供用户暂停 / 竞态收尾 */
     const hardStopEngines = useCallback(() => {
         pauseGenRef.current += 1
         fadeRef.current.cancel()
         fadeRef.current.setGain(0)
-        activeRef.current?.pause()
-        html5Ref.current?.pause()
-        nativeRef.current?.pause()
+        pauseBothEngines()
         applyUserVolume()
-    }, [applyUserVolume])
+    }, [applyUserVolume, pauseBothEngines])
 
     /** 与 isPlayingRef 同拍，暂停路径立刻 hardStop */
     const setPlaying = useCallback(
@@ -297,6 +311,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             filePath: track.filePath ?? null,
             fileName,
             contentHash: track.contentHash ?? null,
+            coverUrl: track.coverUrl || null,
         })
         sessionIdRef.current = null
         sessionTrackRef.current = null
@@ -336,6 +351,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 filePath: track.filePath ?? null,
                 fileName,
                 contentHash: track.contentHash ?? null,
+                coverUrl: track.coverUrl || null,
             })
         },
         [flushSession],
@@ -400,6 +416,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         const handlers: AudioEngineHandlers = {
             onTimeUpdate: (position, duration) => {
+                // seek 进行中：丢弃明显过期的旧 tick，防止进度/时长被改乱
+                if (performance.now() < seekGuardUntilRef.current) {
+                    const expected = lastTickPosRef.current
+                    if (position + 1500 < expected) {
+                        return
+                    }
+                }
                 if (isPlayingRef.current && position > lastTickPosRef.current) {
                     sessionListenedRef.current += position - lastTickPosRef.current
                 }
@@ -535,8 +558,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 return
             }
 
+            // 作废进行中的 resume/fade，避免旧会话 hardStop 误伤新 WASAPI
+            pauseGenRef.current += 1
             fadeRef.current.cancel()
-            activeRef.current?.pause()
+            // 云端 H5 → 本地 WASAPI：必须双停，否则旧引擎抢设备/旧 play 回调乱入
+            pauseBothEngines()
 
             const pref = getEnginePref()
             const wantNative =
@@ -585,11 +611,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const url = resolved.url
 
             try {
-                engine.load(url)
+                await Promise.resolve(engine.load(url))
             } catch (error) {
                 console.warn("[player] load failed", formatInvokeError(error))
                 // 原生 load 失败，回退 H5 同曲
                 if (usedNative && html5) {
+                    pauseBothEngines()
                     activeRef.current = html5
                     setEngineStatus("degraded")
                     engineStatusRef.current = "degraded"
@@ -608,7 +635,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                         return
                     }
                     try {
-                        html5.load(fallback.url)
+                        await Promise.resolve(html5.load(fallback.url))
                         engine = html5
                         usedNative = false
                     } catch (fallbackError) {
@@ -637,11 +664,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
             // load 完成：只标记 ready，play 由 resume effect 统一负责
             applyUserVolume()
-            // 启动恢复进度
+            // 启动恢复进度：必须 await，避免 play 抢在 seek 前从 0 起播
             const restoreMs = pendingSeekMsRef.current
             if (restoreMs != null && restoreMs > 0) {
                 pendingSeekMsRef.current = null
-                engine.seek(restoreMs)
+                try {
+                    await Promise.resolve(engine.seek(restoreMs, { resume: false }))
+                } catch {
+                    // 恢复失败仍从 0 可播
+                }
+                if (cancelled || gen !== loadGenRef.current) {
+                    return
+                }
                 setPositionMs(restoreMs)
                 lastTickPosRef.current = restoreMs
             } else {
@@ -676,6 +710,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         currentTrackId,
         enginesReadyToken,
         hardStopEngines,
+        pauseBothEngines,
         reloadNonce,
         engineEpoch,
     ])
@@ -700,6 +735,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         let cancelled = false
         const trackId = loadedTrackIdRef.current
 
+        /** 仅停本 effect 捕获的引擎；切曲后 isPlaying 仍 true 时绝不能 hardStop 双引擎 */
+        const abandonThisEngine = () => {
+            try {
+                engine.pause()
+            } catch {
+                // ignore
+            }
+        }
+
         void (async () => {
             try {
                 if (fadeRef.current.getGain() < 0.05) {
@@ -715,17 +759,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     if (!isPlayingRef.current) {
                         hardStopEngines()
                     } else {
-                        engine.pause()
+                        abandonThisEngine()
                     }
                     return
                 }
                 await fadeRef.current.fadeTo(1, resolveFadeDurationMs())
                 if (
-                    !isPlayingRef.current ||
+                    cancelled ||
                     gen !== pauseGenRef.current ||
+                    !isPlayingRef.current ||
                     loadedTrackIdRef.current !== trackId
                 ) {
-                    hardStopEngines()
+                    if (!isPlayingRef.current) {
+                        hardStopEngines()
+                    } else {
+                        abandonThisEngine()
+                    }
                 }
             } catch (error) {
                 if (cancelled || gen !== pauseGenRef.current) {
@@ -769,10 +818,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                             }
                             return
                         }
+                        pauseBothEngines()
                         activeRef.current = html5
                         setEngineStatus("degraded")
                         engineStatusRef.current = "degraded"
-                        html5.load(fallback.url)
+                        await Promise.resolve(html5.load(fallback.url))
+                        if (
+                            cancelled ||
+                            gen !== pauseGenRef.current ||
+                            !isPlayingRef.current
+                        ) {
+                            hardStopEngines()
+                            return
+                        }
                         mediaReadyRef.current = true
                         applyUserVolume()
                         fadeRef.current.setGain(0)
@@ -782,7 +840,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                             gen !== pauseGenRef.current ||
                             !isPlayingRef.current
                         ) {
-                            hardStopEngines()
+                            if (!isPlayingRef.current) {
+                                hardStopEngines()
+                            } else {
+                                html5.pause()
+                            }
                             return
                         }
                         await fadeRef.current.fadeTo(1, resolveFadeDurationMs())
@@ -822,8 +884,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             cancelled = true
             pauseGenRef.current += 1
             fadeRef.current.cancel()
+            // 只停本会话引擎，留给 load 去启下一引擎
+            abandonThisEngine()
         }
-    }, [isPlaying, readyEpoch, hardStopEngines, applyUserVolume])
+    }, [isPlaying, readyEpoch, hardStopEngines, pauseBothEngines, applyUserVolume])
 
     const playTrack = useCallback((track: Track, nextQueue?: Track[]) => {
         const list = nextQueue && nextQueue.length > 0 ? nextQueue : [track]
@@ -889,27 +953,57 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const previous = useCallback(() => {
         if (positionMs > 3000) {
-            activeRef.current?.seek(0)
+            // 走统一 seek，播放中带 resume，避免本地 WASAPI 停在 pause
+            const engine = activeRef.current
+            const resume = isPlayingRef.current && mediaReadyRef.current
             setPositionMs(0)
+            lastTickPosRef.current = 0
+            seekGuardUntilRef.current = performance.now() + 800
+            if (engine) {
+                void Promise.resolve(engine.seek(0, { resume })).catch(() => {})
+            }
             return
         }
         advance(-1)
     }, [advance, positionMs])
 
     const seek = useCallback((nextPosition: number) => {
-        activeRef.current?.seek(nextPosition)
-        setPositionMs(nextPosition)
-        lastTickPosRef.current = nextPosition
-        lastSessionWriteRef.current = 0
-        // 本地 native 重解码 seek 后偶发停在 pause；UI 仍 isPlaying 时补一次 play
-        if (isPlayingRef.current && mediaReadyRef.current) {
-            const engine = activeRef.current
-            if (engine) {
-                void engine.play().catch(() => {
-                    // ignore；resume effect / 用户可再点播放
-                })
-            }
+        if (!Number.isFinite(nextPosition)) {
+            return
         }
+        const clamped = Math.max(0, nextPosition)
+        const engine = activeRef.current
+        const resume =
+            isPlayingRef.current &&
+            mediaReadyRef.current &&
+            Boolean(engine)
+
+        // 先更新 UI，再异步落地引擎，避免 skip 时代卡死手感
+        setPositionMs(clamped)
+        lastTickPosRef.current = clamped
+        lastSessionWriteRef.current = 0
+        seekGuardUntilRef.current = performance.now() + 800
+
+        if (!engine) {
+            return
+        }
+
+        const seq = ++seekSeqRef.current
+        void (async () => {
+            try {
+                await Promise.resolve(
+                    engine.seek(clamped, { resume }),
+                )
+            } catch (error) {
+                console.warn("[player] seek failed", formatInvokeError(error))
+                return
+            }
+            if (seq !== seekSeqRef.current) {
+                return
+            }
+            // 原生已按 resume 续播；无需再 play()，否则 Seek/Play 交错无法合并
+            seekGuardUntilRef.current = performance.now() + 320
+        })()
     }, [])
 
     const setVolume = useCallback((nextVolume: number) => {

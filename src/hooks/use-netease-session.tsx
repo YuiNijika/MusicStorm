@@ -18,7 +18,10 @@ import {
     upsertActiveAccount,
     type NeteaseAccountRecord,
 } from "@/lib/netease/account-vault"
-import { isNeteaseLoggedIn } from "@/lib/netease/auth-cookie"
+import {
+    clearNeteaseSession,
+    isNeteaseLoggedIn,
+} from "@/lib/netease/auth-cookie"
 import {
     fetchUserAccount,
     type NeteaseProfile,
@@ -133,10 +136,43 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
 
     const removeAccount = useCallback(
         async (userId: number) => {
+            // React 态 + vault 标记都算「当前」，避免一边登出一边 cookie 残留
+            const wasCurrent =
+                state.activeUserId === userId ||
+                state.profile?.userId === userId ||
+                getActiveUserId() === userId
+
             vaultRemoveAccount(userId)
+
+            if (wasCurrent) {
+                // vault 已尽量清 cookie；再强制一次，覆盖凭证漂移
+                clearNeteaseSession()
+                setState({
+                    ready: true,
+                    loggedIn: false,
+                    profile: null,
+                    error: null,
+                    accounts: listNeteaseAccounts(),
+                    activeUserId: null,
+                })
+                return
+            }
+
+            if (!isNeteaseLoggedIn()) {
+                setState({
+                    ready: true,
+                    loggedIn: false,
+                    profile: null,
+                    error: null,
+                    accounts: listNeteaseAccounts(),
+                    activeUserId: getActiveUserId(),
+                })
+                return
+            }
+
             await refresh()
         },
-        [refresh],
+        [refresh, state.activeUserId, state.profile?.userId],
     )
 
     useEffect(() => {

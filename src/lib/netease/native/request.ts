@@ -1,6 +1,6 @@
 /**
  * 应用内置网易云 API：TS 加密 + 模块映射 + Tauri HTTP 代理
- * 对齐 CloudMusicAPI 的 weapi/eapi 请求形态。
+ * 对齐 CloudMusicAPI 的 weapi/eapi 请求形态与登录风控头。
  */
 
 import { invoke } from "@tauri-apps/api/core"
@@ -13,10 +13,15 @@ import { resolveRealIp } from "@/lib/netease/native/real-ip"
 const DOMAIN = "https://music.163.com"
 const EAPI_DOMAIN = "https://interface3.music.163.com"
 
+/** 桌面客户端版本，UA 与 cookie.appver 保持一致 */
+const DESKTOP_APPVER = "3.1.29.205117"
+
 const UA_WEAPI =
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
-const UA_EAPI =
-    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.29.205117"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
+const UA_EAPI = `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/${DESKTOP_APPVER}`
+
+const DEVICE_ID_KEY = "netease-device-id"
+const NMTID_KEY = "netease-nmtid"
 
 type Query = Record<string, string | number | boolean | undefined>
 
@@ -30,7 +35,64 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-function cookieToRecord(cookie: string | null): Record<string, string> {
+function randomHex(len: number): string {
+    const chars = "0123456789abcdef"
+    let out = ""
+    for (let i = 0; i < len; i += 1) {
+        out += chars[Math.floor(Math.random() * chars.length)]
+    }
+    return out
+}
+
+function randomDeviceId(): string {
+    // 对齐桌面端 deviceId 形态：字母数字 + 下划线
+    const alphabet =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let id = ""
+    for (let i = 0; i < 20; i += 1) {
+        id += alphabet[Math.floor(Math.random() * alphabet.length)]
+    }
+    return id
+}
+
+function readLocal(key: string): string | null {
+    try {
+        return window.localStorage.getItem(key)
+    } catch {
+        return null
+    }
+}
+
+function writeLocal(key: string, value: string): void {
+    try {
+        window.localStorage.setItem(key, value)
+    } catch {
+        // ignore quota / private mode
+    }
+}
+
+/** 会话级稳定设备指纹，避免固定字面量被风控 */
+function getOrCreateDeviceId(): string {
+    const existing = readLocal(DEVICE_ID_KEY)
+    if (existing) {
+        return existing
+    }
+    const next = randomDeviceId()
+    writeLocal(DEVICE_ID_KEY, next)
+    return next
+}
+
+function getOrCreateNmtid(): string {
+    const existing = readLocal(NMTID_KEY)
+    if (existing) {
+        return existing
+    }
+    const next = randomHex(32)
+    writeLocal(NMTID_KEY, next)
+    return next
+}
+
+function cookieToRecord(cookie: string | null | undefined): Record<string, string> {
     const out: Record<string, string> = {}
     if (!cookie) {
         return out
@@ -49,22 +111,32 @@ function cookieToRecord(cookie: string | null): Record<string, string> {
     return out
 }
 
+/**
+ * 设备 cookie 对齐 CloudMusicAPI：
+ * __remember_me / os / appver / osver / deviceId / channel / NMTID
+ */
 function ensureDeviceCookies(jar: Record<string, string>): Record<string, string> {
     const next = { ...jar }
+    if (!next.__remember_me) {
+        next.__remember_me = "true"
+    }
     if (!next.os) {
         next.os = "pc"
     }
     if (!next.appver) {
-        next.appver = "3.1.17.204416"
+        next.appver = DESKTOP_APPVER
     }
     if (!next.osver) {
         next.osver = "Microsoft-Windows-10-Professional-build-19045-64bit"
     }
-    if (!next.deviceId) {
-        next.deviceId = "pafxhud3s9_MusicStorm"
+    if (!next.deviceId && !next.DEVICEID) {
+        next.deviceId = getOrCreateDeviceId()
     }
     if (!next.channel) {
         next.channel = "netease"
+    }
+    if (!next.NMTID) {
+        next.NMTID = getOrCreateNmtid()
     }
     return next
 }
@@ -89,6 +161,7 @@ async function proxyPost(input: {
     cookie?: string
     userAgent?: string
     referer?: string
+    origin?: string
     realIp?: string
 }): Promise<ProxyResponse> {
     if (!isTauriRuntime()) {
@@ -102,6 +175,7 @@ async function proxyPost(input: {
         cookie: input.cookie ?? null,
         userAgent: input.userAgent ?? null,
         referer: input.referer ?? null,
+        origin: input.origin ?? null,
         realIp: input.realIp ?? resolveRealIp(),
     })
 }
@@ -130,11 +204,13 @@ async function nativeNeteaseRequest<T>(
 
     const csrf = jar.__csrf || ""
     const data: Record<string, unknown> = { ...spec.data }
+    const realIp = resolveRealIp(query.realIP)
 
     let url = ""
     let body = ""
     let userAgent = UA_WEAPI
     let referer = DOMAIN
+    let origin = DOMAIN
 
     if (spec.crypto === "weapi") {
         data.csrf_token = csrf
@@ -143,10 +219,12 @@ async function nativeNeteaseRequest<T>(
         body = formBody(encrypted)
         userAgent = UA_WEAPI
         referer = DOMAIN
+        origin = DOMAIN
     } else if (spec.crypto === "eapi") {
+        const deviceId = jar.deviceId || jar.DEVICEID || getOrCreateDeviceId()
         const header = {
             osver: jar.osver,
-            deviceId: jar.deviceId,
+            deviceId,
             os: jar.os,
             appver: jar.appver,
             versioncode: jar.versioncode || "140",
@@ -176,7 +254,8 @@ async function nativeNeteaseRequest<T>(
             cookie: cookieHeader(eapiCookie),
             userAgent,
             referer,
-            realIp: resolveRealIp(query.realIP),
+            origin,
+            realIp,
         })
         return parseProxyBody<T>(path, responseEapi)
     } else {
@@ -195,7 +274,8 @@ async function nativeNeteaseRequest<T>(
         cookie: cookieHeader(jar),
         userAgent,
         referer,
-        realIp: resolveRealIp(query.realIP),
+        origin,
+        realIp,
     })
     return parseProxyBody<T>(path, response)
 }

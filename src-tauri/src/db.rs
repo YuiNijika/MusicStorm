@@ -118,6 +118,11 @@ CREATE INDEX IF NOT EXISTS idx_track_hash ON track(content_hash);
 CREATE INDEX IF NOT EXISTS idx_track_file_name ON track(file_name);
 "#;
 
+/// 会话封面，供统计列表与网易云 JOIN 缺失时回退
+const SCHEMA_V5: &str = r#"
+ALTER TABLE play_session ADD COLUMN cover_url TEXT;
+"#;
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -318,6 +323,20 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         conn.pragma_update(None, "user_version", 4)
             .map_err(|e| format!("set user_version: {e}"))?;
     }
+    let version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|e| format!("user_version: {e}"))?;
+    if version < 5 {
+        for stmt in SCHEMA_V5
+            .split(';')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            let _ = conn.execute_batch(&format!("{stmt};"));
+        }
+        conn.pragma_update(None, "user_version", 5)
+            .map_err(|e| format!("set user_version: {e}"))?;
+    }
     Ok(())
 }
 
@@ -362,6 +381,7 @@ pub struct PlaySessionStart {
     pub file_path: Option<String>,
     pub file_name: Option<String>,
     pub content_hash: Option<String>,
+    pub cover_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -381,6 +401,7 @@ pub struct PlaySessionEnd {
     pub file_path: Option<String>,
     pub file_name: Option<String>,
     pub content_hash: Option<String>,
+    pub cover_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -405,6 +426,16 @@ pub struct TopTrackStat {
     pub file_path: Option<String>,
     pub file_name: Option<String>,
     pub content_hash: Option<String>,
+    pub play_count: i64,
+    pub total_ms: i64,
+    pub duration_ms: i64,
+}
+
+/// 来源占比：local / netease
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListenSourceStat {
+    pub source: String,
     pub play_count: i64,
     pub total_ms: i64,
 }
@@ -526,9 +557,9 @@ pub fn db_start_play_session(
     conn.execute(
         "INSERT OR REPLACE INTO play_session (
             id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br,
-            title, artist, album, file_path, file_name, content_hash
+            title, artist, album, file_path, file_name, content_hash, cover_url
          )
-         VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+         VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             input.id,
             input.track_id,
@@ -541,6 +572,7 @@ pub fn db_start_play_session(
             input.file_path,
             input.file_name,
             input.content_hash,
+            input.cover_url,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -557,9 +589,9 @@ pub fn db_end_play_session(
     conn.execute(
         "INSERT INTO play_session (
             id, track_id, source, started_at, ended_at, listened_ms, completed, quality_br,
-            title, artist, album, file_path, file_name, content_hash
+            title, artist, album, file_path, file_name, content_hash, cover_url
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
          ON CONFLICT(id) DO UPDATE SET
            ended_at = excluded.ended_at,
            listened_ms = excluded.listened_ms,
@@ -570,7 +602,8 @@ pub fn db_end_play_session(
            album = COALESCE(excluded.album, play_session.album),
            file_path = COALESCE(excluded.file_path, play_session.file_path),
            file_name = COALESCE(excluded.file_name, play_session.file_name),
-           content_hash = COALESCE(excluded.content_hash, play_session.content_hash)",
+           content_hash = COALESCE(excluded.content_hash, play_session.content_hash),
+           cover_url = COALESCE(excluded.cover_url, play_session.cover_url)",
         params![
             input.id,
             input.track_id,
@@ -586,6 +619,7 @@ pub fn db_end_play_session(
             input.file_path,
             input.file_name,
             input.content_hash,
+            input.cover_url,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -745,12 +779,13 @@ pub fn db_list_top_tracks(
           ) AS title,
           COALESCE(NULLIF(MAX(s.artist), ''), NULLIF(MAX(t.artist), ''), '') AS artist,
           COALESCE(NULLIF(MAX(s.album), ''), NULLIF(MAX(t.album), ''), '') AS album,
-          MAX(t.cover_url) AS cover_url,
+          COALESCE(NULLIF(MAX(s.cover_url), ''), NULLIF(MAX(t.cover_url), '')) AS cover_url,
           COALESCE(NULLIF(MAX(s.file_path), ''), NULLIF(MAX(t.file_path), '')) AS file_path,
           COALESCE(NULLIF(MAX(s.file_name), ''), NULLIF(MAX(t.file_name), '')) AS file_name,
           COALESCE(NULLIF(MAX(s.content_hash), ''), NULLIF(MAX(t.content_hash), '')) AS content_hash,
           COUNT(*) AS play_count,
-          COALESCE(SUM(s.listened_ms), 0) AS total_ms
+          COALESCE(SUM(s.listened_ms), 0) AS total_ms,
+          COALESCE(MAX(t.duration_ms), 0) AS duration_ms
         FROM play_session s
         LEFT JOIN track t ON t.id = s.track_id
         WHERE s.ended_at IS NOT NULL
@@ -776,6 +811,56 @@ pub fn db_list_top_tracks(
                 content_hash: row.get(8)?,
                 play_count: row.get(9)?,
                 total_ms: row.get(10)?,
+                duration_ms: row.get(11)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+/// 有效听歌按来源汇总
+#[tauri::command]
+pub fn db_listen_source_breakdown(
+    state: State<'_, DbState>,
+    days: Option<i64>,
+) -> Result<Vec<ListenSourceStat>, String> {
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let min_ended: Option<i64> = match days {
+        Some(d) if d > 0 => {
+            let d = d.clamp(1, 365);
+            Some(now_ms() - d * 86_400_000)
+        }
+        _ => None,
+    };
+
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT
+              s.source,
+              COUNT(*) AS play_count,
+              COALESCE(SUM(s.listened_ms), 0) AS total_ms
+            FROM play_session s
+            WHERE s.ended_at IS NOT NULL
+              AND (s.completed = 1 OR s.listened_ms >= 30000)
+              AND (?1 IS NULL OR s.ended_at >= ?1)
+            GROUP BY s.source
+            ORDER BY play_count DESC
+            "#,
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![min_ended], |row| {
+            Ok(ListenSourceStat {
+                source: row.get(0)?,
+                play_count: row.get(1)?,
+                total_ms: row.get(2)?,
             })
         })
         .map_err(|e| e.to_string())?;
