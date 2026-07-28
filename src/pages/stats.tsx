@@ -610,10 +610,6 @@ function SectionLabel({
     )
 }
 
-function MetaDot() {
-    return <span className="mx-1.5 text-foreground/20">·</span>
-}
-
 function MetricCell({
     label,
     value,
