@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 
 import { TrackRow } from "@/components/music/track-row"
 import { StatsPageSkeleton } from "@/components/music/loading-skeletons"
+import { PageTitle } from "@/components/music/page-title"
 import { SortSelect } from "@/components/music/sort-select"
 import {
     StatsDurationTrendChart,
@@ -279,27 +280,22 @@ function StatsPage() {
 
     return (
         <div className="space-y-11 pb-10">
-            {/* 页眉：大标题左，时段右 — 无底部分割线抢戏 */}
-            <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-0.5">
-                <div className="min-w-0 space-y-1">
-                    <h1 className="text-[34px] font-semibold leading-none tracking-[-0.045em] text-foreground">
-                        统计
-                    </h1>
-                    <p className="text-[15px] text-muted-foreground">
-                        了解你的听歌习惯
-                    </p>
-                </div>
-                {tauri ? (
-                    <Segmented
-                        items={PERIODS.map((p) => ({
-                            id: p.id,
-                            label: p.label,
-                        }))}
-                        value={period}
-                        onChange={setPeriod}
-                    />
-                ) : null}
-            </header>
+            <PageTitle
+                title="统计"
+                subtitle="了解你的听歌习惯"
+                trailing={
+                    tauri ? (
+                        <Segmented
+                            items={PERIODS.map((p) => ({
+                                id: p.id,
+                                label: p.label,
+                            }))}
+                            value={period}
+                            onChange={setPeriod}
+                        />
+                    ) : null
+                }
+            />
 
             {!tauri ? (
                 <StateHero
