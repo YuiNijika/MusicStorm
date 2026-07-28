@@ -121,8 +121,8 @@ function LocalAlbumDrawer({
                         </DrawerTitle>
                         <DrawerDescription className="text-[13px] leading-relaxed">
                             {isEdit
-                                ? "修改名称、艺人或封面。关联文件夹可在详情页「再扫」。"
-                                : "创建专辑元数据，可稍后导入文件夹。支持手动封面或从网易云填入信息。"}
+                                ? "修改名称、艺人或封面。可在详情页「添加音乐」从任意位置选文件，不限关联文件夹。"
+                                : "创建自定义专辑。创建后可直接添加任意路径的音乐，不必绑定文件夹。"}
                         </DrawerDescription>
                     </DrawerHeader>
 

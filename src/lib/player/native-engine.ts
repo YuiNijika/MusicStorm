@@ -43,9 +43,7 @@ function createNativeEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
                 positionMs = event.payload.positionMs
                 durationMs = event.payload.durationMs
                 handlers.onTimeUpdate?.(positionMs, durationMs)
-                if (event.payload.ended) {
-                    handlers.onEnded?.()
-                }
+                // ended 标志用于确保最终位置；真正的 ended 事件走 audio://ended 以避免重复触发
             })
             unlistenEnded = await listen("audio://ended", () => {
                 if (!destroyed) {

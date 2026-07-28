@@ -12,6 +12,8 @@ type AppShellProps = {
     onNavigate: (route: AppRoute) => void
     children: ReactNode
     titleBarStyle?: TitleBarStyle
+    /** 标题栏 NEW → 设置·更新 */
+    onOpenUpdate?: () => void
 }
 
 function AppShell({
@@ -19,13 +21,14 @@ function AppShell({
     onNavigate,
     children,
     titleBarStyle = "mac",
+    onOpenUpdate,
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     usePlayerHotkeys()
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
-            <TitleBar style={titleBarStyle} />
+            <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
             <div className="flex min-h-0 flex-1">
                 <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
                 <main className="apple-scroll min-w-0 flex-1 overflow-y-auto">

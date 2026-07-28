@@ -423,29 +423,14 @@ function mergeFolderScan(
 
     const album = albums.find((item) => item.id === albumId)!
     const retained = state.tracks.filter((track) => track.folderPath !== folderPath)
-    const nextFromFolder: StoredLocalTrack[] = scanned.map((item) => ({
-        id: item.id,
-        title: item.title,
-        artist:
-            item.artist && item.artist !== "未知艺人"
-                ? item.artist
-                : album.artist || item.artist || "未知艺人",
-        // 有内嵌专辑名时保留，否则用专辑名
-        album: item.album && item.album !== "本地文件" ? item.album : album.title,
-        path: item.path,
-        durationMs: item.durationMs ?? 0,
-        folderPath,
-        albumId: album.id,
-        coverPath: item.coverPath ?? null,
-        // 大段歌词不进 localStorage，靠 lrcPath 读文件
-        lyricText: capLyricText(item.lyricText),
-        lrcPath: item.lrcPath ?? null,
-        fileName:
-            stripExtension(item.fileName?.trim() || "") ||
-            fileStemFromPath(item.path) ||
-            null,
-        contentHash: item.contentHash?.trim().toLowerCase() || null,
-    }))
+    const nextFromFolder: StoredLocalTrack[] = scanned.map((item) =>
+        scanDtoToStored(item, {
+            albumId: album.id,
+            albumTitle: album.title,
+            albumArtist: album.artist,
+            folderPath,
+        }),
+    )
 
     const byId = new Map<string, StoredLocalTrack>()
     for (const track of retained) {
@@ -460,6 +445,122 @@ function mergeFolderScan(
     )
 
     const next = { folders, albums, tracks }
+    saveLocalLibrary(next)
+    return next
+}
+
+/** 父目录作为 folderPath 记录，不绑定专辑文件夹限制 */
+function parentFolderOf(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, "/")
+    const idx = normalized.lastIndexOf("/")
+    if (idx <= 0) {
+        return ""
+    }
+    // Windows 盘符路径还原反斜杠风格由调用方原 path 父级更稳
+    const fromNative = filePath.includes("\\")
+        ? filePath.slice(0, Math.max(filePath.lastIndexOf("\\"), filePath.lastIndexOf("/")))
+        : filePath.slice(0, idx)
+    return fromNative || ""
+}
+
+function scanDtoToStored(
+    item: ScanTrackDto,
+    opts: {
+        albumId: string | null
+        albumTitle?: string
+        albumArtist?: string
+        folderPath?: string
+    },
+): StoredLocalTrack {
+    const folderPath = opts.folderPath ?? parentFolderOf(item.path)
+    const albumTitle = opts.albumTitle?.trim() || ""
+    const albumArtist = opts.albumArtist?.trim() || ""
+    return {
+        id: item.id,
+        title: item.title,
+        artist:
+            item.artist && item.artist !== "未知艺人"
+                ? item.artist
+                : albumArtist || item.artist || "未知艺人",
+        album:
+            item.album && item.album !== "本地文件"
+                ? item.album
+                : albumTitle || item.album || "本地文件",
+        path: item.path,
+        durationMs: item.durationMs ?? 0,
+        folderPath,
+        albumId: opts.albumId,
+        coverPath: item.coverPath ?? null,
+        lyricText: capLyricText(item.lyricText),
+        lrcPath: item.lrcPath ?? null,
+        fileName:
+            stripExtension(item.fileName?.trim() || "") ||
+            fileStemFromPath(item.path) ||
+            null,
+        contentHash: item.contentHash?.trim().toLowerCase() || null,
+    }
+}
+
+/**
+ * 向专辑（或未分类）追加任意路径的音频。
+ * - 不按文件夹整夹替换
+ * - 同 id 覆盖更新
+ * - albumId = null 表示仅进「全部歌曲」
+ */
+function mergeScannedTracks(
+    state: LocalLibraryState,
+    scanned: ScanTrackDto[],
+    albumId: string | null,
+): LocalLibraryState {
+    if (scanned.length === 0) {
+        return state
+    }
+
+    const album =
+        albumId != null
+            ? state.albums.find((item) => item.id === albumId) ?? null
+            : null
+
+    if (albumId && !album) {
+        return state
+    }
+
+    const ts = nowMs()
+    const incoming = scanned.map((item) =>
+        scanDtoToStored(item, {
+            albumId: album?.id ?? null,
+            albumTitle: album?.title,
+            albumArtist: album?.artist,
+        }),
+    )
+
+    const byId = new Map(state.tracks.map((track) => [track.id, track]))
+    for (const track of incoming) {
+        byId.set(track.id, track)
+    }
+
+    const folders = new Set(state.folders)
+    for (const track of incoming) {
+        if (track.folderPath && !folders.has(track.folderPath)) {
+            folders.add(track.folderPath)
+        }
+    }
+
+    const albums = album
+        ? state.albums.map((item) =>
+              item.id === album.id ? { ...item, updatedAt: ts } : item,
+          )
+        : state.albums
+
+    const tracks = Array.from(byId.values()).sort((a, b) =>
+        a.title.localeCompare(b.title, "zh-CN"),
+    )
+
+    const next: LocalLibraryState = {
+        folders: Array.from(folders),
+        albums,
+        tracks,
+    }
     saveLocalLibrary(next)
     return next
 }
@@ -565,6 +666,7 @@ export {
     listTracksByAlbum,
     loadLocalLibrary,
     mergeFolderScan,
+    mergeScannedTracks,
     removeAlbum,
     removeFolder,
     resolveAlbumCoverUrl,

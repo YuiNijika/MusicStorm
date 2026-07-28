@@ -26,6 +26,7 @@ import {
     fetchUserAccount,
     type NeteaseProfile,
 } from "@/lib/netease/user"
+import { notifyError, notifySuccess, notifyWarning } from "@/lib/notify"
 
 type SessionState = {
     ready: boolean
@@ -124,12 +125,43 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
 
     const switchAccount = useCallback(
         async (userId: number) => {
+            const snapshot = listNeteaseAccounts().find(
+                (item) => item.userId === userId,
+            )
+            const label = snapshot?.nickname?.trim() || `uid ${userId}`
+
             const ok = vaultSwitchAccount(userId)
             if (!ok) {
+                notifyError("切换失败", {
+                    id: "netease-switch-account",
+                    description: "未找到该账号或本地凭证已失效",
+                })
                 return false
             }
-            await refresh()
-            return true
+
+            const profile = await refresh()
+            if (profile) {
+                notifySuccess("已切换账号", {
+                    id: "netease-switch-account",
+                    description: profile.nickname || label,
+                })
+                return true
+            }
+
+            // 凭证已写入，但资料拉取失败：仍算切换成功，提示可重试
+            if (isNeteaseLoggedIn()) {
+                notifyWarning("已切换账号", {
+                    id: "netease-switch-account",
+                    description: `${label} · 资料暂未刷新`,
+                })
+                return true
+            }
+
+            notifyError("切换失败", {
+                id: "netease-switch-account",
+                description: "凭证无效，请重新登录该账号",
+            })
+            return false
         },
         [refresh],
     )

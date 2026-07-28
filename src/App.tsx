@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app/app-shell"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { Toaster, toast } from "@/components/ui/toast"
+import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import {
@@ -30,6 +31,7 @@ import {
     readTitleBarStyle,
     SettingsPage,
     TITLE_BAR_STORAGE_KEY,
+    type SettingsTab,
 } from "@/pages/settings"
 
 import "./App.css"
@@ -38,10 +40,12 @@ function AppRoutes({
     route,
     titleBarStyle,
     onTitleBarStyleChange,
+    settingsTab,
 }: {
     route: AppRoute
     titleBarStyle: TitleBarStyle
     onTitleBarStyleChange: (style: TitleBarStyle) => void
+    settingsTab?: SettingsTab
 }) {
     const { detail, openPlaylist, openRadio, back } = useMusicNavigation()
 
@@ -97,6 +101,7 @@ function AppRoutes({
             <SettingsPage
                 titleBarStyle={titleBarStyle}
                 onTitleBarStyleChange={onTitleBarStyleChange}
+                initialTab={settingsTab}
             />
         )
     }
@@ -108,6 +113,7 @@ function App() {
     const [titleBarStyle, setTitleBarStyle] = useState<TitleBarStyle>(() =>
         readTitleBarStyle(),
     )
+    const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>()
 
     useApiCacheAutoPurge()
 
@@ -119,23 +125,27 @@ function App() {
     return (
         <ThemeProvider>
             <Toaster toastManager={toast}>
-                <IntegratedApiBootEffect />
-                <NeteaseSessionProvider>
-                    <LikedProvider>
-                        <PlayerProvider>
-                            <MusicNavigationProvider>
-                                <AppWithNav
-                                    route={route}
-                                    setRoute={setRoute}
-                                    titleBarStyle={titleBarStyle}
-                                    onTitleBarStyleChange={
-                                        handleTitleBarStyleChange
-                                    }
-                                />
-                            </MusicNavigationProvider>
-                        </PlayerProvider>
-                    </LikedProvider>
-                </NeteaseSessionProvider>
+                <AppUpdateProvider>
+                    <IntegratedApiBootEffect />
+                    <NeteaseSessionProvider>
+                        <LikedProvider>
+                            <PlayerProvider>
+                                <MusicNavigationProvider>
+                                    <AppWithNav
+                                        route={route}
+                                        setRoute={setRoute}
+                                        titleBarStyle={titleBarStyle}
+                                        onTitleBarStyleChange={
+                                            handleTitleBarStyleChange
+                                        }
+                                        settingsTab={settingsTab}
+                                        setSettingsTab={setSettingsTab}
+                                    />
+                                </MusicNavigationProvider>
+                            </PlayerProvider>
+                        </LikedProvider>
+                    </NeteaseSessionProvider>
+                </AppUpdateProvider>
             </Toaster>
         </ThemeProvider>
     )
@@ -154,32 +164,47 @@ function AppWithNav({
     setRoute,
     titleBarStyle,
     onTitleBarStyleChange,
+    settingsTab,
+    setSettingsTab,
 }: {
     route: AppRoute
     setRoute: (route: AppRoute) => void
     titleBarStyle: TitleBarStyle
     onTitleBarStyleChange: (style: TitleBarStyle) => void
+    settingsTab?: SettingsTab
+    setSettingsTab: (tab: SettingsTab | undefined) => void
 }) {
     const { closeDetail } = useMusicNavigation()
 
     const handleNavigate = useCallback(
         (next: AppRoute) => {
             closeDetail()
+            if (next !== "settings") {
+                setSettingsTab(undefined)
+            }
             setRoute(next)
         },
-        [closeDetail, setRoute],
+        [closeDetail, setRoute, setSettingsTab],
     )
+
+    const handleOpenUpdate = useCallback(() => {
+        closeDetail()
+        setSettingsTab("update")
+        setRoute("settings")
+    }, [closeDetail, setRoute, setSettingsTab])
 
     return (
         <AppShell
             activeRoute={route}
             onNavigate={handleNavigate}
             titleBarStyle={titleBarStyle}
+            onOpenUpdate={handleOpenUpdate}
         >
             <AppRoutes
                 route={route}
                 titleBarStyle={titleBarStyle}
                 onTitleBarStyleChange={onTitleBarStyleChange}
+                settingsTab={settingsTab}
             />
         </AppShell>
     )

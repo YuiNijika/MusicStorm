@@ -299,6 +299,7 @@ function SearchPage() {
                                             key={`${track.source}-${track.id}`}
                                             track={track}
                                             index={index}
+                                            showSource={false}
                                             isActive={currentTrack?.id === track.id}
                                             isPlaying={
                                                 currentTrack?.id === track.id &&
@@ -521,6 +522,7 @@ function TrackList({
                     key={`${track.source}-${track.id}`}
                     track={track}
                     index={index}
+                    showSource={false}
                     isActive={currentTrack?.id === track.id}
                     isPlaying={currentTrack?.id === track.id && isPlaying}
                     onPlay={(item) => onPlay(item, tracks)}

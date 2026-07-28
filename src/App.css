@@ -243,72 +243,6 @@
             var(--background);
     }
 
-    /* 液态玻璃基础 */
-    .glass,
-    .glass-panel,
-    .glass-sheet,
-    .glass-chip,
-    .material-chrome,
-    .material-sidebar,
-    .material-player,
-    .material-panel,
-    .material-field {
-        backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
-        -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
-    }
-
-    .glass {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        box-shadow: var(--glass-shadow);
-    }
-
-    .glass-panel {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        box-shadow: var(--glass-shadow);
-    }
-
-    .glass-sheet {
-        background: color-mix(in oklab, var(--glass-bg-strong) 70%, transparent);
-    }
-
-    .glass-chip {
-        background: var(--glass-bg-strong);
-        border: 1px solid var(--glass-border);
-        box-shadow: 0 1px 0 var(--glass-highlight) inset;
-    }
-
-    .material-chrome {
-        background: linear-gradient(
-            180deg,
-            color-mix(in oklab, var(--glass-bg-strong) 90%, transparent),
-            color-mix(in oklab, var(--glass-bg) 75%, transparent)
-        );
-        border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-        box-shadow: 0 1px 0 var(--glass-highlight) inset;
-    }
-
-    .material-sidebar {
-        background: color-mix(in oklab, var(--sidebar) 88%, transparent);
-        box-shadow: 1px 0 0 color-mix(in oklab, var(--border) 70%, transparent);
-    }
-
-    .material-player {
-        background: color-mix(in oklab, var(--glass-bg-strong) 82%, transparent);
-        box-shadow:
-            0 -1px 0 color-mix(in oklab, var(--border) 70%, transparent),
-            0 1px 0 var(--glass-highlight) inset;
-    }
-
-    .material-panel,
-    .material-field {
-        background: color-mix(in oklab, var(--glass-bg) 88%, transparent);
-        box-shadow:
-            inset 0 0 0 1px color-mix(in oklab, var(--border) 75%, transparent),
-            0 1px 0 var(--glass-highlight) inset;
-    }
-
     .apple-scroll {
         scrollbar-gutter: stable;
     }
@@ -367,6 +301,88 @@
     }
 }
 
+/*
+ * 液态玻璃：故意放在 @layer 外。
+ * Tailwind v4 生产构建里 utilities 会压过 components 层，导致 backdrop-filter / 半透明背景丢失。
+ */
+.glass,
+.glass-panel,
+.glass-sheet,
+.glass-chip,
+.material-chrome,
+.material-sidebar,
+.material-player,
+.material-panel,
+.material-field,
+.full-player-sheet {
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
+}
+
+.glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.glass-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.glass-sheet {
+    /* 比 70% 再实一点，blur 失效时也不至于全透明 */
+    background: color-mix(in oklab, var(--glass-bg-strong) 88%, var(--background));
+}
+
+.glass-chip {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 1px 0 var(--glass-highlight) inset;
+}
+
+/* 全屏播放：独立实色兜底，避免仅靠半透明 + blur */
+.full-player-sheet {
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(in oklab, var(--glass-bg-strong) 92%, var(--background)),
+            color-mix(in oklab, var(--glass-bg) 85%, var(--background))
+        );
+    box-shadow: var(--glass-shadow);
+}
+
+.material-chrome {
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--glass-bg-strong) 90%, transparent),
+        color-mix(in oklab, var(--glass-bg) 75%, transparent)
+    );
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    box-shadow: 0 1px 0 var(--glass-highlight) inset;
+}
+
+.material-sidebar {
+    background: color-mix(in oklab, var(--sidebar) 88%, transparent);
+    box-shadow: 1px 0 0 color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+.material-player {
+    background: color-mix(in oklab, var(--glass-bg-strong) 82%, transparent);
+    box-shadow:
+        0 -1px 0 color-mix(in oklab, var(--border) 70%, transparent),
+        0 1px 0 var(--glass-highlight) inset;
+}
+
+.material-panel,
+.material-field {
+    background: color-mix(in oklab, var(--glass-bg) 88%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklab, var(--border) 75%, transparent),
+        0 1px 0 var(--glass-highlight) inset;
+}
+
 @keyframes cover-breathe {
     0%,
     100% {
@@ -397,7 +413,8 @@
     .material-sidebar,
     .material-player,
     .material-panel,
-    .material-field {
+    .material-field,
+    .full-player-sheet {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
         background: var(--background);

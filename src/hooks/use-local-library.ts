@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import {
     commitCreateAlbum,
     commitFolderAlbum,
+    commitMusicFiles,
     isTauriRuntime,
     libraryNeedsMetaRescan,
     pickMusicFolder,
@@ -147,6 +148,50 @@ function useLocalLibrary() {
         }
     }, [])
 
+    /** 添加任意路径单曲/多曲；albumId 空则仅进全部歌曲 */
+    const importTracks = useCallback(
+        async (albumId?: string | null) => {
+            if (!desktop) {
+                notifyError("仅桌面可用", { description: "浏览器预览无法选文件" })
+                return
+            }
+            try {
+                setSubmitting(true)
+                setStatusText("正在添加音乐…")
+                const result = await commitMusicFiles({
+                    albumId: albumId ?? null,
+                })
+                setLibrary(result.state)
+                if (albumId) {
+                    setNav({ kind: "album", albumId })
+                } else if (result.added > 0) {
+                    setNav({ kind: "all" })
+                }
+                const target = result.album?.title ?? "全部歌曲"
+                const msg =
+                    result.added > 0
+                        ? `已添加 ${result.added} 首 · ${target}`
+                        : "未识别到音频文件"
+                setStatusText(msg)
+                notifySuccess(result.added > 0 ? "添加完成" : "未添加曲目", {
+                    description: msg,
+                })
+            } catch (error) {
+                if (error instanceof Error && error.message === "CANCELLED") {
+                    setStatusText(null)
+                    return
+                }
+                notifyError("添加失败", {
+                    description: error instanceof Error ? error.message : "请重试",
+                })
+                setStatusText(null)
+            } finally {
+                setSubmitting(false)
+            }
+        },
+        [desktop],
+    )
+
     const editAlbum = useCallback(
         async (albumId: string, draft: AlbumDraft) => {
             setSubmitting(true)
@@ -250,6 +295,7 @@ function useLocalLibrary() {
         openAlbum,
         openAllSongs,
         importFolder,
+        importTracks,
         createAlbum,
         editAlbum,
         rescanAlbum,

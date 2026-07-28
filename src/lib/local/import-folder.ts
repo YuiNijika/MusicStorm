@@ -6,6 +6,7 @@ import {
     createEmptyAlbum,
     loadLocalLibrary,
     mergeFolderScan,
+    mergeScannedTracks,
     toAssetUrl,
     type AlbumDraft,
     type LocalAlbum,
@@ -24,11 +25,29 @@ async function pickMusicFolder(): Promise<string | null> {
     return invoke<string | null>("pick_music_folder")
 }
 
+/** 多选音频；取消 null */
+async function pickMusicFiles(): Promise<string[] | null> {
+    if (!isTauriRuntime()) {
+        throw new Error("DESKTOP_ONLY")
+    }
+    return invoke<string[] | null>("pick_music_files")
+}
+
 async function scanMusicFolder(path: string): Promise<ScanTrackDto[]> {
     if (!isTauriRuntime()) {
         throw new Error("DESKTOP_ONLY")
     }
     return invoke<ScanTrackDto[]>("scan_music_folder", { path })
+}
+
+async function scanMusicFiles(paths: string[]): Promise<ScanTrackDto[]> {
+    if (!isTauriRuntime()) {
+        throw new Error("DESKTOP_ONLY")
+    }
+    if (paths.length === 0) {
+        return []
+    }
+    return invoke<ScanTrackDto[]>("scan_music_files", { paths })
 }
 
 export type CommitAlbumInput = AlbumDraft & {
@@ -38,6 +57,13 @@ export type CommitAlbumInput = AlbumDraft & {
 export type CommitAlbumResult = {
     state: LocalLibraryState
     album: LocalAlbum
+    added: number
+}
+
+export type CommitFilesResult = {
+    state: LocalLibraryState
+    /** 目标专辑；null 表示仅进全部歌曲 */
+    album: LocalAlbum | null
     added: number
 }
 
@@ -73,6 +99,54 @@ async function commitFolderAlbum(input: CommitAlbumInput): Promise<CommitAlbumRe
         state.albums.find((item) => item.folderPath === folderPath) ?? state.albums[0]!
 
     void dualWriteToSqlite(folderPath, album, scanned)
+
+    return {
+        state,
+        album,
+        added: scanned.length,
+    }
+}
+
+/**
+ * 选择任意路径音频加入资料库。
+ * @param albumId 指定专辑；省略则仅进「全部歌曲」
+ * @param paths 已选路径；省略则弹系统多选
+ */
+async function commitMusicFiles(options?: {
+    albumId?: string | null
+    paths?: string[]
+}): Promise<CommitFilesResult> {
+    if (!isTauriRuntime()) {
+        throw new Error("DESKTOP_ONLY")
+    }
+
+    let paths = options?.paths?.filter((p) => p.trim()) ?? null
+    if (!paths) {
+        paths = await pickMusicFiles()
+    }
+    if (!paths || paths.length === 0) {
+        throw new Error("CANCELLED")
+    }
+
+    const scanned = await scanMusicFiles(paths)
+    if (scanned.length === 0) {
+        const prev = loadLocalLibrary()
+        const album =
+            options?.albumId != null
+                ? prev.albums.find((item) => item.id === options.albumId) ?? null
+                : null
+        return { state: prev, album, added: 0 }
+    }
+
+    const albumId = options?.albumId ?? null
+    const prev = loadLocalLibrary()
+    const state = mergeScannedTracks(prev, scanned, albumId)
+    const album =
+        albumId != null
+            ? state.albums.find((item) => item.id === albumId) ?? null
+            : null
+
+    void dualWriteTracksToSqlite(scanned, album)
 
     return {
         state,
@@ -146,41 +220,63 @@ function dualWriteToSqlite(
         trackCount: scanned.length,
         artist: album.artist,
         coverData: album.coverDataUrl || null,
-    }).then(() =>
-        upsertLibraryTracks(
-            scanned.map((item) => ({
+    }).then(() => dualWriteTracksToSqlite(scanned, album, folderPath))
+}
+
+function dualWriteTracksToSqlite(
+    scanned: ScanTrackDto[],
+    album: LocalAlbum | null,
+    folderPathFallback?: string,
+): void {
+    void upsertLibraryTracks(
+        scanned.map((item) => {
+            const parent =
+                item.path.includes("\\")
+                    ? item.path.slice(
+                          0,
+                          Math.max(
+                              item.path.lastIndexOf("\\"),
+                              item.path.lastIndexOf("/"),
+                          ),
+                      )
+                    : item.path.replace(/\\/g, "/").replace(/\/[^/]+$/, "")
+            return {
                 id: item.id,
                 source: "local",
                 title: item.title,
                 artist:
                     item.artist && item.artist !== "未知艺人"
                         ? item.artist
-                        : album.artist || item.artist || "未知艺人",
+                        : album?.artist || item.artist || "未知艺人",
                 album:
-                    item.album && item.album !== "本地文件" ? item.album : album.title,
+                    item.album && item.album !== "本地文件"
+                        ? item.album
+                        : album?.title || item.album || "本地文件",
                 durationMs: item.durationMs ?? 0,
-                // 曲目内嵌封面 asset URL；否则专辑手动 base64
                 coverUrl:
-                    toAssetUrl(item.coverPath) || album.coverDataUrl || null,
+                    toAssetUrl(item.coverPath) || album?.coverDataUrl || null,
                 filePath: item.path,
-                folderPath,
+                folderPath: folderPathFallback || parent || null,
                 lrcPath: item.lrcPath ?? null,
                 fileName:
                     stripExtension(item.fileName?.trim() || "") ||
                     fileStemFromPath(item.path) ||
                     null,
                 contentHash: item.contentHash?.trim().toLowerCase() || null,
-            })),
-        ),
+            }
+        }),
     )
 }
 
 export {
     commitCreateAlbum,
     commitFolderAlbum,
+    commitMusicFiles,
     isTauriRuntime,
     libraryNeedsMetaRescan,
+    pickMusicFiles,
     pickMusicFolder,
     rescanLocalLibraryMeta,
+    scanMusicFiles,
     scanMusicFolder,
 }

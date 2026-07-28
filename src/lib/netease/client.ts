@@ -4,6 +4,7 @@ import {
     getApiSettings,
     getNeteaseBaseUrl,
 } from "@/lib/netease/api-settings"
+import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
 import { getApiCacheTtlMs } from "@/lib/netease/cache-prefs"
 import { resolveRealIp } from "@/lib/netease/native/real-ip"
 import { nativeNeteaseRequest } from "@/lib/netease/native/request"
@@ -156,7 +157,7 @@ async function fetchExternal<T>(
 async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
     const settings = getApiSettings()
     const method = options.method ?? "GET"
-    const cookieParam = null
+    const cookieParam = getNeteaseCookieParam() ?? null
     const params = mergeParams(options.params, options.query)
     const checkCode = options.checkCode !== false
     const modeKey =

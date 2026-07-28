@@ -13,7 +13,7 @@ import {
     Volume2,
     VolumeX,
 } from "lucide-react"
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { LyricsView } from "@/components/music/lyrics-view"
@@ -102,6 +102,25 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
+    // 进出场计时器不能挂在 phase 依赖的 effect 上：phase→exiting 会触发 cleanup 清掉 closed 定时器
+    const enterTimerRef = useRef<number | null>(null)
+    const exitTimerRef = useRef<number | null>(null)
+    const phaseRef = useRef<Phase>(phase)
+    phaseRef.current = phase
+
+    function clearEnterTimer() {
+        if (enterTimerRef.current != null) {
+            window.clearTimeout(enterTimerRef.current)
+            enterTimerRef.current = null
+        }
+    }
+
+    function clearExitTimer() {
+        if (exitTimerRef.current != null) {
+            window.clearTimeout(exitTimerRef.current)
+            exitTimerRef.current = null
+        }
+    }
 
     useEffect(() => {
         function onLayout() {
@@ -115,34 +134,48 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         return () => {
             window.removeEventListener(LAYOUT_EVENT, onLayout)
             window.removeEventListener(CHROME_EVENT, onChrome)
+            clearEnterTimer()
+            clearExitTimer()
         }
     }, [])
 
     useEffect(() => {
         if (open && currentTrack) {
             setMountedTrack(currentTrack)
-            if (phase === "closed" || phase === "exiting") {
+            clearExitTimer()
+            const current = phaseRef.current
+            if (current === "closed" || current === "exiting") {
                 setPhase("entering")
+                clearEnterTimer()
                 const reduce = prefersReducedMotion()
-                const t = window.setTimeout(() => setPhase("open"), reduce ? 0 : 16)
-                return () => window.clearTimeout(t)
+                enterTimerRef.current = window.setTimeout(
+                    () => {
+                        enterTimerRef.current = null
+                        setPhase("open")
+                    },
+                    reduce ? 0 : 16,
+                )
+            }
+            return
+        }
+
+        if (!open) {
+            clearEnterTimer()
+            const current = phaseRef.current
+            if (current === "open" || current === "entering") {
+                setPhase("exiting")
+                clearExitTimer()
+                const reduce = prefersReducedMotion()
+                exitTimerRef.current = window.setTimeout(
+                    () => {
+                        exitTimerRef.current = null
+                        setPhase("closed")
+                    },
+                    reduce ? 0 : DRAWER_MS,
+                )
             }
         }
-        return undefined
-    }, [open, currentTrack, phase])
-
-    useEffect(() => {
-        if (!open && (phase === "open" || phase === "entering")) {
-            setPhase("exiting")
-            const reduce = prefersReducedMotion()
-            const t = window.setTimeout(
-                () => setPhase("closed"),
-                reduce ? 0 : DRAWER_MS,
-            )
-            return () => window.clearTimeout(t)
-        }
-        return undefined
-    }, [open, phase])
+    }, [open, currentTrack])
 
     useEffect(() => {
         if (open && currentTrack && phase !== "closed" && phase !== "exiting") {
@@ -302,9 +335,13 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     return (
         <div
-            className="fixed inset-0 z-[80] flex flex-col"
+            className={cn(
+                "fixed inset-0 z-[80] flex flex-col",
+                // 退场时仍占满屏：必须关掉命中，否则卡住或动画期会挡住底层
+                phase === "exiting" && "pointer-events-none",
+            )}
             role="dialog"
-            aria-modal="true"
+            aria-modal={phase === "exiting" ? undefined : true}
             aria-label="正在播放"
         >
             <div
@@ -327,7 +364,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
             <div
                 className={cn(
-                    "glass-sheet relative flex h-full min-h-0 flex-col ease-[cubic-bezier(0.32,0.72,0,1)]",
+                    // glass-sheet 用 unlayered CSS；full-player-sheet 再加一层实色兜底
+                    "glass-sheet full-player-sheet relative flex h-full min-h-0 flex-col ease-[cubic-bezier(0.32,0.72,0,1)]",
                     "transition-[transform,opacity]",
                     sheetMotion,
                 )}

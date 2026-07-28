@@ -12,8 +12,10 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { useAppUpdate } from "@/hooks/use-app-update"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { CACHE_TTL_MS } from "@/lib/app/github-update"
 import { ACCENT_OPTIONS, accentSwatch, resolveAccentHue } from "@/lib/appearance/appearance-prefs"
 import {
     setPlaylistTracksView,
@@ -90,18 +92,26 @@ import {
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
+import { openExternalUrl } from "@/lib/open-external"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { cn } from "@/lib/utils"
 
 const TITLE_BAR_STORAGE_KEY = "musicstorm-titlebar-style"
 
-type SettingsTab = "source" | "playback" | "account" | "appearance" | "hotkeys"
+type SettingsTab =
+    | "source"
+    | "playback"
+    | "account"
+    | "appearance"
+    | "hotkeys"
+    | "update"
 
 const TABS: { id: SettingsTab; label: string }[] = [
     { id: "appearance", label: "外观" },
     { id: "source", label: "音源" },
     { id: "playback", label: "播放" },
     { id: "account", label: "账号" },
+    { id: "update", label: "更新" },
     { id: "hotkeys", label: "快捷键" },
 ]
 
@@ -116,11 +126,23 @@ function readTitleBarStyle(): TitleBarStyle {
 type SettingsPageProps = {
     titleBarStyle: TitleBarStyle
     onTitleBarStyleChange: (style: TitleBarStyle) => void
+    /** 从标题栏 NEW 等入口跳入指定 tab */
+    initialTab?: SettingsTab
 }
 
-function SettingsPage({ titleBarStyle, onTitleBarStyleChange }: SettingsPageProps) {
-    const [tab, setTab] = useState<SettingsTab>("appearance")
+function SettingsPage({
+    titleBarStyle,
+    onTitleBarStyleChange,
+    initialTab,
+}: SettingsPageProps) {
+    const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance")
     const [authOpen, setAuthOpen] = useState(false)
+
+    useEffect(() => {
+        if (initialTab) {
+            setTab(initialTab)
+        }
+    }, [initialTab])
 
     return (
         <div className="space-y-5">
@@ -154,6 +176,7 @@ function SettingsPage({ titleBarStyle, onTitleBarStyleChange }: SettingsPageProp
                     onTitleBarStyleChange={onTitleBarStyleChange}
                 />
             ) : null}
+            {tab === "update" ? <UpdateTab /> : null}
             {tab === "hotkeys" ? <HotkeysTab /> : null}
 
             <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
@@ -698,6 +721,14 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
 
     async function handleSwitch(userId: number) {
         if (userId === activeUserId && loggedIn) {
+            const name =
+                accounts.find((item) => item.userId === userId)?.nickname?.trim() ||
+                profile?.nickname ||
+                `uid ${userId}`
+            notifyInfo("已是当前账号", {
+                id: "netease-switch-account",
+                description: name,
+            })
             return
         }
         setBusyId(userId)
@@ -1185,6 +1216,185 @@ function AppearanceTab({
     )
 }
 
+function formatCheckedAt(ts: number): string {
+    try {
+        return new Date(ts).toLocaleString("zh-CN", {
+            hour12: false,
+        })
+    } catch {
+        return "—"
+    }
+}
+
+function formatCacheTtlLabel(): string {
+    const hours = CACHE_TTL_MS / (60 * 60 * 1000)
+    return Number.isInteger(hours) ? `${hours} 小时` : `${hours.toFixed(1)} 小时`
+}
+
+function UpdateTab() {
+    const { status, checking, refresh } = useAppUpdate()
+
+    async function handleRefresh() {
+        try {
+            const result = await refresh(true)
+            if (result.error && !result.latestVersion) {
+                notifyError("检查更新失败", { description: result.error })
+                return
+            }
+            if (result.hasUpdate) {
+                notifySuccess("发现新版本", {
+                    description: `${result.currentVersion} → ${result.latestVersion}`,
+                })
+                return
+            }
+            notifyInfo("已是最新版本", {
+                description: result.currentVersion
+                    ? `当前 ${result.currentVersion}`
+                    : undefined,
+            })
+        } catch (error) {
+            notifyError("检查更新失败", {
+                description:
+                    error instanceof Error ? error.message : "未知错误",
+            })
+        }
+    }
+
+    async function handleOpenRelease() {
+        const url =
+            status?.htmlUrl?.trim() ||
+            "https://github.com/YuiNijika/MusicStorm/releases/latest"
+        await openExternalUrl(url)
+    }
+
+    const current = status?.currentVersion || "—"
+    const latest = status?.latestVersion || "—"
+    const releaseTitle = status?.releaseName || status?.latestTag || "暂无 Release 信息"
+    const body = status?.releaseBody?.trim() || ""
+
+    return (
+        <Section
+            title="版本更新"
+            description="通过 GitHub Releases 检测，不自动安装"
+        >
+            <div className="space-y-3">
+                <div className="material-panel space-y-4 rounded-[20px] px-4 py-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.04]">
+                            <p className="text-[11px] font-medium text-muted-foreground">
+                                当前版本
+                            </p>
+                            <p className="mt-1 font-mono text-[18px] font-semibold tracking-[-0.02em]">
+                                {current}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.04]">
+                            <p className="text-[11px] font-medium text-muted-foreground">
+                                最新版本
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <p className="font-mono text-[18px] font-semibold tracking-[-0.02em]">
+                                    {latest}
+                                </p>
+                                {status?.hasUpdate ? (
+                                    <span className="rounded-full bg-rose-500/90 px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+                                        new
+                                    </span>
+                                ) : status?.latestVersion ? (
+                                    <span className="rounded-full bg-black/[0.06] px-1.5 py-px text-[10px] font-medium text-muted-foreground dark:bg-white/[0.08]">
+                                        最新
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+                        {status?.checkedAt ? (
+                            <span>
+                                上次检测 {formatCheckedAt(status.checkedAt)}
+                                {status.fromCache ? " · 缓存" : " · 实时"}
+                            </span>
+                        ) : (
+                            <span>尚未检测</span>
+                        )}
+                        <span className="text-muted-foreground/50">·</span>
+                        <span>缓存 {formatCacheTtlLabel()}</span>
+                        {status?.publishedAt ? (
+                            <>
+                                <span className="text-muted-foreground/50">·</span>
+                                <span>
+                                    发布{" "}
+                                    {formatCheckedAt(
+                                        Date.parse(status.publishedAt) || 0,
+                                    )}
+                                </span>
+                            </>
+                        ) : null}
+                    </div>
+
+                    {status?.error ? (
+                        <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-200">
+                            {status.error}
+                            {status.latestVersion
+                                ? "（已展示缓存结果）"
+                                : ""}
+                        </p>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => void handleRefresh()}
+                            disabled={checking}
+                            className={cn(
+                                "h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium",
+                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45",
+                                "dark:bg-white/[0.08]",
+                            )}
+                        >
+                            {checking ? "检测中…" : "刷新检测"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleOpenRelease()}
+                            className={cn(
+                                "h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background",
+                                "active:scale-[0.97]",
+                            )}
+                        >
+                            前往更新
+                        </button>
+                    </div>
+                </div>
+
+                <div className="material-panel space-y-2.5 rounded-[20px] px-4 py-4">
+                    <div>
+                        <p className="text-[14px] font-medium tracking-[-0.01em]">
+                            {releaseTitle}
+                        </p>
+                        {status?.latestTag ? (
+                            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                                tag {status.latestTag}
+                            </p>
+                        ) : null}
+                    </div>
+                    {body ? (
+                        <pre className="max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/[0.03] px-3.5 py-3 text-[12.5px] leading-relaxed text-foreground/90 dark:bg-white/[0.04]">
+                            {body}
+                        </pre>
+                    ) : (
+                        <p className="text-[13px] text-muted-foreground">
+                            暂无 Release 说明。可点「刷新检测」从 GitHub
+                            拉取最新信息。
+                        </p>
+                    )}
+                </div>
+            </div>
+        </Section>
+    )
+}
+
 function HotkeysTab() {
     return (
         <Section title="快捷键" description="输入框聚焦时不响应">
@@ -1258,4 +1468,4 @@ function ChoiceChip({
 }
 
 export { SettingsPage, readTitleBarStyle, TITLE_BAR_STORAGE_KEY }
-export type { SettingsPageProps }
+export type { SettingsPageProps, SettingsTab }

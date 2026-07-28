@@ -12,6 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAppUpdate } from "@/hooks/use-app-update"
 import { useWindowControls } from "@/hooks/use-window-controls"
 import {
     ACCENT_OPTIONS,
@@ -39,12 +40,15 @@ type TitleBarProps = {
     style?: TitleBarStyle
     title?: string
     subtitle?: string
+    /** 点击 NEW 标签：跳转设置 → 更新 */
+    onOpenUpdate?: () => void
 }
 
 function TitleBar({
     style = "mac",
     title = "MusicStorm",
     subtitle = "Powered by YuiNijika",
+    onOpenUpdate,
 }: TitleBarProps) {
     const { isMaximized, minimize, toggleMaximize, close, startDragging } =
         useWindowControls()
@@ -57,6 +61,8 @@ function TitleBar({
         setGlassOpacity,
         setGlassBlur,
     } = useTheme()
+    const { status } = useAppUpdate()
+    const showNew = Boolean(status?.hasUpdate)
     const isMacStyle = style === "mac"
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
@@ -89,6 +95,17 @@ function TitleBar({
         startDragging(event)
     }
 
+    const titleBlock = (
+        <TitleText
+            title={title}
+            subtitle={subtitle}
+            centered={isMacStyle}
+            showNew={showNew}
+            newVersion={status?.latestVersion}
+            onOpenUpdate={onOpenUpdate}
+        />
+    )
+
     return (
         <header className="app-title-bar shrink-0 select-none">
             <div
@@ -115,7 +132,7 @@ function TitleBar({
                         onDoubleClick={toggleMaximize}
                     >
                         <BrandMark />
-                        <TitleText title={title} subtitle={subtitle} />
+                        {titleBlock}
                     </div>
                 )}
 
@@ -128,7 +145,7 @@ function TitleBar({
                     >
                         <div className="flex min-w-0 items-center gap-2.5">
                             <BrandMark />
-                            <TitleText title={title} subtitle={subtitle} centered />
+                            {titleBlock}
                         </div>
                     </div>
                 ) : null}
@@ -462,16 +479,56 @@ function TitleText({
     title,
     subtitle,
     centered = false,
+    showNew = false,
+    newVersion,
+    onOpenUpdate,
 }: {
     title: string
     subtitle: string
     centered?: boolean
+    showNew?: boolean
+    newVersion?: string
+    onOpenUpdate?: () => void
 }) {
     return (
         <div className={cn("min-w-0", centered && "text-center")}>
-            <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
-                {title}
-            </p>
+            <div
+                className={cn(
+                    "flex min-w-0 items-center gap-1.5",
+                    centered && "justify-center",
+                )}
+            >
+                <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+                    {title}
+                </p>
+                {showNew ? (
+                    <button
+                        type="button"
+                        title={
+                            newVersion
+                                ? `发现新版本 ${newVersion}，打开设置`
+                                : "发现新版本，打开设置"
+                        }
+                        aria-label="发现新版本，前往设置更新"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onOpenUpdate?.()
+                        }}
+                        onMouseDown={(event) => {
+                            // 避免触发标题栏拖拽
+                            event.stopPropagation()
+                        }}
+                        className={cn(
+                            "shrink-0 cursor-pointer rounded-full px-1.5 py-px",
+                            "bg-rose-500/90 text-[10px] font-semibold uppercase tracking-[0.04em] text-white",
+                            "shadow-sm transition-transform duration-100 active:scale-[0.96]",
+                            "hover:bg-rose-500",
+                        )}
+                    >
+                        new
+                    </button>
+                ) : null}
+            </div>
             <p className="truncate text-[11px] tracking-[0.01em] text-muted-foreground">
                 {subtitle}
             </p>

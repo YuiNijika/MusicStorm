@@ -175,6 +175,60 @@ function SearchResultsSkeleton() {
     return <TrackListSkeleton count={8} />
 }
 
+/** 统计页骨架 */
+function StatsPageSkeleton() {
+    return (
+        <div className="space-y-11" aria-busy aria-label="加载中">
+            <div className="space-y-2 px-0.5">
+                <Skeleton className="h-3.5 w-16 rounded-full" />
+                <div className="flex items-end gap-2">
+                    <Skeleton className="h-16 w-28 rounded-[18px] sm:h-[72px]" />
+                    <Skeleton className="mb-2 h-8 w-20 rounded-full" />
+                </div>
+                <Skeleton className="mt-1 h-4 w-56 rounded-full" />
+            </div>
+
+            <div className="space-y-3">
+                <Skeleton className="h-3.5 w-10 rounded-full" />
+                <div className="material-panel grid grid-cols-3 overflow-hidden rounded-[22px]">
+                    {Array.from({ length: 3 }, (_, i) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "flex flex-col items-center gap-2 px-2 py-5",
+                                i > 0 &&
+                                    "border-l border-black/[0.06] dark:border-white/[0.08]",
+                            )}
+                        >
+                            <Skeleton className="h-3 w-8 rounded-full" />
+                            <Skeleton className="h-6 w-12 rounded-full" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <Skeleton className="h-6 w-12 rounded-full" />
+                <div className="grid gap-3 lg:grid-cols-2">
+                    <Skeleton className="h-[210px] w-full rounded-[22px]" />
+                    <Skeleton className="h-[210px] w-full rounded-[22px]" />
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <Skeleton className="h-6 w-12 rounded-full" />
+                <Skeleton className="h-[168px] w-full rounded-[22px]" />
+            </div>
+
+            <div className="space-y-3.5">
+                <Skeleton className="h-6 w-12 rounded-full" />
+                <Skeleton className="h-10 w-full rounded-full" />
+                <TrackListSkeleton count={6} />
+            </div>
+        </div>
+    )
+}
+
 export {
     DailyColumnsSkeleton,
     DetailHeroSkeleton,
@@ -182,5 +236,6 @@ export {
     LyricsSkeleton,
     PlaylistGridSkeleton,
     SearchResultsSkeleton,
+    StatsPageSkeleton,
     TrackListSkeleton,
 }

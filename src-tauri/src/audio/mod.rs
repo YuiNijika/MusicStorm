@@ -252,3 +252,8 @@ pub fn audio_stop(state: State<'_, AudioState>) -> Result<(), String> {
 pub fn emit_tick(app: &AppHandle, payload: AudioTickPayload) {
     let _ = app.emit("audio://tick", payload);
 }
+
+/// 显式 ended 通知
+pub fn emit_ended(app: &AppHandle) {
+    let _ = app.emit("audio://ended", ());
+}

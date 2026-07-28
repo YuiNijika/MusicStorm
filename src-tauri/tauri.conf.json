@@ -52,6 +52,13 @@
     "icon": [
       "icons/icon.png",
       "icons/icon-128.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
   }
 }

@@ -67,6 +67,21 @@ fn pick_music_folder() -> Result<Option<String>, String> {
     Ok(folder.map(|path| path.to_string_lossy().into_owned()))
 }
 
+/// 多选音频文件；取消时返回 null
+#[tauri::command]
+fn pick_music_files() -> Result<Option<Vec<String>>, String> {
+    let files = rfd::FileDialog::new()
+        .set_title("选择音乐文件")
+        .add_filter("音频", AUDIO_EXTS)
+        .pick_files();
+    Ok(files.map(|paths| {
+        paths
+            .into_iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect()
+    }))
+}
+
 /// 选择本地封面图片并返回 data URL
 #[tauri::command]
 fn pick_image_as_base64() -> Result<Option<String>, String> {
@@ -210,12 +225,7 @@ fn scan_music_folder(app: AppHandle, path: String) -> Result<Vec<LocalScanTrack>
         return Err("不是有效文件夹".into());
     }
 
-    let storage = ensure_storage_paths(&app)?;
-    let covers_dir = storage.cache_dir.join("covers");
-    let lyrics_dir = storage.cache_dir.join("lyrics");
-    let _ = std::fs::create_dir_all(&covers_dir);
-    let _ = std::fs::create_dir_all(&lyrics_dir);
-
+    let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
     let mut tracks = Vec::new();
     scan_dir(
         &root,
@@ -225,13 +235,50 @@ fn scan_music_folder(app: AppHandle, path: String) -> Result<Vec<LocalScanTrack>
         &mut tracks,
         0,
     )?;
+    sort_scan_tracks(&mut tracks);
+    Ok(tracks)
+}
+
+/// 扫描指定音频文件列表（不限同一文件夹）
+#[tauri::command]
+fn scan_music_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<LocalScanTrack>, String> {
+    let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
+    let mut tracks = Vec::new();
+
+    for raw in paths {
+        if tracks.len() >= MAX_TRACKS {
+            break;
+        }
+        let path = PathBuf::from(raw.trim());
+        if !path.is_file() {
+            continue;
+        }
+        if let Some(track) = scan_audio_file(&path, path.parent().unwrap_or(path.as_path()), &covers_dir, &lyrics_dir)
+        {
+            tracks.push(track);
+        }
+    }
+
+    sort_scan_tracks(&mut tracks);
+    Ok(tracks)
+}
+
+fn media_cache_dirs(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
+    let storage = ensure_storage_paths(app)?;
+    let covers_dir = storage.cache_dir.join("covers");
+    let lyrics_dir = storage.cache_dir.join("lyrics");
+    let _ = std::fs::create_dir_all(&covers_dir);
+    let _ = std::fs::create_dir_all(&lyrics_dir);
+    Ok((covers_dir, lyrics_dir))
+}
+
+fn sort_scan_tracks(tracks: &mut [LocalScanTrack]) {
     tracks.sort_by(|a, b| {
         a.title
             .to_lowercase()
             .cmp(&b.title.to_lowercase())
             .then_with(|| a.artist.to_lowercase().cmp(&b.artist.to_lowercase()))
     });
-    Ok(tracks)
 }
 
 fn scan_dir(
@@ -267,58 +314,72 @@ fn scan_dir(
             continue;
         }
 
-        let ext = path
-            .extension()
-            .and_then(|value| value.to_str())
-            .map(|value| value.to_ascii_lowercase())
-            .unwrap_or_default();
-
-        if !AUDIO_EXTS.contains(&ext.as_str()) {
-            continue;
+        if let Some(track) = scan_audio_file(&path, root, covers_dir, lyrics_dir) {
+            out.push(track);
         }
-
-        let stem = path
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("未知曲目");
-        let (fallback_artist, fallback_title) = parse_filename(stem);
-        let fallback_album = path
-            .parent()
-            .filter(|parent| *parent != root)
-            .and_then(|parent| parent.file_name())
-            .and_then(|value| value.to_str())
-            .unwrap_or("本地文件")
-            .to_string();
-
-        let file_meta = local_meta::read_audio_meta(&path, covers_dir, lyrics_dir);
-        let absolute = path.to_string_lossy().into_owned();
-        // 归类键用 stem，不带后缀
-        let file_name = {
-            let s = stem.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        };
-        let content_hash = file_content_md5(&path);
-
-        out.push(LocalScanTrack {
-            id: format!("local:{absolute}"),
-            title: file_meta.title.unwrap_or(fallback_title),
-            artist: file_meta.artist.unwrap_or(fallback_artist),
-            album: file_meta.album.unwrap_or(fallback_album),
-            path: absolute,
-            duration_ms: file_meta.duration_ms,
-            cover_path: file_meta.cover_path,
-            lyric_text: file_meta.lyric_text,
-            lrc_path: file_meta.lrc_path,
-            file_name,
-            content_hash,
-        });
     }
 
     Ok(())
+}
+
+/// 单文件 → LocalScanTrack；非音频或失败返回 None
+fn scan_audio_file(
+    path: &Path,
+    album_root: &Path,
+    covers_dir: &Path,
+    lyrics_dir: &Path,
+) -> Option<LocalScanTrack> {
+    if !path.is_file() {
+        return None;
+    }
+
+    let ext = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_default();
+    if !AUDIO_EXTS.contains(&ext.as_str()) {
+        return None;
+    }
+
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("未知曲目");
+    let (fallback_artist, fallback_title) = parse_filename(stem);
+    let fallback_album = path
+        .parent()
+        .filter(|parent| *parent != album_root)
+        .and_then(|parent| parent.file_name())
+        .and_then(|value| value.to_str())
+        .unwrap_or("本地文件")
+        .to_string();
+
+    let file_meta = local_meta::read_audio_meta(path, covers_dir, lyrics_dir);
+    let absolute = path.to_string_lossy().into_owned();
+    let file_name = {
+        let s = stem.trim();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    };
+    let content_hash = file_content_md5(path);
+
+    Some(LocalScanTrack {
+        id: format!("local:{absolute}"),
+        title: file_meta.title.unwrap_or(fallback_title),
+        artist: file_meta.artist.unwrap_or(fallback_artist),
+        album: file_meta.album.unwrap_or(fallback_album),
+        path: absolute,
+        duration_ms: file_meta.duration_ms,
+        cover_path: file_meta.cover_path,
+        lyric_text: file_meta.lyric_text,
+        lrc_path: file_meta.lrc_path,
+        file_name,
+        content_hash,
+    })
 }
 
 // 流式哈希：大文件不全量读入内存；失败不阻断扫描
@@ -367,11 +428,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             pick_music_folder,
+            pick_music_files,
             pick_image_as_base64,
             pick_text_file,
             save_url_to_file,
             read_text_file,
             scan_music_folder,
+            scan_music_files,
             get_storage_paths,
             db_upsert_folder,
             db_upsert_tracks,

@@ -1,5 +1,6 @@
 import {
     Disc3,
+    FilePlus2,
     FolderOpen,
     Loader2,
     Pencil,
@@ -223,6 +224,30 @@ function LocalPage() {
                                 播放
                             </button>
                         ) : null}
+                        {lib.nav.kind === "album" && lib.selectedAlbum ? (
+                            <button
+                                type="button"
+                                disabled={!lib.desktop || lib.submitting}
+                                onClick={() =>
+                                    void lib.importTracks(lib.selectedAlbum!.id)
+                                }
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                            >
+                                <FilePlus2 className="size-3.5" />
+                                添加音乐
+                            </button>
+                        ) : null}
+                        {lib.nav.kind === "all" ? (
+                            <button
+                                type="button"
+                                disabled={!lib.desktop || lib.submitting}
+                                onClick={() => void lib.importTracks(null)}
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                            >
+                                <FilePlus2 className="size-3.5" />
+                                添加单曲
+                            </button>
+                        ) : null}
                         {lib.selectedAlbum ? (
                             <>
                                 <button
@@ -279,10 +304,31 @@ function LocalPage() {
                         title="暂无曲目"
                         description={
                             lib.nav.kind === "all"
-                                ? "导入文件夹后会出现在这里"
-                                : "可点「再扫」关联文件夹，或从资料库导入"
+                                ? "可点「添加单曲」选择文件，或导入文件夹"
+                                : "可点「添加音乐」从任意位置选文件，不限本专辑文件夹"
                         }
                         icon={Disc3}
+                        action={
+                            lib.desktop ? (
+                                <button
+                                    type="button"
+                                    disabled={lib.submitting}
+                                    onClick={() =>
+                                        void lib.importTracks(
+                                            lib.nav.kind === "album"
+                                                ? lib.selectedAlbum?.id
+                                                : null,
+                                        )
+                                    }
+                                    className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background active:scale-[0.97] disabled:opacity-40"
+                                >
+                                    <FilePlus2 className="size-3.5" />
+                                    {lib.nav.kind === "all"
+                                        ? "添加单曲"
+                                        : "添加音乐"}
+                                </button>
+                            ) : undefined
+                        }
                     />
                 ) : (
                     <div className="overflow-hidden rounded-[16px] bg-black/[0.02] dark:bg-white/[0.03]">
@@ -355,6 +401,20 @@ function LocalPage() {
                         <button
                             type="button"
                             disabled={!lib.desktop || lib.submitting}
+                            onClick={() => void lib.importTracks(null)}
+                            className={cn(
+                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
+                                "bg-black/[0.05] px-3.5 text-[13px] font-semibold text-foreground",
+                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
+                                "dark:bg-white/[0.1]",
+                            )}
+                        >
+                            <FilePlus2 className="size-3.5" />
+                            单曲
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!lib.desktop || lib.submitting}
                             onClick={() => void lib.importFolder()}
                             className={cn(
                                 "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
@@ -390,7 +450,7 @@ function LocalPage() {
                     title="资料库是空的"
                     description={
                         lib.desktop
-                            ? "点「导入」选择文件夹，或「新建」创建空专辑"
+                            ? "「单曲」选文件 · 「导入」整夹 · 「新建」空专辑后可随时加曲"
                             : "浏览器预览无法选目录，请用桌面应用"
                     }
                     icon={FolderOpen}

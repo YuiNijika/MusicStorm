@@ -64,6 +64,8 @@ type TrackRowProps = {
     /** 传入时可从歌单移除 */
     playlistId?: string
     onRemoved?: (trackId: string) => void
+    /** 右侧附加信息（例如统计页播放次数） */
+    trailing?: ReactNode
     onPlay: (track: Track) => void
 }
 
@@ -81,6 +83,7 @@ function TrackRow({
     playlistId,
     onRemoved,
     onPlay,
+    trailing,
 }: TrackRowProps) {
     const { openArtist, openAlbum } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
@@ -92,6 +95,7 @@ function TrackRow({
     const albumCol = showAlbumMeta && (showAlbumColumn ?? isNetease)
     const inlineAlbum = showAlbumMeta && !albumCol
     const actions = showActions ?? (isNetease || isLocal)
+    const hasTrailing = Boolean(trailing)
     const liked = isNetease && isTrackLiked(track.id)
     const coverUrl = resolveTrackCoverUrl(track.id, track.coverUrl)
     const hasLyricOverride = Boolean(getLyricOverride(track.id))
@@ -220,7 +224,9 @@ function TrackRow({
                           ? "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                           : actions
                             ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]"
-                            : "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
+                            : hasTrailing
+                              ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]"
+                              : "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
                     : albumCol && actions
                       ? "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto]"
                       : albumCol
@@ -372,6 +378,16 @@ function TrackRow({
                 </button>
             ) : actions && isLocal ? (
                 <span className="size-8 shrink-0" aria-hidden />
+            ) : null}
+
+            {hasTrailing ? (
+                <div
+                    className="shrink-0 text-[13px] font-medium tabular-nums text-muted-foreground"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                >
+                    {trailing}
+                </div>
             ) : null}
 
             <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">

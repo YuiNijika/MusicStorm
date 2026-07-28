@@ -1,6 +1,6 @@
 // rodio 本地播放内核；远程 URL 由前端 H5 处理
 
-use crate::audio::{emit_tick, AudioTickPayload};
+use crate::audio::{emit_ended, emit_tick, AudioTickPayload};
 use rodio::source::SeekError as RodioSeekError;
 use rodio::{OutputStream, Sink, Source};
 use std::fs::File;
@@ -354,6 +354,7 @@ fn run_worker(
             shared
                 .position_ms
                 .store(duration.to_bits(), Ordering::Relaxed);
+            emit_ended(&app);
         } else if shared.playing.load(Ordering::Relaxed) {
             let pos = f64::from_bits(shared.position_ms.load(Ordering::Relaxed));
             let duration = f64::from_bits(shared.duration_ms.load(Ordering::Relaxed));
