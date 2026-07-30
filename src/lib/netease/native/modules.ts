@@ -59,7 +59,7 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 data: {
                     c: `[${ids.map((id) => `{"id":${id}}`).join(",")}]`,
                 },
-                crypto: "weapi",
+                crypto: "eapi",
             }
         }
         case NETEASE_PATHS.lyric:

@@ -304,6 +304,7 @@
 /*
  * 液态玻璃：故意放在 @layer 外。
  * Tailwind v4 生产构建里 utilities 会压过 components 层，导致 backdrop-filter / 半透明背景丢失。
+ * 已通过 !important 强制保留
  */
 .glass,
 .glass-panel,
@@ -315,8 +316,8 @@
 .material-panel,
 .material-field,
 .full-player-sheet {
-    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
-    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
 }
 
 .glass {
