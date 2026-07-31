@@ -302,20 +302,16 @@
 }
 
 /*
- * 液态玻璃：故意放在 @layer 外。
- * Tailwind v4 生产构建里 utilities 会压过 components 层，导致 backdrop-filter / 半透明背景丢失。
- * 已通过 !important 强制保留
+ * 页面级玻璃组件保留通用规则；全屏播放使用下方独立 surface，避免被构建版 utility 覆盖。
  */
 .glass,
 .glass-panel,
-.glass-sheet,
 .glass-chip,
 .material-chrome,
 .material-sidebar,
 .material-player,
 .material-panel,
-.material-field,
-.full-player-sheet {
+.material-field {
     backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
 }
@@ -332,44 +328,67 @@
     box-shadow: var(--glass-shadow);
 }
 
-.glass-sheet {
-    /* WebView2 构建环境可能不支持 color-mix；先给稳定的不透明度兜底。 */
-    background: rgba(248, 249, 253, 0.94);
-    /* 比 70% 再实一点，blur 失效时也不至于全透明 */
-    background: color-mix(in oklab, var(--glass-bg-strong) 88%, var(--background));
-}
-
-.dark .glass-sheet {
-    background: rgba(28, 31, 40, 0.96);
-    background: color-mix(in oklab, var(--glass-bg-strong) 88%, var(--background));
-}
-
 .glass-chip {
     background: var(--glass-bg-strong);
     border: 1px solid var(--glass-border);
     box-shadow: 0 1px 0 var(--glass-highlight) inset;
 }
 
-.full-player-sheet {
-    /* 构建版不支持 color-mix 时仍保持不透明的 Apple 风格面板。 */
-    background: rgba(248, 249, 253, 0.94);
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in oklab, var(--glass-bg-strong) 92%, var(--background)),
-            color-mix(in oklab, var(--glass-bg) 85%, var(--background))
-        );
-    box-shadow: var(--glass-shadow);
+/*
+ * 全屏播放器的背景层使用固定 CSS 属性，不依赖 Tailwind 生成顺序。
+ * 图片负责提供开发版看到的彩色光晕，surface 负责 blur 与可读性。
+ */
+.full-player-surface {
+    isolation: isolate;
+    background: rgba(248, 249, 253, 0.58);
+    color: var(--foreground);
 }
 
-.dark .full-player-sheet {
-    background: rgba(28, 31, 40, 0.96);
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in oklab, var(--glass-bg-strong) 92%, var(--background)),
-            color-mix(in oklab, var(--glass-bg) 85%, var(--background))
-        );
+.dark .full-player-surface {
+    background: rgba(20, 23, 31, 0.58);
+}
+
+.full-player-backdrop {
+    z-index: 0;
+    overflow: hidden;
+    background: var(--background);
+}
+
+.full-player-backdrop-image {
+    position: absolute;
+    inset: -10%;
+    width: 120%;
+    height: 120%;
+    object-fit: cover;
+    filter: blur(52px) saturate(145%);
+    opacity: 0.62;
+    transform: scale(1.08);
+}
+
+.full-player-backdrop-tint {
+    position: absolute;
+    inset: 0;
+    background: rgba(248, 249, 253, 0.42);
+    backdrop-filter: blur(30px) saturate(160%);
+    -webkit-backdrop-filter: blur(30px) saturate(160%);
+}
+
+.dark .full-player-backdrop-tint {
+    background: rgba(20, 23, 31, 0.54);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    .full-player-backdrop-tint {
+        background: rgba(248, 249, 253, 0.82);
+    }
+
+    .dark .full-player-backdrop-tint {
+        background: rgba(20, 23, 31, 0.86);
+    }
+}
+
+.full-player-surface > .relative.z-\[1\] {
+    background: transparent;
 }
 
 .material-chrome {
@@ -426,17 +445,21 @@
 @media (prefers-reduced-transparency: reduce) {
     .glass,
     .glass-panel,
-    .glass-sheet,
     .glass-chip,
     .material-chrome,
     .material-sidebar,
     .material-player,
     .material-panel,
     .material-field,
-    .full-player-sheet {
+    .full-player-surface,
+    .full-player-backdrop-tint {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
         background: var(--background);
+    }
+
+    .full-player-backdrop-image {
+        opacity: 0;
     }
 
     .material-sidebar {
