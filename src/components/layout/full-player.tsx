@@ -346,35 +346,35 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         >
             <div
                 className={cn(
-                    "pointer-events-none absolute inset-0 overflow-hidden transition-opacity ease-out",
-                    scrimMotion,
-                )}
-                style={{ transitionDuration: `${DRAWER_MS}ms` }}
-            >
-                {displayCover ? (
-                    <img
-                        src={displayCover}
-                        alt=""
-                        aria-hidden
-                        className="size-full scale-110 object-cover opacity-40 blur-3xl dark:opacity-30"
-                    />
-                ) : null}
-                <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background/90 dark:from-black/50 dark:via-background/80 dark:to-background/95" />
-            </div>
-
-            <div
-                className={cn(
-                    // glass-sheet 用 unlayered CSS；full-player-sheet 再加一层实色兜底
-                    "glass-sheet full-player-sheet relative flex h-full min-h-0 flex-col ease-[cubic-bezier(0.32,0.72,0,1)]",
+                    "full-player-surface relative flex h-full min-h-0 flex-col overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)]",
                     "transition-[transform,opacity]",
                     sheetMotion,
                 )}
                 style={{ transitionDuration: `${DRAWER_MS}ms` }}
             >
                 <div
-                    data-tauri-drag-region
-                    className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                    aria-hidden
+                    className={cn(
+                        "full-player-backdrop pointer-events-none absolute inset-0 transition-opacity ease-out",
+                        scrimMotion,
+                    )}
+                    style={{ transitionDuration: `${DRAWER_MS}ms` }}
                 >
+                    {displayCover ? (
+                        <img
+                            src={displayCover}
+                            alt=""
+                            className="full-player-backdrop-image"
+                        />
+                    ) : null}
+                    <div className="full-player-backdrop-tint" />
+                </div>
+
+                <div className="relative z-[1] flex h-full min-h-0 flex-col">
+                    <div
+                        data-tauri-drag-region
+                        className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                    >
                     <button
                         type="button"
                         onClick={onClose}
@@ -493,6 +493,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 </div>
             </div>
         </div>
+    </div>
     )
 }
 
