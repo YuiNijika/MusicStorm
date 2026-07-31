@@ -140,6 +140,7 @@ async function commitMusicFiles(options?: {
 
     const albumId = options?.albumId ?? null
     const prev = loadLocalLibrary()
+    const existingIds = new Set(prev.tracks.map((track) => track.id))
     const state = mergeScannedTracks(prev, scanned, albumId)
     const album =
         albumId != null
@@ -151,7 +152,8 @@ async function commitMusicFiles(options?: {
     return {
         state,
         album,
-        added: scanned.length,
+        // 重复选择同一文件时不再提示“新增”，更符合用户预期。
+        added: scanned.filter((item) => !existingIds.has(item.id)).length,
     }
 }
 

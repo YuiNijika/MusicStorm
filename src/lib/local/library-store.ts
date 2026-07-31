@@ -583,12 +583,19 @@ function removeFolder(state: LocalLibraryState, folderPath: string): LocalLibrar
 
 function removeAlbum(state: LocalLibraryState, albumId: string): LocalLibraryState {
     const album = state.albums.find((item) => item.id === albumId)
+    const remainingAlbums = state.albums.filter((item) => item.id !== albumId)
+    const remainingTracks = state.tracks.filter((track) => track.albumId !== albumId)
+    const folderStillUsed = album?.folderPath
+        ? remainingAlbums.some((item) => item.folderPath === album.folderPath) ||
+          remainingTracks.some((track) => track.folderPath === album.folderPath)
+        : true
     const next: LocalLibraryState = {
-        folders: album?.folderPath
-            ? state.folders.filter((item) => item !== album.folderPath)
-            : state.folders,
-        albums: state.albums.filter((item) => item.id !== albumId),
-        tracks: state.tracks.filter((track) => track.albumId !== albumId),
+        folders:
+            album?.folderPath && !folderStillUsed
+                ? state.folders.filter((item) => item !== album.folderPath)
+                : state.folders,
+        albums: remainingAlbums,
+        tracks: remainingTracks,
     }
     saveLocalLibrary(next)
     return next
