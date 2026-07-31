@@ -333,7 +333,14 @@
 }
 
 .glass-sheet {
+    /* WebView2 构建环境可能不支持 color-mix；先给稳定的不透明度兜底。 */
+    background: rgba(248, 249, 253, 0.94);
     /* 比 70% 再实一点，blur 失效时也不至于全透明 */
+    background: color-mix(in oklab, var(--glass-bg-strong) 88%, var(--background));
+}
+
+.dark .glass-sheet {
+    background: rgba(28, 31, 40, 0.96);
     background: color-mix(in oklab, var(--glass-bg-strong) 88%, var(--background));
 }
 
@@ -343,8 +350,9 @@
     box-shadow: 0 1px 0 var(--glass-highlight) inset;
 }
 
-/* 全屏播放：独立实色兜底，避免仅靠半透明 + blur */
 .full-player-sheet {
+    /* 构建版不支持 color-mix 时仍保持不透明的 Apple 风格面板。 */
+    background: rgba(248, 249, 253, 0.94);
     background:
         linear-gradient(
             180deg,
@@ -352,6 +360,16 @@
             color-mix(in oklab, var(--glass-bg) 85%, var(--background))
         );
     box-shadow: var(--glass-shadow);
+}
+
+.dark .full-player-sheet {
+    background: rgba(28, 31, 40, 0.96);
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(in oklab, var(--glass-bg-strong) 92%, var(--background)),
+            color-mix(in oklab, var(--glass-bg) 85%, var(--background))
+        );
 }
 
 .material-chrome {
