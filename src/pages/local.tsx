@@ -6,6 +6,7 @@ import {
     Pencil,
     Plus,
     RefreshCw,
+    Sparkles,
     Trash2,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
@@ -53,6 +54,11 @@ import {
     setLocalAllOrder,
 } from "@/lib/library/track-order"
 import type { AlbumDraft, LocalAlbum } from "@/lib/local/library-store"
+import {
+    applyNeteaseMetadata,
+    needsNeteaseMetadata,
+} from "@/lib/local/netease-metadata"
+import { notifyError, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -67,6 +73,7 @@ function LocalPage() {
     const { trackSort, localAlbumSort } = useLibraryLayout()
     const lib = useLocalLibrary()
     const [orderTick, setOrderTick] = useState(0)
+    const [metadataBusy, setMetadataBusy] = useState(false)
 
     const orderScope =
         lib.nav.kind === "album" && lib.selectedAlbum
@@ -173,6 +180,46 @@ function LocalPage() {
         setConfirm({ kind: "none" })
     }
 
+    async function enrichTracksFromNetease(tracks: Track[]) {
+        const pending = tracks.filter(needsNeteaseMetadata)
+        if (pending.length === 0) {
+            notifySuccess("封面和歌词已经齐全")
+            return
+        }
+
+        setMetadataBusy(true)
+        let matched = 0
+        let covers = 0
+        let lyrics = 0
+        try {
+            for (let index = 0; index < pending.length; index += 3) {
+                const batch = pending.slice(index, index + 3)
+                const results = await Promise.allSettled(
+                    batch.map((track) =>
+                        applyNeteaseMetadata(track, { onlyMissing: true }),
+                    ),
+                )
+                for (const result of results) {
+                    if (result.status !== "fulfilled" || !result.value.matched) {
+                        continue
+                    }
+                    matched += 1
+                    if (result.value.coverApplied) covers += 1
+                    if (result.value.lyricApplied) lyrics += 1
+                }
+            }
+            notifySuccess("网易云补全完成", {
+                description: `匹配 ${matched}/${pending.length} 首 · 封面 ${covers} · 歌词 ${lyrics}`,
+            })
+        } catch (error) {
+            notifyError("批量补全失败", {
+                description: error instanceof Error ? error.message : "请稍后重试",
+            })
+        } finally {
+            setMetadataBusy(false)
+        }
+    }
+
     // —— 专辑曲目 / 全部歌曲 详情 ——
     if (lib.nav.kind === "album" || lib.nav.kind === "all") {
         const title =
@@ -202,6 +249,23 @@ function LocalPage() {
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        {sortedTracks.length > 0 ? (
+                            <button
+                                type="button"
+                                disabled={metadataBusy}
+                                onClick={() =>
+                                    void enrichTracksFromNetease(sortedTracks)
+                                }
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium active:scale-[0.97] disabled:opacity-40 dark:bg-white/[0.1]"
+                            >
+                                {metadataBusy ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                    <Sparkles className="size-3.5" />
+                                )}
+                                {metadataBusy ? "正在获取…" : "补全封面歌词"}
+                            </button>
+                        ) : null}
                         {sortedTracks.length > 0 ? (
                             <SortSelect
                                 value={trackSort}

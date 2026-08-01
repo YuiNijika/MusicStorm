@@ -12,10 +12,10 @@ function toNeteaseSongId(songId: string): string | null {
     return /^\d+$/.test(songId) ? songId : null
 }
 
-async function fetchLyricLines(songId: string): Promise<LyricLine[]> {
+async function fetchLyricText(songId: string): Promise<string> {
     const numericId = toNeteaseSongId(songId)
     if (!numericId) {
-        return []
+        return ""
     }
 
     const data = await neteaseRequest<LyricApiData>({
@@ -23,7 +23,11 @@ async function fetchLyricLines(songId: string): Promise<LyricLine[]> {
         params: { id: numericId },
     })
 
-    return parseLrc(data.lrc?.lyric ?? "")
+    return data.lrc?.lyric?.trim() ?? ""
 }
 
-export { fetchLyricLines }
+async function fetchLyricLines(songId: string): Promise<LyricLine[]> {
+    return parseLrc(await fetchLyricText(songId))
+}
+
+export { fetchLyricLines, fetchLyricText }

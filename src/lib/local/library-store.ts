@@ -35,6 +35,8 @@ export type StoredLocalTrack = {
     fileName: string | null
     /** 内容 MD5 */
     contentHash: string | null
+    /** 是否已经完成过元数据扫描；无封面/歌词仍属于已扫描 */
+    metadataScanned: boolean
 }
 
 export type LocalLibraryState = {
@@ -62,6 +64,7 @@ type ScanTrackDto = {
     lrcPath?: string | null
     fileName?: string | null
     contentHash?: string | null
+    metadataScanned?: boolean
 }
 
 function emptyLibrary(): LocalLibraryState {
@@ -207,6 +210,9 @@ function normalizeTrack(raw: Partial<StoredLocalTrack>): StoredLocalTrack | null
             typeof raw.contentHash === "string" && raw.contentHash.trim()
                 ? raw.contentHash.trim().toLowerCase()
                 : null,
+        metadataScanned:
+            raw.metadataScanned === true ||
+            (typeof raw.contentHash === "string" && Boolean(raw.contentHash.trim())),
     }
 }
 
@@ -498,6 +504,7 @@ function scanDtoToStored(
             fileStemFromPath(item.path) ||
             null,
         contentHash: item.contentHash?.trim().toLowerCase() || null,
+        metadataScanned: true,
     }
 }
 
@@ -559,6 +566,38 @@ function mergeScannedTracks(
     const next: LocalLibraryState = {
         folders: Array.from(folders),
         albums,
+        tracks,
+    }
+    saveLocalLibrary(next)
+    return next
+}
+
+function mergeScannedTrackMeta(
+    state: LocalLibraryState,
+    scanned: ScanTrackDto[],
+): LocalLibraryState {
+    if (scanned.length === 0) {
+        return state
+    }
+
+    const scannedById = new Map(scanned.map((item) => [item.id, item]))
+    const albumById = new Map(state.albums.map((album) => [album.id, album]))
+    const tracks = state.tracks.map((track) => {
+        const item = scannedById.get(track.id)
+        if (!item) {
+            return track
+        }
+        const album = track.albumId ? albumById.get(track.albumId) : undefined
+        return scanDtoToStored(item, {
+            albumId: track.albumId,
+            albumTitle: album?.title || track.album,
+            albumArtist: album?.artist,
+            folderPath: track.folderPath,
+        })
+    })
+
+    const next: LocalLibraryState = {
+        ...state,
         tracks,
     }
     saveLocalLibrary(next)
@@ -673,6 +712,7 @@ export {
     listTracksByAlbum,
     loadLocalLibrary,
     mergeFolderScan,
+    mergeScannedTrackMeta,
     mergeScannedTracks,
     removeAlbum,
     removeFolder,
