@@ -63,18 +63,30 @@ function useLocalLibrary() {
         }
         let cancelled = false
         setStatusText("正在补扫本地元数据…")
-        void rescanLocalLibraryMeta(library).then((next) => {
-            if (cancelled) {
-                return
-            }
-            setLibrary(next)
-            const withCover = next.tracks.filter((t) => t.coverPath).length
-            const withLrc = next.tracks.filter((t) => t.lrcPath || t.lyricText).length
-            setStatusText(`元数据已更新 · 封面 ${withCover} · 歌词 ${withLrc}`)
-            notifySuccess("本地元数据已补扫", {
-                description: `封面 ${withCover} 首 · 歌词 ${withLrc} 首`,
+        void rescanLocalLibraryMeta(library)
+            .then((next) => {
+                if (cancelled) {
+                    return
+                }
+                setLibrary(next)
+                const withCover = next.tracks.filter((t) => t.coverPath).length
+                const withLrc = next.tracks.filter(
+                    (t) => t.lrcPath || t.lyricText,
+                ).length
+                setStatusText(`元数据已更新 · 封面 ${withCover} · 歌词 ${withLrc}`)
+                notifySuccess("本地元数据已补扫", {
+                    description: `封面 ${withCover} 首 · 歌词 ${withLrc} 首`,
+                })
             })
-        })
+            .catch((error) => {
+                if (cancelled) {
+                    return
+                }
+                setStatusText(null)
+                notifyError("本地元数据补扫失败", {
+                    description: error instanceof Error ? error.message : "请重试",
+                })
+            })
         return () => {
             cancelled = true
         }

@@ -21,6 +21,7 @@ import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { formatDuration } from "@/lib/format"
 import { pickImageAsDataUrl } from "@/lib/local/cover"
+import { applyNeteaseMetadata } from "@/lib/local/netease-metadata"
 import {
     LYRIC_OVERRIDE_EVENT,
     clearLyricOverride,
@@ -197,6 +198,34 @@ function TrackRow({
         } catch (error) {
             notifyError("更换封面失败", {
                 description: error instanceof Error ? error.message : "请重试",
+            })
+        }
+    }
+
+    async function handleNeteaseMetadata() {
+        try {
+            notifyInfo("正在匹配网易云", {
+                description: `${track.title} · ${track.artist}`,
+            })
+            const result = await applyNeteaseMetadata(track)
+            if (!result.matched) {
+                notifyInfo("没有找到可靠匹配", {
+                    description: "请检查歌名和歌手信息",
+                })
+                return
+            }
+            const applied = [
+                result.coverApplied ? "封面" : "",
+                result.lyricApplied ? "歌词" : "",
+            ].filter(Boolean)
+            notifySuccess("网易云信息已获取", {
+                description: applied.length > 0
+                    ? `${result.matched.title} · ${applied.join("、")}`
+                    : `${result.matched.title} · 没有可用封面或歌词`,
+            })
+        } catch (error) {
+            notifyError("网易云信息获取失败", {
+                description: error instanceof Error ? error.message : "请稍后重试",
             })
         }
     }
@@ -441,6 +470,11 @@ function TrackRow({
                         {isLocal ? (
                             <>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => void handleNeteaseMetadata()}
+                                >
+                                    从网易云获取封面和歌词
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => void handleOverrideCover()}
                                 >

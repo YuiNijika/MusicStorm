@@ -6,6 +6,7 @@ import {
     createEmptyAlbum,
     loadLocalLibrary,
     mergeFolderScan,
+    mergeScannedTrackMeta,
     mergeScannedTracks,
     toAssetUrl,
     type AlbumDraft,
@@ -157,58 +158,61 @@ async function commitMusicFiles(options?: {
     }
 }
 
+let metaRescanInFlight: Promise<LocalLibraryState> | null = null
+
 /**
- * 对已有专辑文件夹重新扫描封面、歌词、时长，不改用户手动封面
+ * 旧版本曲库只补扫缺少内容指纹的文件，不再按专辑全量重扫。
+ * 无封面或无歌词是有效状态，不能作为“未扫描”依据。
  */
-async function rescanLocalLibraryMeta(
+function rescanLocalLibraryMeta(
     prev: LocalLibraryState = loadLocalLibrary(),
 ): Promise<LocalLibraryState> {
     if (!isTauriRuntime()) {
+        return Promise.resolve(prev)
+    }
+    if (metaRescanInFlight) {
+        return metaRescanInFlight
+    }
+
+    metaRescanInFlight = rescanMissingTrackMeta(prev).finally(() => {
+        metaRescanInFlight = null
+    })
+    return metaRescanInFlight
+}
+
+async function rescanMissingTrackMeta(
+    prev: LocalLibraryState,
+): Promise<LocalLibraryState> {
+    const paths = prev.tracks
+        .filter((track) => !track.metadataScanned)
+        .map((track) => track.path)
+    if (paths.length === 0) {
         return prev
     }
 
-    let state = prev
-    const albums = prev.albums.filter((album) => album.folderPath)
+    const scanned = await scanMusicFiles(paths)
+    const state = mergeScannedTrackMeta(prev, scanned)
 
-    for (const album of albums) {
-        const folderPath = album.folderPath!
-        try {
-            const scanned = await scanMusicFolder(folderPath)
-            state = mergeFolderScan(
-                state,
-                folderPath,
-                scanned,
-                {
-                    title: album.title,
-                    artist: album.artist,
-                    // 保留手动 data: 封面；asset 兜底不算手动
-                    coverDataUrl: album.coverDataUrl.startsWith("data:")
-                        ? album.coverDataUrl
-                        : "",
-                    folderPath,
-                },
-                album.id,
-            )
-            void dualWriteToSqlite(folderPath, album, scanned)
-        } catch {
-            // 单文件夹失败不阻断其余
+    const albumById = new Map(state.albums.map((album) => [album.id, album]))
+    const grouped = new Map<string, ScanTrackDto[]>()
+    for (const item of scanned) {
+        const stored = state.tracks.find((track) => track.id === item.id)
+        if (!stored?.albumId) {
+            continue
         }
+        const items = grouped.get(stored.albumId) ?? []
+        items.push(item)
+        grouped.set(stored.albumId, items)
+    }
+    for (const [albumId, items] of grouped) {
+        void dualWriteTracksToSqlite(items, albumById.get(albumId) ?? null)
     }
 
     return state
 }
 
 function libraryNeedsMetaRescan(state: LocalLibraryState): boolean {
-    if (state.tracks.length === 0) {
-        return false
-    }
-    // 旧导入：无封面/歌词，或缺少内容指纹
-    const missing = state.tracks.filter(
-        (t) =>
-            (!t.coverPath && !t.lrcPath && !t.lyricText) ||
-            !t.contentHash,
-    )
-    return missing.length >= Math.max(1, Math.floor(state.tracks.length * 0.5))
+    return state.tracks.some((track) => !track.metadataScanned)
 }
 
 function dualWriteToSqlite(
