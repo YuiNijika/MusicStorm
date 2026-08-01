@@ -1,5 +1,5 @@
-import { Heart } from "lucide-react"
-import { useEffect, useState } from "react"
+import { ArrowUpDown, Heart } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
@@ -15,6 +15,9 @@ import { fetchDjDetailWithPrograms } from "@/lib/netease/dj"
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio, RadioProgram } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+/** 按电台 ID 记忆排序偏好，切换页面后恢复 */
+const sortPrefs = new Map<string, boolean>()
 
 type RadioPageProps = {
     radioId: string
@@ -32,6 +35,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
     const [subBusy, setSubBusy] = useState(false)
+    const [sortAsc, setSortAsc] = useState(() => sortPrefs.get(radioId) ?? false)
 
     const subscribed = isRadioSubscribed(radioId)
 
@@ -64,7 +68,12 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
         }
     }, [radioId, retry])
 
-    const queue = programs.map((item) => item.track)
+    const sortedPrograms = useMemo(() => {
+        if (!sortAsc) return programs
+        return [...programs].reverse()
+    }, [programs, sortAsc])
+
+    const queue = sortedPrograms.map((item) => item.track)
 
     return (
         <div className="space-y-6 pb-2">
@@ -186,12 +195,37 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                         </div>
                     </header>
 
-                    <Section title="节目" description={`${programs.length} 期`}>
+                    <Section
+                        title="节目"
+                        description={`${programs.length} 期`}
+                        action={
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setSortAsc((v) => {
+                                        const next = !v
+                                        sortPrefs.set(radioId, next)
+                                        return next
+                                    })
+                                }
+                                className={cn(
+                                    "inline-flex h-7 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors",
+                                    sortAsc
+                                        ? "bg-foreground text-background"
+                                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]",
+                                )}
+                                title={sortAsc ? "正序" : "倒序"}
+                            >
+                                <ArrowUpDown className="size-3" />
+                                {sortAsc ? "正序" : "倒序"}
+                            </button>
+                        }
+                    >
                         {programs.length === 0 ? (
                             <StateHero variant="empty" title="暂无节目" />
                         ) : (
                             <div className="space-y-0.5 overflow-hidden rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
-                                {programs.map((program, index) => {
+                                {sortedPrograms.map((program, index) => {
                                     const active =
                                         currentTrack?.id === program.track.id
                                     return (
