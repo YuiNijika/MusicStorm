@@ -84,6 +84,10 @@ import {
     type LyricsAlign,
 } from "@/lib/player/full-player-prefs"
 import {
+    getPlayerPreferences,
+    setStartupAutoPlay,
+} from "@/lib/player/playback-prefs"
+import {
     getAudioOutputMode,
     listAudioDevices,
     setAudioDevice,
@@ -568,6 +572,9 @@ function PlaybackTab() {
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() => getEnginePref())
     const [fadeEnabled, setFadeEnabledState] = useState(() => getFadePrefs().enabled)
     const [fadeMs, setFadeMsState] = useState(() => getFadePrefs().durationMs)
+    const [autoPlayOnStartup, setAutoPlayOnStartup] = useState(
+        () => getPlayerPreferences().autoPlayOnStartup,
+    )
     const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
     const [audioMode, setAudioMode] = useState<AudioOutputMode | null>(null)
 
@@ -590,6 +597,24 @@ function PlaybackTab() {
     return (
         <Section title="播放" description="引擎、淡入淡出与输出设备">
             <div className="space-y-3">
+                <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
+                    <div className="min-w-0">
+                        <p className="text-[14px] font-medium tracking-[-0.01em]">
+                            启动时自动播放
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                            打开应用后自动播放上次队列，默认关闭
+                        </p>
+                    </div>
+                    <Switch
+                        checked={autoPlayOnStartup}
+                        onCheckedChange={(checked) => {
+                            setStartupAutoPlay(checked)
+                            setAutoPlayOnStartup(checked)
+                        }}
+                    />
+                </div>
+
                 <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
                     <div>
                         <p className="text-[14px] font-medium tracking-[-0.01em]">播放引擎</p>
@@ -900,6 +925,7 @@ function AppearanceTab({
         setTheme,
         appearance,
         setAccent,
+        setTintScope,
         setCustomHue,
         setGlassOpacity,
         setGlassBlur,
@@ -975,6 +1001,29 @@ function AppearanceTab({
                             预设色点，或拖动自定义色相
                         </p>
                     </div>
+                    <div className="apple-segmented flex w-full" role="group" aria-label="调色范围">
+                        <button
+                            type="button"
+                            aria-pressed={appearance.tintScope === "accent"}
+                            onClick={() => setTintScope("accent")}
+                            className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-3 text-[12px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                        >
+                            强调色
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={appearance.tintScope === "global"}
+                            onClick={() => setTintScope("global")}
+                            className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-3 text-[12px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                        >
+                            全局色调
+                        </button>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        {appearance.tintScope === "global"
+                            ? "背景、卡片、侧栏与玻璃材质使用低彩度染色"
+                            : "仅影响按钮、选中态、焦点与图表等强调元素"}
+                    </p>
                     <div className="flex flex-wrap gap-2.5">
                         {ACCENT_OPTIONS.map((option) => {
                             const active = appearance.accent === option.id
@@ -1458,7 +1507,7 @@ function ChoiceChip({
                 "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors duration-100",
                 "active:scale-[0.97]",
                 active
-                    ? "bg-foreground text-background"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]",
             )}
         >

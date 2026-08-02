@@ -462,7 +462,7 @@ function StatsPage() {
                                 }
                             />
                         ) : (
-                            <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                            <div className="apple-list-surface space-y-0.5 p-1.5">
                                 {filteredTracks.map((cluster, index) => {
                                     const open = expanded.has(cluster.key)
                                     const canExpand = cluster.memberCount > 1

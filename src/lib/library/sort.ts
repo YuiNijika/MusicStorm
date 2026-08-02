@@ -11,6 +11,8 @@ type TrackSortKey =
     | "custom"
 
 type CollectionSortKey = "default" | "title" | "count" | "updated"
+type RadioSortKey = "default" | "custom" | "title" | "count"
+type ProgramSortKey = "latest" | "earliest" | "custom"
 
 const TRACK_SORT_OPTIONS: Array<{ value: TrackSortKey; label: string }> = [
     { value: "default", label: "默认" },
@@ -25,6 +27,25 @@ const PLAYLIST_SORT_OPTIONS: Array<{ value: CollectionSortKey; label: string }> 
     { value: "default", label: "默认" },
     { value: "title", label: "名称" },
     { value: "count", label: "曲目数" },
+]
+
+const RADIO_SORT_OPTIONS: Array<{
+    value: RadioSortKey
+    label: string
+}> = [
+    { value: "default", label: "默认" },
+    { value: "custom", label: "自定义" },
+    { value: "title", label: "名称" },
+    { value: "count", label: "节目数" },
+]
+
+const PROGRAM_SORT_OPTIONS: Array<{
+    value: ProgramSortKey
+    label: string
+}> = [
+    { value: "latest", label: "最新" },
+    { value: "earliest", label: "最早" },
+    { value: "custom", label: "自定义" },
 ]
 
 const LOCAL_ALBUM_SORT_OPTIONS: Array<{
@@ -51,6 +72,16 @@ type SortablePlaylist = {
     trackIds?: string[]
 }
 
+type SortableRadio = {
+    title: string
+    programCount?: number
+}
+
+type SortableProgram = {
+    id: string
+    createTime?: number
+}
+
 type SortableLocalAlbum = {
     title: string
     updatedAt: number
@@ -70,6 +101,19 @@ function isTrackSortKey(value: unknown): value is TrackSortKey {
         value === "album" ||
         value === "duration"
     )
+}
+
+function isRadioSortKey(value: unknown): value is RadioSortKey {
+    return (
+        value === "default" ||
+        value === "custom" ||
+        value === "title" ||
+        value === "count"
+    )
+}
+
+function isProgramSortKey(value: unknown): value is ProgramSortKey {
+    return value === "latest" || value === "earliest" || value === "custom"
 }
 
 function isCollectionSortKey(value: unknown): value is CollectionSortKey {
@@ -146,6 +190,52 @@ function sortPlaylists<T extends SortablePlaylist>(
     return indexed.map((row) => row.item)
 }
 
+function sortRadios<T extends SortableRadio & { id: string }>(
+    items: readonly T[],
+    key: RadioSortKey,
+    customOrder?: readonly string[],
+): T[] {
+    if (key === "custom") {
+        return applyIdOrder(items, customOrder ?? [])
+    }
+    if (key === "default" || items.length <= 1) {
+        return items.slice()
+    }
+    const indexed = items.map((item, index) => ({ item, index }))
+    indexed.sort((a, b) => {
+        const cmp =
+            key === "title"
+                ? collatorCompare(a.item.title, b.item.title)
+                : (b.item.programCount ?? 0) - (a.item.programCount ?? 0)
+        return cmp !== 0 ? cmp : a.index - b.index
+    })
+    return indexed.map((row) => row.item)
+}
+
+function sortPrograms<T extends SortableProgram>(
+    items: readonly T[],
+    key: ProgramSortKey,
+    customOrder?: readonly string[],
+): T[] {
+    if (key === "custom") {
+        return applyIdOrder(items, customOrder ?? [])
+    }
+    if (items.length <= 1) {
+        return items.slice()
+    }
+    const indexed = items.map((item, index) => ({ item, index }))
+    indexed.sort((a, b) => {
+        const aTime = a.item.createTime
+        const bTime = b.item.createTime
+        if (aTime == null && bTime != null) return 1
+        if (aTime != null && bTime == null) return -1
+        const cmp = (aTime ?? 0) - (bTime ?? 0)
+        const directed = key === "earliest" ? cmp : -cmp
+        return directed !== 0 ? directed : a.index - b.index
+    })
+    return indexed.map((row) => row.item)
+}
+
 function sortLocalAlbums<T extends SortableLocalAlbum>(
     items: readonly T[],
     key: CollectionSortKey,
@@ -172,11 +262,22 @@ function sortLocalAlbums<T extends SortableLocalAlbum>(
 export {
     LOCAL_ALBUM_SORT_OPTIONS,
     PLAYLIST_SORT_OPTIONS,
+    PROGRAM_SORT_OPTIONS,
+    RADIO_SORT_OPTIONS,
     TRACK_SORT_OPTIONS,
     isCollectionSortKey,
+    isProgramSortKey,
+    isRadioSortKey,
     isTrackSortKey,
     sortLocalAlbums,
     sortPlaylists,
+    sortPrograms,
+    sortRadios,
     sortTracks,
 }
-export type { CollectionSortKey, TrackSortKey }
+export type {
+    CollectionSortKey,
+    ProgramSortKey,
+    RadioSortKey,
+    TrackSortKey,
+}

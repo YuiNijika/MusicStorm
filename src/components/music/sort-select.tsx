@@ -45,7 +45,7 @@ function SortSelect<T extends string>({
                 size="sm"
                 aria-label={label}
                 className={cn(
-                    "h-8 min-w-[7.5rem] cursor-pointer rounded-full border-0 bg-black/[0.06] px-3 text-[12px] font-medium shadow-none dark:bg-white/[0.1]",
+                    "apple-control h-9 min-w-[7.5rem] cursor-pointer border-0 px-3 text-[13px] font-medium shadow-none",
                     className,
                 )}
             >

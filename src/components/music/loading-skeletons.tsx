@@ -46,7 +46,7 @@ function PlaylistGridSkeleton({
 function TrackListSkeleton({ count = 6 }: { count?: number }) {
     return (
         <div
-            className="space-y-1 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]"
+            className="apple-list-surface space-y-1 p-1.5"
             aria-busy
             aria-label="加载中"
         >

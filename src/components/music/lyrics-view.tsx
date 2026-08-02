@@ -151,7 +151,11 @@ function LyricsView({
                 }
 
                 if (currentTrack.source === "netease" && /^\d+$/.test(currentTrack.id)) {
-                    const result = await fetchLyricLines(currentTrack.id)
+                    const remote = await fetchLyricLines(currentTrack.id)
+                    const result =
+                        remote.length > 0
+                            ? remote
+                            : parseLyricText(currentTrack.lyricText ?? "")
                     if (cancelled) {
                         return
                     }

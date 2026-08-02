@@ -149,7 +149,7 @@ function LibraryPage() {
                         description="在网易云创建或收藏歌单后会出现在这里"
                     />
                 ) : playlistView === "list" ? (
-                    <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                    <div className="apple-list-surface space-y-0.5 p-1.5">
                         {sortedPlaylists.map((playlist) => {
                             const isLikedFolder =
                                 playlist.id === likedSongPlaylistId

@@ -181,7 +181,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 playTrack(first, sortedTracks)
                                             }
                                         }}
-                                        className="h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background active:scale-[0.97]"
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
                                     >
                                         播放全部
                                     </button>
@@ -254,7 +254,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                            <div className="apple-list-surface space-y-0.5 p-1.5">
                                 <DragList
                                     items={sortedTracks}
                                     enabled={dragEnabled}
@@ -269,6 +269,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 currentTrack?.id === track.id &&
                                                 isPlaying
                                             }
+                                            showSource={false}
                                             playlistId={
                                                 isOwnLiked ? undefined : playlistId
                                             }

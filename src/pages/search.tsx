@@ -293,7 +293,7 @@ function SearchPage() {
                                 description={`${remote.tracks.length} 首`}
                                 variant="listen"
                             >
-                                <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                                <div className="apple-list-surface space-y-0.5 p-1.5">
                                     {remote.tracks.map((track, index) => (
                                         <TrackRow
                                             key={`${track.source}-${track.id}`}
@@ -516,7 +516,7 @@ function TrackList({
     onPlay: (item: Track, list: Track[]) => void
 }) {
     return (
-        <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+        <div className="apple-list-surface space-y-0.5 p-1.5">
             {tracks.map((track, index) => (
                 <TrackRow
                     key={`${track.source}-${track.id}`}

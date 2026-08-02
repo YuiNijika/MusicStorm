@@ -256,7 +256,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                 <button
                                     type="button"
                                     onClick={() => playTrack(hotTracks[0], hotTracks)}
-                                    className="mt-1 h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background active:scale-[0.97]"
+                                    className="mt-1 h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
                                 >
                                     播放热门
                                 </button>
@@ -304,7 +304,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             {hotTracks.length === 0 ? (
                                 <StateHero variant="empty" title="暂无热门歌曲" />
                             ) : (
-                                <div className="space-y-0.5 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                                <div className="apple-list-surface space-y-0.5 p-1.5">
                                     {hotTracks.map((track, index) => (
                                         <TrackRow
                                             key={track.id}

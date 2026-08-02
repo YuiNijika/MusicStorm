@@ -31,17 +31,15 @@ function MediaCard({
             type="button"
             onClick={onClick}
             className={cn(
-                "group relative flex shrink-0 cursor-pointer flex-col gap-2 text-left outline-none",
-                "transition-transform duration-200 ease-out active:scale-[0.97]",
+                "group relative flex shrink-0 cursor-pointer flex-col gap-2.5 text-left outline-none",
+                "transition-transform duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.98]",
                 widthClassName,
                 className,
             )}
         >
             <div
                 className={cn(
-                    "relative overflow-hidden rounded-[12px]",
-                    "shadow-[0_8px_28px_rgba(15,23,42,0.12)] ring-1 ring-black/[0.04]",
-                    "dark:shadow-[0_10px_32px_rgba(0,0,0,0.45)] dark:ring-white/[0.06]",
+                    "apple-card-shadow relative overflow-hidden rounded-[14px] ring-1 ring-black/[0.06] dark:ring-white/[0.08]",
                     active && "ring-2 ring-primary/70",
                 )}
             >
@@ -49,7 +47,7 @@ function MediaCard({
                     src={coverUrl}
                     alt={title}
                     size="xl"
-                    className="rounded-[12px] transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                    className="rounded-[14px] shadow-none transition-transform duration-300 ease-out group-hover:scale-[1.02]"
                 />
                 {overlay}
             </div>

@@ -122,7 +122,7 @@ function RadioProgramPage({
                                 onClick={() =>
                                     playOrToggle(program.track, [program.track])
                                 }
-                                className="h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background active:scale-[0.97]"
+                                className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
                             >
                                 {active && isPlaying ? "暂停" : "播放"}
                             </button>

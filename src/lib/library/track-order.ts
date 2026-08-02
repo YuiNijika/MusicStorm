@@ -2,7 +2,11 @@
 
 const LOCAL_ORDER_KEY = "musicstorm.local.track-order"
 const PLAYLIST_ORDER_KEY = "musicstorm.playlist.track-order"
+const RADIO_ORDER_KEY = "musicstorm.radio.order"
+const PROGRAM_ORDER_KEY = "musicstorm.radio.program-order"
 const ORDER_EVENT = "musicstorm-track-order"
+
+type RadioOrderScope = "subscribed" | "discover"
 
 type LocalTrackOrder = {
     all: string[]
@@ -10,6 +14,8 @@ type LocalTrackOrder = {
 }
 
 type PlaylistOrderMap = Record<string, string[]>
+type RadioOrderMap = Record<RadioOrderScope, string[]>
+type ProgramOrderMap = Record<string, string[]>
 
 function readJson<T>(key: string, fallback: T): T {
     if (typeof window === "undefined") {
@@ -83,6 +89,35 @@ function setPlaylistTrackOrder(playlistId: string, ids: string[]): void {
     emitOrder()
 }
 
+function getRadioOrder(scope: RadioOrderScope): string[] {
+    const map = readJson<Partial<RadioOrderMap>>(RADIO_ORDER_KEY, {})
+    const list = map[scope]
+    return Array.isArray(list) ? list.filter((id) => typeof id === "string") : []
+}
+
+function setRadioOrder(scope: RadioOrderScope, ids: string[]): void {
+    const next: RadioOrderMap = {
+        subscribed: getRadioOrder("subscribed"),
+        discover: getRadioOrder("discover"),
+        [scope]: ids,
+    }
+    window.localStorage.setItem(RADIO_ORDER_KEY, JSON.stringify(next))
+    emitOrder()
+}
+
+function getProgramOrder(radioId: string): string[] {
+    const map = readJson<ProgramOrderMap>(PROGRAM_ORDER_KEY, {})
+    const list = map[radioId]
+    return Array.isArray(list) ? list.filter((id) => typeof id === "string") : []
+}
+
+function setProgramOrder(radioId: string, ids: string[]): void {
+    const map = readJson<ProgramOrderMap>(PROGRAM_ORDER_KEY, {})
+    map[radioId] = ids
+    window.localStorage.setItem(PROGRAM_ORDER_KEY, JSON.stringify(map))
+    emitOrder()
+}
+
 /** 按 order 重排；order 中没有的 id 保持相对顺序接在末尾 */
 function applyIdOrder<T extends { id: string }>(
     items: readonly T[],
@@ -115,7 +150,12 @@ export {
     getLocalOrderIds,
     getLocalTrackOrder,
     getPlaylistTrackOrder,
+    getProgramOrder,
+    getRadioOrder,
     setLocalAlbumOrder,
     setLocalAllOrder,
     setPlaylistTrackOrder,
+    setProgramOrder,
+    setRadioOrder,
 }
+export type { RadioOrderScope }

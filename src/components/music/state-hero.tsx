@@ -51,9 +51,7 @@ function StateHero({
         <div
             role={isError ? "alert" : "status"}
             className={cn(
-                "flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-[28px] px-6 py-12 text-center",
-                "bg-black/[0.025] dark:bg-white/[0.035]",
-                "ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
+                "material-panel flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-[20px] px-8 py-14 text-center",
                 className,
             )}
         >
@@ -94,8 +92,7 @@ function HeroRetryButton({
             type="button"
             onClick={onClick}
             className={cn(
-                "h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background",
-                "transition-transform active:scale-[0.97]",
+                "h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform active:scale-[0.98]",
             )}
         >
             {children}

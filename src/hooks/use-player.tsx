@@ -28,6 +28,10 @@ import {
 import { createFadeGainController } from "@/lib/player/fade-gain"
 import { resolveFadeDurationMs } from "@/lib/player/fade-prefs"
 import { shouldUseWasapiForTrack } from "@/lib/player/local-quality"
+import {
+    getPlayerPreferences,
+    setPlayerPreferences,
+} from "@/lib/player/playback-prefs"
 import { createNativeEngine } from "@/lib/player/native-engine"
 import {
     hydrateLocalTracks,
@@ -109,13 +113,17 @@ function sessionFileName(track: { fileName?: string; filePath?: string }): strin
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
     const restored = useMemo(() => readPlaybackSession(), [])
+    const playerPrefs = useMemo(() => getPlayerPreferences(), [])
 
     const [queue, setQueue] = useState<Track[]>(() => restored?.queue ?? [])
     const [currentIndex, setCurrentIndex] = useState(
         () => restored?.currentIndex ?? -1,
     )
     const [isPlaying, setIsPlaying] = useState(
-        () => Boolean(restored?.wasPlaying && restored.queue.length > 0),
+        () =>
+            Boolean(
+                playerPrefs.autoPlayOnStartup && restored?.queue.length,
+            ),
     )
     const [positionMs, setPositionMs] = useState(
         () => restored?.positionMs ?? 0,
@@ -124,9 +132,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const track = restored?.queue[restored.currentIndex]
         return track?.durationMs ?? 0
     })
-    const [volume, setVolumeState] = useState(() => restored?.volume ?? 0.8)
+    const [volume, setVolumeState] = useState(() => playerPrefs.volume)
     const [reloadNonce, setReloadNonce] = useState(0)
-    const [isMuted, setIsMuted] = useState(() => restored?.isMuted ?? false)
+    const [isMuted, setIsMuted] = useState(() => playerPrefs.isMuted)
     const [shuffle, setShuffle] = useState(() => restored?.shuffle ?? false)
     const [repeat, setRepeat] = useState<RepeatMode>(
         () => restored?.repeat ?? "off",
@@ -207,6 +215,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         durationMs,
         engineStatus,
     ])
+
+    useEffect(() => {
+        try {
+            setPlayerPreferences({ volume, isMuted })
+        } catch {
+            // 偏好写入失败不影响当前播放。
+        }
+    }, [volume, isMuted])
 
     useEffect(() => {
         function refreshLocalQueueMetadata() {

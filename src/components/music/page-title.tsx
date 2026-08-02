@@ -14,12 +14,12 @@ function PageTitle({ title, subtitle, trailing, className }: PageTitleProps) {
     return (
         <header
             className={cn(
-                "flex items-end justify-between gap-3 border-b border-black/[0.06] pb-3 dark:border-white/[0.08]",
+                "flex items-end justify-between gap-4 border-b border-[var(--separator)] pb-4",
                 className,
             )}
         >
             <div className="min-w-0 space-y-0.5">
-                <h1 className="truncate text-[22px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
+                <h1 className="truncate text-[24px] font-semibold leading-tight tracking-[-0.025em] text-foreground">
                     {title}
                 </h1>
                 {subtitle ? (

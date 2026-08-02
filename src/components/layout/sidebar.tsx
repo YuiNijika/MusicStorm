@@ -48,7 +48,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
     const [authOpen, setAuthOpen] = useState(false)
 
     return (
-        <aside className="material-sidebar flex w-[220px] shrink-0 flex-col border-r border-black/[0.06] dark:border-white/[0.06]">
+        <aside className="material-sidebar flex w-[224px] shrink-0 flex-col">
             <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-2 pb-2">
                 {NAV_ITEMS.map((item) => {
                     const Icon = ICONS[item.id]
@@ -60,11 +60,10 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                             type="button"
                             onClick={() => onNavigate(item.id)}
                             className={cn(
-                                "group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150 ease-out",
-                                "active:scale-[0.98]",
+                                "group flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-colors duration-150 ease-out active:scale-[0.99]",
                                 isActive
-                                    ? "glass-chip text-foreground"
-                                    : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.05]",
+                                    ? "bg-sidebar-accent text-foreground"
+                                    : "text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
                             )}
                         >
                             <Icon

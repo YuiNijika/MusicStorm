@@ -1,23 +1,33 @@
-import { ArrowUpDown, Heart } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Heart } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
+import { DragList } from "@/components/music/drag-list"
 import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { MediaCard } from "@/components/music/media-card"
 import { Section } from "@/components/music/section"
+import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
+import { ViewModeToggle } from "@/components/music/view-mode-toggle"
+import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import { formatDuration } from "@/lib/format"
+import { setProgramSort, setProgramView } from "@/lib/library/layout-prefs"
+import {
+    ORDER_EVENT,
+    getProgramOrder,
+    setProgramOrder,
+} from "@/lib/library/track-order"
+import { PROGRAM_SORT_OPTIONS, sortPrograms } from "@/lib/library/sort"
 import { fetchDjDetailWithPrograms } from "@/lib/netease/dj"
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio, RadioProgram } from "@/lib/types"
 import { cn } from "@/lib/utils"
-
-/** 按电台 ID 记忆排序偏好，切换页面后恢复 */
-const sortPrefs = new Map<string, boolean>()
 
 type RadioPageProps = {
     radioId: string
@@ -29,15 +39,27 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
     const { openRadioProgram } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
     const { isRadioSubscribed, toggleRadioSubscribed } = useLiked()
+    const { programSort, programView } = useLibraryLayout()
+    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
     const [radio, setRadio] = useState<Radio | null>(null)
     const [programs, setPrograms] = useState<RadioProgram[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
     const [subBusy, setSubBusy] = useState(false)
-    const [sortAsc, setSortAsc] = useState(() => sortPrefs.get(radioId) ?? false)
+    const [orderRevision, setOrderRevision] = useState(0)
 
     const subscribed = isRadioSubscribed(radioId)
+
+    useEffect(() => {
+        const syncOrder = () => setOrderRevision((value) => value + 1)
+        window.addEventListener(ORDER_EVENT, syncOrder)
+        window.addEventListener("storage", syncOrder)
+        return () => {
+            window.removeEventListener(ORDER_EVENT, syncOrder)
+            window.removeEventListener("storage", syncOrder)
+        }
+    }, [])
 
     useEffect(() => {
         let cancelled = false
@@ -68,12 +90,18 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
         }
     }, [radioId, retry])
 
-    const sortedPrograms = useMemo(() => {
-        if (!sortAsc) return programs
-        return [...programs].reverse()
-    }, [programs, sortAsc])
+    const sortedPrograms = useMemo(
+        () =>
+            sortPrograms(
+                programs,
+                programSort,
+                getProgramOrder(radioId),
+            ),
+        [programs, programSort, radioId, orderRevision],
+    )
 
     const queue = sortedPrograms.map((item) => item.track)
+    const dragEnabled = programView === "list" && programSort === "custom"
 
     return (
         <div className="space-y-6 pb-2">
@@ -133,7 +161,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                     <button
                                         type="button"
                                         onClick={() => playTrack(queue[0], queue)}
-                                        className="h-9 cursor-pointer rounded-full bg-foreground px-5 text-[13px] font-medium text-background active:scale-[0.97]"
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
                                     >
                                         播放最新
                                     </button>
@@ -199,40 +227,70 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                         title="节目"
                         description={`${programs.length} 期`}
                         action={
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setSortAsc((v) => {
-                                        const next = !v
-                                        sortPrefs.set(radioId, next)
-                                        return next
-                                    })
-                                }
-                                className={cn(
-                                    "inline-flex h-7 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors",
-                                    sortAsc
-                                        ? "bg-foreground text-background"
-                                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]",
-                                )}
-                                title={sortAsc ? "正序" : "倒序"}
-                            >
-                                <ArrowUpDown className="size-3" />
-                                {sortAsc ? "正序" : "倒序"}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <SortSelect
+                                    value={programSort}
+                                    options={PROGRAM_SORT_OPTIONS}
+                                    onChange={setProgramSort}
+                                    label="节目排序"
+                                />
+                                <ViewModeToggle
+                                    value={programView}
+                                    onChange={setProgramView}
+                                    label="节目展示"
+                                />
+                            </div>
                         }
                     >
                         {programs.length === 0 ? (
                             <StateHero variant="empty" title="暂无节目" />
+                        ) : programView === "card" ? (
+                            <div ref={gridRef} className={gridClass} style={gridStyle}>
+                                {sortedPrograms.map((program) => {
+                                    const active =
+                                        currentTrack?.id === program.track.id
+                                    return (
+                                        <MediaCard
+                                            key={program.id}
+                                            coverUrl={program.coverUrl}
+                                            title={program.title}
+                                            subtitle={programSubtitle(program)}
+                                            active={active}
+                                            widthClassName="w-full"
+                                            onClick={() =>
+                                                openRadioProgram(
+                                                    program.id,
+                                                    program.radioId || radioId,
+                                                )
+                                            }
+                                            overlay={
+                                                active ? (
+                                                    <div className="pointer-events-none absolute inset-0 bg-primary/[0.08]" />
+                                                ) : null
+                                            }
+                                        />
+                                    )
+                                })}
+                            </div>
                         ) : (
-                            <div className="space-y-0.5 overflow-hidden rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
-                                {sortedPrograms.map((program, index) => {
+                            <DragList
+                                items={sortedPrograms}
+                                enabled={dragEnabled}
+                                onReorder={(next) =>
+                                    setProgramOrder(
+                                        radioId,
+                                        next.map((program) => program.id),
+                                    )
+                                }
+                                className="apple-list-surface space-y-0.5 p-1.5"
+                                renderItem={(program, index, handle) => {
                                     const active =
                                         currentTrack?.id === program.track.id
                                     return (
                                         <ProgramRow
-                                            key={program.id}
                                             program={program}
                                             index={index}
+                                            leading={handle}
                                             isActive={active}
                                             isPlaying={active && isPlaying}
                                             onOpen={() =>
@@ -246,8 +304,8 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                             }
                                         />
                                     )
-                                })}
-                            </div>
+                                }}
+                            />
                         )}
                     </Section>
                 </>
@@ -259,6 +317,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
 function ProgramRow({
     program,
     index,
+    leading,
     isActive,
     isPlaying,
     onOpen,
@@ -266,6 +325,7 @@ function ProgramRow({
 }: {
     program: RadioProgram
     index: number
+    leading?: ReactNode
     isActive: boolean
     isPlaying: boolean
     onOpen: () => void
@@ -274,12 +334,14 @@ function ProgramRow({
     return (
         <div
             className={cn(
-                "group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl px-2.5 py-2 transition-colors",
+                "group flex w-full min-w-0 items-center gap-1 rounded-2xl transition-colors",
                 isActive
                     ? "bg-black/[0.05] dark:bg-white/[0.08]"
                     : "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]",
             )}
         >
+            {leading ? <div className="ml-1 shrink-0">{leading}</div> : null}
+            <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-2">
             <button
                 type="button"
                 onClick={onPlay}
@@ -321,8 +383,17 @@ function ProgramRow({
             <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
                 {formatDuration(program.durationMs)}
             </span>
+            </div>
         </div>
     )
+}
+
+function programSubtitle(program: RadioProgram): string {
+    const owner = program.djName || program.radioTitle || "电台节目"
+    const duration = formatDuration(program.durationMs)
+    return program.listenerCount != null && program.listenerCount > 0
+        ? `${owner} · ${formatListener(program.listenerCount)} 收听 · ${duration}`
+        : `${owner} · ${duration}`
 }
 
 function formatListener(count: number): string {

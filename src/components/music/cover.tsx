@@ -10,10 +10,10 @@ type CoverProps = {
 }
 
 const SIZE_CLASS = {
-    sm: "size-10 rounded-lg",
-    md: "size-12 rounded-xl",
-    lg: "size-[72px] rounded-2xl",
-    xl: "aspect-square w-full rounded-[22px]",
+    sm: "size-10 rounded-[8px]",
+    md: "size-12 rounded-[10px]",
+    lg: "size-[72px] rounded-[14px]",
+    xl: "aspect-square w-full rounded-[14px]",
 } as const
 
 function Cover({ src, alt, size = "md", className }: CoverProps) {
@@ -27,7 +27,7 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
     return (
         <div
             className={cn(
-                "relative shrink-0 overflow-hidden bg-gradient-to-br from-slate-200 to-slate-300 shadow-[0_8px_24px_rgba(15,23,42,0.12)] ring-1 ring-black/[0.04] dark:from-slate-700 dark:to-slate-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)] dark:ring-white/[0.06]",
+                "apple-card-shadow relative shrink-0 overflow-hidden bg-gradient-to-br from-neutral-200 to-neutral-300 ring-1 ring-black/[0.06] dark:from-neutral-700 dark:to-neutral-900 dark:ring-white/[0.08]",
                 SIZE_CLASS[size],
                 className,
             )}

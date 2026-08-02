@@ -15,8 +15,12 @@ type AccentTone =
     | "indigo"
     | "custom"
 
+type TintScope = "accent" | "global"
+
 type AppearancePrefs = {
     accent: AccentTone
+    /** 强调色仅作用于交互，global 额外低彩度染色所有表面 */
+    tintScope: TintScope
     /** 0–359，仅 accent === "custom" 时生效 */
     customHue: number
     /** 0.35 – 0.9，玻璃底不透明度倾向 */
@@ -52,6 +56,7 @@ const DEFAULT_CUSTOM_HUE = 280
 
 const DEFAULT_APPEARANCE: AppearancePrefs = {
     accent: "neutral",
+    tintScope: "accent",
     customHue: DEFAULT_CUSTOM_HUE,
     glassOpacity: 0.58,
     glassBlur: 28,
@@ -88,6 +93,8 @@ function readAppearancePrefs(): AppearancePrefs {
         const data = JSON.parse(raw) as Partial<AppearancePrefs>
         return {
             accent: isAccent(data.accent) ? data.accent : DEFAULT_APPEARANCE.accent,
+            tintScope:
+                data.tintScope === "global" ? "global" : DEFAULT_APPEARANCE.tintScope,
             customHue:
                 typeof data.customHue === "number"
                     ? normalizeHue(data.customHue)
@@ -137,151 +144,278 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
     const root = document.documentElement
     const hue = resolveAccentHue(prefs)
     const neutral = isNeutralAccent(prefs)
+    const tintAllSurfaces = prefs.tintScope === "global" && !neutral
     const opacityPct = Math.round(prefs.glassOpacity * 100)
     const strongPct = Math.min(96, opacityPct + 16)
 
     root.style.setProperty("--accent-hue", String(hue))
     root.dataset.accent = prefs.accent
+    root.dataset.tintScope = prefs.tintScope
     root.style.setProperty("--glass-opacity", String(prefs.glassOpacity))
     root.style.setProperty("--glass-blur", `${prefs.glassBlur}px`)
 
     const dark = root.classList.contains("dark")
 
     if (dark) {
-        const c = neutral ? 0.018 : 0.035
-        const glassC = neutral ? 0.02 : 0.04
+        const accentChroma = neutral ? 0.025 : 0.15
 
-        root.style.setProperty("--background", `oklch(0.14 ${c} ${hue})`)
-        root.style.setProperty("--foreground", `oklch(0.97 0.008 ${hue})`)
-        root.style.setProperty("--card", `oklch(0.2 ${glassC} ${hue} / 72%)`)
-        root.style.setProperty("--card-foreground", `oklch(0.97 0.008 ${hue})`)
-        // 菜单/浮层：接近实色，避免透底看不清
-        root.style.setProperty("--popover", `oklch(0.2 ${glassC} ${hue} / 96%)`)
-        root.style.setProperty("--popover-foreground", `oklch(0.97 0.008 ${hue})`)
+        root.style.setProperty(
+            "--background",
+            tintAllSurfaces ? `oklch(0.145 0.012 ${hue})` : "oklch(0.145 0.004 260)",
+        )
+        root.style.setProperty("--foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty(
+            "--card",
+            tintAllSurfaces
+                ? `oklch(0.205 0.014 ${hue} / 88%)`
+                : "oklch(0.205 0.005 260 / 84%)",
+        )
+        root.style.setProperty("--card-foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty(
+            "--popover",
+            tintAllSurfaces
+                ? `oklch(0.225 0.016 ${hue} / 97%)`
+                : "oklch(0.225 0.005 260 / 97%)",
+        )
+        root.style.setProperty("--popover-foreground", "oklch(0.955 0.003 260)")
         root.style.setProperty(
             "--primary",
-            neutral ? `oklch(0.96 0.008 ${hue})` : `oklch(0.78 0.12 ${hue})`,
+            neutral ? "oklch(0.72 0.025 260)" : `oklch(0.72 ${accentChroma} ${hue})`,
         )
         root.style.setProperty(
             "--primary-foreground",
-            neutral ? `oklch(0.2 0.015 ${hue})` : `oklch(0.16 0.03 ${hue})`,
+            neutral ? "oklch(0.15 0.004 260)" : `oklch(0.14 0.02 ${hue})`,
         )
-        root.style.setProperty("--secondary", `oklch(0.24 ${glassC} ${hue} / 75%)`)
-        root.style.setProperty("--secondary-foreground", `oklch(0.97 0.008 ${hue})`)
-        root.style.setProperty("--muted", `oklch(0.24 ${glassC} ${hue} / 75%)`)
-        root.style.setProperty("--muted-foreground", `oklch(0.72 0.02 ${hue})`)
-        root.style.setProperty("--accent", `oklch(0.26 ${glassC + 0.01} ${hue} / 78%)`)
-        root.style.setProperty("--accent-foreground", `oklch(0.97 0.008 ${hue})`)
-        root.style.setProperty("--border", `oklch(1 0 0 / 10%)`)
-        root.style.setProperty("--input", `oklch(1 0 0 / 12%)`)
+        root.style.setProperty(
+            "--secondary",
+            tintAllSurfaces
+                ? `oklch(0.26 0.014 ${hue} / 82%)`
+                : "oklch(0.26 0.006 260 / 78%)",
+        )
+        root.style.setProperty("--secondary-foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty(
+            "--muted",
+            tintAllSurfaces
+                ? `oklch(0.25 0.012 ${hue} / 80%)`
+                : "oklch(0.25 0.006 260 / 76%)",
+        )
+        root.style.setProperty("--muted-foreground", "oklch(0.70 0.008 260)")
+        root.style.setProperty(
+            "--accent",
+            neutral
+                ? "oklch(0.29 0.008 260 / 82%)"
+                : `color-mix(in oklab, var(--primary) 20%, oklch(0.24 0.006 260))`,
+        )
+        root.style.setProperty("--accent-foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty("--border", "oklch(1 0 0 / 11%)")
+        root.style.setProperty("--input", "oklch(1 0 0 / 14%)")
         root.style.setProperty(
             "--ring",
-            neutral ? `oklch(0.55 0.03 ${hue})` : `oklch(0.62 0.1 ${hue})`,
+            neutral ? "oklch(0.62 0.025 260)" : `oklch(0.68 0.13 ${hue})`,
         )
-        root.style.setProperty("--sidebar", `oklch(0.16 ${c} ${hue} / 70%)`)
-        root.style.setProperty("--sidebar-foreground", `oklch(0.97 0.008 ${hue})`)
         root.style.setProperty(
-            "--sidebar-primary",
-            neutral ? `oklch(0.62 0.04 ${hue})` : `oklch(0.68 0.14 ${hue})`,
+            "--sidebar",
+            tintAllSurfaces
+                ? `oklch(0.18 0.014 ${hue} / 90%)`
+                : "oklch(0.18 0.005 260 / 86%)",
         )
-        root.style.setProperty("--sidebar-primary-foreground", `oklch(0.985 0 0)`)
-        root.style.setProperty("--sidebar-accent", `oklch(0.24 ${glassC} ${hue} / 78%)`)
-        root.style.setProperty("--sidebar-accent-foreground", `oklch(0.97 0.008 ${hue})`)
-        root.style.setProperty("--sidebar-border", `oklch(1 0 0 / 8%)`)
+        root.style.setProperty("--sidebar-foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty("--sidebar-primary", "var(--primary)")
+        root.style.setProperty("--sidebar-primary-foreground", "var(--primary-foreground)")
         root.style.setProperty(
-            "--sidebar-ring",
-            neutral ? `oklch(0.55 0.03 ${hue})` : `oklch(0.62 0.1 ${hue})`,
+            "--sidebar-accent",
+            "color-mix(in oklab, var(--primary) 18%, transparent)",
+        )
+        root.style.setProperty("--sidebar-accent-foreground", "oklch(0.955 0.003 260)")
+        root.style.setProperty("--sidebar-border", "oklch(1 0 0 / 8%)")
+        root.style.setProperty("--sidebar-ring", "var(--ring)")
+        root.style.setProperty("--chart-1", "var(--primary)")
+        root.style.setProperty(
+            "--chart-2",
+            neutral ? "oklch(0.68 0.025 210)" : `oklch(0.72 0.13 ${(hue + 70) % 360})`,
+        )
+        root.style.setProperty(
+            "--chart-3",
+            neutral ? "oklch(0.72 0.025 120)" : `oklch(0.75 0.14 ${(hue + 140) % 360})`,
+        )
+        root.style.setProperty(
+            "--chart-4",
+            neutral ? "oklch(0.66 0.025 310)" : `oklch(0.70 0.14 ${(hue + 210) % 360})`,
+        )
+        root.style.setProperty(
+            "--chart-5",
+            neutral ? "oklch(0.70 0.025 40)" : `oklch(0.72 0.15 ${(hue + 285) % 360})`,
         )
 
         root.style.setProperty(
             "--glass-bg",
-            `color-mix(in oklab, oklch(0.22 ${glassC} ${hue}) ${opacityPct}%, transparent)`,
+            tintAllSurfaces
+                ? `color-mix(in oklab, oklch(0.22 0.018 ${hue}) ${opacityPct}%, transparent)`
+                : `color-mix(in oklab, oklch(0.22 0.005 260) ${opacityPct}%, transparent)`,
         )
         root.style.setProperty(
             "--glass-bg-strong",
-            `color-mix(in oklab, oklch(0.25 ${glassC} ${hue}) ${strongPct}%, transparent)`,
+            tintAllSurfaces
+                ? `color-mix(in oklab, oklch(0.25 0.02 ${hue}) ${strongPct}%, transparent)`
+                : `color-mix(in oklab, oklch(0.25 0.005 260) ${strongPct}%, transparent)`,
         )
         root.style.setProperty(
-            "--glass-border",
-            `color-mix(in oklab, white 12%, oklch(0.4 ${glassC} ${hue}))`,
+            "--surface-raised",
+            tintAllSurfaces
+                ? `oklch(0.235 0.016 ${hue} / 92%)`
+                : "oklch(0.235 0.005 260 / 90%)",
         )
-        root.style.setProperty("--glass-highlight", `color-mix(in oklab, white 10%, transparent)`)
+        root.style.setProperty(
+            "--surface-fill",
+            tintAllSurfaces
+                ? `color-mix(in oklab, var(--primary) 10%, rgb(255 255 255 / 6%))`
+                : "rgb(255 255 255 / 7%)",
+        )
+        root.style.setProperty(
+            "--surface-fill-hover",
+            tintAllSurfaces
+                ? `color-mix(in oklab, var(--primary) 14%, rgb(255 255 255 / 8%))`
+                : "rgb(255 255 255 / 11%)",
+        )
+        root.style.setProperty(
+            "--surface-fill-pressed",
+            tintAllSurfaces
+                ? `color-mix(in oklab, var(--primary) 18%, rgb(255 255 255 / 10%))`
+                : "rgb(255 255 255 / 15%)",
+        )
+        root.style.setProperty("--glass-border", "rgb(255 255 255 / 10%)")
+        root.style.setProperty("--glass-highlight", "rgb(255 255 255 / 9%)")
         root.style.setProperty(
             "--glass-shadow",
-            `0 12px 40px rgb(0 0 0 / 35%), 0 1px 0 rgb(255 255 255 / 8%) inset`,
+            "0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset",
         )
         return
     }
 
-    // —— 日间：背景 / 玻璃 / 主色都带 chroma，色调才可见 ——
-    const c = neutral ? 0.008 : 0.028
-    const glassC = neutral ? 0.012 : 0.04
-    const primaryC = neutral ? 0.02 : 0.13
+    const accentChroma = neutral ? 0.025 : 0.18
 
-    root.style.setProperty("--background", `oklch(0.97 ${c} ${hue})`)
-    root.style.setProperty("--foreground", `oklch(0.18 0.025 ${hue})`)
-    root.style.setProperty("--card", `oklch(0.995 ${c * 0.6} ${hue} / 92%)`)
-    root.style.setProperty("--card-foreground", `oklch(0.18 0.025 ${hue})`)
-    // 菜单实底：日间近乎不透明
-    root.style.setProperty("--popover", `oklch(0.995 ${c * 0.5} ${hue} / 98%)`)
-    root.style.setProperty("--popover-foreground", `oklch(0.18 0.025 ${hue})`)
+    root.style.setProperty(
+        "--background",
+        tintAllSurfaces ? `oklch(0.972 0.012 ${hue})` : "oklch(0.972 0.002 260)",
+    )
+    root.style.setProperty("--foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty(
+        "--card",
+        tintAllSurfaces ? `oklch(0.995 0.01 ${hue} / 94%)` : "oklch(1 0 0 / 92%)",
+    )
+    root.style.setProperty("--card-foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty(
+        "--popover",
+        tintAllSurfaces
+            ? `oklch(0.992 0.012 ${hue} / 98%)`
+            : "oklch(0.992 0.002 260 / 98%)",
+    )
+    root.style.setProperty("--popover-foreground", "oklch(0.205 0.006 260)")
     root.style.setProperty(
         "--primary",
-        neutral ? `oklch(0.24 ${primaryC} ${hue})` : `oklch(0.48 ${primaryC} ${hue})`,
+        neutral ? "oklch(0.43 0.025 260)" : `oklch(0.50 ${accentChroma} ${hue})`,
     )
-    root.style.setProperty("--primary-foreground", `oklch(0.99 0.01 ${hue})`)
-    root.style.setProperty("--secondary", `oklch(0.95 ${glassC} ${hue} / 88%)`)
-    root.style.setProperty("--secondary-foreground", `oklch(0.24 0.03 ${hue})`)
-    root.style.setProperty("--muted", `oklch(0.95 ${glassC * 0.8} ${hue} / 88%)`)
-    root.style.setProperty("--muted-foreground", `oklch(0.46 0.03 ${hue})`)
-    root.style.setProperty("--accent", `oklch(0.94 ${glassC + 0.01} ${hue} / 90%)`)
+    root.style.setProperty("--primary-foreground", "oklch(0.99 0 0)")
     root.style.setProperty(
-        "--accent-foreground",
-        neutral ? `oklch(0.22 0.02 ${hue})` : `oklch(0.32 0.08 ${hue})`,
+        "--secondary",
+        tintAllSurfaces
+            ? `oklch(0.94 0.014 ${hue} / 88%)`
+            : "oklch(0.94 0.003 260 / 86%)",
     )
-    root.style.setProperty("--border", `oklch(0.88 ${c} ${hue} / 58%)`)
-    root.style.setProperty("--input", `oklch(0.92 ${c} ${hue} / 78%)`)
+    root.style.setProperty("--secondary-foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty(
+        "--muted",
+        tintAllSurfaces
+            ? `oklch(0.94 0.012 ${hue} / 84%)`
+            : "oklch(0.94 0.003 260 / 82%)",
+    )
+    root.style.setProperty("--muted-foreground", "oklch(0.49 0.008 260)")
+    root.style.setProperty(
+        "--accent",
+        neutral
+            ? "oklch(0.92 0.006 260 / 86%)"
+            : `color-mix(in oklab, var(--primary) 12%, oklch(0.96 0.003 260))`,
+    )
+    root.style.setProperty("--accent-foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty("--border", "oklch(0.80 0.004 260 / 42%)")
+    root.style.setProperty("--input", "oklch(0.90 0.004 260 / 76%)")
     root.style.setProperty(
         "--ring",
-        neutral ? `oklch(0.68 0.03 ${hue})` : `oklch(0.58 0.1 ${hue})`,
+        neutral ? "oklch(0.58 0.025 260)" : `oklch(0.58 0.15 ${hue})`,
     )
-    root.style.setProperty("--sidebar", `oklch(0.98 ${c} ${hue} / 78%)`)
-    root.style.setProperty("--sidebar-foreground", `oklch(0.18 0.025 ${hue})`)
     root.style.setProperty(
-        "--sidebar-primary",
-        neutral ? `oklch(0.24 ${primaryC} ${hue})` : `oklch(0.48 ${primaryC} ${hue})`,
+        "--sidebar",
+        tintAllSurfaces
+            ? `oklch(0.955 0.014 ${hue} / 86%)`
+            : "oklch(0.955 0.003 260 / 82%)",
     )
-    root.style.setProperty("--sidebar-primary-foreground", `oklch(0.99 0.01 ${hue})`)
-    root.style.setProperty("--sidebar-accent", `oklch(0.94 ${glassC} ${hue} / 88%)`)
-    root.style.setProperty("--sidebar-accent-foreground", `oklch(0.24 0.03 ${hue})`)
-    root.style.setProperty("--sidebar-border", `oklch(0.9 ${c} ${hue} / 48%)`)
+    root.style.setProperty("--sidebar-foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty("--sidebar-primary", "var(--primary)")
+    root.style.setProperty("--sidebar-primary-foreground", "var(--primary-foreground)")
     root.style.setProperty(
-        "--sidebar-ring",
-        neutral ? `oklch(0.68 0.03 ${hue})` : `oklch(0.58 0.1 ${hue})`,
+        "--sidebar-accent",
+        "color-mix(in oklab, var(--primary) 12%, transparent)",
+    )
+    root.style.setProperty("--sidebar-accent-foreground", "oklch(0.205 0.006 260)")
+    root.style.setProperty("--sidebar-border", "oklch(0.78 0.004 260 / 30%)")
+    root.style.setProperty("--sidebar-ring", "var(--ring)")
+    root.style.setProperty("--chart-1", "var(--primary)")
+    root.style.setProperty(
+        "--chart-2",
+        neutral ? "oklch(0.62 0.025 210)" : `oklch(0.64 0.15 ${(hue + 70) % 360})`,
+    )
+    root.style.setProperty(
+        "--chart-3",
+        neutral ? "oklch(0.66 0.025 120)" : `oklch(0.68 0.15 ${(hue + 140) % 360})`,
+    )
+    root.style.setProperty(
+        "--chart-4",
+        neutral ? "oklch(0.60 0.025 310)" : `oklch(0.62 0.16 ${(hue + 210) % 360})`,
+    )
+    root.style.setProperty(
+        "--chart-5",
+        neutral ? "oklch(0.64 0.025 40)" : `oklch(0.65 0.17 ${(hue + 285) % 360})`,
     )
 
-    // 日间玻璃：带色相的浅底，而不是纯白
     root.style.setProperty(
         "--glass-bg",
-        `color-mix(in oklab, oklch(0.98 ${glassC} ${hue}) ${opacityPct}%, transparent)`,
+        tintAllSurfaces
+            ? `color-mix(in oklab, oklch(0.985 0.018 ${hue}) ${opacityPct}%, transparent)`
+            : `color-mix(in oklab, white ${opacityPct}%, transparent)`,
     )
     root.style.setProperty(
         "--glass-bg-strong",
-        `color-mix(in oklab, oklch(0.99 ${glassC * 0.85} ${hue}) ${strongPct}%, transparent)`,
+        tintAllSurfaces
+            ? `color-mix(in oklab, oklch(0.99 0.018 ${hue}) ${strongPct}%, transparent)`
+            : `color-mix(in oklab, white ${strongPct}%, transparent)`,
     )
     root.style.setProperty(
-        "--glass-border",
-        `color-mix(in oklab, white 48%, oklch(0.78 ${glassC} ${hue}))`,
+        "--surface-raised",
+        tintAllSurfaces ? `oklch(0.995 0.01 ${hue} / 90%)` : "oklch(1 0 0 / 88%)",
     )
     root.style.setProperty(
-        "--glass-highlight",
-        `color-mix(in oklab, white 70%, oklch(0.95 ${glassC * 0.5} ${hue}))`,
+        "--surface-fill",
+        tintAllSurfaces
+            ? "color-mix(in oklab, var(--primary) 7%, rgb(0 0 0 / 3%))"
+            : "rgb(0 0 0 / 4.5%)",
     )
+    root.style.setProperty(
+        "--surface-fill-hover",
+        tintAllSurfaces
+            ? "color-mix(in oklab, var(--primary) 10%, rgb(0 0 0 / 4%))"
+            : "rgb(0 0 0 / 7%)",
+    )
+    root.style.setProperty(
+        "--surface-fill-pressed",
+        tintAllSurfaces
+            ? "color-mix(in oklab, var(--primary) 13%, rgb(0 0 0 / 6%))"
+            : "rgb(0 0 0 / 10%)",
+    )
+    root.style.setProperty("--glass-border", "rgb(255 255 255 / 46%)")
+    root.style.setProperty("--glass-highlight", "rgb(255 255 255 / 62%)")
     root.style.setProperty(
         "--glass-shadow",
-        neutral
-            ? `0 8px 32px rgb(15 23 42 / 8%), 0 1px 0 rgb(255 255 255 / 35%) inset`
-            : `0 8px 32px oklch(0.45 ${glassC} ${hue} / 12%), 0 1px 0 rgb(255 255 255 / 40%) inset`,
+        "0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset",
     )
 }
 
@@ -297,4 +431,4 @@ export {
     resolveAccentHue,
     writeAppearancePrefs,
 }
-export type { AccentOption, AccentTone, AppearancePrefs }
+export type { AccentOption, AccentTone, AppearancePrefs, TintScope }

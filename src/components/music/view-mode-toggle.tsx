@@ -22,10 +22,7 @@ function ViewModeToggle({
         <div
             role="group"
             aria-label={label}
-            className={cn(
-                "inline-flex shrink-0 rounded-full bg-black/[0.06] p-0.5 dark:bg-white/[0.1]",
-                className,
-            )}
+            className={cn("apple-segmented shrink-0", className)}
         >
             <button
                 type="button"
@@ -33,9 +30,9 @@ function ViewModeToggle({
                 aria-pressed={value === "card"}
                 onClick={() => onChange("card")}
                 className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-all",
+                    "apple-segmented-item flex cursor-pointer items-center justify-center",
                     value === "card"
-                        ? "bg-background text-foreground shadow-sm dark:bg-white/15"
+                        ? "text-foreground"
                         : "text-muted-foreground hover:text-foreground",
                 )}
             >
@@ -47,9 +44,9 @@ function ViewModeToggle({
                 aria-pressed={value === "list"}
                 onClick={() => onChange("list")}
                 className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-all",
+                    "apple-segmented-item flex cursor-pointer items-center justify-center",
                     value === "list"
-                        ? "bg-background text-foreground shadow-sm dark:bg-white/15"
+                        ? "text-foreground"
                         : "text-muted-foreground hover:text-foreground",
                 )}
             >

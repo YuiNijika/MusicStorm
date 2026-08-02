@@ -149,15 +149,15 @@ function mapProgram(
         program.radio?.id != null
             ? String(program.radio.id)
             : fallbackRadioId
+    const coverUrl = programCover(program) || track.coverUrl
+    const fallbackText =
+        program.description?.trim() || program.desc?.trim() || undefined
 
     return {
         id: String(program.id),
         title: program.name?.trim() || track.title,
-        coverUrl: programCover(program) || track.coverUrl,
-        description:
-            program.description?.trim() ||
-            program.desc?.trim() ||
-            undefined,
+        coverUrl,
+        description: fallbackText,
         durationMs: program.duration ?? track.durationMs,
         radioId,
         radioTitle: fallbackRadioTitle || program.radio?.name,
@@ -166,6 +166,8 @@ function mapProgram(
         createTime: program.createTime,
         track: {
             ...track,
+            coverUrl,
+            lyricText: fallbackText,
             album: track.album || fallbackRadioTitle || program.radio?.name || "电台",
         },
     }

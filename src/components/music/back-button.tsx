@@ -15,9 +15,8 @@ function BackButton({
             type="button"
             onClick={onClick}
             className={cn(
-                "inline-flex cursor-pointer items-center gap-0.5 rounded-full px-2 py-1",
+                "apple-control inline-flex h-9 cursor-pointer items-center gap-0.5 px-2.5",
                 "text-[13px] font-medium text-primary",
-                "transition-colors hover:bg-primary/8 active:scale-[0.98]",
             )}
         >
             <ChevronLeft className="size-4" strokeWidth={2.25} />

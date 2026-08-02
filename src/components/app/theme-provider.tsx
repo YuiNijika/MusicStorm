@@ -15,6 +15,7 @@ import {
     writeAppearancePrefs,
     type AccentTone,
     type AppearancePrefs,
+    type TintScope,
 } from "@/lib/appearance/appearance-prefs"
 
 type Theme = "light" | "dark" | "system"
@@ -27,6 +28,7 @@ type ThemeContextValue = {
     toggleTheme: () => void
     appearance: AppearancePrefs
     setAccent: (accent: AccentTone) => void
+    setTintScope: (scope: TintScope) => void
     /** 切到自定义色调并写入色相 0–359 */
     setCustomHue: (hue: number) => void
     setGlassOpacity: (value: number) => void
@@ -114,6 +116,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const setTintScope = useCallback((tintScope: TintScope) => {
+        setAppearance((prev) => {
+            const next = { ...prev, tintScope }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
     const setCustomHue = useCallback((hue: number) => {
         setAppearance((prev) => {
             const next = {
@@ -156,6 +166,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             toggleTheme,
             appearance,
             setAccent,
+            setTintScope,
             setCustomHue,
             setGlassOpacity,
             setGlassBlur,
@@ -167,6 +178,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             toggleTheme,
             appearance,
             setAccent,
+            setTintScope,
             setCustomHue,
             setGlassOpacity,
             setGlassBlur,

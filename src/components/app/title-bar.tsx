@@ -57,6 +57,7 @@ function TitleBar({
         setTheme,
         appearance,
         setAccent,
+        setTintScope,
         setCustomHue,
         setGlassOpacity,
         setGlassBlur,
@@ -198,6 +199,28 @@ function TitleBar({
                                 <DropdownMenuLabel className="text-[11px] text-muted-foreground">
                                     色调
                                 </DropdownMenuLabel>
+                                <div
+                                    className="apple-segmented mx-1 mb-2 flex w-[calc(100%-0.5rem)]"
+                                    role="group"
+                                    aria-label="调色范围"
+                                >
+                                    <button
+                                        type="button"
+                                        aria-pressed={appearance.tintScope === "accent"}
+                                        onClick={() => setTintScope("accent")}
+                                        className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-2.5 text-[11px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                                    >
+                                        强调色
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-pressed={appearance.tintScope === "global"}
+                                        onClick={() => setTintScope("global")}
+                                        className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-2.5 text-[11px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                                    >
+                                        全局色调
+                                    </button>
+                                </div>
                                 <div className="flex flex-wrap gap-1.5 px-1 pb-1.5">
                                     {ACCENT_OPTIONS.map((option) => {
                                         const selected = appearance.accent === option.id

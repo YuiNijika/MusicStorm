@@ -1,23 +1,149 @@
 import { Podcast, RefreshCw } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+    type CSSProperties,
+    type ReactNode,
+    type Ref,
+} from "react"
 
+import { Cover } from "@/components/music/cover"
+import { DragList } from "@/components/music/drag-list"
 import { MediaCard } from "@/components/music/media-card"
 import { PageTitle } from "@/components/music/page-title"
 import { Section } from "@/components/music/section"
+import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
-import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { ViewModeToggle } from "@/components/music/view-mode-toggle"
+import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
+import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import { setRadioSort, setRadioView } from "@/lib/library/layout-prefs"
+import {
+    ORDER_EVENT,
+    getRadioOrder,
+    setRadioOrder,
+    type RadioOrderScope,
+} from "@/lib/library/track-order"
+import { RADIO_SORT_OPTIONS, sortRadios } from "@/lib/library/sort"
 import { fetchDjSublist, fetchHomeRadios } from "@/lib/netease/dj"
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+function radioSubtitle(radio: Radio): string {
+    const owner = radio.djName || radio.category
+    const count =
+        radio.programCount != null ? `${radio.programCount} 期` : undefined
+    return [owner, count].filter(Boolean).join(" · ") || "电台"
+}
+
+function RadioList({
+    items,
+    scope,
+    draggable,
+    onOpen,
+}: {
+    items: Radio[]
+    scope: RadioOrderScope
+    draggable: boolean
+    onOpen: (id: string) => void
+}) {
+    return (
+        <DragList
+            items={items}
+            enabled={draggable}
+            onReorder={(next) =>
+                setRadioOrder(
+                    scope,
+                    next.map((radio) => radio.id),
+                )
+            }
+            className="apple-list-surface space-y-0.5 p-1.5"
+            renderItem={(radio, _index, handle) => (
+                <div className="flex items-center gap-1 rounded-2xl transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.07]">
+                    {handle ? <div className="ml-1 shrink-0">{handle}</div> : null}
+                    <button
+                        type="button"
+                        onClick={() => onOpen(radio.id)}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
+                    >
+                        <Cover
+                            src={radio.coverUrl}
+                            alt={radio.title}
+                            size="sm"
+                            className="size-12 rounded-xl"
+                        />
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
+                                {radio.title}
+                            </p>
+                            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                                {radioSubtitle(radio)}
+                            </p>
+                        </div>
+                    </button>
+                </div>
+            )}
+        />
+    )
+}
+
+function RadioCollection({
+    items,
+    scope,
+    view,
+    draggable,
+    gridClass,
+    gridStyle,
+    gridRef,
+    onOpen,
+}: {
+    items: Radio[]
+    scope: RadioOrderScope
+    view: "card" | "list"
+    draggable: boolean
+    gridClass: string
+    gridStyle: CSSProperties
+    gridRef?: Ref<HTMLDivElement>
+    onOpen: (id: string) => void
+}) {
+    if (view === "list") {
+        return (
+            <RadioList
+                items={items}
+                scope={scope}
+                draggable={draggable}
+                onOpen={onOpen}
+            />
+        )
+    }
+
+    return (
+        <div ref={gridRef} className={gridClass} style={gridStyle}>
+            {items.map((radio) => (
+                <MediaCard
+                    key={radio.id}
+                    title={radio.title}
+                    subtitle={radioSubtitle(radio)}
+                    coverUrl={radio.coverUrl}
+                    widthClassName="w-full"
+                    onClick={() => onOpen(radio.id)}
+                />
+            ))}
+        </div>
+    )
+}
+
 function RadiosPage() {
     const { openRadio } = useMusicNavigation()
     const { ready, loggedIn } = useNeteaseSession()
     const { subscribedRadioIds, refresh } = useLiked()
+    const { radioSort, radioView } = useLibraryLayout()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
 
     const [subscribed, setSubscribed] = useState<Radio[]>([])
@@ -26,6 +152,33 @@ function RadiosPage() {
     const [loadingDiscover, setLoadingDiscover] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
+    const [orderRevision, setOrderRevision] = useState(0)
+
+    useEffect(() => {
+        const syncOrder = () => setOrderRevision((value) => value + 1)
+        window.addEventListener(ORDER_EVENT, syncOrder)
+        window.addEventListener("storage", syncOrder)
+        return () => {
+            window.removeEventListener(ORDER_EVENT, syncOrder)
+            window.removeEventListener("storage", syncOrder)
+        }
+    }, [])
+
+    const sortedSubscribed = useMemo(
+        () =>
+            sortRadios(
+                subscribed,
+                radioSort,
+                getRadioOrder("subscribed"),
+            ),
+        [subscribed, radioSort, orderRevision],
+    )
+    const sortedDiscover = useMemo(
+        () =>
+            sortRadios(discover, radioSort, getRadioOrder("discover")),
+        [discover, radioSort, orderRevision],
+    )
+    const dragEnabled = radioView === "list" && radioSort === "custom"
 
     const load = useCallback(async () => {
         setError(null)
@@ -65,23 +218,41 @@ function RadiosPage() {
         void load()
     }, [ready, loggedIn, retry, load])
 
+    const controls: ReactNode = (
+        <>
+            <SortSelect
+                value={radioSort}
+                options={RADIO_SORT_OPTIONS}
+                onChange={setRadioSort}
+                label="电台排序"
+            />
+            <ViewModeToggle
+                value={radioView}
+                onChange={setRadioView}
+                label="电台展示"
+            />
+            <button
+                type="button"
+                onClick={() => setRetry((n) => n + 1)}
+                className={cn(
+                    "glass-chip inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3",
+                    "text-[13px] font-medium active:scale-[0.97]",
+                )}
+                title="刷新"
+            >
+                <RefreshCw className="size-3.5 opacity-70" />
+                刷新
+            </button>
+        </>
+    )
+
     return (
         <div className="space-y-6 pb-4">
-            <div className="flex items-start justify-between gap-3">
-                <PageTitle title="电台" subtitle="订阅同步 · 发现播客" />
-                <button
-                    type="button"
-                    onClick={() => setRetry((n) => n + 1)}
-                    className={cn(
-                        "glass-chip inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3",
-                        "text-[13px] font-medium active:scale-[0.97]",
-                    )}
-                    title="刷新"
-                >
-                    <RefreshCw className="size-3.5 opacity-70" />
-                    刷新
-                </button>
-            </div>
+            <PageTitle
+                title="电台"
+                subtitle="订阅同步 · 发现播客"
+                trailing={controls}
+            />
 
             {error && !discover.length ? (
                 <StateHero
@@ -119,25 +290,16 @@ function RadiosPage() {
                                 icon={Podcast}
                             />
                         ) : (
-                            <div
-                                ref={gridRef}
-                                className={gridClass}
-                                style={gridStyle}
-                            >
-                                {subscribed.map((radio) => (
-                                    <MediaCard
-                                        key={radio.id}
-                                        title={radio.title}
-                                        subtitle={
-                                            radio.djName ||
-                                            radio.category ||
-                                            "电台"
-                                        }
-                                        coverUrl={radio.coverUrl}
-                                        onClick={() => openRadio(radio.id)}
-                                    />
-                                ))}
-                            </div>
+                            <RadioCollection
+                                items={sortedSubscribed}
+                                scope="subscribed"
+                                view={radioView}
+                                draggable={dragEnabled}
+                                gridClass={gridClass}
+                                gridStyle={gridStyle}
+                                gridRef={gridRef}
+                                onOpen={openRadio}
+                            />
                         )}
                     </Section>
 
@@ -151,22 +313,15 @@ function RadiosPage() {
                                 description="稍后再试或检查网络"
                             />
                         ) : (
-                            <div className={gridClass} style={gridStyle}>
-                                {discover.map((radio) => (
-                                    <MediaCard
-                                        key={radio.id}
-                                        title={radio.title}
-                                        subtitle={
-                                            radio.djName ||
-                                            (radio.programCount != null
-                                                ? `${radio.programCount} 期`
-                                                : "电台")
-                                        }
-                                        coverUrl={radio.coverUrl}
-                                        onClick={() => openRadio(radio.id)}
-                                    />
-                                ))}
-                            </div>
+                            <RadioCollection
+                                items={sortedDiscover}
+                                scope="discover"
+                                view={radioView}
+                                draggable={dragEnabled}
+                                gridClass={gridClass}
+                                gridStyle={gridStyle}
+                                onOpen={openRadio}
+                            />
                         )}
                     </Section>
                 </>

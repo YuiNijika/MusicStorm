@@ -32,7 +32,7 @@ function AppShell({
             <div className="flex min-h-0 flex-1">
                 <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
                 <main className="apple-scroll min-w-0 flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[1600px] px-6 py-4 pb-8 sm:px-8">
+                    <div className="mx-auto max-w-[1440px] px-6 py-6 pb-10 sm:px-8 lg:px-10">
                         {children}
                     </div>
                 </main>
