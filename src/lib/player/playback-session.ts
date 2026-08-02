@@ -1,5 +1,6 @@
 /** 播放会话持久化：队列 + 状态，启动续播 */
 
+import { listLocalPlayableTracks, loadLocalLibrary } from "@/lib/local/library-store"
 import type { RepeatMode, Track } from "@/lib/types"
 
 const STORAGE_KEY = "musicstorm-playback-session"
@@ -33,6 +34,19 @@ function isTrack(value: unknown): value is Track {
     )
 }
 
+function hydrateLocalTracks(queue: Track[]): Track[] {
+    const localById = new Map(
+        listLocalPlayableTracks(loadLocalLibrary()).map((track) => [track.id, track]),
+    )
+    return queue.map((track) => {
+        if (track.source !== "local") {
+            return track
+        }
+        const current = localById.get(track.id)
+        return current ? { ...track, ...current } : track
+    })
+}
+
 function readPlaybackSession(): PlaybackSession | null {
     if (typeof window === "undefined") {
         return null
@@ -46,7 +60,7 @@ function readPlaybackSession(): PlaybackSession | null {
         if (!Array.isArray(data.queue) || data.queue.length === 0) {
             return null
         }
-        const queue = data.queue.filter(isTrack)
+        const queue = hydrateLocalTracks(data.queue.filter(isTrack))
         if (queue.length === 0) {
             return null
         }
@@ -82,11 +96,21 @@ function writePlaybackSession(session: PlaybackSession): void {
         return
     }
     try {
-        // 网易云 url 会过期，落盘时剥离，恢复时重新解析
         const queue = session.queue.map((track) => {
-            if (track.source !== "netease" || !track.url) {
+            if (track.source === "local") {
+                // 本地元数据以曲库为准，避免会话长期保存过期歌词/封面快照。
+                const {
+                    lyricText: _lyricText,
+                    lrcPath: _lrcPath,
+                    coverUrl: _coverUrl,
+                    ...rest
+                } = track
+                return { ...rest, coverUrl: "" }
+            }
+            if (!track.url) {
                 return track
             }
+            // 网易云 url 会过期，恢复时重新解析。
             const { url: _url, ...rest } = track
             return rest
         })
@@ -106,5 +130,10 @@ function clearPlaybackSession(): void {
     window.localStorage.removeItem(STORAGE_KEY)
 }
 
-export { clearPlaybackSession, readPlaybackSession, writePlaybackSession }
+export {
+    clearPlaybackSession,
+    hydrateLocalTracks,
+    readPlaybackSession,
+    writePlaybackSession,
+}
 export type { PlaybackSession }

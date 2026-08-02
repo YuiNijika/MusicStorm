@@ -194,27 +194,7 @@ fn read_text_file(path: String) -> Result<String, String> {
         return Err("文件不存在".into());
     }
     let data = std::fs::read(&path).map_err(|e| format!("读取失败: {e}"))?;
-    if data.len() > 1024 * 1024 {
-        return Err("文件过大".into());
-    }
-    // UTF-8 BOM
-    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        return std::str::from_utf8(&data[3..])
-            .map(|s| s.to_string())
-            .map_err(|_| "不是有效 UTF-8 文本".into());
-    }
-    // UTF-16 LE
-    if data.starts_with(&[0xFF, 0xFE]) && data.len() >= 4 {
-        let u16s: Vec<u16> = data[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-            .collect();
-        return String::from_utf16(&u16s).map_err(|_| "不是有效 UTF-16 文本".into());
-    }
-    match String::from_utf8(data.clone()) {
-        Ok(s) => Ok(s),
-        Err(_) => Ok(String::from_utf8_lossy(&data).into_owned()),
-    }
+    local_meta::decode_text_bytes(&data).ok_or_else(|| "歌词文件为空或编码不受支持".into())
 }
 
 /// 递归扫描音频：tag 失败仍入库；后缀见 AUDIO_EXTS

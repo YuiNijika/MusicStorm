@@ -282,64 +282,67 @@ fn path_hash(path: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// 按 UTF-8、BOM、UTF-16 解码文本，失败则有损回退
-fn read_text_flexible(path: &Path) -> Option<String> {
-    let data = fs::read(path).ok()?;
+/// 按 UTF-8、BOM、UTF-16、GB18030 解码歌词文本。
+pub fn decode_text_bytes(data: &[u8]) -> Option<String> {
     if data.is_empty() || data.len() > 1024 * 1024 {
         return None;
     }
 
-    // UTF-8 BOM
-    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        if let Ok(s) = std::str::from_utf8(&data[3..]) {
-            let t = s.trim();
-            if !t.is_empty() {
-                return Some(t.to_string());
-            }
-        }
-    }
-
-    // UTF-16 LE BOM
-    if data.starts_with(&[0xFF, 0xFE]) && data.len() >= 4 {
+    let decoded = if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        std::str::from_utf8(&data[3..]).ok().map(str::to_string)
+    } else if data.starts_with(&[0xFF, 0xFE]) && data.len() >= 4 {
         let u16s: Vec<u16> = data[2..]
             .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
-        if let Ok(s) = String::from_utf16(&u16s) {
-            let t = s.trim();
-            if !t.is_empty() {
-                return Some(t.to_string());
-            }
-        }
-    }
-
-    // UTF-16 BE BOM
-    if data.starts_with(&[0xFE, 0xFF]) && data.len() >= 4 {
+        String::from_utf16(&u16s).ok()
+    } else if data.starts_with(&[0xFE, 0xFF]) && data.len() >= 4 {
         let u16s: Vec<u16> = data[2..]
             .chunks_exact(2)
             .map(|c| u16::from_be_bytes([c[0], c[1]]))
             .collect();
-        if let Ok(s) = String::from_utf16(&u16s) {
-            let t = s.trim();
-            if !t.is_empty() {
-                return Some(t.to_string());
-            }
-        }
-    }
-
-    if let Ok(s) = std::str::from_utf8(&data) {
-        let t = s.trim();
-        if !t.is_empty() {
-            return Some(t.to_string());
-        }
-    }
-
-    // 非 UTF-8：lossy 至少不丢行；中文 GBK 可能花字，但时间轴仍可用
-    let s = String::from_utf8_lossy(&data);
-    let t = s.trim();
-    if t.is_empty() {
-        None
+        String::from_utf16(&u16s).ok()
+    } else if let Ok(text) = std::str::from_utf8(data) {
+        Some(text.to_string())
     } else {
-        Some(t.to_string())
+        let (text, _, _) = encoding_rs::GB18030.decode(data);
+        Some(text.into_owned())
+    };
+
+    decoded
+        .map(|text| text.trim().trim_start_matches('\u{feff}').to_string())
+        .filter(|text| !text.is_empty())
+}
+
+fn read_text_flexible(path: &Path) -> Option<String> {
+    let data = fs::read(path).ok()?;
+    decode_text_bytes(&data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_text_bytes;
+
+    #[test]
+    fn decodes_utf8_lyrics() {
+        let text = decode_text_bytes("[00:01.00]你好".as_bytes());
+        assert_eq!(text.as_deref(), Some("[00:01.00]你好"));
+    }
+
+    #[test]
+    fn decodes_utf16_le_lyrics() {
+        let mut data = vec![0xFF, 0xFE];
+        for unit in "[00:01.00]你好".encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        let text = decode_text_bytes(&data);
+        assert_eq!(text.as_deref(), Some("[00:01.00]你好"));
+    }
+
+    #[test]
+    fn decodes_gb18030_lyrics() {
+        let (data, _, _) = encoding_rs::GB18030.encode("[00:01.00]你好");
+        let text = decode_text_bytes(&data);
+        assert_eq!(text.as_deref(), Some("[00:01.00]你好"));
     }
 }

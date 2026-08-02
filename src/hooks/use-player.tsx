@@ -11,6 +11,7 @@ import {
 
 import { recordPlaySessionEnd, startPlaySession } from "@/lib/db/play-stats"
 import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
+import { LOCAL_LIBRARY_EVENT } from "@/lib/local/library-store"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import { notifyError, notifyWarning } from "@/lib/notify"
@@ -29,6 +30,7 @@ import { resolveFadeDurationMs } from "@/lib/player/fade-prefs"
 import { shouldUseWasapiForTrack } from "@/lib/player/local-quality"
 import { createNativeEngine } from "@/lib/player/native-engine"
 import {
+    hydrateLocalTracks,
     readPlaybackSession,
     writePlaybackSession,
 } from "@/lib/player/playback-session"
@@ -205,6 +207,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         durationMs,
         engineStatus,
     ])
+
+    useEffect(() => {
+        function refreshLocalQueueMetadata() {
+            setQueue((current) => hydrateLocalTracks(current))
+        }
+        window.addEventListener(LOCAL_LIBRARY_EVENT, refreshLocalQueueMetadata)
+        return () =>
+            window.removeEventListener(LOCAL_LIBRARY_EVENT, refreshLocalQueueMetadata)
+    }, [])
 
     // 播放会话落盘，进度节流
     useEffect(() => {

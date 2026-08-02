@@ -4,6 +4,8 @@ import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import type { Track } from "@/lib/types"
 
 const STORAGE_KEY = "musicstorm.local.library"
+const LOCAL_LIBRARY_EVENT = "musicstorm:local-library-change"
+const CURRENT_METADATA_VERSION = 2
 
 export type LocalAlbum = {
     id: string
@@ -35,7 +37,9 @@ export type StoredLocalTrack = {
     fileName: string | null
     /** 内容 MD5 */
     contentHash: string | null
-    /** 是否已经完成过元数据扫描；无封面/歌词仍属于已扫描 */
+    /** 元数据扫描能力版本；低于当前版本时执行一次增量补扫 */
+    metadataVersion: number
+    /** 兼容旧状态，后续迁移完成后可移除 */
     metadataScanned: boolean
 }
 
@@ -64,6 +68,7 @@ type ScanTrackDto = {
     lrcPath?: string | null
     fileName?: string | null
     contentHash?: string | null
+    metadataVersion?: number
     metadataScanned?: boolean
 }
 
@@ -210,9 +215,11 @@ function normalizeTrack(raw: Partial<StoredLocalTrack>): StoredLocalTrack | null
             typeof raw.contentHash === "string" && raw.contentHash.trim()
                 ? raw.contentHash.trim().toLowerCase()
                 : null,
-        metadataScanned:
-            raw.metadataScanned === true ||
-            (typeof raw.contentHash === "string" && Boolean(raw.contentHash.trim())),
+        metadataVersion:
+            typeof raw.metadataVersion === "number" && raw.metadataVersion >= 0
+                ? Math.floor(raw.metadataVersion)
+                : 0,
+        metadataScanned: raw.metadataScanned === true,
     }
 }
 
@@ -280,6 +287,7 @@ function migrateFoldersToAlbums(state: LocalLibraryState): LocalLibraryState {
 
 function saveLocalLibrary(state: LocalLibraryState): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    window.dispatchEvent(new Event(LOCAL_LIBRARY_EVENT))
 }
 
 function createEmptyAlbum(draft: AlbumDraft): { state: LocalLibraryState; album: LocalAlbum } {
@@ -504,6 +512,7 @@ function scanDtoToStored(
             fileStemFromPath(item.path) ||
             null,
         contentHash: item.contentHash?.trim().toLowerCase() || null,
+        metadataVersion: CURRENT_METADATA_VERSION,
         metadataScanned: true,
     }
 }
@@ -575,25 +584,44 @@ function mergeScannedTracks(
 function mergeScannedTrackMeta(
     state: LocalLibraryState,
     scanned: ScanTrackDto[],
+    attemptedTrackIds: ReadonlySet<string> = new Set(),
 ): LocalLibraryState {
-    if (scanned.length === 0) {
+    if (scanned.length === 0 && attemptedTrackIds.size === 0) {
         return state
     }
 
     const scannedById = new Map(scanned.map((item) => [item.id, item]))
-    const albumById = new Map(state.albums.map((album) => [album.id, album]))
     const tracks = state.tracks.map((track) => {
         const item = scannedById.get(track.id)
         if (!item) {
-            return track
+            return attemptedTrackIds.has(track.id)
+                ? {
+                      ...track,
+                      metadataVersion: CURRENT_METADATA_VERSION,
+                      metadataScanned: true,
+                  }
+                : track
         }
-        const album = track.albumId ? albumById.get(track.albumId) : undefined
-        return scanDtoToStored(item, {
-            albumId: track.albumId,
-            albumTitle: album?.title || track.album,
-            albumArtist: album?.artist,
-            folderPath: track.folderPath,
-        })
+
+        const nextLyricText = capLyricText(item.lyricText)
+        return {
+            ...track,
+            title: item.title?.trim() || track.title,
+            artist: item.artist?.trim() || track.artist,
+            durationMs: item.durationMs > 0 ? item.durationMs : track.durationMs,
+            coverPath: item.coverPath?.trim() || track.coverPath,
+            lyricText: nextLyricText || track.lyricText,
+            lrcPath: item.lrcPath?.trim() || track.lrcPath,
+            fileName:
+                stripExtension(item.fileName?.trim() || "") ||
+                track.fileName ||
+                fileStemFromPath(item.path) ||
+                null,
+            contentHash:
+                item.contentHash?.trim().toLowerCase() || track.contentHash,
+            metadataVersion: CURRENT_METADATA_VERSION,
+            metadataScanned: true,
+        }
     })
 
     const next: LocalLibraryState = {
@@ -704,6 +732,8 @@ function listTracksByAlbum(state: LocalLibraryState, albumId: string): Track[] {
 }
 
 export {
+    CURRENT_METADATA_VERSION,
+    LOCAL_LIBRARY_EVENT,
     STORAGE_KEY,
     clearLocalLibrary,
     createEmptyAlbum,

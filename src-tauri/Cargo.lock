@@ -2405,6 +2405,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "cpal",
+ "encoding_rs",
  "lofty",
  "md-5",
  "reqwest 0.12.28",

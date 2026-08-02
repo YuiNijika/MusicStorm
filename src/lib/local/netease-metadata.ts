@@ -113,13 +113,31 @@ async function applyNeteaseMetadata(
 
     const cover = coverResult.status === "fulfilled" ? coverResult.value : ""
     const lyric = lyricResult.status === "fulfilled" ? lyricResult.value : ""
-    if (cover) setCoverOverride(track.id, cover)
-    if (lyric) setLyricOverride(track.id, lyric)
+    let coverApplied = false
+    let lyricApplied = false
+
+    // 两种元数据独立提交；封面 base64 触发 quota 时不能阻断歌词。
+    if (lyric) {
+        try {
+            setLyricOverride(track.id, lyric)
+            lyricApplied = true
+        } catch {
+            lyricApplied = false
+        }
+    }
+    if (cover) {
+        try {
+            setCoverOverride(track.id, cover)
+            coverApplied = true
+        } catch {
+            coverApplied = false
+        }
+    }
 
     return {
         matched,
-        coverApplied: Boolean(cover),
-        lyricApplied: Boolean(lyric),
+        coverApplied,
+        lyricApplied,
     }
 }
 

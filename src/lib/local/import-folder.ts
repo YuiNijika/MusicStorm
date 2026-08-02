@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { upsertLibraryFolder, upsertLibraryTracks } from "@/lib/db/play-stats"
 import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import {
+    CURRENT_METADATA_VERSION,
     createEmptyAlbum,
     loadLocalLibrary,
     mergeFolderScan,
@@ -183,15 +184,20 @@ function rescanLocalLibraryMeta(
 async function rescanMissingTrackMeta(
     prev: LocalLibraryState,
 ): Promise<LocalLibraryState> {
-    const paths = prev.tracks
-        .filter((track) => !track.metadataScanned)
-        .map((track) => track.path)
+    const pending = prev.tracks.filter(
+        (track) => track.metadataVersion < CURRENT_METADATA_VERSION,
+    )
+    const paths = pending.map((track) => track.path)
     if (paths.length === 0) {
         return prev
     }
 
     const scanned = await scanMusicFiles(paths)
-    const state = mergeScannedTrackMeta(prev, scanned)
+    const state = mergeScannedTrackMeta(
+        prev,
+        scanned,
+        new Set(pending.map((track) => track.id)),
+    )
 
     const albumById = new Map(state.albums.map((album) => [album.id, album]))
     const grouped = new Map<string, ScanTrackDto[]>()
@@ -212,7 +218,9 @@ async function rescanMissingTrackMeta(
 }
 
 function libraryNeedsMetaRescan(state: LocalLibraryState): boolean {
-    return state.tracks.some((track) => !track.metadataScanned)
+    return state.tracks.some(
+        (track) => track.metadataVersion < CURRENT_METADATA_VERSION,
+    )
 }
 
 function dualWriteToSqlite(
