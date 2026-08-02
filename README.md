@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/icon.png" width="128" alt="MusicStorm 图标" />
+  <img src="/public/icon.png" width="128" alt="MusicStorm 图标" />
 </p>
 
 <h1 align="center">MusicStorm</h1>
