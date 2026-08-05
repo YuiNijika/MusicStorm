@@ -21,7 +21,7 @@ export function useWindowControls() {
                 await appWindow.toggleMaximize()
                 setIsMaximized(await appWindow.isMaximized())
             } catch {
-                // browser preview without tauri runtime
+                // 浏览器预览无 Tauri 运行时，忽略
             }
         })()
     }, [appWindow])

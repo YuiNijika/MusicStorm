@@ -1,4 +1,4 @@
-import { fetchImageAsDataUrl } from "@/lib/local/cover"
+import { cacheCoverUrl } from "@/lib/local/cover"
 import { getLyricOverride, setLyricOverride } from "@/lib/lyric/overrides"
 import { getCoverOverride, setCoverOverride } from "@/lib/music/cover-overrides"
 import { fetchLyricText } from "@/lib/netease/lyric"
@@ -106,17 +106,17 @@ async function applyNeteaseMetadata(
 
     const [coverResult, lyricResult] = await Promise.allSettled([
         needsCover && matched.coverUrl
-            ? fetchImageAsDataUrl(matched.coverUrl)
-            : Promise.resolve(""),
-        needsLyric ? fetchLyricText(matched.id) : Promise.resolve(""),
+            ? cacheCoverUrl(matched.coverUrl).then((cached) => cached)
+            : Promise.reject(new Error("no cover")),
+        needsLyric ? fetchLyricText(matched.id) : Promise.reject(new Error("no lyric")),
     ])
 
-    const cover = coverResult.status === "fulfilled" ? coverResult.value : ""
+    const cover = coverResult.status === "fulfilled" ? coverResult.value : null
     const lyric = lyricResult.status === "fulfilled" ? lyricResult.value : ""
     let coverApplied = false
     let lyricApplied = false
 
-    // 两种元数据独立提交；封面 base64 触发 quota 时不能阻断歌词。
+    // 两种元数据独立提交；封面 base64 触发 quota 时不能阻断歌词
     if (lyric) {
         try {
             setLyricOverride(track.id, lyric)
@@ -127,7 +127,7 @@ async function applyNeteaseMetadata(
     }
     if (cover) {
         try {
-            setCoverOverride(track.id, cover)
+            await setCoverOverride(track.id, cover)
             coverApplied = true
         } catch {
             coverApplied = false

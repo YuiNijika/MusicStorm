@@ -7,10 +7,24 @@ const STORAGE_KEY = "musicstorm.local.library"
 const LOCAL_LIBRARY_EVENT = "musicstorm:local-library-change"
 const CURRENT_METADATA_VERSION = 2
 
+export type LocalArtist = {
+    id: string
+    /** 艺人 / 合集名，如 Beyond */
+    name: string
+    /** 艺人文件夹路径；null 表示手动创建的分组 */
+    folderPath: string | null
+    /** base64 封面 */
+    coverDataUrl: string
+    createdAt: number
+    updatedAt: number
+}
+
 export type LocalAlbum = {
     id: string
     title: string
     artist: string
+    /** 归属艺人分组 id；null = 独立专辑 */
+    artistId: string | null
     /** base64 封面，存入 localStorage 与 SQLite */
     coverDataUrl: string
     folderPath: string | null
@@ -45,6 +59,7 @@ export type StoredLocalTrack = {
 
 export type LocalLibraryState = {
     folders: string[]
+    artists: LocalArtist[]
     albums: LocalAlbum[]
     tracks: StoredLocalTrack[]
 }
@@ -54,6 +69,8 @@ export type AlbumDraft = {
     artist: string
     coverDataUrl: string
     folderPath: string | null
+    /** 归属艺人分组；null = 独立 */
+    artistId?: string | null
 }
 
 type ScanTrackDto = {
@@ -73,7 +90,7 @@ type ScanTrackDto = {
 }
 
 function emptyLibrary(): LocalLibraryState {
-    return { folders: [], albums: [], tracks: [] }
+    return { folders: [], artists: [], albums: [], tracks: [] }
 }
 
 function nowMs(): number {
@@ -97,6 +114,10 @@ function capLyricText(text: string | null | undefined): string | null {
 
 function newAlbumId(): string {
     return `album:${nowMs().toString(16)}-${Math.random().toString(16).slice(2, 10)}`
+}
+
+function newArtistId(): string {
+    return `artist:${nowMs().toString(16)}-${Math.random().toString(16).slice(2, 10)}`
 }
 
 function folderDisplayName(folderPath: string): string {
@@ -178,11 +199,29 @@ function normalizeAlbum(raw: Partial<LocalAlbum>): LocalAlbum | null {
         id: raw.id,
         title: typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : "未命名专辑",
         artist: typeof raw.artist === "string" ? raw.artist.trim() : "",
+        artistId: typeof raw.artistId === "string" && raw.artistId ? raw.artistId : null,
         coverDataUrl: typeof raw.coverDataUrl === "string" ? raw.coverDataUrl : "",
         folderPath:
             typeof raw.folderPath === "string" && raw.folderPath.trim()
                 ? raw.folderPath
                 : null,
+        createdAt: typeof raw.createdAt === "number" ? raw.createdAt : nowMs(),
+        updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : nowMs(),
+    }
+}
+
+function normalizeArtist(raw: Partial<LocalArtist>): LocalArtist | null {
+    if (!raw || typeof raw.id !== "string" || !raw.id) {
+        return null
+    }
+    return {
+        id: raw.id,
+        name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : "未命名艺人",
+        folderPath:
+            typeof raw.folderPath === "string" && raw.folderPath.trim()
+                ? raw.folderPath
+                : null,
+        coverDataUrl: typeof raw.coverDataUrl === "string" ? raw.coverDataUrl : "",
         createdAt: typeof raw.createdAt === "number" ? raw.createdAt : nowMs(),
         updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : nowMs(),
     }
@@ -236,6 +275,9 @@ function loadLocalLibrary(): LocalLibraryState {
         const folders = Array.isArray(parsed.folders)
             ? parsed.folders.filter((f) => typeof f === "string")
             : []
+        const artists = Array.isArray(parsed.artists)
+            ? parsed.artists.map(normalizeArtist).filter((item): item is LocalArtist => item != null)
+            : []
         const albums = Array.isArray(parsed.albums)
             ? parsed.albums.map(normalizeAlbum).filter((item): item is LocalAlbum => item != null)
             : []
@@ -246,12 +288,12 @@ function loadLocalLibrary(): LocalLibraryState {
             : []
 
         if (albums.length === 0 && folders.length > 0) {
-            const migrated = migrateFoldersToAlbums({ folders, albums: [], tracks })
+            const migrated = migrateFoldersToAlbums({ folders, artists, albums: [], tracks })
             saveLocalLibrary(migrated)
             return migrated
         }
 
-        return { folders, albums, tracks }
+        return { folders, artists, albums, tracks }
     } catch {
         return emptyLibrary()
     }
@@ -264,6 +306,7 @@ function migrateFoldersToAlbums(state: LocalLibraryState): LocalLibraryState {
             id: newAlbumId(),
             title: folderDisplayName(folderPath),
             artist: "",
+            artistId: null,
             coverDataUrl: "",
             folderPath,
             createdAt: ts,
@@ -282,7 +325,12 @@ function migrateFoldersToAlbums(state: LocalLibraryState): LocalLibraryState {
             album: album.title,
         }
     })
-    return { folders: state.folders, albums, tracks }
+    return {
+        folders: state.folders,
+        artists: state.artists ?? [],
+        albums,
+        tracks,
+    }
 }
 
 function saveLocalLibrary(state: LocalLibraryState): void {
@@ -293,10 +341,15 @@ function saveLocalLibrary(state: LocalLibraryState): void {
 function createEmptyAlbum(draft: AlbumDraft): { state: LocalLibraryState; album: LocalAlbum } {
     const prev = loadLocalLibrary()
     const ts = nowMs()
+    const artist =
+        draft.artistId != null
+            ? prev.artists.find((item) => item.id === draft.artistId) ?? null
+            : null
     const album: LocalAlbum = {
         id: newAlbumId(),
         title: draft.title.trim() || "未命名专辑",
-        artist: draft.artist.trim(),
+        artist: artist?.name ?? draft.artist.trim(),
+        artistId: draft.artistId ?? null,
         coverDataUrl: draft.coverDataUrl,
         folderPath: draft.folderPath,
         createdAt: ts,
@@ -310,6 +363,7 @@ function createEmptyAlbum(draft: AlbumDraft): { state: LocalLibraryState; album:
 
     const state: LocalLibraryState = {
         folders,
+        artists: prev.artists,
         albums: [album, ...prev.albums],
         tracks: prev.tracks,
     }
@@ -320,17 +374,35 @@ function createEmptyAlbum(draft: AlbumDraft): { state: LocalLibraryState; album:
 function updateAlbum(
     state: LocalLibraryState,
     albumId: string,
-    patch: Partial<Pick<LocalAlbum, "title" | "artist" | "coverDataUrl" | "folderPath">>,
+    patch: Partial<
+        Pick<LocalAlbum, "title" | "artist" | "artistId" | "coverDataUrl" | "folderPath">
+    >,
 ): LocalLibraryState {
     const ts = nowMs()
+    const targetArtist =
+        patch.artistId != null
+            ? state.artists.find((item) => item.id === patch.artistId) ?? null
+            : null
     const albums = state.albums.map((album) => {
         if (album.id !== albumId) {
             return album
         }
+        const nextArtistId =
+            patch.artistId !== undefined ? patch.artistId ?? null : album.artistId
+        // 手动填 artist 优先；否则跟随艺人分组名；否则保持原值
+        const nextArtist =
+            patch.artist !== undefined && patch.artist.trim()
+                ? patch.artist.trim()
+                : targetArtist
+                  ? targetArtist.name
+                  : patch.artistId === null
+                    ? album.artist
+                    : album.artist
         return {
             ...album,
             title: patch.title !== undefined ? patch.title.trim() || album.title : album.title,
-            artist: patch.artist !== undefined ? patch.artist.trim() : album.artist,
+            artist: nextArtist,
+            artistId: nextArtistId,
             coverDataUrl:
                 patch.coverDataUrl !== undefined ? patch.coverDataUrl : album.coverDataUrl,
             folderPath: patch.folderPath !== undefined ? patch.folderPath : album.folderPath,
@@ -355,7 +427,7 @@ function updateAlbum(
         folders = [...folders, album.folderPath]
     }
 
-    const next = { folders, albums, tracks }
+    const next = { folders, artists: state.artists, albums, tracks }
     saveLocalLibrary(next)
     return next
 }
@@ -373,6 +445,16 @@ function mergeFolderScan(
         ? state.folders
         : [...state.folders, folderPath]
 
+    const artist =
+        draft.artistId != null
+            ? state.artists.find((item) => item.id === draft.artistId) ?? null
+            : null
+    // 艺人分组名优先；手动 artist 次之；最后标签推导
+    const artistName =
+        artist?.name ||
+        draft.artist.trim() ||
+        derived.artist
+
     let albumId = existingAlbumId ?? null
     let albums = [...state.albums]
 
@@ -382,10 +464,13 @@ function mergeFolderScan(
                 ? {
                       ...album,
                       title: derived.title || album.title,
-                      // 空字符串表示沿用标签推导或清空用户未填
                       artist: draft.artist.trim()
                           ? draft.artist.trim()
-                          : derived.artist || album.artist,
+                          : artistName || album.artist,
+                      artistId:
+                          draft.artistId !== undefined
+                              ? draft.artistId ?? null
+                              : album.artistId,
                       coverDataUrl: draft.coverDataUrl
                           ? draft.coverDataUrl
                           : album.coverDataUrl.startsWith("data:")
@@ -407,7 +492,11 @@ function mergeFolderScan(
                           title: derived.title || album.title,
                           artist: draft.artist.trim()
                               ? draft.artist.trim()
-                              : derived.artist || album.artist,
+                              : artistName || album.artist,
+                          artistId:
+                              draft.artistId !== undefined
+                                  ? draft.artistId ?? null
+                                  : album.artistId,
                           coverDataUrl: draft.coverDataUrl
                               ? draft.coverDataUrl
                               : album.coverDataUrl.startsWith("data:")
@@ -424,7 +513,8 @@ function mergeFolderScan(
                 {
                     id: albumId,
                     title: derived.title,
-                    artist: derived.artist,
+                    artist: artistName,
+                    artistId: draft.artistId ?? null,
                     coverDataUrl: derived.coverDataUrl,
                     folderPath,
                     createdAt: ts,
@@ -458,7 +548,7 @@ function mergeFolderScan(
         a.title.localeCompare(b.title, "zh-CN"),
     )
 
-    const next = { folders, albums, tracks }
+    const next = { folders, artists: state.artists, albums, tracks }
     saveLocalLibrary(next)
     return next
 }
@@ -518,7 +608,7 @@ function scanDtoToStored(
 }
 
 /**
- * 向专辑（或未分类）追加任意路径的音频。
+ * 向专辑或未分类追加任意路径的音频。
  * - 不按文件夹整夹替换
  * - 同 id 覆盖更新
  * - albumId = null 表示仅进「全部歌曲」
@@ -574,6 +664,7 @@ function mergeScannedTracks(
 
     const next: LocalLibraryState = {
         folders: Array.from(folders),
+        artists: state.artists,
         albums,
         tracks,
     }
@@ -641,6 +732,7 @@ function clearLocalLibrary(): LocalLibraryState {
 function removeFolder(state: LocalLibraryState, folderPath: string): LocalLibraryState {
     const next: LocalLibraryState = {
         folders: state.folders.filter((item) => item !== folderPath),
+        artists: state.artists,
         albums: state.albums.filter((album) => album.folderPath !== folderPath),
         tracks: state.tracks.filter((track) => track.folderPath !== folderPath),
     }
@@ -661,11 +753,191 @@ function removeAlbum(state: LocalLibraryState, albumId: string): LocalLibrarySta
             album?.folderPath && !folderStillUsed
                 ? state.folders.filter((item) => item !== album.folderPath)
                 : state.folders,
+        artists: state.artists,
         albums: remainingAlbums,
         tracks: remainingTracks,
     }
     saveLocalLibrary(next)
     return next
+}
+
+/** 新增或更新艺人分组；folderPath 相同视为同一艺人（重扫时复用） */
+function upsertArtist(
+    state: LocalLibraryState,
+    draft: Pick<LocalArtist, "name" | "folderPath" | "coverDataUrl">,
+): { state: LocalLibraryState; artist: LocalArtist } {
+    const ts = nowMs()
+    const existing =
+        draft.folderPath != null
+            ? state.artists.find((item) => item.folderPath === draft.folderPath) ?? null
+            : null
+    let artists: LocalArtist[]
+    let artist: LocalArtist
+    if (existing) {
+        artist = {
+            ...existing,
+            name: draft.name.trim() || existing.name,
+            coverDataUrl: draft.coverDataUrl || existing.coverDataUrl,
+            updatedAt: ts,
+        }
+        artists = state.artists.map((item) => (item.id === existing.id ? artist : item))
+    } else {
+        artist = {
+            id: newArtistId(),
+            name: draft.name.trim() || "未命名艺人",
+            folderPath: draft.folderPath,
+            coverDataUrl: draft.coverDataUrl,
+            createdAt: ts,
+            updatedAt: ts,
+        }
+        artists = [...state.artists, artist]
+    }
+    const next = { ...state, artists }
+    saveLocalLibrary(next)
+    return { state: next, artist }
+}
+
+/** 更新艺人信息；可选重命名，重命名时同步其下专辑 artist 字段 */
+function updateArtist(
+    state: LocalLibraryState,
+    artistId: string,
+    patch: Partial<Pick<LocalArtist, "name" | "coverDataUrl">>,
+): LocalLibraryState {
+    const ts = nowMs()
+    let renamed = false
+    const artists = state.artists.map((item) => {
+        if (item.id !== artistId) {
+            return item
+        }
+        const nextName = patch.name !== undefined ? patch.name.trim() : item.name
+        renamed = nextName !== item.name && Boolean(nextName)
+        return {
+            ...item,
+            name: nextName || item.name,
+            coverDataUrl: patch.coverDataUrl !== undefined ? patch.coverDataUrl : item.coverDataUrl,
+            updatedAt: ts,
+        }
+    })
+    const artist = artists.find((item) => item.id === artistId)
+    const albums = renamed && artist
+        ? state.albums.map((album) =>
+              album.artistId === artistId
+                  ? { ...album, artist: artist.name, updatedAt: ts }
+                  : album,
+          )
+        : state.albums
+    const next = { ...state, artists, albums }
+    saveLocalLibrary(next)
+    return next
+}
+
+/** 删除艺人分组；其下专辑解除归属（保留专辑本身） */
+function removeArtist(state: LocalLibraryState, artistId: string): LocalLibraryState {
+    const artists = state.artists.filter((item) => item.id !== artistId)
+    const albums = state.albums.map((album) =>
+        album.artistId === artistId ? { ...album, artistId: null, updatedAt: nowMs() } : album,
+    )
+    const next = { ...state, artists, albums }
+    saveLocalLibrary(next)
+    return next
+}
+
+/** 批量移除专辑（连同曲目索引）；不删磁盘文件。已无引用的 folder 一并清理 */
+function removeAlbumsBulk(
+    state: LocalLibraryState,
+    albumIds: ReadonlySet<string>,
+): LocalLibraryState {
+    if (albumIds.size === 0) {
+        return state
+    }
+    const remainingAlbums = state.albums.filter((album) => !albumIds.has(album.id))
+    const remainingTracks = state.tracks.filter(
+        (track) => track.albumId == null || !albumIds.has(track.albumId),
+    )
+    const usedFolders = new Set<string>()
+    for (const album of remainingAlbums) {
+        if (album.folderPath) {
+            usedFolders.add(album.folderPath)
+        }
+    }
+    for (const track of remainingTracks) {
+        if (track.folderPath) {
+            usedFolders.add(track.folderPath)
+        }
+    }
+    const next: LocalLibraryState = {
+        folders: state.folders.filter((folder) => usedFolders.has(folder)),
+        artists: state.artists,
+        albums: remainingAlbums,
+        tracks: remainingTracks,
+    }
+    saveLocalLibrary(next)
+    return next
+}
+
+/**
+ * 批量移除艺人分组。
+ * - includeAlbums = false：仅解除专辑归属（专辑保留）
+ * - includeAlbums = true：连同其下专辑与曲目索引一并移除
+ */
+function removeArtistsBulk(
+    state: LocalLibraryState,
+    artistIds: ReadonlySet<string>,
+    includeAlbums: boolean,
+): LocalLibraryState {
+    if (artistIds.size === 0) {
+        return state
+    }
+    const remainingArtists = state.artists.filter((artist) => !artistIds.has(artist.id))
+
+    if (!includeAlbums) {
+        const albums = state.albums.map((album) =>
+            album.artistId != null && artistIds.has(album.artistId)
+                ? { ...album, artistId: null, updatedAt: nowMs() }
+                : album,
+        )
+        const next: LocalLibraryState = { ...state, artists: remainingArtists, albums }
+        saveLocalLibrary(next)
+        return next
+    }
+
+    const albumIds = new Set(
+        state.albums
+            .filter((album) => album.artistId != null && artistIds.has(album.artistId))
+            .map((album) => album.id),
+    )
+    const remainingAlbums = state.albums.filter((album) => !albumIds.has(album.id))
+    const remainingTracks = state.tracks.filter(
+        (track) => track.albumId == null || !albumIds.has(track.albumId),
+    )
+    const usedFolders = new Set<string>()
+    for (const album of remainingAlbums) {
+        if (album.folderPath) {
+            usedFolders.add(album.folderPath)
+        }
+    }
+    for (const track of remainingTracks) {
+        if (track.folderPath) {
+            usedFolders.add(track.folderPath)
+        }
+    }
+    const next: LocalLibraryState = {
+        folders: state.folders.filter((folder) => usedFolders.has(folder)),
+        artists: remainingArtists,
+        albums: remainingAlbums,
+        tracks: remainingTracks,
+    }
+    saveLocalLibrary(next)
+    return next
+}
+
+/** 艺人下专辑数 / 曲目数统计 */
+function artistAlbumCount(state: LocalLibraryState, artistId: string): number {
+    return state.albums.filter((album) => album.artistId === artistId).length
+}
+
+function listAlbumsByArtist(state: LocalLibraryState, artistId: string): LocalAlbum[] {
+    return state.albums.filter((album) => album.artistId === artistId)
 }
 
 function albumCoverMap(state: LocalLibraryState): Map<string, string> {
@@ -735,9 +1007,11 @@ export {
     CURRENT_METADATA_VERSION,
     LOCAL_LIBRARY_EVENT,
     STORAGE_KEY,
+    artistAlbumCount,
     clearLocalLibrary,
     createEmptyAlbum,
     folderDisplayName,
+    listAlbumsByArtist,
     listLocalPlayableTracks,
     listTracksByAlbum,
     loadLocalLibrary,
@@ -745,11 +1019,16 @@ export {
     mergeScannedTrackMeta,
     mergeScannedTracks,
     removeAlbum,
+    removeAlbumsBulk,
+    removeArtist,
+    removeArtistsBulk,
     removeFolder,
     resolveAlbumCoverUrl,
     saveLocalLibrary,
     storedToTrack,
     toAssetUrl,
     updateAlbum,
+    updateArtist,
+    upsertArtist,
 }
 export type { ScanTrackDto }

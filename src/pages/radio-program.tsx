@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { RadioProgramDetailSkeleton } from "@/components/music/loading-skeletons"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayer } from "@/hooks/use-player"
@@ -65,7 +65,7 @@ function RadioProgramPage({
             <BackButton onClick={onBack} />
 
             {loading ? (
-                <DetailPageSkeleton coverShape="rounded" />
+                <RadioProgramDetailSkeleton />
             ) : error ? (
                 <StateHero
                     variant="error"

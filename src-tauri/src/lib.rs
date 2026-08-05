@@ -1,7 +1,8 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 // 本地扫描 / 存储 / 播放 / 网易云代理入口
 mod audio;
+mod cover_cache;
 mod db;
+mod ffmpeg;
 mod local_meta;
 mod netease_proxy;
 
@@ -9,18 +10,22 @@ use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
     audio_seek, audio_set_device, audio_set_exclusive, audio_set_volume, audio_stop, AudioState,
 };
+use cover_cache::{cache_cover_data_url, cache_cover_url, pick_cover_image};
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
     db_listen_source_breakdown, db_set_setting, db_start_play_session, db_upsert_folder,
     db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db, purge_expired_api_cache,
-    DbState,
+    resolve_app_dir, DbState,
 };
 use netease_proxy::netease_http_post;
+use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate, pick_ffmpeg_executable};
+use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 const AUDIO_EXTS: &[&str] = &[
     // 常用
@@ -36,6 +41,8 @@ const AUDIO_EXTS: &[&str] = &[
 ];
 const MAX_TRACKS: usize = 2_000;
 const MAX_DEPTH: usize = 8;
+const MIN_SCAN_THREADS: usize = 2;
+const MAX_SCAN_THREADS: usize = 6;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,8 +53,10 @@ struct LocalScanTrack {
     album: String,
     path: String,
     duration_ms: u64,
-    /// 内嵌封面落盘绝对路径
+    /// 封面原图缓存绝对路径
     cover_path: Option<String>,
+    /// 列表缩略图缓存绝对路径
+    cover_thumbnail_path: Option<String>,
     /// 内嵌或 sidecar 歌词全文
     lyric_text: Option<String>,
     /// sidecar lrc 路径
@@ -197,50 +206,56 @@ fn read_text_file(path: String) -> Result<String, String> {
     local_meta::decode_text_bytes(&data).ok_or_else(|| "歌词文件为空或编码不受支持".into())
 }
 
-/// 递归扫描音频：tag 失败仍入库；后缀见 AUDIO_EXTS
+/// 递归扫描音频：先收集路径，再用有界线程池并行读取元数据
 #[tauri::command]
-fn scan_music_folder(app: AppHandle, path: String) -> Result<Vec<LocalScanTrack>, String> {
-    let root = PathBuf::from(path.trim());
-    if !root.is_dir() {
-        return Err("不是有效文件夹".into());
-    }
+async fn scan_music_folder(
+    app: AppHandle,
+    path: String,
+) -> Result<Vec<LocalScanTrack>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = PathBuf::from(path.trim());
+        if !root.is_dir() {
+            return Err("不是有效文件夹".into());
+        }
 
-    let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
-    let mut tracks = Vec::new();
-    scan_dir(
-        &root,
-        &root,
-        &covers_dir,
-        &lyrics_dir,
-        &mut tracks,
-        0,
-    )?;
-    sort_scan_tracks(&mut tracks);
-    Ok(tracks)
+        let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
+        let mut paths = Vec::new();
+        collect_audio_paths(&root, &mut paths, 0)?;
+        Ok(scan_audio_paths(
+            paths,
+            &root,
+            &covers_dir,
+            &lyrics_dir,
+            Some(&app),
+        ))
+    })
+    .await
+    .map_err(|error| format!("扫描任务失败: {error}"))?
 }
 
 /// 扫描指定音频文件列表（不限同一文件夹）
 #[tauri::command]
-fn scan_music_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<LocalScanTrack>, String> {
-    let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
-    let mut tracks = Vec::new();
-
-    for raw in paths {
-        if tracks.len() >= MAX_TRACKS {
-            break;
-        }
-        let path = PathBuf::from(raw.trim());
-        if !path.is_file() {
-            continue;
-        }
-        if let Some(track) = scan_audio_file(&path, path.parent().unwrap_or(path.as_path()), &covers_dir, &lyrics_dir)
-        {
-            tracks.push(track);
-        }
-    }
-
-    sort_scan_tracks(&mut tracks);
-    Ok(tracks)
+async fn scan_music_files(
+    app: AppHandle,
+    paths: Vec<String>,
+) -> Result<Vec<LocalScanTrack>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
+        let paths = paths
+            .into_iter()
+            .take(MAX_TRACKS)
+            .map(|raw| PathBuf::from(raw.trim()))
+            .filter(|path| is_audio_file(path))
+            .collect::<Vec<_>>();
+        Ok(scan_audio_paths_with_parents(
+            paths,
+            &covers_dir,
+            &lyrics_dir,
+            Some(&app),
+        ))
+    })
+    .await
+    .map_err(|error| format!("扫描任务失败: {error}"))?
 }
 
 fn media_cache_dirs(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
@@ -252,21 +267,199 @@ fn media_cache_dirs(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
     Ok((covers_dir, lyrics_dir))
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArtistScanResult {
+    /// 艺人文件夹名
+    display_name: String,
+    /// 直接子文件夹路径列表，每个子文件夹视为一个专辑
+    group_folders: Vec<String>,
+    /// 全部扫描曲目（扁平），前端按路径前缀分组
+    tracks: Vec<LocalScanTrack>,
+}
+
+/// 艺人文件夹扫描：直接子文件夹 = 专辑，根目录散曲归入全部歌曲
+/// 一次收集所有音频路径，复用并行扫描池
+#[tauri::command]
+async fn scan_music_artist_folder(
+    app: AppHandle,
+    path: String,
+) -> Result<ArtistScanResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = PathBuf::from(path.trim());
+        if !root.is_dir() {
+            return Err("不是有效文件夹".into());
+        }
+
+        let (covers_dir, lyrics_dir) = media_cache_dirs(&app)?;
+        let mut all_files: Vec<PathBuf> = Vec::new();
+        let mut group_folders: Vec<String> = Vec::new();
+
+        let entries =
+            std::fs::read_dir(&root).map_err(|error| format!("无法读取目录: {error}"))?;
+        for entry in entries.flatten() {
+            let item = entry.path();
+            let name = item
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("");
+            if name.starts_with('.') {
+                continue;
+            }
+            if item.is_dir() {
+                let mut sub_paths = Vec::new();
+                collect_audio_paths(&item, &mut sub_paths, 0)?;
+                if sub_paths.is_empty() {
+                    continue;
+                }
+                group_folders.push(item.to_string_lossy().into_owned());
+                all_files.extend(sub_paths);
+            } else if is_audio_file(&item) {
+                all_files.push(item);
+            }
+        }
+
+        let tracks = scan_audio_paths_with_parents(
+            all_files,
+            &covers_dir,
+            &lyrics_dir,
+            Some(&app),
+        );
+        let display_name = root
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("未命名艺人")
+            .to_string();
+
+        Ok(ArtistScanResult {
+            display_name,
+            group_folders,
+            tracks,
+        })
+    })
+    .await
+    .map_err(|error| format!("扫描任务失败: {error}"))?
+}
+
+fn scan_thread_count(track_count: usize) -> usize {
+    let available = std::thread::available_parallelism()
+        .map(usize::from)
+        .unwrap_or(MIN_SCAN_THREADS);
+    available
+        .clamp(MIN_SCAN_THREADS, MAX_SCAN_THREADS)
+        .min(track_count.max(1))
+}
+
+fn scan_audio_paths(
+    paths: Vec<PathBuf>,
+    album_root: &Path,
+    covers_dir: &Path,
+    lyrics_dir: &Path,
+    app: Option<&AppHandle>,
+) -> Vec<LocalScanTrack> {
+    scan_in_pool(paths, app, |path| {
+        scan_audio_file(path, album_root, covers_dir, lyrics_dir)
+    })
+}
+
+fn scan_audio_paths_with_parents(
+    paths: Vec<PathBuf>,
+    covers_dir: &Path,
+    lyrics_dir: &Path,
+    app: Option<&AppHandle>,
+) -> Vec<LocalScanTrack> {
+    scan_in_pool(paths, app, |path| {
+        let album_root = path.parent().unwrap_or(path.as_path());
+        scan_audio_file(path, album_root, covers_dir, lyrics_dir)
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScanProgressPayload {
+    done: usize,
+    total: usize,
+    current_path: String,
+}
+
+/// 向主窗口广播扫描进度；失败静默（如窗口未就绪）
+fn emit_scan_progress(app: &AppHandle, done: usize, total: usize, current_path: &str) {
+    let _ = app.emit(
+        "musicstorm:scan-progress",
+        ScanProgressPayload {
+            done,
+            total,
+            current_path: current_path.to_string(),
+        },
+    );
+}
+
+fn scan_in_pool<F>(paths: Vec<PathBuf>, app: Option<&AppHandle>, scan: F) -> Vec<LocalScanTrack>
+where
+    F: Fn(&PathBuf) -> Option<LocalScanTrack> + Sync + Send,
+{
+    if paths.is_empty() {
+        return Vec::new();
+    }
+
+    let thread_count = scan_thread_count(paths.len());
+    let total = paths.len();
+    let done = AtomicUsize::new(0);
+    // 每约 25 次更新一次进度，避免高频 IPC
+    let emit_every = (total / 25).max(1);
+    let app_owned = app.cloned();
+    let mut tracks = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count)
+        .thread_name(|index| format!("music-scan-{index}"))
+        .build()
+        .map(|pool| {
+            pool.install(|| {
+                paths
+                    .par_iter()
+                    .filter_map(|path| {
+                        let result = scan(path);
+                        let current = done.fetch_add(1, Ordering::Relaxed) + 1;
+                        if let Some(ref handle) = app_owned {
+                            if current % emit_every == 0 || current == total {
+                                emit_scan_progress(
+                                    handle,
+                                    current,
+                                    total,
+                                    &path.to_string_lossy(),
+                                );
+                            }
+                        }
+                        result
+                    })
+                    .collect::<Vec<LocalScanTrack>>()
+            })
+        })
+        .unwrap_or_else(|_| {
+            // 线程池构建失败时串行兜底，仍发最终进度
+            if let Some(ref handle) = app_owned {
+                let current = total;
+                emit_scan_progress(handle, current, total, "");
+            }
+            paths.iter().filter_map(scan).collect()
+        });
+
+    sort_scan_tracks(&mut tracks);
+    tracks
+}
+
 fn sort_scan_tracks(tracks: &mut [LocalScanTrack]) {
     tracks.sort_by(|a, b| {
         a.title
             .to_lowercase()
             .cmp(&b.title.to_lowercase())
             .then_with(|| a.artist.to_lowercase().cmp(&b.artist.to_lowercase()))
+            .then_with(|| a.path.cmp(&b.path))
     });
 }
 
-fn scan_dir(
-    root: &Path,
+fn collect_audio_paths(
     dir: &Path,
-    covers_dir: &Path,
-    lyrics_dir: &Path,
-    out: &mut Vec<LocalScanTrack>,
+    out: &mut Vec<PathBuf>,
     depth: usize,
 ) -> Result<(), String> {
     if depth > MAX_DEPTH || out.len() >= MAX_TRACKS {
@@ -284,22 +477,27 @@ fn scan_dir(
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or("");
-
         if name.starts_with('.') {
             continue;
         }
 
         if path.is_dir() {
-            scan_dir(root, &path, covers_dir, lyrics_dir, out, depth + 1)?;
-            continue;
-        }
-
-        if let Some(track) = scan_audio_file(&path, root, covers_dir, lyrics_dir) {
-            out.push(track);
+            collect_audio_paths(&path, out, depth + 1)?;
+        } else if is_audio_file(&path) {
+            out.push(path);
         }
     }
 
     Ok(())
+}
+
+fn is_audio_file(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase())
+            .is_some_and(|extension| AUDIO_EXTS.contains(&extension.as_str()))
 }
 
 /// 单文件 → LocalScanTrack；非音频或失败返回 None
@@ -355,6 +553,7 @@ fn scan_audio_file(
         path: absolute,
         duration_ms: file_meta.duration_ms,
         cover_path: file_meta.cover_path,
+        cover_thumbnail_path: file_meta.cover_thumbnail_path,
         lyric_text: file_meta.lyric_text,
         lrc_path: file_meta.lrc_path,
         file_name,
@@ -395,26 +594,89 @@ fn parse_filename(stem: &str) -> (String, String) {
     ("未知艺人".into(), stem.trim().to_string())
 }
 
+/// 后台清理过期 API 缓存；开独立连接避免锁主线程 DB
+fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String> {
+    let conn = open_db(app)?;
+    purge_expired_api_cache(app, &conn)
+}
+
+/// 计算 WebView2 数据目录，持久化到 app 本地目录避免冷启动全量重建
+fn webview_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let app_dir = resolve_app_dir(app)?;
+    let dir = app_dir.join("resources").join("webview-data");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("create webview data dir: {e}"))?;
+    Ok(dir)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let conn = open_db(app.handle())?;
-            let _ = purge_expired_api_cache(app.handle(), &conn);
             app.manage(DbState(Mutex::new(conn)));
             app.manage(AudioState::default());
+
+            let data_dir = webview_data_dir(app.handle())?;
+
+            // 使用固定 WebView2 数据目录，冷启动时复用已有缓存避免全量重建
+            // 主窗口初始隐藏，待 splash handoff 后显示
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("MusicStorm")
+            .inner_size(1280.0, 800.0)
+            .min_inner_size(960.0, 640.0)
+            .decorations(false)
+            .visible(false)
+            .center()
+            .data_directory(data_dir.clone())
+            .build()
+            .map_err(|e| format!("create main window: {e}"))?;
+
+            // Splash 窗口：轻量 HTML，冷启动优先渲染
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "splashscreen",
+                tauri::WebviewUrl::App("splashscreen.html".into()),
+            )
+            .title("MusicStorm")
+            .inner_size(440.0, 420.0)
+            .resizable(false)
+            .decorations(false)
+            .shadow(false)
+            .transparent(true)
+            .always_on_top(true)
+            .center()
+            .skip_taskbar(true)
+            .data_directory(data_dir)
+            .build()
+            .map_err(|e| format!("create splash window: {e}"))?;
+
+            // 过期缓存清理移到后台线程，不阻塞 WebView 初始化
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = purge_expired_api_cache_in_background(&app_handle);
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             pick_music_folder,
             pick_music_files,
             pick_image_as_base64,
+            pick_cover_image,
+            cache_cover_url,
+            cache_cover_data_url,
             pick_text_file,
             save_url_to_file,
             read_text_file,
             scan_music_folder,
             scan_music_files,
+            scan_music_artist_folder,
             get_storage_paths,
             db_upsert_folder,
             db_upsert_tracks,
@@ -430,6 +692,10 @@ pub fn run() {
             api_cache_set,
             api_cache_clear,
             api_cache_purge_expired,
+            ffmpeg_detect,
+            ffmpeg_validate,
+            ffmpeg_set_path,
+            pick_ffmpeg_executable,
             audio_list_devices,
             audio_get_output_mode,
             audio_set_device,

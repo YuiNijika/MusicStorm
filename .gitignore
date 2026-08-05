@@ -23,5 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Tauri build artifacts
+src-tauri/resources/webview-data/
+src-tauri/resources/config/*.db
+src-tauri/target/
+
 .cursor
 CloudMusicAPI

@@ -146,7 +146,7 @@ async function fetchExternal<T>(
             }
             detail = errBody.msg?.trim() || errBody.message?.trim() || detail
         } catch {
-            // ignore
+            // 非 JSON 响应，保留 HTTP 状态码信息即可
         }
         throw new Error(`网易云接口失败: ${detail}`)
     }
@@ -180,7 +180,7 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
                     }
                     return cached
                 } catch {
-                    // ignore bad cache
+                    // 缓存损坏时忽略并回源请求
                 }
             }
         }

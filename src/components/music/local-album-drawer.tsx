@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
 import { fetchImageAsDataUrl, pickImageAsDataUrl } from "@/lib/local/cover"
-import type { AlbumDraft } from "@/lib/local/library-store"
+import type { AlbumDraft, LocalArtist } from "@/lib/local/library-store"
 import type { NeteaseAlbumHit } from "@/lib/netease/search"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,8 @@ export type LocalAlbumDrawerProps = {
     open: boolean
     mode: LocalAlbumDrawerMode
     initial: AlbumDraft
+    /** 可选艺人分组列表（编辑归属用） */
+    artists?: LocalArtist[]
     submitting?: boolean
     onOpenChange: (open: boolean) => void
     onSubmit: (draft: AlbumDraft) => void | Promise<void>
@@ -34,6 +36,7 @@ function LocalAlbumDrawer({
     open,
     mode,
     initial,
+    artists = [],
     submitting = false,
     onOpenChange,
     onSubmit,
@@ -42,6 +45,7 @@ function LocalAlbumDrawer({
     const [artist, setArtist] = useState(initial.artist)
     const [coverDataUrl, setCoverDataUrl] = useState(initial.coverDataUrl)
     const [folderPath, setFolderPath] = useState(initial.folderPath)
+    const [artistId, setArtistId] = useState<string | null>(initial.artistId ?? null)
     const [pickerOpen, setPickerOpen] = useState(false)
     const [coverBusy, setCoverBusy] = useState(false)
 
@@ -53,6 +57,7 @@ function LocalAlbumDrawer({
         setArtist(initial.artist)
         setCoverDataUrl(initial.coverDataUrl)
         setFolderPath(initial.folderPath)
+        setArtistId(initial.artistId ?? null)
     }, [open, initial])
 
     async function handlePickCover() {
@@ -102,6 +107,7 @@ function LocalAlbumDrawer({
             artist: artist.trim(),
             coverDataUrl,
             folderPath,
+            artistId,
         })
     }
 
@@ -198,6 +204,26 @@ function LocalAlbumDrawer({
                                         className="h-11 rounded-2xl border-border/70 bg-background/70"
                                     />
                                 </Field>
+                                {artists.length > 0 ? (
+                                    <Field label="所属艺人分组">
+                                        <select
+                                            value={artistId ?? ""}
+                                            onChange={(event) =>
+                                                setArtistId(
+                                                    event.currentTarget.value || null,
+                                                )
+                                            }
+                                            className="h-11 w-full cursor-pointer rounded-2xl border border-border/70 bg-background/70 px-3 text-[13px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                        >
+                                            <option value="">不分组</option>
+                                            {artists.map((item) => (
+                                                <option key={item.id} value={item.id}>
+                                                    {item.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                ) : null}
                                 <button
                                     type="button"
                                     disabled={coverBusy}

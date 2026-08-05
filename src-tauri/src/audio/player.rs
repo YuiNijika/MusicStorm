@@ -4,7 +4,9 @@ use crate::audio::{emit_ended, emit_tick, AudioTickPayload};
 use rodio::source::SeekError as RodioSeekError;
 use rodio::{OutputStream, Sink, Source};
 use std::fs::File;
-use std::path::Path;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -24,6 +26,7 @@ use tauri::AppHandle;
 pub struct PlayerHandle {
     cmd_tx: Mutex<mpsc::Sender<PlayerCmd>>,
     volume: Arc<Mutex<f32>>,
+    ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
 }
 
 enum PlayerCmd {
@@ -97,6 +100,12 @@ impl PlayerHandle {
         }
     }
 
+    pub fn set_ffmpeg_path(&self, path: Option<PathBuf>) {
+        if let Ok(mut current) = self.ffmpeg_path.lock() {
+            *current = path;
+        }
+    }
+
     pub fn stop(&self) {
         let _ = self.send(PlayerCmd::Stop);
     }
@@ -113,10 +122,12 @@ impl PlayerHandle {
 pub struct PlayerInner;
 
 impl PlayerInner {
-    pub fn start(app: AppHandle) -> Result<PlayerHandle, String> {
+    pub fn start(app: AppHandle, ffmpeg_path: Option<PathBuf>) -> Result<PlayerHandle, String> {
         let (tx, rx) = mpsc::channel::<PlayerCmd>();
         let volume = Arc::new(Mutex::new(0.8_f32));
         let volume_worker = Arc::clone(&volume);
+        let ffmpeg_path = Arc::new(Mutex::new(ffmpeg_path));
+        let ffmpeg_path_worker = Arc::clone(&ffmpeg_path);
         let shared = Arc::new(SharedPlayback {
             position_ms: AtomicU64::new(0),
             duration_ms: AtomicU64::new(0),
@@ -129,7 +140,7 @@ impl PlayerInner {
         thread::Builder::new()
             .name("audio-player".into())
             .spawn(move || {
-                if let Err(error) = run_worker(app, rx, volume_worker, shared_tick) {
+                if let Err(error) = run_worker(app, rx, volume_worker, shared_tick, ffmpeg_path_worker) {
                     eprintln!("[audio] worker exit: {error}");
                 }
             })
@@ -138,6 +149,7 @@ impl PlayerInner {
         Ok(PlayerHandle {
             cmd_tx: Mutex::new(tx),
             volume,
+            ffmpeg_path,
         })
     }
 }
@@ -147,11 +159,16 @@ fn is_remote_source(source: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://")
 }
 
+fn current_ffmpeg_path(path: &Arc<Mutex<Option<PathBuf>>>) -> Option<PathBuf> {
+    path.lock().ok().and_then(|value| value.clone())
+}
+
 fn run_worker(
     app: AppHandle,
     rx: mpsc::Receiver<PlayerCmd>,
     volume: Arc<Mutex<f32>>,
     shared: Arc<SharedPlayback>,
+    ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
 ) -> Result<(), String> {
     let (_stream, handle) =
         OutputStream::try_default().map_err(|e| format!("无法打开音频输出: {e}"))?;
@@ -210,6 +227,7 @@ fn run_worker(
                     &mut has_buffer,
                     &mut current_source,
                     source,
+                    current_ffmpeg_path(&ffmpeg_path).as_deref(),
                 );
                 let _ = reply.send(result);
             }
@@ -253,6 +271,7 @@ fn run_worker(
                     &current_source,
                     target,
                     want_resume,
+                    current_ffmpeg_path(&ffmpeg_path).as_deref(),
                 );
                 shared.seeking.store(false, Ordering::Relaxed);
                 for r in replies {
@@ -286,6 +305,7 @@ fn run_worker(
                                 &mut has_buffer,
                                 &mut current_source,
                                 source,
+                                current_ffmpeg_path(&ffmpeg_path).as_deref(),
                             );
                             let _ = reply.send(result);
                         }
@@ -316,6 +336,7 @@ fn run_worker(
                                 &current_source,
                                 next_ms.max(0.0),
                                 next_resume,
+                                current_ffmpeg_path(&ffmpeg_path).as_deref(),
                             );
                             shared.seeking.store(false, Ordering::Relaxed);
                             let _ = next_reply.send(Ok(()));
@@ -378,6 +399,7 @@ fn apply_play(
     has_buffer: &mut bool,
     current_source: &mut Option<String>,
     source: String,
+    ffmpeg_path: Option<&Path>,
 ) -> Result<(), String> {
     let same = current_source.as_ref() == Some(&source);
     // 仅同曲且 sink 仍有该曲缓冲时 resume；否则一律重开，避免切源后误续播
@@ -392,7 +414,7 @@ fn apply_play(
         return Ok(());
     }
 
-    match start_playback_from(sink, &source, shared, 0.0) {
+    match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path) {
         Ok(()) => {
             *current_source = Some(source);
             *has_buffer = true;
@@ -424,6 +446,7 @@ fn apply_seek(
     current_source: &Option<String>,
     target: f64,
     resume: bool,
+    ffmpeg_path: Option<&Path>,
 ) {
     let Some(source) = current_source.clone() else {
         shared
@@ -458,7 +481,7 @@ fn apply_seek(
     *has_buffer = false;
     shared.playing.store(false, Ordering::Relaxed);
 
-    match start_playback_from(sink, &source, shared, target) {
+    match start_playback_from(sink, &source, shared, target, ffmpeg_path) {
         Ok(()) => {
             *has_buffer = true;
             if let Ok(v) = volume.lock() {
@@ -477,7 +500,7 @@ fn apply_seek(
         Err(error) => {
             eprintln!("[audio] seek error: {error}");
             if was_playing {
-                match start_playback_from(sink, &source, shared, 0.0) {
+                match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path) {
                     Ok(()) => {
                         *has_buffer = true;
                         if let Ok(v) = volume.lock() {
@@ -535,7 +558,7 @@ fn validate_local_path(source: &str) -> Result<std::path::PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
-/// 直接基于 symphonia 的容器级 Source，实现 PotPlayer 风格的快速 seek。
+/// 直接基于 symphonia 的容器级 Source，实现 PotPlayer 风格的快速 seek
 /// - 打开即 probe
 /// - offset >0 时先 FormatReader::seek（Coarse），再创建 decoder 从目标附近开始解码
 /// - 实现 try_seek 支持 sink.try_seek 直达容器索引
@@ -737,17 +760,167 @@ impl Source for SymphoniaSource {
     }
 }
 
-/// 从 offset_ms 装入 sink：全程容器级 seek（prebuild 索引 + Coarse），无 skip_duration 全解码
+/// FFmpeg 流式 WAV PCM；不指定 -ar，保留源采样率
+struct FfmpegSource {
+    child: Child,
+    stdout: ChildStdout,
+    channels: u16,
+    sample_rate: u32,
+    total_duration: Option<Duration>,
+}
+
+impl FfmpegSource {
+    fn open(
+        executable: &Path,
+        input: &Path,
+        offset: Duration,
+        total_duration: Option<Duration>,
+    ) -> Result<Self, String> {
+        let mut command = Command::new(executable);
+        command.stdin(Stdio::null()).stderr(Stdio::null());
+        if offset > Duration::ZERO {
+            command.args(["-ss", &format!("{:.6}", offset.as_secs_f64())]);
+        }
+        let mut child = command
+            .arg("-i")
+            .arg(input)
+            .args([
+                "-map",
+                "0:a:0",
+                "-vn",
+                "-sn",
+                "-dn",
+                "-c:a",
+                "pcm_f32le",
+                "-f",
+                "wav",
+                "pipe:1",
+            ])
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|error| format!("FFMPEG_DECODE_FAILED: 无法启动 FFmpeg: {error}"))?;
+        let mut stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "FFMPEG_DECODE_FAILED: 无法读取 FFmpeg 输出".to_string())?;
+        let (channels, sample_rate) = read_streaming_wav_header(&mut stdout).map_err(|error| {
+            let _ = child.kill();
+            format!("FFMPEG_DECODE_FAILED: {error}")
+        })?;
+        Ok(Self {
+            child,
+            stdout,
+            channels,
+            sample_rate,
+            total_duration,
+        })
+    }
+}
+
+impl Drop for FfmpegSource {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+impl Iterator for FfmpegSource {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut bytes = [0u8; 4];
+        self.stdout.read_exact(&mut bytes).ok()?;
+        Some(f32::from_le_bytes(bytes))
+    }
+}
+
+impl Source for FfmpegSource {
+    fn current_frame_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.total_duration
+    }
+}
+
+fn read_streaming_wav_header(reader: &mut impl Read) -> io::Result<(u16, u32)> {
+    let mut riff = [0u8; 12];
+    reader.read_exact(&mut riff)?;
+    if &riff[..4] != b"RIFF" || &riff[8..] != b"WAVE" {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "FFmpeg 未输出有效 WAV"));
+    }
+
+    let mut format = None;
+    loop {
+        let mut header = [0u8; 8];
+        reader.read_exact(&mut header)?;
+        let size = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+        match &header[..4] {
+            b"fmt " => {
+                let mut data = vec![0u8; size];
+                reader.read_exact(&mut data)?;
+                if data.len() < 16 {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, "WAV fmt 块无效"));
+                }
+                let channels = u16::from_le_bytes([data[2], data[3]]);
+                let sample_rate = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+                let bits = u16::from_le_bytes([data[14], data[15]]);
+                if channels == 0 || sample_rate == 0 || bits != 32 {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, "FFmpeg PCM 参数无效"));
+                }
+                format = Some((channels, sample_rate));
+            }
+            b"data" => {
+                return format.ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "WAV 缺少 fmt 块")
+                });
+            }
+            _ => {
+                io::copy(&mut reader.take(size as u64), &mut io::sink())?;
+            }
+        }
+        if size % 2 == 1 {
+            let mut padding = [0u8; 1];
+            reader.read_exact(&mut padding)?;
+        }
+    }
+}
+
+fn requires_external_decoder(path: &Path) -> bool {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    !matches!(
+        extension.as_str(),
+        "mp1" | "mp2" | "mp3" | "mpga" | "wav" | "pcm" | "raw" | "aac"
+            | "m4a" | "flac" | "ogg" | "aif" | "aiff"
+    )
+}
+
+/// 从 offset_ms 装入 sink：原生支持格式走 Symphonia，其余格式才走外部 FFmpeg
 fn start_playback_from(
     sink: &Sink,
     source: &str,
     shared: &SharedPlayback,
     offset_ms: f64,
+    ffmpeg_path: Option<&Path>,
 ) -> Result<(), String> {
     sink.stop();
 
     let path_buf = validate_local_path(source)?;
-    let clamped = if let Some(dur) = compute_duration_hint(&path_buf) {
+    let duration_hint = compute_duration_hint(&path_buf);
+    let clamped = if let Some(dur) = duration_hint {
         shared
             .duration_ms
             .store((dur.as_secs_f64() * 1000.0).to_bits(), Ordering::Relaxed);
@@ -758,18 +931,35 @@ fn start_playback_from(
     };
 
     let offset = Duration::from_millis(clamped as u64);
-    let src = SymphoniaSource::open(&path_buf, offset)?;
-
-    // 若上面没拿到时长，再尝试从 source
-    if f64::from_bits(shared.duration_ms.load(Ordering::Relaxed)) <= 0.0 {
-        if let Some(d) = src.total_duration() {
-            shared
-                .duration_ms
-                .store((d.as_secs_f64() * 1000.0).to_bits(), Ordering::Relaxed);
+    if requires_external_decoder(&path_buf) {
+        let executable = ffmpeg_path.ok_or_else(|| {
+            "FFMPEG_REQUIRED: 此格式需要外部 FFmpeg，请前往设置 > 播放配置 FFmpeg".to_string()
+        })?;
+        let source = FfmpegSource::open(executable, &path_buf, offset, duration_hint)?;
+        sink.append(source);
+    } else {
+        match SymphoniaSource::open(&path_buf, offset) {
+            Ok(source) => {
+                if f64::from_bits(shared.duration_ms.load(Ordering::Relaxed)) <= 0.0 {
+                    if let Some(duration) = source.total_duration() {
+                        shared.duration_ms.store(
+                            (duration.as_secs_f64() * 1000.0).to_bits(),
+                            Ordering::Relaxed,
+                        );
+                    }
+                }
+                sink.append(source);
+            }
+            Err(error) if error.contains("无法创建解码器") => {
+                let executable = ffmpeg_path.ok_or_else(|| {
+                    "FFMPEG_REQUIRED: 音频编码不受内置解码器支持，请前往设置 > 播放配置 FFmpeg".to_string()
+                })?;
+                let source = FfmpegSource::open(executable, &path_buf, offset, duration_hint)?;
+                sink.append(source);
+            }
+            Err(error) => return Err(error),
         }
     }
-
-    sink.append(src);
     shared
         .position_ms
         .store(clamped.to_bits(), Ordering::Relaxed);

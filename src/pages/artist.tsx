@@ -2,10 +2,11 @@ import { useEffect, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { ArtistDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayer } from "@/hooks/use-player"
@@ -214,7 +215,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
             <BackButton onClick={onBack} />
 
             {loading ? (
-                <DetailPageSkeleton coverShape="circle" />
+                <ArtistDetailSkeleton />
             ) : error ? (
                 <StateHero
                     variant="error"
@@ -304,10 +305,13 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             {hotTracks.length === 0 ? (
                                 <StateHero variant="empty" title="暂无热门歌曲" />
                             ) : (
-                                <div className="apple-list-surface space-y-0.5 p-1.5">
-                                    {hotTracks.map((track, index) => (
+                                <VirtualList
+                                    items={hotTracks}
+                                    itemHeight={58}
+                                    className="apple-list-surface p-1.5"
+                                    getItemKey={(track) => track.id}
+                                    renderItem={(track, index) => (
                                         <TrackRow
-                                            key={track.id}
                                             track={track}
                                             index={index}
                                             isActive={currentTrack?.id === track.id}
@@ -320,8 +324,8 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                                 playOrToggle(item, hotTracks)
                                             }
                                         />
-                                    ))}
-                                </div>
+                                    )}
+                                />
                             )}
                         </TabsContent>
 

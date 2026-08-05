@@ -84,6 +84,12 @@ import {
     type LyricsAlign,
 } from "@/lib/player/full-player-prefs"
 import {
+    detectFfmpeg,
+    pickFfmpegExecutable,
+    setFfmpegPath,
+    type FfmpegStatus,
+} from "@/lib/player/ffmpeg"
+import {
     getPlayerPreferences,
     setStartupAutoPlay,
 } from "@/lib/player/playback-prefs"
@@ -95,7 +101,7 @@ import {
     type AudioDeviceInfo,
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
-import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
+import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/notify"
 import { openExternalUrl } from "@/lib/open-external"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { cn } from "@/lib/utils"
@@ -567,6 +573,16 @@ function SourceTab() {
     )
 }
 
+function formatSettingsError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message
+    }
+    if (typeof error === "string") {
+        return error
+    }
+    return "未知错误"
+}
+
 function PlaybackTab() {
     const { engineStatus } = usePlayer()
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() => getEnginePref())
@@ -577,6 +593,8 @@ function PlaybackTab() {
     )
     const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
     const [audioMode, setAudioMode] = useState<AudioOutputMode | null>(null)
+    const [ffmpegStatus, setFfmpegStatus] = useState<FfmpegStatus | null>(null)
+    const [ffmpegBusy, setFfmpegBusy] = useState(false)
 
     useEffect(() => {
         let cancelled = false
@@ -593,6 +611,79 @@ function PlaybackTab() {
             cancelled = true
         }
     }, [])
+
+    useEffect(() => {
+        let cancelled = false
+        void detectFfmpeg().then((status) => {
+            if (!cancelled) {
+                setFfmpegStatus(status)
+            }
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    async function refreshFfmpeg() {
+        setFfmpegBusy(true)
+        try {
+            const status = await detectFfmpeg()
+            setFfmpegStatus(status)
+            if (status.available) {
+                notifySuccess("已发现 FFmpeg", {
+                    description: status.path ?? undefined,
+                })
+            } else {
+                notifyWarning("未发现 FFmpeg", {
+                    description: status.error ?? undefined,
+                })
+            }
+        } catch (error) {
+            notifyError("FFmpeg 检测失败", {
+                description: formatSettingsError(error),
+            })
+        } finally {
+            setFfmpegBusy(false)
+        }
+    }
+
+    async function chooseFfmpeg() {
+        setFfmpegBusy(true)
+        try {
+            const path = await pickFfmpegExecutable()
+            if (!path) {
+                return
+            }
+            const status = await setFfmpegPath(path)
+            setFfmpegStatus(status)
+            notifySuccess("FFmpeg 已配置", {
+                description: status.path ?? path,
+            })
+        } catch (error) {
+            notifyError("FFmpeg 配置无效", {
+                description: formatSettingsError(error),
+            })
+        } finally {
+            setFfmpegBusy(false)
+        }
+    }
+
+    async function clearFfmpeg() {
+        setFfmpegBusy(true)
+        try {
+            const status = await setFfmpegPath(null)
+            setFfmpegStatus(status)
+            notifyInfo("已清除手动路径", {
+                description: status.available ? "已恢复环境自动发现" : undefined,
+            })
+        } catch (error) {
+            notifyError("清除 FFmpeg 配置失败", {
+                description: formatSettingsError(error),
+            })
+        } finally {
+            setFfmpegBusy(false)
+        }
+    }
 
     return (
         <Section title="播放" description="引擎、淡入淡出与输出设备">
@@ -682,6 +773,81 @@ function PlaybackTab() {
                             {fadeMs} ms
                         </span>
                     </div>
+                </div>
+
+                <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                FFmpeg 解码器
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                仅在内置解码器不支持格式时调用外部 FFmpeg
+                            </p>
+                        </div>
+                        <span
+                            className={cn(
+                                "rounded-full px-2.5 py-1 text-[11px] font-medium",
+                                ffmpegStatus?.available
+                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                    : "bg-black/[0.05] text-muted-foreground dark:bg-white/[0.08]",
+                            )}
+                        >
+                            {ffmpegStatus?.available ? "可用" : "未配置"}
+                        </span>
+                    </div>
+                    <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
+                        {ffmpegStatus?.path ? (
+                            <p className="break-all font-mono" title={ffmpegStatus.path}>
+                                {ffmpegStatus.path}
+                            </p>
+                        ) : (
+                            <p>{ffmpegStatus?.error ?? "正在检测 FFmpeg…"}</p>
+                        )}
+                        {ffmpegStatus?.version ? (
+                            <p className="truncate" title={ffmpegStatus.version}>
+                                {ffmpegStatus.version}
+                            </p>
+                        ) : null}
+                        {ffmpegStatus?.available ? (
+                            <p>
+                                {ffmpegStatus.source === "configured"
+                                    ? "来源 · 手动配置"
+                                    : "来源 · 环境变量 / PATH"}
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            disabled={ffmpegBusy}
+                            onClick={() => void refreshFfmpeg()}
+                            className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] disabled:opacity-45 dark:bg-white/[0.08]"
+                        >
+                            自动检测
+                        </button>
+                        <button
+                            type="button"
+                            disabled={ffmpegBusy}
+                            onClick={() => void chooseFfmpeg()}
+                            className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97] disabled:opacity-45"
+                        >
+                            选择文件
+                        </button>
+                        {ffmpegStatus?.source === "configured" ? (
+                            <button
+                                type="button"
+                                disabled={ffmpegBusy}
+                                onClick={() => void clearFfmpeg()}
+                                className="h-9 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.06]"
+                            >
+                                清除
+                            </button>
+                        ) : null}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        FFmpeg 输出 32-bit 浮点 PCM，并保留源采样率；共享模式下系统仍可能按设备混音格式重采样。
+                    </p>
                 </div>
 
                 <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">

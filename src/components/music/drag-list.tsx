@@ -83,7 +83,7 @@ function DragList<T extends { id: string }>({
         try {
             target.releasePointerCapture(event.pointerId)
         } catch {
-            // ignore
+            // 指针捕获可能已丢失，无需处理
         }
         finish(dragId, overId)
     }

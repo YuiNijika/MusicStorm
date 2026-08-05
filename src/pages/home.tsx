@@ -270,7 +270,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
             >
                 {playlistStatus === "loading" ? (
                     <PlaylistGridSkeleton
-                        count={Math.min(skeletonCount, 6)}
+                        count={Math.min(skeletonCount, 5)}
                         style={playlistGridStyle}
                     />
                 ) : playlistStatus === "error" ? (
@@ -409,7 +409,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                 }
             >
                 {radioStatus === "loading" ? (
-                    <PlaylistGridSkeleton count={6} style={playlistGridStyle} />
+                    <PlaylistGridSkeleton count={5} style={playlistGridStyle} />
                 ) : radioStatus === "error" ? (
                     <StateHero
                         variant="error"

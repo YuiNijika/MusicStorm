@@ -43,7 +43,7 @@ function guessExtFromUrl(url: string): string {
             return match[1].toLowerCase()
         }
     } catch {
-        // ignore
+        // URL 非法时回落默认扩展名
     }
     return "mp3"
 }

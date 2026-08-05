@@ -68,7 +68,7 @@ function removeCookie(key: string): void {
     try {
         document.cookie = `${key}=; Max-Age=0; path=/`
     } catch {
-        // ignore
+        // localStorage 已兜底，cookie 删除失败可忽略
     }
 }
 
@@ -98,7 +98,7 @@ function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     try {
         document.cookie = `MUSIC_U=${credentials.musicU}`
     } catch {
-        // ignore
+        // localStorage 已兜底，cookie 写入失败可忽略
     }
     window.localStorage.setItem("cookie-MUSIC_U", credentials.musicU)
 
@@ -106,7 +106,7 @@ function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
         try {
             document.cookie = `__csrf=${credentials.csrf}`
         } catch {
-            // ignore
+            // localStorage 已兜底，cookie 写入失败可忽略
         }
         window.localStorage.setItem("cookie-__csrf", credentials.csrf)
     } else {

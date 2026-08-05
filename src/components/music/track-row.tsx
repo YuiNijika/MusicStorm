@@ -20,7 +20,7 @@ import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { formatDuration } from "@/lib/format"
-import { pickImageAsDataUrl } from "@/lib/local/cover"
+import { pickCoverImage } from "@/lib/local/cover"
 import { applyNeteaseMetadata } from "@/lib/local/netease-metadata"
 import {
     LYRIC_OVERRIDE_EVENT,
@@ -98,7 +98,7 @@ function TrackRow({
     const actions = showActions ?? (isNetease || isLocal)
     const hasTrailing = Boolean(trailing)
     const liked = isNetease && isTrackLiked(track.id)
-    const coverUrl = resolveTrackCoverUrl(track.id, track.coverUrl)
+    const coverUrl = resolveTrackCoverUrl(track.id, track.coverUrl, "thumbnail")
     const hasLyricOverride = Boolean(getLyricOverride(track.id))
     const hasCoverOverride = Boolean(getCoverOverride(track.id))
 
@@ -188,12 +188,12 @@ function TrackRow({
 
     async function handleOverrideCover() {
         try {
-            const dataUrl = await pickImageAsDataUrl()
-            if (!dataUrl) {
+            const cover = await pickCoverImage()
+            if (!cover) {
                 notifyInfo("已取消")
                 return
             }
-            setCoverOverride(track.id, dataUrl)
+            await setCoverOverride(track.id, cover)
             notifySuccess("已更换封面", { description: track.title })
         } catch (error) {
             notifyError("更换封面失败", {

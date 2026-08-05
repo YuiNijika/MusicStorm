@@ -120,8 +120,7 @@ function bitBuffer(): {
 }
 
 function capacityBytes(version: number): number {
-    const [ecPer, b1, d1, b2, d2] = ECC_M_TABLE[version]
-    void ecPer
+    const [, b1, d1, b2, d2] = ECC_M_TABLE[version]
     return b1 * d1 + b2 * d2
 }
 
@@ -147,7 +146,7 @@ function buildDataCodewords(text: string, version: number): number[] {
     }
     const totalData = capacityBytes(version)
     const maxBits = totalData * 8
-    // terminator
+    // 码字不足整字节时需按规范补 terminator 与 pad，扫描器才认
     const remain = maxBits - buf.bits.length
     buf.put(0, Math.min(4, remain))
     while (buf.bits.length % 8 !== 0) {
@@ -271,7 +270,7 @@ function placeFormat(mod: number[][], size: number, mask: number, ecc: EccLevel)
         const [r, c] = coords[i]
         mod[r][c] = bit
     }
-    // 副本
+    // 规范要求 format 信息双份冗余，单侧污损仍可解码
     for (let i = 0; i < 8; i++) {
         mod[size - 1 - i][8] = (bits >> (14 - i)) & 1
     }
@@ -349,7 +348,7 @@ function buildMatrix(text: string): number[][] {
     placeFinders(reserved, size)
     placeTiming(reserved, size)
     placeAlignment(reserved, version)
-    // 预留 format
+    // format 位受 mask 影响，须先清空让 placeData 独占，最后再写
     for (let i = 0; i < 9; i++) {
         if (reserved[8][i] < 0 && i !== 6) {
             reserved[8][i] = 0
@@ -373,7 +372,7 @@ function buildMatrix(text: string): number[][] {
     const mod = reserved.map((row) => row.slice())
     placeData(mod, size, finalCw, mask)
     placeFormat(mod, size, mask, 1) // M
-    // 填剩余
+    // 剩余空白模块按规范补 0，保证输出矩阵闭合
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (mod[r][c] < 0) {

@@ -32,7 +32,7 @@ function writeLocal(key: string, value: string): void {
     try {
         window.localStorage.setItem(key, value)
     } catch {
-        // ignore
+        // 匿名态设备信息非关键路径，写入失败不影响流程
     }
 }
 
@@ -40,7 +40,7 @@ function removeLocal(key: string): void {
     try {
         window.localStorage.removeItem(key)
     } catch {
-        // ignore
+        // 清除失败时下次写入会覆盖旧值，可忽略
     }
 }
 

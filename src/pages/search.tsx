@@ -7,6 +7,7 @@ import { CardsRail, RailControls, useRailApi } from "@/components/music/media-ra
 import { Section } from "@/components/music/section"
 import { StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayer } from "@/hooks/use-player"
 import { listLocalPlayableTracks } from "@/lib/local/library-store"
@@ -516,10 +517,13 @@ function TrackList({
     onPlay: (item: Track, list: Track[]) => void
 }) {
     return (
-        <div className="apple-list-surface space-y-0.5 p-1.5">
-            {tracks.map((track, index) => (
+        <VirtualList
+            items={tracks}
+            itemHeight={58}
+            className="apple-list-surface p-1.5"
+            getItemKey={(track) => `${track.source}-${track.id}`}
+            renderItem={(track, index) => (
                 <TrackRow
-                    key={`${track.source}-${track.id}`}
                     track={track}
                     index={index}
                     showSource={false}
@@ -527,8 +531,8 @@ function TrackList({
                     isPlaying={currentTrack?.id === track.id && isPlaying}
                     onPlay={(item) => onPlay(item, tracks)}
                 />
-            ))}
-        </div>
+            )}
+        />
     )
 }
 

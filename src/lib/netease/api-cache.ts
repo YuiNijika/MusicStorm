@@ -30,7 +30,7 @@ async function apiCacheSet(key: string, body: string, ttlMs: number): Promise<vo
     try {
         await invoke("api_cache_set", { key, body, ttlMs })
     } catch {
-        // ignore
+        // 缓存失败只损失命中率，不影响请求本身
     }
 }
 
@@ -41,7 +41,7 @@ async function apiCacheClear(): Promise<void> {
     try {
         await invoke("api_cache_clear")
     } catch {
-        // ignore
+        // 清理失败不影响主流程
     }
 }
 

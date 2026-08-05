@@ -142,6 +142,17 @@ fn new_id() -> String {
 pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
     let paths = ensure_storage_paths(app)?;
     let conn = Connection::open(&paths.database_path).map_err(|e| format!("open db: {e}"))?;
+
+    // 冷启动性能优化：WAL 模式 + 合理同步策略
+    conn.execute_batch(
+        "PRAGMA journal_mode=WAL;
+         PRAGMA synchronous=NORMAL;
+         PRAGMA cache_size=-64000;
+         PRAGMA busy_timeout=5000;
+         PRAGMA temp_store=MEMORY;",
+    )
+    .map_err(|e| format!("pragma: {e}"))?;
+
     migrate(&conn)?;
     Ok(conn)
 }
@@ -158,7 +169,7 @@ pub struct StoragePaths {
 
 /// 运行目录取可执行文件所在目录
 /// 优先 executable_dir，失败再取 current_exe 父目录
-fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if let Ok(dir) = app.path().executable_dir() {
         return Ok(dir);
     }
@@ -661,18 +672,8 @@ pub fn db_end_play_session(
 }
 
 fn chrono_day(ms: i64) -> String {
-    // 简化：用 UTC 日；本地统计后续可改
-    let secs = ms / 1000;
-    let days = secs / 86_400;
-    // 1970-01-01 + days — 用简单格式够用
-    let epoch_days = days;
-    // 避免引入 chrono 依赖：YYYY-MM-DD 近似用 ISO 从系统本地格式化
-    use std::time::{Duration, UNIX_EPOCH};
-    let datetime = UNIX_EPOCH + Duration::from_secs(secs.max(0) as u64);
-    // Windows 无 chrono 时用 debug 时间不够；用固定公式
-    let _ = datetime;
-    // 使用本地偏移粗略：直接存 unix day 也可；这里用简易算法
-    format_ymd(epoch_days)
+    // 不引入 chrono：按 UTC 日做统计粒度，本地时区口径后续再改
+    format_ymd(ms / 86_400_000)
 }
 
 fn format_ymd(epoch_days: i64) -> String {

@@ -87,7 +87,7 @@ function extractMusicA(cookies: string[], bodyText?: string): string | null {
             }
         }
     } catch {
-        // ignore
+        // cookie 解析失败时按无 cookie 处理，后续请求仍会带自己的凭证
     }
     return null
 }
@@ -279,7 +279,7 @@ async function nativeNeteaseRequest<T>(
         return parseProxyBody<T>(path, responseEapi)
     }
 
-    // 明文 api
+    // 非 eapi 的明文请求：走常规表单 POST
     const response = await proxyPost({
         url: `${DOMAIN}${spec.uri}`,
         body: formBody(

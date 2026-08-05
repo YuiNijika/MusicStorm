@@ -5,13 +5,14 @@ import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { PlaylistDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { SourceBadge } from "@/components/music/source-badge"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
@@ -137,7 +138,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
             <BackButton onClick={onBack} />
 
             {isLoading ? (
-                <DetailPageSkeleton coverShape="rounded" />
+                <PlaylistDetailSkeleton />
             ) : errorText ? (
                 <StateHero
                     variant="error"
@@ -254,38 +255,71 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="apple-list-surface space-y-0.5 p-1.5">
-                                <DragList
-                                    items={sortedTracks}
-                                    enabled={dragEnabled}
-                                    onReorder={handleReorder}
-                                    renderItem={(track, index, handle) => (
-                                        <TrackRow
-                                            track={track}
-                                            index={index}
-                                            leading={handle}
-                                            isActive={currentTrack?.id === track.id}
-                                            isPlaying={
-                                                currentTrack?.id === track.id &&
-                                                isPlaying
-                                            }
-                                            showSource={false}
-                                            playlistId={
-                                                isOwnLiked ? undefined : playlistId
-                                            }
-                                            onRemoved={(id) =>
-                                                setTracks((prev) =>
-                                                    prev.filter(
-                                                        (item) => item.id !== id,
-                                                    ),
-                                                )
-                                            }
-                                            onPlay={(item) =>
-                                                playOrToggle(item, sortedTracks)
-                                            }
-                                        />
-                                    )}
-                                />
+                            <div className="apple-list-surface p-1.5">
+                                {dragEnabled ? (
+                                    <DragList
+                                        items={sortedTracks}
+                                        enabled
+                                        onReorder={handleReorder}
+                                        renderItem={(track, index, handle) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                leading={handle}
+                                                isActive={currentTrack?.id === track.id}
+                                                isPlaying={
+                                                    currentTrack?.id === track.id &&
+                                                    isPlaying
+                                                }
+                                                showSource={false}
+                                                playlistId={
+                                                    isOwnLiked ? undefined : playlistId
+                                                }
+                                                onRemoved={(id) =>
+                                                    setTracks((prev) =>
+                                                        prev.filter(
+                                                            (item) => item.id !== id,
+                                                        ),
+                                                    )
+                                                }
+                                                onPlay={(item) =>
+                                                    playOrToggle(item, sortedTracks)
+                                                }
+                                            />
+                                        )}
+                                    />
+                                ) : (
+                                    <VirtualList
+                                        items={sortedTracks}
+                                        itemHeight={58}
+                                        getItemKey={(track) => track.id}
+                                        renderItem={(track, index) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                isActive={currentTrack?.id === track.id}
+                                                isPlaying={
+                                                    currentTrack?.id === track.id &&
+                                                    isPlaying
+                                                }
+                                                showSource={false}
+                                                playlistId={
+                                                    isOwnLiked ? undefined : playlistId
+                                                }
+                                                onRemoved={(id) =>
+                                                    setTracks((prev) =>
+                                                        prev.filter(
+                                                            (item) => item.id !== id,
+                                                        ),
+                                                    )
+                                                }
+                                                onPlay={(item) =>
+                                                    playOrToggle(item, sortedTracks)
+                                                }
+                                            />
+                                        )}
+                                    />
+                                )}
                             </div>
                         )}
                     </Section>

@@ -10,8 +10,10 @@ import {
     mergeScannedTrackMeta,
     mergeScannedTracks,
     toAssetUrl,
+    upsertArtist,
     type AlbumDraft,
     type LocalAlbum,
+    type LocalArtist,
     type LocalLibraryState,
     type ScanTrackDto,
 } from "@/lib/local/library-store"
@@ -52,6 +54,119 @@ async function scanMusicFiles(paths: string[]): Promise<ScanTrackDto[]> {
     return invoke<ScanTrackDto[]>("scan_music_files", { paths })
 }
 
+type ArtistScanResultDto = {
+    displayName: string
+    groupFolders: string[]
+    tracks: ScanTrackDto[]
+}
+
+async function scanMusicArtistFolder(path: string): Promise<ArtistScanResultDto> {
+    if (!isTauriRuntime()) {
+        throw new Error("DESKTOP_ONLY")
+    }
+    return invoke<ArtistScanResultDto>("scan_music_artist_folder", { path })
+}
+
+/** 路径前缀匹配：filePath 以 folderPath 开头且不在更深层其他组内 */
+function pathBelongsToFolder(filePath: string, folderPath: string): boolean {
+    const file = filePath.replace(/\\/g, "/")
+    const folder = folderPath.replace(/\\/g, "/").replace(/\/+$/, "")
+    if (file === folder) {
+        return true
+    }
+    return file.startsWith(folder + "/")
+}
+
+function parentFolderOfNative(filePath: string): string {
+    const idx = Math.max(filePath.lastIndexOf("\\"), filePath.lastIndexOf("/"))
+    return idx > 0 ? filePath.slice(0, idx) : ""
+}
+
+/**
+ * 导入「艺人文件夹」：直接子文件夹 = 专辑，根目录散曲自建「精选」专辑。
+ * 复用合并逻辑，每个子文件夹单独成专辑并关联艺人。
+ */
+async function commitArtistFolder(input: {
+    folderPath: string
+    artistName?: string
+    coverDataUrl?: string
+}): Promise<{ state: LocalLibraryState; artist: LocalArtist; added: number }> {
+    const folderPath = input.folderPath?.trim()
+    if (!folderPath) {
+        throw new Error("请选择艺人文件夹")
+    }
+    if (!isTauriRuntime()) {
+        throw new Error("DESKTOP_ONLY")
+    }
+
+    const scannedResult = await scanMusicArtistFolder(folderPath)
+    const tracks = scannedResult.tracks
+    const groupFolders = scannedResult.groupFolders
+
+    const prev = loadLocalLibrary()
+    const existingIds = new Set(prev.tracks.map((track) => track.id))
+
+    // 1. 创建 / 复用艺人分组（folderPath 相同视为同一艺人）
+    const { state: withArtist, artist } = upsertArtist(prev, {
+        name: input.artistName?.trim() || scannedResult.displayName,
+        folderPath,
+        coverDataUrl: input.coverDataUrl ?? "",
+    })
+    let state = withArtist
+
+    // 2. 根目录散曲 → 自建「精选」专辑（同时自然进入全部歌曲）
+    const rootPathNorm = folderPath.replace(/[\\/]+$/, "")
+    const rootTracks = tracks.filter((track) => {
+        const parent = parentFolderOfNative(track.path)
+        if (!parent) {
+            return false
+        }
+        const parentNorm = parent.replace(/[\\/]+$/, "")
+        return parentNorm === rootPathNorm
+    })
+    if (rootTracks.length > 0) {
+        state = mergeFolderScan(
+            state,
+            folderPath,
+            rootTracks,
+            {
+                title: `${artist.name} 精选`,
+                artist: artist.name,
+                coverDataUrl: "",
+                folderPath,
+                artistId: artist.id,
+            },
+            null,
+        )
+    }
+
+    // 3. 每个直接子文件夹 → 一个专辑
+    for (const group of groupFolders) {
+        const groupTracks = tracks.filter((track) =>
+            pathBelongsToFolder(track.path, group),
+        )
+        if (groupTracks.length === 0) {
+            continue
+        }
+        state = mergeFolderScan(
+            state,
+            group,
+            groupTracks,
+            {
+                title: "",
+                artist: artist.name,
+                coverDataUrl: "",
+                folderPath: group,
+                artistId: artist.id,
+            },
+            null,
+        )
+    }
+
+    const added = tracks.filter((track) => !existingIds.has(track.id)).length
+    return { state, artist, added }
+}
+
 export type CommitAlbumInput = AlbumDraft & {
     albumId?: string | null
 }
@@ -75,7 +190,7 @@ function commitCreateAlbum(draft: AlbumDraft): CommitAlbumResult {
 }
 
 /**
- * 确认导入：扫描元数据写入本地库与 SQLite
+ * 确认导入 扫描元数据写入本地库与 SQLite
  * 标题艺人可空，merge 内从标签多数表决
  */
 async function commitFolderAlbum(input: CommitAlbumInput): Promise<CommitAlbumResult> {
@@ -154,7 +269,7 @@ async function commitMusicFiles(options?: {
     return {
         state,
         album,
-        // 重复选择同一文件时不再提示“新增”，更符合用户预期。
+        // 重复选择同一文件时不再提示“新增”，更符合用户预期
         added: scanned.filter((item) => !existingIds.has(item.id)).length,
     }
 }
@@ -200,9 +315,10 @@ async function rescanMissingTrackMeta(
     )
 
     const albumById = new Map(state.albums.map((album) => [album.id, album]))
+    const trackById = new Map(state.tracks.map((track) => [track.id, track]))
     const grouped = new Map<string, ScanTrackDto[]>()
     for (const item of scanned) {
-        const stored = state.tracks.find((track) => track.id === item.id)
+        const stored = trackById.get(item.id)
         if (!stored?.albumId) {
             continue
         }
@@ -283,6 +399,7 @@ function dualWriteTracksToSqlite(
 }
 
 export {
+    commitArtistFolder,
     commitCreateAlbum,
     commitFolderAlbum,
     commitMusicFiles,

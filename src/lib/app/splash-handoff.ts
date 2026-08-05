@@ -15,6 +15,7 @@ async function completeSplashHandoff(): Promise<void> {
 
         const main = getCurrentWindow()
         if (main.label === "main") {
+            // 先显示主窗口，再关闭 splash，避免闪烁
             await main.show()
             await main.setFocus()
         }
@@ -29,7 +30,7 @@ async function completeSplashHandoff(): Promise<void> {
 }
 
 /** 挂载后 handoff；超时兜底防卡 splash */
-function scheduleSplashHandoff(timeoutMs = 8_000): () => void {
+function scheduleSplashHandoff(timeoutMs = 5_000): () => void {
     if (!isTauriRuntime()) {
         return () => {}
     }
@@ -43,7 +44,7 @@ function scheduleSplashHandoff(timeoutMs = 8_000): () => void {
         void completeSplashHandoff()
     }
 
-    // 双 rAF：等首帧绘制
+    // 双 rAF 等首帧绘制后再 handoff，确保主窗口内容已渲染
     requestAnimationFrame(() => {
         requestAnimationFrame(run)
     })

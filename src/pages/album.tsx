@@ -3,12 +3,13 @@ import { useEffect, useMemo, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { AlbumDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
@@ -101,7 +102,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
             <BackButton onClick={onBack} />
 
             {loading ? (
-                <DetailPageSkeleton coverShape="rounded" />
+                <AlbumDetailSkeleton />
             ) : error ? (
                 <StateHero
                     variant="error"
@@ -217,6 +218,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                         coverUrl={resolveTrackCoverUrl(
                                             track.id,
                                             track.coverUrl,
+                                            "thumbnail",
                                         )}
                                         active={currentTrack?.id === track.id}
                                         onClick={() =>
@@ -226,10 +228,13 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="apple-list-surface space-y-0.5 p-1.5">
-                                {sortedTracks.map((track, index) => (
+                            <VirtualList
+                                items={sortedTracks}
+                                itemHeight={58}
+                                className="apple-list-surface p-1.5"
+                                getItemKey={(track) => track.id}
+                                renderItem={(track, index) => (
                                     <TrackRow
-                                        key={track.id}
                                         track={track}
                                         index={index}
                                         isActive={currentTrack?.id === track.id}
@@ -243,8 +248,8 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                             playOrToggle(item, sortedTracks)
                                         }
                                     />
-                                ))}
-                            </div>
+                                )}
+                            />
                         )}
                     </Section>
                 </>

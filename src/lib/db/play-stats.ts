@@ -348,7 +348,7 @@ async function startPlaySession(input: PlaySessionStart): Promise<void> {
     try {
         await invoke("db_start_play_session", { input })
     } catch {
-        // ignore
+        // 统计失败不影响播放
     }
 }
 
@@ -359,7 +359,7 @@ async function recordPlaySessionEnd(input: PlaySessionEnd): Promise<void> {
     try {
         await invoke("db_end_play_session", { input })
     } catch {
-        // ignore
+        // 统计失败不影响播放
     }
 }
 
@@ -444,7 +444,7 @@ async function dbSetSetting(key: string, value: string): Promise<void> {
     try {
         await invoke("db_set_setting", { key, value })
     } catch {
-        // ignore
+        // 设置持久化失败不阻断本次会话
     }
 }
 

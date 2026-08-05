@@ -69,6 +69,23 @@ const HIGH_QUALITY_EXTS = new Set([
     "raw",
 ])
 
+/** 当前 Symphonia 构建可直接解码的扩展名；其余本地格式需进入 FFmpeg 回退。 */
+const NATIVE_DECODER_EXTS = new Set([
+    "mp1",
+    "mp2",
+    "mp3",
+    "mpga",
+    "wav",
+    "pcm",
+    "raw",
+    "aac",
+    "m4a",
+    "flac",
+    "ogg",
+    "aif",
+    "aiff",
+])
+
 function extensionOf(pathOrName: string): string {
     const base = pathOrName.split(/[/\\]/).pop() ?? pathOrName
     const dot = base.lastIndexOf(".")
@@ -116,5 +133,6 @@ export {
     HIGH_QUALITY_EXTS,
     isLocalAudioExt,
     LOCAL_AUDIO_EXTS,
+    NATIVE_DECODER_EXTS,
     stripExtension,
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 
 import { AppShell } from "@/components/app/app-shell"
 import { ThemeProvider } from "@/components/app/theme-provider"
@@ -7,6 +7,7 @@ import { Toaster, toast } from "@/components/ui/toast"
 import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
+import { migrateLegacyOverrides } from "@/lib/music/cover-overrides"
 import {
     MusicNavigationProvider,
     useMusicNavigation,
@@ -15,24 +16,40 @@ import { NeteaseSessionProvider } from "@/hooks/use-netease-session"
 import { LikedProvider } from "@/hooks/use-liked"
 import { PlayerProvider } from "@/hooks/use-player"
 import type { AppRoute } from "@/lib/routes"
-import { AlbumPage } from "@/pages/album"
-import { ArtistPage } from "@/pages/artist"
+// 首屏必须的页面保持静态 import，其他页面按需拆分以减小初始 bundle
 import { HomePage } from "@/pages/home"
-import { LibraryPage } from "@/pages/library"
-import { LocalPage } from "@/pages/local"
-import { MvPage } from "@/pages/mv"
-import { PlaylistPage } from "@/pages/playlist"
-import { RadioPage } from "@/pages/radio"
-import { RadioProgramPage } from "@/pages/radio-program"
-import { RadiosPage } from "@/pages/radios"
-import { SearchPage } from "@/pages/search"
-import { StatsPage } from "@/pages/stats"
+import {
+    AlbumDetailSkeleton,
+    ArtistDetailSkeleton,
+    LocalPageSkeleton,
+    MvDetailSkeleton,
+    PlaylistDetailSkeleton,
+    PlaylistGridSkeleton,
+    RadioDetailSkeleton,
+    RadioProgramDetailSkeleton,
+    RadiosPageSkeleton,
+    SearchResultsSkeleton,
+    StatsPageSkeleton,
+} from "@/components/music/loading-skeletons"
 import {
     readTitleBarStyle,
     SettingsPage,
     TITLE_BAR_STORAGE_KEY,
     type SettingsTab,
 } from "@/pages/settings"
+
+// 非首屏页面 React.lazy 拆分 chunk，冷启动时 V8 只需解析首屏代码
+const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
+const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
+const LibraryPage = lazy(() => import("@/pages/library").then(m => ({ default: m.LibraryPage })))
+const LocalPage = lazy(() => import("@/pages/local").then(m => ({ default: m.LocalPage })))
+const MvPage = lazy(() => import("@/pages/mv").then(m => ({ default: m.MvPage })))
+const PlaylistPage = lazy(() => import("@/pages/playlist").then(m => ({ default: m.PlaylistPage })))
+const RadioPage = lazy(() => import("@/pages/radio").then(m => ({ default: m.RadioPage })))
+const RadioProgramPage = lazy(() => import("@/pages/radio-program").then(m => ({ default: m.RadioProgramPage })))
+const RadiosPage = lazy(() => import("@/pages/radios").then(m => ({ default: m.RadiosPage })))
+const SearchPage = lazy(() => import("@/pages/search").then(m => ({ default: m.SearchPage })))
+const StatsPage = lazy(() => import("@/pages/stats").then(m => ({ default: m.StatsPage })))
 
 import "./App.css"
 
@@ -49,31 +66,40 @@ function AppRoutes({
 }) {
     const { detail, openPlaylist, openRadio, back } = useMusicNavigation()
 
+    // 分包加载期间的占位骨架：每个页面按自己的真实布局定制，互不相同
+    const playlistFallback = <PlaylistDetailSkeleton />
+    const albumFallback = <AlbumDetailSkeleton />
+    const artistFallback = <ArtistDetailSkeleton />
+    const radioFallback = <RadioDetailSkeleton />
+    const programFallback = <RadioProgramDetailSkeleton />
+    const mvFallback = <MvDetailSkeleton />
+    const gridFallback = <PlaylistGridSkeleton count={5} />
+
     if (detail?.type === "playlist") {
-        return (
-            <PlaylistPage playlistId={detail.id} onBack={back} />
-        )
+        return <Suspense fallback={playlistFallback}><PlaylistPage playlistId={detail.id} onBack={back} /></Suspense>
     }
     if (detail?.type === "artist") {
-        return <ArtistPage artistId={detail.id} onBack={back} />
+        return <Suspense fallback={artistFallback}><ArtistPage artistId={detail.id} onBack={back} /></Suspense>
     }
     if (detail?.type === "album") {
-        return <AlbumPage albumId={detail.id} onBack={back} />
+        return <Suspense fallback={albumFallback}><AlbumPage albumId={detail.id} onBack={back} /></Suspense>
     }
     if (detail?.type === "radio") {
-        return <RadioPage radioId={detail.id} onBack={back} />
+        return <Suspense fallback={radioFallback}><RadioPage radioId={detail.id} onBack={back} /></Suspense>
     }
     if (detail?.type === "radio-program") {
         return (
-            <RadioProgramPage
-                programId={detail.id}
-                radioId={detail.radioId}
-                onBack={back}
-            />
+            <Suspense fallback={programFallback}>
+                <RadioProgramPage
+                    programId={detail.id}
+                    radioId={detail.radioId}
+                    onBack={back}
+                />
+            </Suspense>
         )
     }
     if (detail?.type === "mv") {
-        return <MvPage mvId={detail.id} onBack={back} />
+        return <Suspense fallback={mvFallback}><MvPage mvId={detail.id} onBack={back} /></Suspense>
     }
 
     if (route === "home") {
@@ -82,19 +108,19 @@ function AppRoutes({
         )
     }
     if (route === "local") {
-        return <LocalPage />
+        return <Suspense fallback={<LocalPageSkeleton />}><LocalPage /></Suspense>
     }
     if (route === "library") {
-        return <LibraryPage />
+        return <Suspense fallback={gridFallback}><LibraryPage /></Suspense>
     }
     if (route === "radios") {
-        return <RadiosPage />
+        return <Suspense fallback={<RadiosPageSkeleton />}><RadiosPage /></Suspense>
     }
     if (route === "search") {
-        return <SearchPage />
+        return <Suspense fallback={<SearchResultsSkeleton />}><SearchPage /></Suspense>
     }
     if (route === "stats") {
-        return <StatsPage />
+        return <Suspense fallback={<StatsPageSkeleton />}><StatsPage /></Suspense>
     }
     if (route === "settings") {
         return (
@@ -151,10 +177,16 @@ function App() {
     )
 }
 
-/** 挂在 Toaster 内，保证失败 toast 可展示 */
+/** 挂在 Toaster 内，保证失败 toast；同时静默迁移旧 base64 封面。
+ *  冷启动优化：延迟非关键操作到首屏渲染完成后执行。 */
 function IntegratedApiBootEffect() {
     useEffect(() => {
-        void bootIntegratedApiProbe()
+        // API 探测和旧数据迁移延迟到首帧之后，避免阻塞冷启动关键路径
+        const timer = window.setTimeout(() => {
+            void bootIntegratedApiProbe()
+            void migrateLegacyOverrides()
+        }, 2_500)
+        return () => window.clearTimeout(timer)
     }, [])
     return null
 }

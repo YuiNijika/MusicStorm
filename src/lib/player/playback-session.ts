@@ -98,7 +98,7 @@ function writePlaybackSession(session: PlaybackSession): void {
     try {
         const queue = session.queue.map((track) => {
             if (track.source === "local") {
-                // 本地元数据以曲库为准，避免会话长期保存过期歌词/封面快照。
+                // 本地元数据以曲库为准，避免会话长期保存过期歌词/封面快照
                 const {
                     lyricText: _lyricText,
                     lrcPath: _lrcPath,
@@ -110,7 +110,7 @@ function writePlaybackSession(session: PlaybackSession): void {
             if (!track.url) {
                 return track
             }
-            // 网易云 url 会过期，恢复时重新解析。
+            // 网易云 url 会过期，恢复时重新解析
             const { url: _url, ...rest } = track
             return rest
         })

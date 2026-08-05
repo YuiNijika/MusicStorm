@@ -3,6 +3,7 @@
 import {
     extensionOf,
     HIGH_QUALITY_EXTS,
+    NATIVE_DECODER_EXTS,
 } from "@/lib/local/audio-formats"
 import { isTauriRuntime } from "@/lib/player/native-bridge"
 import type { EnginePref } from "@/lib/player/engine-policy"
@@ -56,6 +57,10 @@ function shouldUseWasapiForTrack(track: Track, pref: EnginePref): boolean {
         return false
     }
     if (pref === "wasapi") {
+        return true
+    }
+    const extension = extensionOf(track.filePath)
+    if (extension && !NATIVE_DECODER_EXTS.has(extension)) {
         return true
     }
     return isLocalHighQualityTrack(track)

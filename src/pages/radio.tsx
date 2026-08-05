@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { RadioDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
@@ -108,7 +108,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
             <BackButton onClick={onBack} />
 
             {loading ? (
-                <DetailPageSkeleton coverShape="rounded" />
+                <RadioDetailSkeleton />
             ) : error ? (
                 <StateHero
                     variant="error"

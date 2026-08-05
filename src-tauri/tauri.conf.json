@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MusicStorm",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "identifier": "com.yuinijika.musicstorm",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -10,34 +10,6 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "MusicStorm",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 960,
-        "minHeight": 640,
-        "decorations": false,
-        "visible": false,
-        "center": true
-      },
-      {
-        "label": "splashscreen",
-        "title": "MusicStorm",
-        "url": "splashscreen.html",
-        "width": 440,
-        "height": 420,
-        "resizable": false,
-        "fullscreen": false,
-        "decorations": false,
-        "shadow": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "center": true,
-        "skipTaskbar": true
-      }
-    ],
     "security": {
       "csp": null,
       "assetProtocol": {

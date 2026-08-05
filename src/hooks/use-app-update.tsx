@@ -56,6 +56,7 @@ function AppUpdateProvider({ children }: { children: ReactNode }) {
     }, [])
 
     // 启动：用缓存先画 NEW，再后台检测（未过期则几乎不发网）
+    // 冷启动优化：延迟到首屏渲染完成后，避免阻塞 WebView2 冷初始化
     useEffect(() => {
         let cancelled = false
         const timer = window.setTimeout(() => {
@@ -83,7 +84,7 @@ function AppUpdateProvider({ children }: { children: ReactNode }) {
                     timeout: 5200,
                 })
             })()
-        }, 1800)
+        }, 5_000)
         return () => {
             cancelled = true
             window.clearTimeout(timer)

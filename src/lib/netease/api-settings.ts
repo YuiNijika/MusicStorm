@@ -121,7 +121,7 @@ function readRaw(): ApiSettings {
             }
         }
     } catch {
-        // fall through migrate
+        // 旧格式解析失败时继续走迁移，不清空用户数据
     }
 
     const migrated = migrateLegacy()

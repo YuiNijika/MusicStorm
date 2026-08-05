@@ -135,7 +135,7 @@ function writeCache(payload: CachePayload): void {
     try {
         window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
     } catch {
-        // ignore
+        // 缓存写入失败不阻塞更新检查
     }
 }
 

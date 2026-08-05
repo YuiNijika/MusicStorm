@@ -2,6 +2,8 @@
 
 mod player;
 
+use crate::db::DbState;
+use crate::ffmpeg::resolve_ffmpeg_path;
 use player::{PlayerHandle, PlayerInner};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
@@ -64,10 +66,15 @@ pub struct AudioTickPayload {
     pub ended: bool,
 }
 
-fn ensure_player(state: &AudioState, app: &AppHandle) -> Result<Arc<PlayerHandle>, String> {
+fn ensure_player(
+    state: &AudioState,
+    db: &DbState,
+    app: &AppHandle,
+) -> Result<Arc<PlayerHandle>, String> {
     let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
     if guard.is_none() {
-        let handle = Arc::new(PlayerInner::start(app.clone())?);
+        let ffmpeg_path = resolve_ffmpeg_path(db).ok().flatten();
+        let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path)?);
         *guard = Some(Arc::clone(&handle));
         return Ok(handle);
     }
@@ -172,13 +179,15 @@ pub fn audio_probe() -> Result<AudioProbeResult, String> {
 pub fn audio_load(
     app: AppHandle,
     state: State<'_, AudioState>,
+    db: State<'_, DbState>,
     url_or_path: String,
     kind: String,
 ) -> Result<(), String> {
     if kind == "remote" || is_remote_url(&url_or_path) {
         return Err("原生引擎仅支持本地文件".into());
     }
-    let player = ensure_player(&state, &app)?;
+    let player = ensure_player(&state, &db, &app)?;
+    player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
     player.load(url_or_path, false)
 }
 
@@ -186,13 +195,15 @@ pub fn audio_load(
 pub fn audio_play(
     app: AppHandle,
     state: State<'_, AudioState>,
+    db: State<'_, DbState>,
     url_or_path: String,
     kind: String,
 ) -> Result<(), String> {
     if kind == "remote" || is_remote_url(&url_or_path) {
         return Err("原生引擎仅支持本地文件".into());
     }
-    let player = ensure_player(&state, &app)?;
+    let player = ensure_player(&state, &db, &app)?;
+    player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
     player.play(url_or_path, false)
 }
 

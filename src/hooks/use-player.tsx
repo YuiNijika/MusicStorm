@@ -26,6 +26,7 @@ import {
     type EngineStatus,
 } from "@/lib/player/engine-policy"
 import { createFadeGainController } from "@/lib/player/fade-gain"
+import { isFfmpegRequiredError } from "@/lib/player/ffmpeg"
 import { resolveFadeDurationMs } from "@/lib/player/fade-prefs"
 import { shouldUseWasapiForTrack } from "@/lib/player/local-quality"
 import {
@@ -220,7 +221,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         try {
             setPlayerPreferences({ volume, isMuted })
         } catch {
-            // 偏好写入失败不影响当前播放。
+            // 偏好写入失败不影响当前播放
         }
     }, [volume, isMuted])
 
@@ -641,6 +642,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 await Promise.resolve(engine.load(url))
             } catch (error) {
                 console.warn("[player] load failed", formatInvokeError(error))
+                if (isFfmpegRequiredError(error)) {
+                    isPlayingRef.current = false
+                    hardStopEngines()
+                    setIsPlaying(false)
+                    notifyError("需要配置 FFmpeg", {
+                        description: `${track.title} · 此格式需要外部 FFmpeg，请前往设置 > 播放完成配置`,
+                        id: `ffmpeg-required-${track.id}`,
+                    })
+                    return
+                }
                 // 原生 load 失败，回退 H5 同曲
                 if (usedNative && html5) {
                     pauseBothEngines()
@@ -767,7 +778,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             try {
                 engine.pause()
             } catch {
-                // ignore
+                // 引擎可能已销毁，收尾路径无需再管
             }
         }
 
@@ -807,9 +818,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 if (cancelled || gen !== pauseGenRef.current) {
                     return
                 }
+                const track = queueRef.current[indexRef.current]
+                if (isFfmpegRequiredError(error)) {
+                    isPlayingRef.current = false
+                    hardStopEngines()
+                    setIsPlaying(false)
+                    if (track) {
+                        notifyError("需要配置 FFmpeg", {
+                            description: `${track.title} · 此格式需要外部 FFmpeg，请前往设置 > 播放完成配置`,
+                            id: `ffmpeg-required-${track.id}`,
+                        })
+                    }
+                    return
+                }
                 // 原生 play 失败，同曲 H5 一次
                 const html5 = html5Ref.current
-                const track = queueRef.current[indexRef.current]
                 if (
                     html5 &&
                     track &&

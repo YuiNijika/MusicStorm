@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
-import { DetailPageSkeleton } from "@/components/music/loading-skeletons"
+import { MvDetailSkeleton } from "@/components/music/loading-skeletons"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { formatDuration } from "@/lib/format"
@@ -69,7 +69,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
             <BackButton onClick={onBack} />
 
             {loading ? (
-                <DetailPageSkeleton coverShape="rounded" />
+                <MvDetailSkeleton />
             ) : error ? (
                 <StateHero
                     variant="error"

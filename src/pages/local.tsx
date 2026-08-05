@@ -1,16 +1,22 @@
 import {
+    Check,
     Disc3,
     FilePlus2,
     FolderOpen,
     Loader2,
+    MicVocal,
+    Pencil,
     Plus,
     Sparkles,
+    SquareCheck,
+    Trash2,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
+import { LocalArtistDrawer } from "@/components/music/local-artist-drawer"
 import {
     LocalAlbumDrawer,
     type LocalAlbumDrawerMode,
@@ -22,6 +28,7 @@ import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import {
     AlertDialog,
@@ -33,6 +40,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLocalLibrary } from "@/hooks/use-local-library"
 import { usePlayer } from "@/hooks/use-player"
@@ -54,7 +67,8 @@ import {
     setLocalAlbumOrder,
     setLocalAllOrder,
 } from "@/lib/library/track-order"
-import type { AlbumDraft, LocalAlbum } from "@/lib/local/library-store"
+import type { AlbumDraft, LocalAlbum, LocalArtist } from "@/lib/local/library-store"
+import { listTracksByAlbum } from "@/lib/local/library-store"
 import {
     applyNeteaseMetadata,
     needsNeteaseMetadata,
@@ -67,6 +81,9 @@ type ConfirmState =
     | { kind: "none" }
     | { kind: "clear" }
     | { kind: "remove"; album: LocalAlbum }
+    | { kind: "remove-artist"; artist: LocalArtist; albumCount?: number }
+    | { kind: "remove-artists"; artists: LocalArtist[]; albumCount?: number }
+    | { kind: "remove-albums"; albums: LocalAlbum[] }
 
 function LocalPage() {
     const { playOrToggle, currentTrack, isPlaying } = usePlayer()
@@ -113,13 +130,22 @@ function LocalPage() {
     const sortedAlbums = useMemo(
         () =>
             sortLocalAlbums(
-                lib.library.albums,
+                // 根视图只展示独立专辑；艺人下专辑在艺人详情中展示
+                lib.library.albums.filter((album) => album.artistId == null),
                 localAlbumSort,
                 (album) =>
                     lib.library.tracks.filter((track) => track.albumId === album.id)
                         .length,
             ),
         [lib.library.albums, lib.library.tracks, localAlbumSort],
+    )
+
+    const sortedArtists = useMemo(
+        () =>
+            [...lib.library.artists].sort((a, b) =>
+                a.name.localeCompare(b.name, "zh-CN"),
+            ),
+        [lib.library.artists],
     )
 
     const [drawerOpen, setDrawerOpen] = useState(false)
@@ -132,6 +158,87 @@ function LocalPage() {
         folderPath: null,
     })
     const [confirm, setConfirm] = useState<ConfirmState>({ kind: "none" })
+    const [artistDrawerOpen, setArtistDrawerOpen] = useState(false)
+    const [artistEditId, setArtistEditId] = useState<string | null>(null)
+    const [artistInitial, setArtistInitial] = useState<{
+        name: string
+        coverDataUrl: string
+    }>({ name: "", coverDataUrl: "" })
+
+    function openArtistEditDrawer(artist: LocalArtist) {
+        setArtistEditId(artist.id)
+        setArtistInitial({
+            name: artist.name,
+            coverDataUrl: artist.coverDataUrl,
+        })
+        setArtistDrawerOpen(true)
+    }
+
+    function handleArtistDrawerSubmit(draft: { name: string; coverDataUrl: string }) {
+        if (artistEditId) {
+            lib.editArtist(artistEditId, draft)
+        }
+        setArtistDrawerOpen(false)
+    }
+
+    // —— 多选批量操作 ——
+    const [selectionMode, setSelectionMode] = useState<"album" | "artist" | null>(null)
+    const [selection, setSelection] = useState<ReadonlySet<string>>(new Set())
+
+    function toggleSelection(id: string) {
+        setSelection((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+                next.delete(id)
+            } else {
+                next.add(id)
+            }
+            return next
+        })
+    }
+
+    function selectAllModeItems() {
+        if (selectionMode === "artist") {
+            setSelection(new Set(sortedArtists.map((item) => item.id)))
+        } else if (selectionMode === "album") {
+            const albums =
+                lib.nav.kind === "artist" ? lib.artistAlbums : sortedAlbums
+            setSelection(new Set(albums.map((item) => item.id)))
+        }
+    }
+
+    function exitSelectionMode() {
+        setSelectionMode(null)
+        setSelection(new Set())
+    }
+
+    function handleBulkDelete() {
+        if (selection.size === 0) {
+            return
+        }
+        if (selectionMode === "artist") {
+            const artists = sortedArtists.filter((item) => selection.has(item.id))
+            if (artists.length > 0) {
+                const albumCount = artists.reduce(
+                    (sum, item) =>
+                        sum +
+                        lib.library.albums.filter(
+                            (album) => album.artistId === item.id,
+                        ).length,
+                    0,
+                )
+                setConfirm({ kind: "remove-artists", artists, albumCount })
+            }
+        } else if (selectionMode === "album") {
+            const albums =
+                lib.nav.kind === "artist"
+                    ? lib.artistAlbums.filter((item) => selection.has(item.id))
+                    : sortedAlbums.filter((item) => selection.has(item.id))
+            if (albums.length > 0) {
+                setConfirm({ kind: "remove-albums", albums })
+            }
+        }
+    }
 
     function openCreateDrawer() {
         setDrawerMode("create")
@@ -153,6 +260,7 @@ function LocalPage() {
             artist: album.artist,
             coverDataUrl: lib.albumCover(album),
             folderPath: album.folderPath,
+            artistId: album.artistId,
         })
         setDrawerOpen(true)
     }
@@ -170,12 +278,22 @@ function LocalPage() {
         }
     }
 
-    function handleConfirmAction() {
+    function handleConfirmAction(includeAlbums = false) {
         if (confirm.kind === "clear") {
             lib.clearAll()
         } else if (confirm.kind === "remove") {
             lib.deleteAlbum(confirm.album)
+        } else if (confirm.kind === "remove-artist") {
+            lib.deleteArtist(confirm.artist, includeAlbums)
+        } else if (confirm.kind === "remove-artists") {
+            lib.deleteArtists(
+                confirm.artists.map((item) => item.id),
+                includeAlbums,
+            )
+        } else if (confirm.kind === "remove-albums") {
+            lib.deleteAlbums(confirm.albums.map((item) => item.id))
         }
+        exitSelectionMode()
         setConfirm({ kind: "none" })
     }
 
@@ -217,6 +335,206 @@ function LocalPage() {
         } finally {
             setMetadataBusy(false)
         }
+    }
+
+    // —— 艺人详情：该艺人的专辑网格 ——
+    if (lib.nav.kind === "artist" && lib.selectedArtist) {
+        const artist = lib.selectedArtist
+        const artistTrackList = lib.artistAlbums.flatMap((album) =>
+            listTracksByAlbum(lib.library, album.id),
+        )
+        const artistCover =
+            artist.coverDataUrl ||
+            lib.albumCover(lib.artistAlbums[0] ?? ({} as LocalAlbum)) ||
+            ""
+
+        return (
+            <div className="space-y-6 pb-4">
+                <BackButton onClick={lib.goRoot} label="资料库" />
+
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="flex flex-wrap items-end gap-5">
+                        <Cover
+                            src={artistCover}
+                            alt={artist.name}
+                            size="lg"
+                            className="size-36 rounded-full shadow-md ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                        />
+                        <div className="min-w-0 space-y-2 pb-1">
+                            <p className="text-[12px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+                                艺人 / 合集
+                            </p>
+                            <h1 className="text-[32px] font-semibold tracking-[-0.04em]">
+                                {artist.name}
+                            </h1>
+                            <p className="text-[13px] text-muted-foreground">
+                                {lib.artistAlbums.length} 张专辑 · {artistTrackList.length} 首
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {artistTrackList.length > 0 ? (
+                            <button
+                                type="button"
+                                disabled={metadataBusy}
+                                onClick={() =>
+                                    void enrichTracksFromNetease(artistTrackList)
+                                }
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                            >
+                                {metadataBusy ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                    <Sparkles className="size-3.5" />
+                                )}
+                                {metadataBusy ? "正在获取…" : "网易云补全封面歌词"}
+                            </button>
+                        ) : null}
+                        <button
+                            type="button"
+                            onClick={() => openArtistEditDrawer(artist)}
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                        >
+                            <Pencil className="size-3.5" />
+                            编辑
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                selectionMode === "album"
+                                    ? exitSelectionMode()
+                                    : setSelectionMode("album")
+                            }
+                            className={cn(
+                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium active:scale-[0.97]",
+                                selectionMode === "album"
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-black/[0.05] dark:bg-white/[0.08]",
+                            )}
+                        >
+                            <SquareCheck className="size-3.5" />
+                            {selectionMode === "album" ? "完成" : "多选"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setConfirm({
+                                    kind: "remove-artist",
+                                    artist,
+                                    albumCount: lib.library.albums.filter(
+                                        (album) => album.artistId === artist.id,
+                                    ).length,
+                                })
+                            }
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium text-muted-foreground hover:text-foreground active:scale-[0.97] dark:bg-white/[0.08]"
+                        >
+                            <Trash2 className="size-3.5" />
+                            删除分组
+                        </button>
+                    </div>
+                </header>
+
+                {lib.artistAlbums.length === 0 ? (
+                    <StateHero
+                        variant="empty"
+                        title="该艺人暂无专辑"
+                        description="导入艺人文件夹或在该艺人的专辑详情中添加音乐"
+                        icon={MicVocal}
+                    />
+                ) : (
+                    <Section
+                        title="专辑"
+                        description={`${lib.artistAlbums.length} 张 · 点开进入曲目`}
+                    >
+                        <div ref={gridRef} className={gridClass} style={gridStyle}>
+                            {lib.artistAlbums.map((album) => {
+                                const count = lib.library.tracks.filter(
+                                    (track) => track.albumId === album.id,
+                                ).length
+                                const selected = selection.has(album.id)
+                                return (
+                                    <div key={album.id} className="group relative">
+                                        <MediaCard
+                                            coverUrl={lib.albumCover(album)}
+                                            title={album.title}
+                                            subtitle={`${album.artist || "未知艺人"} · ${count} 首`}
+                                            widthClassName="w-full"
+                                            onClick={() =>
+                                                selectionMode === "album"
+                                                    ? toggleSelection(album.id)
+                                                    : lib.openAlbum(album.id)
+                                            }
+                                        />
+                                        {selectionMode === "album" ? (
+                                            <SelectionBadge selected={selected} />
+                                        ) : (
+                                            <div className="absolute top-2 right-2">
+                                                <LocalAlbumMenu
+                                                    album={album}
+                                                    busy={lib.submitting}
+                                                    overlay
+                                                    onEdit={openEditDrawer}
+                                                    onRescan={(item) =>
+                                                        void lib.rescanAlbum(item)
+                                                    }
+                                                    onDelete={(item) =>
+                                                        setConfirm({
+                                                            kind: "remove",
+                                                            album: item,
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </Section>
+                )}
+
+                <LocalAlbumDrawer
+                    open={drawerOpen}
+                    mode={drawerMode}
+                    initial={drawerInitial}
+                    artists={lib.library.artists}
+                    submitting={lib.submitting}
+                    onOpenChange={setDrawerOpen}
+                    onSubmit={handleDrawerSubmit}
+                />
+
+                <LocalArtistDrawer
+                    open={artistDrawerOpen}
+                    initial={artistInitial}
+                    submitting={lib.submitting}
+                    onOpenChange={setArtistDrawerOpen}
+                    onSubmit={handleArtistDrawerSubmit}
+                />
+
+                <ConfirmDialog
+                    confirm={confirm}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setConfirm({ kind: "none" })
+                        }
+                    }}
+                    onConfirm={handleConfirmAction}
+                />
+
+                {lib.submitting ? <BusyPill /> : null}
+                {selectionMode ? (
+                    <BulkActionBar
+                        mode={selectionMode}
+                        count={selection.size}
+                        canSwitch={false}
+                        onSwitchMode={() => {}}
+                        onSelectAll={selectAllModeItems}
+                        onDelete={handleBulkDelete}
+                        onDone={exitSelectionMode}
+                    />
+                ) : null}
+            </div>
+        )
     }
 
     // —— 专辑曲目 / 全部歌曲 详情 ——
@@ -349,26 +667,48 @@ function LocalPage() {
                     />
                 ) : (
                     <div className="overflow-hidden rounded-[16px] bg-black/[0.02] dark:bg-white/[0.03]">
-                        <DragList
-                            items={sortedTracks}
-                            enabled={dragEnabled}
-                            onReorder={handleTrackReorder}
-                            renderItem={(track, index, handle) => (
-                                <TrackRow
-                                    track={track}
-                                    index={index}
-                                    leading={handle}
-                                    isActive={currentTrack?.id === track.id}
-                                    isPlaying={
-                                        currentTrack?.id === track.id && isPlaying
-                                    }
-                                    showSource={false}
-                                    onPlay={(item) =>
-                                        playOrToggle(item, sortedTracks)
-                                    }
-                                />
-                            )}
-                        />
+                        {dragEnabled ? (
+                            <DragList
+                                items={sortedTracks}
+                                enabled
+                                onReorder={handleTrackReorder}
+                                renderItem={(track, index, handle) => (
+                                    <TrackRow
+                                        track={track}
+                                        index={index}
+                                        leading={handle}
+                                        isActive={currentTrack?.id === track.id}
+                                        isPlaying={
+                                            currentTrack?.id === track.id && isPlaying
+                                        }
+                                        showSource={false}
+                                        onPlay={(item) =>
+                                            playOrToggle(item, sortedTracks)
+                                        }
+                                    />
+                                )}
+                            />
+                        ) : (
+                            <VirtualList
+                                items={sortedTracks}
+                                itemHeight={58}
+                                getItemKey={(track) => track.id}
+                                renderItem={(track, index) => (
+                                    <TrackRow
+                                        track={track}
+                                        index={index}
+                                        isActive={currentTrack?.id === track.id}
+                                        isPlaying={
+                                            currentTrack?.id === track.id && isPlaying
+                                        }
+                                        showSource={false}
+                                        onPlay={(item) =>
+                                            playOrToggle(item, sortedTracks)
+                                        }
+                                    />
+                                )}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -376,6 +716,7 @@ function LocalPage() {
                     open={drawerOpen}
                     mode={drawerMode}
                     initial={drawerInitial}
+                    artists={lib.library.artists}
                     submitting={lib.submitting}
                     onOpenChange={setDrawerOpen}
                     onSubmit={handleDrawerSubmit}
@@ -396,7 +737,7 @@ function LocalPage() {
         )
     }
 
-    // —— 资料库根：专辑网格 ——
+    // —— 资料库根：艺人分组 + 专辑网格 ——
     return (
         <div className="space-y-7 pb-4">
             <PageTitle
@@ -404,110 +745,240 @@ function LocalPage() {
                 subtitle={lib.subtitle}
                 trailing={
                     <>
-                        <button
-                            type="button"
-                            onClick={openCreateDrawer}
-                            className={cn(
-                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
-                                "bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground",
-                                "active:scale-[0.97]",
-                            )}
-                        >
-                            <Plus className="size-3.5" strokeWidth={2.4} />
-                            新建
-                        </button>
-                        <button
-                            type="button"
-                            disabled={!lib.desktop || lib.submitting}
-                            onClick={() => void lib.importTracks(null)}
-                            className={cn(
-                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
-                                "bg-black/[0.05] px-3.5 text-[13px] font-semibold text-foreground",
-                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
-                                "dark:bg-white/[0.1]",
-                            )}
-                        >
-                            <FilePlus2 className="size-3.5" />
-                            单曲
-                        </button>
-                        <button
-                            type="button"
-                            disabled={!lib.desktop || lib.submitting}
-                            onClick={() => void lib.importFolder()}
-                            className={cn(
-                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
-                                "bg-black/[0.05] px-3.5 text-[13px] font-semibold text-foreground",
-                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
-                                "dark:bg-white/[0.1]",
-                            )}
-                        >
-                            {lib.submitting ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                                <FolderOpen className="size-3.5" />
-                            )}
-                            {lib.submitting ? "导入中…" : "导入"}
-                        </button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                disabled={lib.submitting}
+                                className={cn(
+                                    "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
+                                    "bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground",
+                                    "outline-none active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60",
+                                )}
+                            >
+                                {lib.submitting ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                    <Plus className="size-3.5" strokeWidth={2.4} />
+                                )}
+                                {lib.submitting ? "处理中…" : "新建"}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                sideOffset={8}
+                                className="w-52 p-1.5"
+                            >
+                                <DropdownMenuItem
+                                    onClick={openCreateDrawer}
+                                    className="cursor-pointer"
+                                >
+                                    <Plus className="size-4" strokeWidth={2.2} />
+                                    <span className="flex flex-col">
+                                        <span>新建专辑</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">
+                                            空专辑，可手动加曲
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!lib.desktop || lib.submitting}
+                                    onClick={() => void lib.importFolder()}
+                                    className="cursor-pointer"
+                                >
+                                    <FolderOpen className="size-4" />
+                                    <span className="flex flex-col">
+                                        <span>导入专辑文件夹</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">
+                                            整夹导入为一张专辑
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!lib.desktop || lib.submitting}
+                                    onClick={() => void lib.importArtistFolder()}
+                                    className="cursor-pointer"
+                                >
+                                    <MicVocal className="size-4" />
+                                    <span className="flex flex-col">
+                                        <span>导入艺人文件夹</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">
+                                            子专辑文件夹自动归组
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!lib.desktop || lib.submitting}
+                                    onClick={() => void lib.importTracks(null)}
+                                    className="cursor-pointer"
+                                >
+                                    <FilePlus2 className="size-4" />
+                                    <span className="flex flex-col">
+                                        <span>添加单曲</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">
+                                            选择任意音频文件
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {lib.library.tracks.length > 0 ||
                         lib.library.albums.length > 0 ? (
-                            <button
-                                type="button"
-                                onClick={() => setConfirm({ kind: "clear" })}
-                                className="h-9 cursor-pointer rounded-full px-2.5 text-[13px] font-medium text-muted-foreground hover:text-foreground active:scale-[0.97]"
-                            >
-                                清空
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        selectionMode === null
+                                            ? setSelectionMode(
+                                                  sortedArtists.length > 0
+                                                      ? "artist"
+                                                      : "album",
+                                              )
+                                            : exitSelectionMode()
+                                    }
+                                    className={cn(
+                                        "h-9 cursor-pointer rounded-full px-3 text-[13px] font-medium active:scale-[0.97]",
+                                        selectionMode
+                                            ? "bg-primary text-primary-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <SquareCheck className="size-3.5" />
+                                        {selectionMode ? "完成" : "多选"}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirm({ kind: "clear" })}
+                                    className="h-9 cursor-pointer rounded-full px-2.5 text-[13px] font-medium text-muted-foreground hover:text-foreground active:scale-[0.97]"
+                                >
+                                    清空
+                                </button>
+                            </>
                         ) : null}
                     </>
                 }
             />
 
-            {lib.library.albums.length === 0 && lib.allTracks.length === 0 ? (
+            {lib.library.albums.length === 0 &&
+            lib.library.artists.length === 0 &&
+            lib.allTracks.length === 0 ? (
                 <StateHero
                     variant="empty"
                     title="资料库是空的"
                     description={
                         lib.desktop
-                            ? "「单曲」选文件 · 「导入」整夹 · 「新建」空专辑后可随时加曲"
+                            ? "点右上角「新建」：新建专辑 · 导入专辑文件夹 · 导入艺人文件夹 · 添加单曲"
                             : "浏览器预览无法选目录，请用桌面应用"
                     }
                     icon={FolderOpen}
                 />
             ) : (
-                <Section
-                    title="专辑"
-                    description={`${sortedAlbums.length} 张 · 点开进入曲目`}
-                    variant="listen"
+                <>
+                    {sortedArtists.length > 0 ? (
+                        <Section
+                            title="艺人"
+                            description={`${sortedArtists.length} 位 · 子专辑文件夹自动归组`}
+                        >
+                            <div ref={gridRef} className={gridClass} style={gridStyle}>
+                                {sortedArtists.map((artist) => {
+                                    const albums = lib.library.albums.filter(
+                                        (album) => album.artistId === artist.id,
+                                    )
+                                    const cover =
+                                        artist.coverDataUrl ||
+                                        lib.albumCover(albums[0] ?? ({} as LocalAlbum)) ||
+                                        ""
+                                    return (
+                                        <div key={artist.id} className="group relative">
+                                            <MediaCard
+                                                coverUrl={cover}
+                                                title={artist.name}
+                                                subtitle={`${albums.length} 张专辑`}
+                                                widthClassName="w-full"
+                                                onClick={() =>
+                                                    selectionMode === "artist"
+                                                        ? toggleSelection(artist.id)
+                                                        : lib.openArtist(artist.id)
+                                                }
+                                            />
+                                            {selectionMode === "artist" ? (
+                                                <SelectionBadge
+                                                    selected={selection.has(artist.id)}
+                                                />
+                                            ) : (
+                                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                                                    <button
+                                                        type="button"
+                                                        title="编辑艺人"
+                                                        onClick={() =>
+                                                            openArtistEditDrawer(artist)
+                                                        }
+                                                        className="flex size-7 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-colors hover:bg-black/65 active:scale-95"
+                                                    >
+                                                        <Pencil className="size-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        title="删除艺人分组"
+                                                        onClick={() =>
+                                                            setConfirm({
+                                                                kind: "remove-artist",
+                                                                artist,
+                                                                albumCount: albums.length,
+                                                            })
+                                                        }
+                                                        className="flex size-7 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-colors hover:bg-black/65 active:scale-95"
+                                                    >
+                                                        <Trash2 className="size-3.5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </Section>
+                    ) : null}
+
+                    <Section
+                        title="专辑"
+                        description={`${sortedAlbums.length} 张 · 点开进入曲目`}
+                        variant="listen"
                     action={
-                        <div className="flex flex-wrap items-center gap-2">
-                            {sortedAlbums.length > 0 ? (
-                                <SortSelect
-                                    value={localAlbumSort}
-                                    options={LOCAL_ALBUM_SORT_OPTIONS}
-                                    onChange={setLocalAlbumSort}
-                                    label="专辑排序"
+                        selectionMode === null ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {sortedAlbums.length > 0 ? (
+                                    <SortSelect
+                                        value={localAlbumSort}
+                                        options={LOCAL_ALBUM_SORT_OPTIONS}
+                                        onChange={setLocalAlbumSort}
+                                        label="专辑排序"
+                                    />
+                                ) : null}
+                                <ViewModeToggle
+                                    value={localAlbumView}
+                                    onChange={setLocalAlbumView}
+                                    label="本地专辑展示"
                                 />
-                            ) : null}
-                            <ViewModeToggle
-                                value={localAlbumView}
-                                onChange={setLocalAlbumView}
-                                label="本地专辑展示"
-                            />
-                            {lib.allTracks.length > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={lib.openAllSongs}
-                                    className="cursor-pointer text-[13px] font-semibold text-primary active:opacity-70"
-                                >
-                                    全部歌曲
-                                </button>
-                            ) : null}
-                        </div>
+                                {lib.allTracks.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={lib.openAllSongs}
+                                        className="cursor-pointer text-[13px] font-semibold text-primary active:opacity-70"
+                                    >
+                                        全部歌曲
+                                    </button>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <span className="text-[12px] text-muted-foreground">
+                                已选 {selection.size} 项
+                            </span>
+                        )
                     }
                 >
                     {localAlbumView === "list" ? (
                         <div className="apple-list-surface space-y-0.5 p-1.5">
-                            {lib.allTracks.length > 0 ? (
+                            {selectionMode === null && lib.allTracks.length > 0 ? (
                                 <button
                                     type="button"
                                     onClick={lib.openAllSongs}
@@ -530,14 +1001,24 @@ function LocalPage() {
                                 const count = lib.library.tracks.filter(
                                     (track) => track.albumId === album.id,
                                 ).length
+                                const selected = selection.has(album.id)
                                 return (
                                     <div
                                         key={album.id}
-                                        className="group flex items-center gap-1 rounded-2xl transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
+                                        className={cn(
+                                            "group flex items-center gap-1 rounded-2xl transition-colors",
+                                            selectionMode === "album" && selected
+                                                ? "bg-primary/[0.08] ring-1 ring-primary/25"
+                                                : "hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+                                        )}
                                     >
                                         <button
                                             type="button"
-                                            onClick={() => lib.openAlbum(album.id)}
+                                            onClick={() =>
+                                                selectionMode === "album"
+                                                    ? toggleSelection(album.id)
+                                                    : lib.openAlbum(album.id)
+                                            }
                                             className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
                                         >
                                             <Cover
@@ -556,20 +1037,24 @@ function LocalPage() {
                                             </div>
                                         </button>
                                         <div className="mr-2 shrink-0">
-                                            <LocalAlbumMenu
-                                                album={album}
-                                                busy={lib.submitting}
-                                                onEdit={openEditDrawer}
-                                                onRescan={(item) =>
-                                                    void lib.rescanAlbum(item)
-                                                }
-                                                onDelete={(item) =>
-                                                    setConfirm({
-                                                        kind: "remove",
-                                                        album: item,
-                                                    })
-                                                }
-                                            />
+                                            {selectionMode === "album" ? (
+                                                <SelectionBadge selected={selected} />
+                                            ) : (
+                                                <LocalAlbumMenu
+                                                    album={album}
+                                                    busy={lib.submitting}
+                                                    onEdit={openEditDrawer}
+                                                    onRescan={(item) =>
+                                                        void lib.rescanAlbum(item)
+                                                    }
+                                                    onDelete={(item) =>
+                                                        setConfirm({
+                                                            kind: "remove",
+                                                            album: item,
+                                                        })
+                                                    }
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 )
@@ -577,7 +1062,7 @@ function LocalPage() {
                         </div>
                     ) : (
                         <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {lib.allTracks.length > 0 ? (
+                            {selectionMode === null && lib.allTracks.length > 0 ? (
                                 <MediaCard
                                     coverUrl=""
                                     title="全部歌曲"
@@ -595,6 +1080,7 @@ function LocalPage() {
                                 const count = lib.library.tracks.filter(
                                     (track) => track.albumId === album.id,
                                 ).length
+                                const selected = selection.has(album.id)
                                 return (
                                     <div key={album.id} className="group relative">
                                         <MediaCard
@@ -602,40 +1088,60 @@ function LocalPage() {
                                             title={album.title}
                                             subtitle={`${album.artist || "未知艺人"} · ${count} 首`}
                                             widthClassName="w-full"
-                                            onClick={() => lib.openAlbum(album.id)}
+                                            onClick={() =>
+                                                selectionMode === "album"
+                                                    ? toggleSelection(album.id)
+                                                    : lib.openAlbum(album.id)
+                                            }
                                         />
-                                        <div className="absolute top-2 right-2">
-                                            <LocalAlbumMenu
-                                                album={album}
-                                                busy={lib.submitting}
-                                                overlay
-                                                onEdit={openEditDrawer}
-                                                onRescan={(item) =>
-                                                    void lib.rescanAlbum(item)
-                                                }
-                                                onDelete={(item) =>
-                                                    setConfirm({
-                                                        kind: "remove",
-                                                        album: item,
-                                                    })
-                                                }
-                                            />
-                                        </div>
+                                        {selectionMode === "album" ? (
+                                            <div className="absolute top-2 left-2">
+                                                <SelectionBadge selected={selected} />
+                                            </div>
+                                        ) : (
+                                            <div className="absolute top-2 right-2">
+                                                <LocalAlbumMenu
+                                                    album={album}
+                                                    busy={lib.submitting}
+                                                    overlay
+                                                    onEdit={openEditDrawer}
+                                                    onRescan={(item) =>
+                                                        void lib.rescanAlbum(item)
+                                                    }
+                                                    onDelete={(item) =>
+                                                        setConfirm({
+                                                            kind: "remove",
+                                                            album: item,
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}
                         </div>
                     )}
                 </Section>
+                </>
             )}
 
             <LocalAlbumDrawer
                 open={drawerOpen}
                 mode={drawerMode}
                 initial={drawerInitial}
+                artists={lib.library.artists}
                 submitting={lib.submitting}
                 onOpenChange={setDrawerOpen}
                 onSubmit={handleDrawerSubmit}
+            />
+
+            <LocalArtistDrawer
+                open={artistDrawerOpen}
+                initial={artistInitial}
+                submitting={lib.submitting}
+                onOpenChange={setArtistDrawerOpen}
+                onSubmit={handleArtistDrawerSubmit}
             />
 
             <ConfirmDialog
@@ -649,6 +1155,20 @@ function LocalPage() {
             />
 
             {lib.submitting ? <BusyPill /> : null}
+            {selectionMode ? (
+                <BulkActionBar
+                    mode={selectionMode}
+                    count={selection.size}
+                    canSwitch={lib.nav.kind === "root"}
+                    onSwitchMode={(mode) => {
+                        setSelectionMode(mode)
+                        setSelection(new Set())
+                    }}
+                    onSelectAll={selectAllModeItems}
+                    onDelete={handleBulkDelete}
+                    onDone={exitSelectionMode}
+                />
+            ) : null}
         </div>
     )
 }
@@ -660,31 +1180,98 @@ function ConfirmDialog({
 }: {
     confirm: ConfirmState
     onOpenChange: (open: boolean) => void
-    onConfirm: () => void
+    onConfirm: (includeAlbums: boolean) => void
 }) {
+    const [includeAlbums, setIncludeAlbums] = useState(false)
+
+    useEffect(() => {
+        if (confirm.kind !== "none") {
+            setIncludeAlbums(false)
+        }
+    }, [confirm])
+
     const open = confirm.kind !== "none"
     const isClear = confirm.kind === "clear"
+    const isRemoveArtist =
+        confirm.kind === "remove-artist" || confirm.kind === "remove-artists"
+
+    const albumCount =
+        confirm.kind === "remove"
+            ? 1
+            : confirm.kind === "remove-albums"
+              ? confirm.albums.length
+              : 0
+    const artistCount =
+        confirm.kind === "remove-artist"
+            ? 1
+            : confirm.kind === "remove-artists"
+              ? confirm.artists.length
+              : 0
+    const artistName =
+        confirm.kind === "remove-artist"
+            ? confirm.artist.name
+            : confirm.kind === "remove-artists"
+              ? confirm.artists.map((item) => item.name).join("、")
+              : undefined
     const albumTitle =
         confirm.kind === "remove" ? confirm.album.title : undefined
+    const linkedAlbumCount =
+        confirm.kind === "remove-artist"
+            ? confirm.albumCount ?? 0
+            : confirm.kind === "remove-artists"
+              ? confirm.albumCount ?? 0
+              : 0
 
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent size="default">
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        {isClear ? "清空本地资料库？" : "删除这张专辑？"}
+                        {isClear
+                            ? "清空本地资料库？"
+                            : isRemoveArtist
+                              ? artistCount > 1
+                                ? `删除 ${artistCount} 位艺人？`
+                                : "删除艺人分组？"
+                              : albumCount > 1
+                                ? `删除 ${albumCount} 张专辑？`
+                                : "删除这张专辑？"}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         {isClear
                             ? "将移除全部本地专辑与曲目索引，不会删除磁盘上的音频文件。"
-                            : `「${albumTitle}」及其曲目将从资料库移除，不会删除磁盘文件。`}
+                            : isRemoveArtist
+                              ? `「${artistName}」${linkedAlbumCount > 0 ? `分组下共 ${linkedAlbumCount} 张专辑，` : ""}删除后磁盘文件保留。`
+                              : albumCount > 1
+                                ? `${albumCount} 张专辑及其曲目将从资料库移除，不会删除磁盘文件。`
+                                : `「${albumTitle}」及其曲目将从资料库移除，不会删除磁盘文件。`}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+
+                {isRemoveArtist ? (
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.05]">
+                        <input
+                            type="checkbox"
+                            checked={includeAlbums}
+                            onChange={(event) =>
+                                setIncludeAlbums(event.currentTarget.checked)
+                            }
+                            className="size-4 cursor-pointer accent-primary"
+                        />
+                        <span className="text-[13px]">
+                            同时删除其下专辑与曲目索引
+                            <span className="block text-[11px] text-muted-foreground">
+                                磁盘上的音频文件始终保留
+                            </span>
+                        </span>
+                    </label>
+                ) : null}
+
                 <AlertDialogFooter>
                     <AlertDialogCancel>取消</AlertDialogCancel>
                     <AlertDialogAction
                         variant="destructive"
-                        onClick={onConfirm}
+                        onClick={() => onConfirm(includeAlbums)}
                     >
                         {isClear ? "清空" : "删除"}
                     </AlertDialogAction>
@@ -700,6 +1287,99 @@ function BusyPill() {
             <div className="material-panel flex items-center gap-2 rounded-full px-4 py-2 text-[13px] shadow-lg">
                 <Loader2 className="size-4 animate-spin" />
                 处理中…
+            </div>
+        </div>
+    )
+}
+
+/** 多选勾选角标 */
+function SelectionBadge({ selected }: { selected: boolean }) {
+    return (
+        <div
+            className={cn(
+                "flex size-6 items-center justify-center rounded-full border-2 shadow-sm transition-colors",
+                selected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-white/95 bg-black/30 text-transparent",
+            )}
+        >
+            <Check className="size-3.5" strokeWidth={3} />
+        </div>
+    )
+}
+
+/** 底部批量操作栏：类型切换 + 已选计数 + 全选/删除/完成 */
+function BulkActionBar({
+    mode,
+    count,
+    canSwitch = false,
+    onSwitchMode,
+    onSelectAll,
+    onDelete,
+    onDone,
+}: {
+    mode: "album" | "artist"
+    count: number
+    canSwitch?: boolean
+    onSwitchMode: (mode: "album" | "artist") => void
+    onSelectAll: () => void
+    onDelete: () => void
+    onDone: () => void
+}) {
+    return (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
+            <div className="material-panel pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-full px-2 py-2 text-[13px] shadow-lg">
+                {canSwitch ? (
+                    <div className="flex items-center gap-0.5 rounded-full bg-black/[0.05] p-0.5 dark:bg-white/[0.08]">
+                        <button
+                            type="button"
+                            onClick={() => onSwitchMode("album")}
+                            className={cn(
+                                "h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium transition-colors",
+                                mode === "album"
+                                    ? "bg-foreground text-background"
+                                    : "text-muted-foreground",
+                            )}
+                        >
+                            专辑
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onSwitchMode("artist")}
+                            className={cn(
+                                "h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium transition-colors",
+                                mode === "artist"
+                                    ? "bg-foreground text-background"
+                                    : "text-muted-foreground",
+                            )}
+                        >
+                            艺人
+                        </button>
+                    </div>
+                ) : null}
+                <span className="pl-1.5 text-muted-foreground">已选 {count} 项</span>
+                <button
+                    type="button"
+                    onClick={onSelectAll}
+                    className="h-8 cursor-pointer rounded-full px-3 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                >
+                    全选
+                </button>
+                <button
+                    type="button"
+                    disabled={count === 0}
+                    onClick={onDelete}
+                    className="h-8 cursor-pointer rounded-full px-3 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    删除
+                </button>
+                <button
+                    type="button"
+                    onClick={onDone}
+                    className="h-8 cursor-pointer rounded-full bg-foreground px-3.5 text-[12px] font-medium text-background active:scale-[0.97]"
+                >
+                    完成
+                </button>
             </div>
         </div>
     )
