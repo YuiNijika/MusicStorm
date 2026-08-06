@@ -5,6 +5,7 @@ import {
     FolderOpen,
     Loader2,
     MicVocal,
+    MoreHorizontal,
     Pencil,
     Plus,
     Sparkles,
@@ -21,7 +22,7 @@ import {
     LocalAlbumDrawer,
     type LocalAlbumDrawerMode,
 } from "@/components/music/local-album-drawer"
-import { LocalAlbumMenu } from "@/components/music/local-album-menu"
+import { LocalAlbumMenu, LocalArtistMenu } from "@/components/music/local-album-menu"
 import { MediaCard } from "@/components/music/media-card"
 import { PageTitle } from "@/components/music/page-title"
 import { Section } from "@/components/music/section"
@@ -44,6 +45,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
@@ -413,7 +415,7 @@ function LocalPage() {
                             )}
                         >
                             <SquareCheck className="size-3.5" />
-                            {selectionMode === "album" ? "完成" : "多选"}
+                            {selectionMode === "album" ? "完成" : "管理"}
                         </button>
                         <button
                             type="button"
@@ -819,40 +821,69 @@ function LocalPage() {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        {lib.library.tracks.length > 0 ||
-                        lib.library.albums.length > 0 ? (
-                            <>
-                                <button
+                        {selectionMode ? (
+                            <button
+                                type="button"
+                                onClick={exitSelectionMode}
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground active:scale-[0.97]"
+                            >
+                                <SquareCheck className="size-3.5" />
+                                完成
+                            </button>
+                        ) : lib.library.tracks.length > 0 ||
+                          lib.library.albums.length > 0 ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger
                                     type="button"
-                                    onClick={() =>
-                                        selectionMode === null
-                                            ? setSelectionMode(
-                                                  sortedArtists.length > 0
-                                                      ? "artist"
-                                                      : "album",
-                                              )
-                                            : exitSelectionMode()
-                                    }
+                                    title="更多操作"
+                                    aria-label="资料库更多操作"
                                     className={cn(
-                                        "h-9 cursor-pointer rounded-full px-3 text-[13px] font-medium active:scale-[0.97]",
-                                        selectionMode
-                                            ? "bg-primary text-primary-foreground"
-                                            : "text-muted-foreground hover:text-foreground",
+                                        "inline-flex size-9 cursor-pointer items-center justify-center rounded-full",
+                                        "bg-black/[0.05] text-foreground transition-colors hover:bg-black/[0.08]",
+                                        "outline-none active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]",
                                     )}
                                 >
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <SquareCheck className="size-3.5" />
-                                        {selectionMode ? "完成" : "多选"}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirm({ kind: "clear" })}
-                                    className="h-9 cursor-pointer rounded-full px-2.5 text-[13px] font-medium text-muted-foreground hover:text-foreground active:scale-[0.97]"
+                                    <MoreHorizontal className="size-4" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                    sideOffset={8}
+                                    className="w-48 p-1.5"
                                 >
-                                    清空
-                                </button>
-                            </>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setSelectionMode(
+                                                sortedArtists.length > 0
+                                                    ? "artist"
+                                                    : "album",
+                                            )
+                                        }
+                                        className="cursor-pointer"
+                                    >
+                                        <SquareCheck className="size-4" />
+                                        <span className="flex flex-col">
+                                            <span>批量管理</span>
+                                            <span className="text-[11px] font-normal text-muted-foreground">
+                                                多选专辑或艺人后删除
+                                            </span>
+                                        </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        onClick={() => setConfirm({ kind: "clear" })}
+                                        className="cursor-pointer"
+                                    >
+                                        <Trash2 className="size-4" />
+                                        <span className="flex flex-col">
+                                            <span>清空资料库</span>
+                                            <span className="text-[11px] font-normal text-muted-foreground">
+                                                移除全部本地曲目索引
+                                            </span>
+                                        </span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : null}
                     </>
                 }
@@ -905,31 +936,19 @@ function LocalPage() {
                                                     selected={selection.has(artist.id)}
                                                 />
                                             ) : (
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                                                    <button
-                                                        type="button"
-                                                        title="编辑艺人"
-                                                        onClick={() =>
-                                                            openArtistEditDrawer(artist)
-                                                        }
-                                                        className="flex size-7 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-colors hover:bg-black/65 active:scale-95"
-                                                    >
-                                                        <Pencil className="size-3.5" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        title="删除艺人分组"
-                                                        onClick={() =>
+                                                <div className="absolute top-2 right-2">
+                                                    <LocalArtistMenu
+                                                        artist={artist}
+                                                        overlay
+                                                        onEdit={openArtistEditDrawer}
+                                                        onDelete={(item) =>
                                                             setConfirm({
                                                                 kind: "remove-artist",
-                                                                artist,
+                                                                artist: item,
                                                                 albumCount: albums.length,
                                                             })
                                                         }
-                                                        className="flex size-7 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-colors hover:bg-black/65 active:scale-95"
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                    </button>
+                                                    />
                                                 </div>
                                             )}
                                         </div>
@@ -959,15 +978,6 @@ function LocalPage() {
                                     onChange={setLocalAlbumView}
                                     label="本地专辑展示"
                                 />
-                                {lib.allTracks.length > 0 ? (
-                                    <button
-                                        type="button"
-                                        onClick={lib.openAllSongs}
-                                        className="cursor-pointer text-[13px] font-semibold text-primary active:opacity-70"
-                                    >
-                                        全部歌曲
-                                    </button>
-                                ) : null}
                             </div>
                         ) : (
                             <span className="text-[12px] text-muted-foreground">
@@ -1369,8 +1379,9 @@ function BulkActionBar({
                     type="button"
                     disabled={count === 0}
                     onClick={onDelete}
-                    className="h-8 cursor-pointer rounded-full px-3 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
+                    <Trash2 className="size-3.5" />
                     删除
                 </button>
                 <button

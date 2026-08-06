@@ -16,7 +16,7 @@ use db::{
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
     db_listen_source_breakdown, db_set_setting, db_start_play_session, db_upsert_folder,
     db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db, purge_expired_api_cache,
-    resolve_app_dir, DbState,
+    DbState,
 };
 use netease_proxy::netease_http_post;
 use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate, pick_ffmpeg_executable};
@@ -600,63 +600,17 @@ fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String>
     purge_expired_api_cache(app, &conn)
 }
 
-/// 计算 WebView2 数据目录，持久化到 app 本地目录避免冷启动全量重建
-fn webview_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_dir = resolve_app_dir(app)?;
-    let dir = app_dir.join("resources").join("webview-data");
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| format!("create webview data dir: {e}"))?;
-    Ok(dir)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // main 窗口由 tauri.conf.json 注册并直接显示；setup 只做轻量状态初始化
             let conn = open_db(app.handle())?;
             app.manage(DbState(Mutex::new(conn)));
             app.manage(AudioState::default());
 
-            let data_dir = webview_data_dir(app.handle())?;
-
-            // 使用固定 WebView2 数据目录，冷启动时复用已有缓存避免全量重建
-            // 主窗口初始隐藏，待 splash handoff 后显示
-            tauri::WebviewWindowBuilder::new(
-                app,
-                "main",
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .title("MusicStorm")
-            .inner_size(1280.0, 800.0)
-            .min_inner_size(960.0, 640.0)
-            .decorations(false)
-            .visible(false)
-            .center()
-            .data_directory(data_dir.clone())
-            .build()
-            .map_err(|e| format!("create main window: {e}"))?;
-
-            // Splash 窗口：轻量 HTML，冷启动优先渲染
-            tauri::WebviewWindowBuilder::new(
-                app,
-                "splashscreen",
-                tauri::WebviewUrl::App("splashscreen.html".into()),
-            )
-            .title("MusicStorm")
-            .inner_size(440.0, 420.0)
-            .resizable(false)
-            .decorations(false)
-            .shadow(false)
-            .transparent(true)
-            .always_on_top(true)
-            .center()
-            .skip_taskbar(true)
-            .data_directory(data_dir)
-            .build()
-            .map_err(|e| format!("create splash window: {e}"))?;
-
-            // 过期缓存清理移到后台线程，不阻塞 WebView 初始化
+            // 过期缓存清理移到后台线程，不阻塞窗口创建
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let _ = purge_expired_api_cache_in_background(&app_handle);

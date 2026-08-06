@@ -12,9 +12,8 @@ import {
     UserPlus,
     type LucideIcon,
 } from "lucide-react"
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 
-import { NeteaseAuthDialog } from "@/components/auth/netease-auth-dialog"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +26,13 @@ import { openNeteaseRegister } from "@/lib/netease/open-register"
 import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
+
+/** 登录弹窗按需加载，避免登录表单进启动包 */
+const NeteaseAuthDialog = lazy(() =>
+    import("@/components/auth/netease-auth-dialog").then(m => ({
+        default: m.NeteaseAuthDialog,
+    })),
+)
 
 const ICONS: Record<AppRoute, LucideIcon> = {
     home: Home,
@@ -162,7 +168,11 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                 </DropdownMenu>
             </div>
 
-            <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+            {authOpen ? (
+                <Suspense fallback={null}>
+                    <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+                </Suspense>
+            ) : null}
         </aside>
     )
 }

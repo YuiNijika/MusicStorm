@@ -5,9 +5,180 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MusicStorm</title>
+    <script>
+      (function () {
+        var KEY = "musicstorm-theme";
+        function systemDark() {
+          return window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+        function apply() {
+          var stored = null;
+          try {
+            stored = window.localStorage.getItem(KEY);
+          } catch (e) {
+            /* 存储不可用时回退系统 */
+          }
+          var resolved =
+            stored === "light" || stored === "dark"
+              ? stored
+              : systemDark()
+                ? "dark"
+                : "light";
+          var root = document.documentElement;
+          root.classList.toggle("dark", resolved === "dark");
+          root.dataset.theme = resolved;
+        }
+        apply();
+        // system 模式下跟随系统明暗切换
+        var media = window.matchMedia("(prefers-color-scheme: dark)");
+        function onSystemChange() {
+          var stored = null;
+          try {
+            stored = window.localStorage.getItem(KEY);
+          } catch (e) {
+            /* ignore */
+          }
+          if (stored !== "light" && stored !== "dark") {
+            apply();
+          }
+        }
+        if (media.addEventListener) {
+          media.addEventListener("change", onSystemChange);
+        } else if (media.addListener) {
+          media.addListener(onSystemChange);
+        }
+      })();
+    </script>
+    <style>
+      #boot-loading {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: radial-gradient(
+          130% 130% at 50% 26%,
+          #fafafa 0%,
+          #f2f2f4 55%,
+          #ecedef 100%
+        );
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
+          sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      #boot-loading .hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        max-width: min(86vw, 560px);
+        padding: 0 24px;
+        animation: boot-hero-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      #boot-loading .logo {
+        width: 88px;
+        height: 88px;
+        margin-bottom: 30px;
+        border-radius: 22px;
+        object-fit: cover;
+        box-shadow:
+          0 18px 40px rgba(0, 0, 0, 0.14),
+          0 2px 6px rgba(0, 0, 0, 0.06);
+      }
+      #boot-loading h1 {
+        margin: 0;
+        font-size: clamp(34px, 6vw, 46px);
+        font-weight: 700;
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+        color: #1d1d1f;
+      }
+      #boot-loading p {
+        margin: 14px 0 0;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+        color: rgba(60, 60, 67, 0.62);
+      }
+      #boot-loading .progress {
+        margin-top: 40px;
+        width: 168px;
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+      }
+      #boot-loading .progress > i {
+        display: block;
+        height: 100%;
+        width: 42%;
+        border-radius: inherit;
+        background: #1d1d1f;
+        animation: boot-slide 1.15s ease-in-out infinite;
+      }
+
+      html[data-theme="dark"] #boot-loading {
+        background: radial-gradient(
+          130% 130% at 50% 26%,
+          #1e1e20 0%,
+          #19191b 55%,
+          #151517 100%
+        );
+      }
+      html[data-theme="dark"] #boot-loading h1 {
+        color: #f5f5f7;
+      }
+      html[data-theme="dark"] #boot-loading p {
+        color: rgba(235, 235, 245, 0.58);
+      }
+      html[data-theme="dark"] #boot-loading .progress {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      html[data-theme="dark"] #boot-loading .progress > i {
+        background: #f5f5f7;
+      }
+
+      @keyframes boot-hero-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.985);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes boot-slide {
+        0% {
+          transform: translateX(-120%);
+        }
+        100% {
+          transform: translateX(280%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot-loading .hero {
+          animation: none;
+        }
+        #boot-loading .progress > i {
+          animation-duration: 3.5s;
+        }
+      }
+    </style>
   </head>
 
   <body>
+    <div id="boot-loading">
+      <div class="hero">
+        <img class="logo" src="/icon.png" alt="MusicStorm" draggable="false" />
+        <h1>MusicStorm</h1>
+        <p>正在准备你的音乐库…</p>
+        <div class="progress" aria-hidden="true"><i></i></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

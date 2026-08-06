@@ -12,7 +12,6 @@
 import { invoke } from "@tauri-apps/api/core"
 
 import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
-import { eapi, weapi } from "@/lib/netease/native/crypto"
 import {
     buildAnonymousUsername,
     cookieHeader,
@@ -27,6 +26,13 @@ import {
 } from "@/lib/netease/native/device-cookie"
 import { resolveNativeModule } from "@/lib/netease/native/modules"
 import { resolveRealIp } from "@/lib/netease/native/real-ip"
+
+/** weapi/eapi 加密（node-forge + crypto-js）较重，首个加密请求时才加载 */
+let cryptoModule: Promise<typeof import("@/lib/netease/native/crypto")> | null = null
+function loadCrypto() {
+    cryptoModule ??= import("@/lib/netease/native/crypto")
+    return cryptoModule
+}
 
 const DOMAIN = "https://music.163.com"
 /** CloudMusicAPI APP_CONF.eapiDomain — PC 客户端 eapi，扫码 unikey 必须走这域 */
@@ -144,6 +150,7 @@ async function ensureAnonymousToken(): Promise<void> {
                 // 确保 jar.deviceId 就是注册用的那枚
                 jar.deviceId = deviceId
 
+                const { weapi } = await loadCrypto()
                 const encrypted = weapi({ username })
                 const response = await proxyPost({
                     url: `${DOMAIN}/weapi/register/anonimous`,
@@ -178,6 +185,7 @@ async function ensureAnonymousToken(): Promise<void> {
                         .padStart(4, "0")}`,
                 }
                 const eapiData = { username, header }
+                const { eapi } = await loadCrypto()
                 const eapiEnc = eapi("/api/register/anonimous", eapiData)
                 const eapiRes = await proxyPost({
                     url: `${EAPI_DOMAIN}/eapi/register/anonimous`,
@@ -229,6 +237,7 @@ async function nativeNeteaseRequest<T>(
 
     if (spec.crypto === "weapi") {
         data.csrf_token = csrf
+        const { weapi } = await loadCrypto()
         const encrypted = weapi(data)
         const response = await proxyPost({
             url: `${DOMAIN}/weapi/${spec.uri.replace(/^\/api\//, "")}`,
@@ -265,6 +274,7 @@ async function nativeNeteaseRequest<T>(
             header.MUSIC_A = jar.MUSIC_A
         }
         data.header = header
+        const { eapi } = await loadCrypto()
         const encrypted = eapi(spec.uri, data)
         // 登录 eapi：与 CloudMusicAPI 一样不带 Origin/Referer，UA 用 iphone 默认
         const responseEapi = await proxyPost({

@@ -4,7 +4,7 @@
  */
 
 import { NETEASE_PATHS } from "@/lib/netease/paths"
-import { md5Hex } from "@/lib/netease/native/crypto"
+import { md5Hex } from "@/lib/netease/native/md5"
 
 export type CryptoKind = "weapi" | "eapi" | "api" | "local"
 

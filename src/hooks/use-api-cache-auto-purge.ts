@@ -20,12 +20,17 @@ function useApiCacheAutoPurge(): void {
         }
 
         let timer: number | null = null
+        let firstRun: number | null = null
         let cancelled = false
 
         function clearTimer() {
             if (timer != null) {
                 window.clearInterval(timer)
                 timer = null
+            }
+            if (firstRun != null) {
+                window.clearTimeout(firstRun)
+                firstRun = null
             }
         }
 
@@ -42,8 +47,11 @@ function useApiCacheAutoPurge(): void {
                 void apiCachePurgeExpired()
             }
 
-            // 启动即清
-            tick()
+            // 首轮延迟执行，避免与首屏渲染争抢磁盘 I/O
+            firstRun = window.setTimeout(() => {
+                firstRun = null
+                tick()
+            }, 3_000)
             timer = window.setInterval(tick, getApiCachePurgeIntervalMs())
         }
 

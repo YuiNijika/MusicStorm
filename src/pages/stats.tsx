@@ -1,13 +1,3 @@
-/**
- * 统计 — Apple Screen Time × Music 排版
- *
- * 信息架构（上 → 下唯一焦点递减）：
- * 1. 时段 + 主收听时长（最大字号）
- * 2. 今日三指标（同级）
- * 3. 活动图 / 来源
- * 4. 常听列表 + 轻量筛选
- */
-
 import { ChevronDown, Search } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 

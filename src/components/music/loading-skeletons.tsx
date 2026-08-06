@@ -436,6 +436,32 @@ function RadiosPageSkeleton() {
     )
 }
 
+/** 设置页骨架：左侧 tab 列表 + 右侧内容区 */
+function SettingsPageSkeleton() {
+    return (
+        <div className="flex gap-10" aria-busy aria-label="设置加载中">
+            <div className="w-40 shrink-0 space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full rounded-full" />
+                ))}
+            </div>
+            <div className="flex-1 space-y-6">
+                <Skeleton className="h-7 w-24 rounded-full" />
+                <div className="space-y-3">
+                    <Skeleton className="h-5 w-3/4 rounded-full" />
+                    <Skeleton className="h-5 w-full rounded-full" />
+                    <Skeleton className="h-5 w-2/3 rounded-full" />
+                </div>
+                <div className="space-y-3">
+                    <Skeleton className="h-5 w-1/2 rounded-full" />
+                    <Skeleton className="h-5 w-3/4 rounded-full" />
+                    <Skeleton className="h-5 w-1/3 rounded-full" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export {
     AlbumDetailSkeleton,
     ArtistDetailSkeleton,
@@ -451,6 +477,7 @@ export {
     RadioProgramDetailSkeleton,
     RadiosPageSkeleton,
     SearchResultsSkeleton,
+    SettingsPageSkeleton,
     StatsPageSkeleton,
     TrackListSkeleton,
 }

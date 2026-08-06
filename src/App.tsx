@@ -7,6 +7,11 @@ import { Toaster, toast } from "@/components/ui/toast"
 import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
+import {
+    readTitleBarStyle,
+    TITLE_BAR_STORAGE_KEY,
+    type SettingsTab,
+} from "@/lib/app/title-bar-prefs"
 import { migrateLegacyOverrides } from "@/lib/music/cover-overrides"
 import {
     MusicNavigationProvider,
@@ -29,16 +34,12 @@ import {
     RadioProgramDetailSkeleton,
     RadiosPageSkeleton,
     SearchResultsSkeleton,
+    SettingsPageSkeleton,
     StatsPageSkeleton,
 } from "@/components/music/loading-skeletons"
-import {
-    readTitleBarStyle,
-    SettingsPage,
-    TITLE_BAR_STORAGE_KEY,
-    type SettingsTab,
-} from "@/pages/settings"
 
 // 非首屏页面 React.lazy 拆分 chunk，冷启动时 V8 只需解析首屏代码
+const SettingsPage = lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage })))
 const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
 const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
 const LibraryPage = lazy(() => import("@/pages/library").then(m => ({ default: m.LibraryPage })))
@@ -124,11 +125,13 @@ function AppRoutes({
     }
     if (route === "settings") {
         return (
-            <SettingsPage
-                titleBarStyle={titleBarStyle}
-                onTitleBarStyleChange={onTitleBarStyleChange}
-                initialTab={settingsTab}
-            />
+            <Suspense fallback={<SettingsPageSkeleton />}>
+                <SettingsPage
+                    titleBarStyle={titleBarStyle}
+                    onTitleBarStyleChange={onTitleBarStyleChange}
+                    initialTab={settingsTab}
+                />
+            </Suspense>
         )
     }
     return null
@@ -142,6 +145,11 @@ function App() {
     const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>()
 
     useApiCacheAutoPurge()
+
+    useEffect(() => {
+        // 首帧 DOM 已提交：撤掉内联启动兜底画面
+        document.getElementById("boot-loading")?.remove()
+    }, [])
 
     const handleTitleBarStyleChange = useCallback((style: TitleBarStyle) => {
         setTitleBarStyle(style)

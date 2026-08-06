@@ -90,8 +90,4 @@ function eapi(
     }
 }
 
-function md5Hex(text: string): string {
-    return CryptoJS.MD5(text).toString()
-}
-
-export { eapi, linuxapi, md5Hex, weapi }
+export { eapi, linuxapi, weapi }

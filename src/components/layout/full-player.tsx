@@ -13,10 +13,9 @@ import {
     Volume2,
     VolumeX,
 } from "lucide-react"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
-import { LyricsView } from "@/components/music/lyrics-view"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
@@ -60,6 +59,11 @@ type FullPlayerProps = {
     open: boolean
     onClose: () => void
 }
+
+/** 歌词模块只在播放器展开时按需加载，避免进启动包 */
+const LyricsView = lazy(() =>
+    import("@/components/music/lyrics-view").then(m => ({ default: m.LyricsView })),
+)
 
 /** closed → entering → open → exiting → closed */
 type Phase = "closed" | "entering" | "open" | "exiting"
@@ -444,12 +448,16 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 {meta}
                             </div>
                         </div>
-                        <LyricsView
-                            variant="full"
-                            active={lyricsActive}
-                            className="min-h-0 flex-1"
-                            listClassName="h-full"
-                        />
+                        {lyricsActive ? (
+                            <Suspense fallback={null}>
+                                <LyricsView
+                                    variant="full"
+                                    active={lyricsActive}
+                                    className="min-h-0 flex-1"
+                                    listClassName="h-full"
+                                />
+                            </Suspense>
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -474,13 +482,17 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
                 {layout === "lyrics" ? (
                     <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
-                        <LyricsView
-                            variant="full"
-                            active={lyricsActive}
-                            align={chrome.lyricsAlign}
-                            className="h-full min-h-0 flex-1"
-                            listClassName="h-full py-2"
-                        />
+                        {lyricsActive ? (
+                            <Suspense fallback={null}>
+                                <LyricsView
+                                    variant="full"
+                                    active={lyricsActive}
+                                    align={chrome.lyricsAlign}
+                                    className="h-full min-h-0 flex-1"
+                                    listClassName="h-full py-2"
+                                />
+                            </Suspense>
+                        ) : null}
                     </div>
                 ) : null}
 

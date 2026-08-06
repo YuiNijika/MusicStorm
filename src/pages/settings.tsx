@@ -105,16 +105,7 @@ import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/not
 import { openExternalUrl } from "@/lib/open-external"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { cn } from "@/lib/utils"
-
-const TITLE_BAR_STORAGE_KEY = "musicstorm-titlebar-style"
-
-type SettingsTab =
-    | "source"
-    | "playback"
-    | "account"
-    | "appearance"
-    | "hotkeys"
-    | "update"
+import { readTitleBarStyle, TITLE_BAR_STORAGE_KEY, type SettingsTab } from "@/lib/app/title-bar-prefs"
 
 const TABS: { id: SettingsTab; label: string }[] = [
     { id: "appearance", label: "外观" },
@@ -124,14 +115,6 @@ const TABS: { id: SettingsTab; label: string }[] = [
     { id: "update", label: "更新" },
     { id: "hotkeys", label: "快捷键" },
 ]
-
-function readTitleBarStyle(): TitleBarStyle {
-    if (typeof window === "undefined") {
-        return "mac"
-    }
-    const stored = window.localStorage.getItem(TITLE_BAR_STORAGE_KEY)
-    return stored === "windows" ? "windows" : "mac"
-}
 
 type SettingsPageProps = {
     titleBarStyle: TitleBarStyle
