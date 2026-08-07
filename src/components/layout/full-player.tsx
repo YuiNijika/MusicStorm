@@ -402,33 +402,38 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div
                         className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
                         onPointerDown={(event) => {
-                            // 顶栏拖拽：双击 = 最小化，与主标题栏一致
+                            // 顶栏拖拽：双击 = 最小化，与主标题栏一致。
+                            // 按钮上的 onPointerDown 会 stopPropagation，不干扰拖拽
                             startDragging(event)
                         }}
                     >
                     <button
                         type="button"
                         onClick={onClose}
+                        onPointerDown={(event) => event.stopPropagation()}
                         className={cn(
-                            "glass-chip flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
-                            "text-[13px] font-medium text-foreground/90",
-                            "transition-transform duration-100 active:scale-[0.97]",
+                            "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
+                            "text-[13px] font-medium text-foreground/70",
+                            "transition-colors duration-100 hover:bg-black/[0.06] hover:text-foreground",
+                            "active:scale-[0.97] dark:hover:bg-white/[0.1]",
                         )}
                     >
-                        <ChevronDown className="size-4 opacity-70" />
+                        <ChevronDown className="size-4" />
                         收起
                     </button>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger
+                            onPointerDown={(event) => event.stopPropagation()}
                             className={cn(
-                                "glass-chip flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
-                                "text-[12px] font-medium text-foreground/90 outline-none",
-                                "transition-transform duration-100 active:scale-[0.97]",
+                                "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
+                                "text-[12px] font-medium text-foreground/70 outline-none",
+                                "transition-colors duration-100 hover:bg-black/[0.06] hover:text-foreground",
+                                "active:scale-[0.97] dark:hover:bg-white/[0.1]",
                             )}
                             title="播放样式"
                         >
-                            <LayoutTemplate className="size-3.5 opacity-70" />
+                            <LayoutTemplate className="size-3.5" />
                             {FULL_PLAYER_LAYOUTS.find((item) => item.id === layout)?.label ??
                                 "样式"}
                         </DropdownMenuTrigger>
