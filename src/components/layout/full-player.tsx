@@ -402,8 +402,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div
                         className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
                         onPointerDown={(event) => {
-                            // 顶栏拖拽：双击 = 最小化，与主标题栏一致。
-                            // 按钮上的 onPointerDown 会 stopPropagation，不干扰拖拽
+                            // 可交互元素（按钮/菜单项）不参与拖拽与双击判定，
+                            // 否则按下按钮会被双击检测误判为「双击 → 最小化」
+                            if ((event.target as HTMLElement).closest("button")) {
+                                return
+                            }
+                            // 顶栏空白拖拽：双击 = 最小化，与主标题栏一致
                             startDragging(event)
                         }}
                     >
