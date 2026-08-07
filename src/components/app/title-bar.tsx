@@ -1,5 +1,5 @@
 import { MoonStar, Palette, SunMedium } from "lucide-react"
-import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react"
+import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react"
 
 import { useTheme } from "@/components/app/theme-provider"
 import {
@@ -92,10 +92,9 @@ function TitleBar({
         "dark:hover:bg-white/[0.08]",
     )
 
-    function handleDragStart(event: MouseEvent) {
+    function handleDragStart(event: PointerEvent<HTMLElement>) {
         startDragging(event)
     }
-
     const titleBlock = (
         <TitleText
             title={title}
@@ -127,10 +126,8 @@ function TitleBar({
                     </div>
                 ) : (
                     <div
-                        data-tauri-drag-region
                         className="flex min-w-0 flex-1 cursor-default items-center gap-2.5 pl-1"
-                        onMouseDown={handleDragStart}
-                        onDoubleClick={toggleMaximize}
+                        onPointerDown={handleDragStart}
                     >
                         <BrandMark />
                         {titleBlock}
@@ -139,10 +136,8 @@ function TitleBar({
 
                 {isMacStyle ? (
                     <div
-                        data-tauri-drag-region
                         className="absolute inset-x-0 top-0 flex h-full cursor-default items-center justify-center px-24"
-                        onMouseDown={handleDragStart}
-                        onDoubleClick={toggleMaximize}
+                        onPointerDown={handleDragStart}
                     >
                         <div className="flex min-w-0 items-center gap-2.5">
                             <BrandMark />
@@ -537,7 +532,7 @@ function TitleText({
                             event.stopPropagation()
                             onOpenUpdate?.()
                         }}
-                        onMouseDown={(event) => {
+                        onPointerDown={(event) => {
                             // 避免触发标题栏拖拽
                             event.stopPropagation()
                         }}

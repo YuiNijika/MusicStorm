@@ -20,6 +20,7 @@ import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
+import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,6 +36,7 @@ import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { useWindowControls } from "@/hooks/use-window-controls"
 import {
     QUALITY_OPTIONS,
     getNeteaseQualityBr,
@@ -104,6 +106,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         reloadCurrent,
     } = usePlayer()
     const { loggedIn } = useNeteaseSession()
+    const { startDragging } = useWindowControls()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
 
@@ -390,19 +393,18 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     }}
                 >
                     {displayCover ? (
-                        <img
-                            src={displayCover}
-                            alt=""
-                            className="full-player-backdrop-image"
-                        />
+                        <CachedBackdropImage src={displayCover} />
                     ) : null}
                     <div className="full-player-backdrop-tint" />
                 </div>
 
                 <div className="relative z-[1] flex h-full min-h-0 flex-col">
                     <div
-                        data-tauri-drag-region
                         className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                        onPointerDown={(event) => {
+                            // 顶栏拖拽：双击 = 最小化，与主标题栏一致
+                            startDragging(event)
+                        }}
                     >
                     <button
                         type="button"
@@ -734,6 +736,12 @@ function IconBtn({
             {children}
         </button>
     )
+}
+
+/** 全屏背景封面：远程 URL 透明升级为本地缓存，避免每次打开都拉 CDN */
+function CachedBackdropImage({ src }: { src: string }) {
+    const resolved = useCachedCoverUrl(src, "original")
+    return <img src={resolved} alt="" className="full-player-backdrop-image" />
 }
 
 export { FullPlayer }

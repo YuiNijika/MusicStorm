@@ -676,6 +676,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // 单实例：二次启动唤起已有窗口，而不是再开一个进程
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             // 窗口在 Rust 里创建（而非 conf 注册），以便按「性能模式」动态注入浏览器参数
             let conn = open_db(app.handle())?;

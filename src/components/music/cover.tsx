@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
 import { cn } from "@/lib/utils"
 
 type CoverProps = {
@@ -27,6 +28,9 @@ const SIZE_PX = {
 
 function Cover({ src, alt, size = "md", className }: CoverProps) {
     const [failed, setFailed] = useState(false)
+    // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
+    const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
+    const resolvedSrc = useCachedCoverUrl(src, kind)
     // src 切换时必须重置，否则上一张失败会永远挡住后续封面
     useEffect(() => {
         setFailed(false)
@@ -44,8 +48,8 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
         >
             {showImage ? (
                 <img
-                    key={src}
-                    src={src}
+                    key={resolvedSrc}
+                    src={resolvedSrc}
                     alt={alt}
                     width={px.width}
                     height={px.height}
