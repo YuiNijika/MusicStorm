@@ -18,9 +18,12 @@ function setDevToolsEnabled(enabled: boolean): void {
     window.dispatchEvent(new Event(DEVTOOLS_EVENT))
 }
 
-/** 启用 DevTools 时全局监听 F12 打开开发者工具 */
+/** 启用 DevTools 时全局监听 F12 打开开发者工具；仅开发构建生效 */
 function useDevtoolsShortcut(): void {
     useEffect(() => {
+        if (!import.meta.env.DEV) {
+            return
+        }
         function onKeyDown(event: KeyboardEvent) {
             if (event.key === "F12" && getDevToolsEnabled()) {
                 event.preventDefault()

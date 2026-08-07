@@ -71,11 +71,16 @@ struct LocalScanTrack {
     content_hash: Option<String>,
 }
 
-/// 打开 WebView DevTools；release 构建需启用 tauri "devtools" feature
+/// 打开 WebView DevTools。
+/// release 构建默认禁用 devtools：open_devtools 仅 debug 构建实际生效，
+/// 避免 WebView2 原生 F12 / 右键「检查」绕过前端开关。
 #[tauri::command]
 fn open_devtools(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.open_devtools();
+    #[cfg(debug_assertions)]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            window.open_devtools();
+        }
     }
     Ok(())
 }

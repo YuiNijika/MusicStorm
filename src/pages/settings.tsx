@@ -1788,7 +1788,7 @@ function OtherTab() {
                             启用 DevTools
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            启用后按 F12 打开开发者工具（调试用）
+                            启用后按 F12 打开开发者工具（仅开发构建生效）
                         </p>
                     </div>
                     <Switch
@@ -1796,7 +1796,7 @@ function OtherTab() {
                         onCheckedChange={(checked) => {
                             setDevToolsEnabled(checked)
                             setDevtoolsEnabledState(checked)
-                            if (checked) {
+                            if (checked && import.meta.env.DEV) {
                                 void invoke("open_devtools")
                             }
                         }}
