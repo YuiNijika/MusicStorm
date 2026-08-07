@@ -99,6 +99,17 @@
     --accent-hue: 250;
     --scrollbar-thumb: rgb(60 60 67 / 24%);
     --scrollbar-thumb-hover: rgb(60 60 67 / 40%);
+
+    /* Apple motion tokens（全局唯一真源，组件内不得自定义缓动）
+     * enter/exit 互为镜像（inverse cubic-bezier），保证可逆过渡路径对称 */
+    --ease-enter: cubic-bezier(0.32, 0.72, 0, 1); /* 快速到达，柔和落定 */
+    --ease-exit: cubic-bezier(1, 0, 0.68, 0.28); /* = enter 的时间反转 */
+    --ease-press: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* 按压即时反馈 */
+    --duration-press: 100ms;
+    --duration-control: 140ms;
+    --duration-hover: 200ms;
+    --duration-enter: 340ms;
+    --duration-exit: 320ms;
 }
 
 .dark {
@@ -258,7 +269,10 @@
         min-height: 36px;
         border-radius: 10px;
         background: var(--surface-fill);
-        transition: background-color 140ms ease, transform 140ms ease, color 140ms ease;
+        transition:
+            background-color var(--duration-control) var(--ease-press),
+            transform var(--duration-press) var(--ease-press),
+            color var(--duration-control) var(--ease-press);
     }
 
     .apple-control:hover {
@@ -282,7 +296,10 @@
         min-width: 32px;
         min-height: 32px;
         border-radius: 8px;
-        transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+        transition:
+            background-color var(--duration-control) var(--ease-press),
+            box-shadow var(--duration-control) var(--ease-press),
+            color var(--duration-control) var(--ease-press);
     }
 
     .apple-segmented-item[aria-pressed="true"] {
@@ -310,6 +327,7 @@
         color: var(--primary-foreground);
         background: var(--primary);
         box-shadow: 0 1px 2px color-mix(in oklab, var(--primary) 24%, transparent);
+        transition: filter var(--duration-control) var(--ease-press);
     }
 
     .apple-primary-action:hover {
@@ -348,7 +366,7 @@
         background: var(--primary);
         border: none;
         box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
-        transition: transform 100ms ease-out;
+        transition: transform var(--duration-press) var(--ease-press);
     }
 
     .progress-range:active::-webkit-slider-thumb {
@@ -513,17 +531,44 @@
     }
 }
 
+/*
+ * 减少动态效果：不是「零反馈」，而是把位移/缩放/keyframes 换成短促的透明度/色彩
+ * cross-fade（Apple HIG：用非前庭性运动保留状态反馈）。
+ * 强制 transition-property 白名单——位移/缩放类过渡直接禁用，色彩类平滑过渡。
+ */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+        transition-duration: 150ms !important;
+        transition-property:
+            color, background-color, border-color, opacity, box-shadow, outline-color !important;
+    }
+
+    /* 全屏播放器退出：滑动退场 → 纯淡出 cross-fade */
+    .full-player-exit {
+        animation-name: full-player-fade-exit;
+        animation-duration: 150ms !important;
+        animation-timing-function: ease-out;
+    }
+    .full-player-scrim-exit {
+        animation-name: full-player-scrim-exit;
+        animation-duration: 150ms !important;
+    }
+}
+@keyframes full-player-fade-exit {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
     }
 }
 
+/* 系统「减弱透明」时降级毛玻璃为实色：省 GPU 合成内存，玻璃面板底色保留 */
 @media (prefers-reduced-transparency: reduce) {
     .glass,
     .glass-panel,
@@ -533,11 +578,10 @@
     .material-player,
     .material-panel,
     .material-field,
-    .full-player-surface,
+    .full-player-backdrop,
     .full-player-backdrop-tint {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: var(--background);
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
     }
 
     .full-player-backdrop-image {
@@ -548,8 +592,118 @@
         background: var(--sidebar);
     }
 
+    .material-player,
+    .full-player-backdrop-tint {
+        background: var(--background);
+    }
+
     .app-root,
     .dark .app-root {
         background: var(--background);
+    }
+}
+
+/* 设置「常驻毛玻璃」关闭时：常驻面板降级为实色，浮层菜单不受影响 */
+html.glass-disabled .glass,
+html.glass-disabled .glass-panel,
+html.glass-disabled .glass-chip,
+html.glass-disabled .material-chrome,
+html.glass-disabled .material-sidebar,
+html.glass-disabled .material-player,
+html.glass-disabled .material-panel,
+html.glass-disabled .material-field,
+html.glass-disabled .full-player-backdrop,
+html.glass-disabled .full-player-backdrop-tint {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html.glass-disabled .material-sidebar {
+    background: var(--sidebar, #f5f5f7) !important;
+}
+html.glass-disabled .material-player,
+html.glass-disabled .full-player-backdrop-tint {
+    background: var(--background, #f5f5f7) !important;
+}
+
+/* 性能模式：关闭全部动画/过渡，减少 GPU 与合成开销 */
+html.performance-mode *,
+html.performance-mode *::before,
+html.performance-mode *::after {
+    animation: none !important;
+    transition: none !important;
+}
+html.performance-mode .animate-pulse,
+html.performance-mode [class*="animate-in"],
+html.performance-mode [class*="animate-out"] {
+    animation: none !important;
+}
+
+/* ===== MV 播放器（ArtPlayer）apple 风格 =====
+ * 只做安全的质感覆盖；进度条/按钮结构保持 ArtPlayer 默认，
+ * 颜色由 theme 参数（跟随 --accent-hue）统一控制 */
+.art-shell .art-app {
+    background: #000;
+}
+/* 底部控制条：上渐变 + 毛玻璃 */
+.art-shell .art-controls {
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.68) 0%,
+        rgba(0, 0, 0, 0.38) 55%,
+        transparent 100%
+    );
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    transition: opacity 0.25s ease;
+}
+/* 播放段进度条圆角（不改高度，避免破坏指示器） */
+.art-shell .art-progress-played,
+.art-shell .art-progress-buffer,
+.art-shell .art-progress-indicator {
+    border-radius: 999px;
+}
+/* 设置面板 / 右键菜单 / 提示气泡：深色毛玻璃浮层 */
+.art-shell .art-settings,
+.art-shell .art-menu {
+    border-radius: 14px;
+    background: rgba(28, 28, 30, 0.9);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.art-shell .art-tooltip {
+    border-radius: 8px;
+    background: rgba(28, 28, 30, 0.9);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    font-size: 12px;
+}
+
+/* 全屏播放器退出动画：滑回底部 + 淡出（无 blur，避免全屏模糊重绘卡顿）
+ * 缓动 = 进入曲线的时间反转镜像（§7 可逆过渡路径对称）；
+ * CSS animation 兜底，不依赖 class 过渡 */
+.full-player-exit {
+    animation: full-player-exit var(--duration-exit) var(--ease-exit) forwards;
+}
+@keyframes full-player-exit {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+.full-player-scrim-exit {
+    animation: full-player-scrim-exit var(--duration-exit) var(--ease-exit) forwards;
+}
+@keyframes full-player-scrim-exit {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
     }
 }

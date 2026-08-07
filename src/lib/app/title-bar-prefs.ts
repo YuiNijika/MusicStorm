@@ -10,6 +10,7 @@ export type SettingsTab =
     | "appearance"
     | "hotkeys"
     | "update"
+    | "other"
 
 /** 读取标题栏样式偏好；非法值回落 mac */
 export function readTitleBarStyle(): TitleBarStyle {

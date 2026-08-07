@@ -27,6 +27,8 @@ type AppearancePrefs = {
     glassOpacity: number
     /** 8 – 48 px 模糊 */
     glassBlur: number
+    /** 常驻毛玻璃（侧栏/底栏/面板），关闭可降低性能开销 */
+    materialGlass: boolean
 }
 
 type AccentOption = {
@@ -60,6 +62,7 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
     customHue: DEFAULT_CUSTOM_HUE,
     glassOpacity: 0.58,
     glassBlur: 28,
+    materialGlass: true,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -107,6 +110,10 @@ function readAppearancePrefs(): AppearancePrefs {
                 typeof data.glassBlur === "number"
                     ? clamp(data.glassBlur, 8, 48)
                     : DEFAULT_APPEARANCE.glassBlur,
+            materialGlass:
+                typeof data.materialGlass === "boolean"
+                    ? data.materialGlass
+                    : DEFAULT_APPEARANCE.materialGlass,
         }
     } catch {
         return DEFAULT_APPEARANCE
@@ -148,6 +155,8 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
     const opacityPct = Math.round(prefs.glassOpacity * 100)
     const strongPct = Math.min(96, opacityPct + 16)
 
+    // 常驻毛玻璃开关：关闭时挂 glass-disabled，CSS 降级为实色
+    root.classList.toggle("glass-disabled", !prefs.materialGlass)
     root.style.setProperty("--accent-hue", String(hue))
     root.dataset.accent = prefs.accent
     root.dataset.tintScope = prefs.tintScope

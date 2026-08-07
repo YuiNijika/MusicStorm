@@ -47,6 +47,18 @@ type PlayerContextValue = PlayerSnapshot & {
     playTrack: (track: Track, queue?: Track[]) => void
     /** 同曲再点：播放中暂停 / 已暂停则继续；异曲：换队列并播 */
     playOrToggle: (track: Track, queue?: Track[]) => void
+    /** 插入当前播放之后并立即播放 */
+    playNext: (track: Track) => void
+    /** 追加到队列末尾（不打断当前播放） */
+    addToQueue: (track: Track) => void
+    /** 移除队列指定索引 */
+    removeFromQueue: (index: number) => void
+    /** 跳转到队列指定索引播放 */
+    jumpTo: (index: number) => void
+    /** 队列内拖动排序 */
+    reorderQueue: (from: number, to: number) => void
+    /** 清空队列并停止 */
+    clearQueue: () => void
     reloadCurrent: () => void
     togglePlay: () => void
     next: () => void
@@ -1093,6 +1105,137 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    /** 将曲目插入当前播放之后并立即播放（"下一首播放"） */
+    const playNext = useCallback((track: Track) => {
+        const list = [...queueRef.current]
+        const idx = indexRef.current
+        if (list.length === 0 || idx < 0) {
+            playTrack(track)
+            return
+        }
+        const insertAt = Math.min(idx + 1, list.length)
+        // 若曲目已在队列中，先移除旧位置，避免重复
+        const existing = list.findIndex((item) => item.id === track.id)
+        if (existing >= 0) {
+            list.splice(existing, 1)
+        }
+        const target =
+            existing >= 0 && existing <= insertAt ? insertAt - 1 : insertAt
+        list.splice(target, 0, track)
+        loadedTrackIdRef.current = null
+        mediaReadyRef.current = false
+        setQueue(list)
+        setCurrentIndex(target)
+        setPositionMs(0)
+        setDurationMs(track.durationMs)
+        isPlayingRef.current = true
+        setIsPlaying(true)
+    }, [playTrack])
+
+    /** 追加到队列末尾（不打断当前播放） */
+    const addToQueue = useCallback((track: Track) => {
+        const list = [...queueRef.current]
+        if (list.some((item) => item.id === track.id)) {
+            return
+        }
+        if (list.length === 0 || indexRef.current < 0) {
+            playTrack(track)
+            return
+        }
+        setQueue([...list, track])
+    }, [playTrack])
+
+    /** 从队列移除指定索引；移除当前曲时切到同位置新曲 */
+    const removeFromQueue = useCallback((index: number) => {
+        const list = [...queueRef.current]
+        if (index < 0 || index >= list.length) {
+            return
+        }
+        const removingCurrent = index === indexRef.current
+        list.splice(index, 1)
+        if (list.length === 0) {
+            loadedTrackIdRef.current = null
+            mediaReadyRef.current = false
+            setQueue([])
+            setCurrentIndex(-1)
+            setPositionMs(0)
+            setDurationMs(0)
+            isPlayingRef.current = false
+            setIsPlaying(false)
+            return
+        }
+        if (removingCurrent) {
+            const nextIndex = Math.min(index, list.length - 1)
+            loadedTrackIdRef.current = null
+            mediaReadyRef.current = false
+            setQueue(list)
+            setCurrentIndex(nextIndex)
+            setPositionMs(0)
+            setDurationMs(list[nextIndex].durationMs)
+            isPlayingRef.current = true
+            setIsPlaying(true)
+            return
+        }
+        setQueue(list)
+        if (index < indexRef.current) {
+            setCurrentIndex(indexRef.current - 1)
+        }
+    }, [])
+
+    /** 跳转到队列指定索引播放 */
+    const jumpTo = useCallback((index: number) => {
+        const list = queueRef.current
+        if (index < 0 || index >= list.length) {
+            return
+        }
+        loadedTrackIdRef.current = null
+        mediaReadyRef.current = false
+        setCurrentIndex(index)
+        setPositionMs(0)
+        setDurationMs(list[index].durationMs)
+        isPlayingRef.current = true
+        setIsPlaying(true)
+    }, [])
+
+    /** 队列内拖动排序（from→to），同步当前播放索引 */
+    const reorderQueue = useCallback((from: number, to: number) => {
+        const list = [...queueRef.current]
+        if (
+            from < 0 ||
+            from >= list.length ||
+            to < 0 ||
+            to >= list.length ||
+            from === to
+        ) {
+            return
+        }
+        const [moved] = list.splice(from, 1)
+        list.splice(to, 0, moved)
+        const idx = indexRef.current
+        let newIndex = idx
+        if (idx === from) {
+            newIndex = to
+        } else if (from < idx && to >= idx) {
+            newIndex = idx - 1
+        } else if (from > idx && to <= idx) {
+            newIndex = idx + 1
+        }
+        setQueue(list)
+        setCurrentIndex(newIndex)
+    }, [])
+
+    /** 清空整个队列并停止播放 */
+    const clearQueue = useCallback(() => {
+        loadedTrackIdRef.current = null
+        mediaReadyRef.current = false
+        setQueue([])
+        setCurrentIndex(-1)
+        setPositionMs(0)
+        setDurationMs(0)
+        isPlayingRef.current = false
+        setIsPlaying(false)
+    }, [])
+
     const value = useMemo<PlayerContextValue>(
         () => ({
             queue,
@@ -1108,6 +1251,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             engineStatus,
             playTrack,
             playOrToggle,
+            playNext,
+            addToQueue,
+            removeFromQueue,
+            jumpTo,
+            reorderQueue,
+            clearQueue,
             reloadCurrent,
             togglePlay,
             next,
@@ -1132,6 +1281,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             engineStatus,
             playTrack,
             playOrToggle,
+            playNext,
+            addToQueue,
+            removeFromQueue,
+            jumpTo,
+            reorderQueue,
+            clearQueue,
             reloadCurrent,
             togglePlay,
             next,

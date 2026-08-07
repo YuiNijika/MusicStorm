@@ -4,6 +4,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode,
 } from "react"
@@ -53,17 +54,39 @@ const initial: SessionState = {
     activeUserId: null,
 }
 
+/** 网易云明确返回「需要登录」的错误：消息形如「接口错误 code=301」或 HTTP 401 */
+function isSessionExpiredError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error)
+    return (
+        /code\D*(301|302)\b/.test(message) ||
+        /HTTP\s*401\b/.test(message) ||
+        /(需要登录|login required|not logged in)/i.test(message)
+    )
+}
+
 const NeteaseSessionContext = createContext<SessionContextValue | null>(null)
 
 function NeteaseSessionProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<SessionState>(initial)
+    // 竞态保护：dev HMR / 手动刷新会触发并发 refresh，旧响应不得覆盖新响应
+    const refreshSeqRef = useRef(0)
+    const retryRef = useRef<number | null>(null)
+    const stateRef = useRef(state)
+    stateRef.current = state
 
     const refresh = useCallback(async () => {
+        const seq = ++refreshSeqRef.current
+        const commit = (next: SessionState) => {
+            if (seq !== refreshSeqRef.current) {
+                return
+            }
+            setState(next)
+        }
         const accounts = listNeteaseAccounts()
         const activeUserId = getActiveUserId()
 
         if (!isNeteaseLoggedIn()) {
-            setState({
+            commit({
                 ready: true,
                 loggedIn: false,
                 profile: null,
@@ -74,22 +97,38 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
             return null
         }
 
+        // API 抖动（网络/风控/外部源异常）时保留登录态，45s 后自动重试一次
+        const scheduleRetry = () => {
+            if (retryRef.current != null) {
+                return
+            }
+            retryRef.current = window.setTimeout(() => {
+                retryRef.current = null
+                if (isNeteaseLoggedIn()) {
+                    void refresh()
+                }
+            }, 45_000)
+        }
+
         try {
             const profile = await fetchUserAccount()
             if (!profile) {
-                setState({
+                // 请求成功但拿不到资料（网易云风控/新接口行为/外部源格式差异）：
+                // cookie 还在就不杀登录态，避免误判导致喜欢列表等本地数据被清空
+                commit({
                     ready: true,
-                    loggedIn: false,
-                    profile: null,
-                    error: null,
+                    loggedIn: isNeteaseLoggedIn(),
+                    profile: stateRef.current.profile,
+                    error: "账号资料暂不可用",
                     accounts,
                     activeUserId,
                 })
+                scheduleRetry()
                 return null
             }
 
             upsertActiveAccount(profile)
-            setState({
+            commit({
                 ready: true,
                 loggedIn: true,
                 profile,
@@ -98,20 +137,39 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                 activeUserId: profile.userId,
             })
             return profile
-        } catch {
-            setState({
+        } catch (error) {
+            if (isSessionExpiredError(error)) {
+                // 网易云明确返回「需要登录」：清掉失效凭证，避免僵死登录态
+                clearNeteaseSession()
+                commit({
+                    ready: true,
+                    loggedIn: false,
+                    profile: null,
+                    error: null,
+                    accounts: listNeteaseAccounts(),
+                    activeUserId: null,
+                })
+                return null
+            }
+            commit({
                 ready: true,
                 loggedIn: isNeteaseLoggedIn(),
-                profile: null,
+                profile: stateRef.current.profile,
                 error: "无法获取账号信息",
                 accounts: listNeteaseAccounts(),
                 activeUserId: getActiveUserId(),
             })
+            scheduleRetry()
             return null
         }
     }, [])
 
     const logout = useCallback(() => {
+        if (retryRef.current != null) {
+            window.clearTimeout(retryRef.current)
+            retryRef.current = null
+        }
+        refreshSeqRef.current += 1 // 使进行中的 refresh 失效
         deactivateNeteaseSession()
         setState({
             ready: true,
@@ -210,6 +268,13 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         reconcileNeteaseVaultOnBoot()
         void refresh()
+        return () => {
+            refreshSeqRef.current += 1
+            if (retryRef.current != null) {
+                window.clearTimeout(retryRef.current)
+                retryRef.current = null
+            }
+        }
     }, [refresh])
 
     const value = useMemo<SessionContextValue>(

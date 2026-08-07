@@ -160,10 +160,31 @@ async function migrateLegacyOverrides(): Promise<number> {
     return count
 }
 
+/** 收集歌曲封面覆盖引用的缓存内容 MD5，供清空封面缓存时保留这些文件 */
+function collectCoverRefHashes(): string[] {
+    const hashes = new Set<string>()
+    for (const item of Object.values(cache)) {
+        const original = /[\\/]originals[\\/]([a-f0-9]{16,})\.[a-z0-9]+$/i.exec(
+            item.originalPath,
+        )?.[1]
+        const thumb = /[\\/]thumbnails[\\/]([a-f0-9]{16,})\.jpg$/i.exec(
+            item.thumbnailPath,
+        )?.[1]
+        if (original) {
+            hashes.add(original)
+        }
+        if (thumb) {
+            hashes.add(thumb)
+        }
+    }
+    return [...hashes]
+}
+
 export {
     clearCoverOverride,
     clearLegacyCoverOverrides,
     COVER_OVERRIDE_EVENT,
+    collectCoverRefHashes,
     ensureCoverOverridesLoaded,
     getCoverOverride,
     migrateLegacyOverrides,

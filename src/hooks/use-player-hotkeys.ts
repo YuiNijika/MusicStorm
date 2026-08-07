@@ -1,6 +1,12 @@
-import { useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
+import {
+    IN_APP_SHORTCUT_EVENT,
+    getInAppShortcuts,
+    keydownToInAppShortcut,
+    type InAppShortcutMap,
+} from "@/lib/app/in-app-shortcut-prefs"
 
 function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
@@ -13,7 +19,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 }
 
-/** 全局播放快捷键：空格 / 方向键 / [ ] 音量 */
+/** 全局播放快捷键（可自定义）：空格 / 方向键 / [ ] 音量 */
 function usePlayerHotkeys() {
     const {
         currentTrack,
@@ -26,50 +32,66 @@ function usePlayerHotkeys() {
         seek,
         setVolume,
     } = usePlayer()
+    // 配置随事件热更新；用 ref 供监听闭包读取，避免频繁重挂监听
+    const [shortcuts, setShortcuts] = useState<InAppShortcutMap>(() =>
+        getInAppShortcuts(),
+    )
+    const shortcutsRef = useRef(shortcuts)
+    shortcutsRef.current = shortcuts
+
+    useEffect(() => {
+        function bump() {
+            setShortcuts(getInAppShortcuts())
+        }
+        window.addEventListener(IN_APP_SHORTCUT_EVENT, bump)
+        return () => window.removeEventListener(IN_APP_SHORTCUT_EVENT, bump)
+    }, [])
 
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.metaKey || event.ctrlKey || event.altKey) {
-                return
-            }
             if (isTypingTarget(event.target)) {
                 return
             }
             if (!currentTrack) {
                 return
             }
-
-            switch (event.code) {
-                case "Space":
+            const combo = keydownToInAppShortcut(event)
+            if (!combo) {
+                return
+            }
+            const map = shortcutsRef.current
+            switch (combo) {
+                case map.togglePlay:
                     event.preventDefault()
                     togglePlay()
                     break
-                case "ArrowRight": {
+                case map.seekForward: {
                     event.preventDefault()
-                    const total = durationMs > 0 ? durationMs : currentTrack.durationMs
+                    const total =
+                        durationMs > 0 ? durationMs : currentTrack.durationMs
                     seek(Math.min(total, positionMs + 5_000))
                     break
                 }
-                case "ArrowLeft": {
+                case map.seekBackward: {
                     event.preventDefault()
                     seek(Math.max(0, positionMs - 5_000))
                     break
                 }
-                case "ArrowUp": {
+                case map.volumeUp: {
                     event.preventDefault()
                     setVolume(Math.min(1, volume + 0.05))
                     break
                 }
-                case "ArrowDown": {
+                case map.volumeDown: {
                     event.preventDefault()
                     setVolume(Math.max(0, volume - 0.05))
                     break
                 }
-                case "BracketRight":
+                case map.next:
                     event.preventDefault()
                     next()
                     break
-                case "BracketLeft":
+                case map.previous:
                     event.preventDefault()
                     previous()
                     break

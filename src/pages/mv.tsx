@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
+import { invoke } from "@tauri-apps/api/core"
+import { Download } from "lucide-react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { MvDetailSkeleton } from "@/components/music/loading-skeletons"
+import { MvPlayer } from "@/components/music/mv-player"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { formatDuration } from "@/lib/format"
 import { fetchMvPlayable, type MvPlayable } from "@/lib/netease/mv"
-import { formatError, notifyFromError } from "@/lib/notify"
+import { formatError, notifyFromError, notifyInfo, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
 type MvPageProps = {
@@ -17,7 +20,6 @@ type MvPageProps = {
 
 function MvPage({ mvId, onBack }: MvPageProps) {
     const { openArtist } = useMusicNavigation()
-    const videoRef = useRef<HTMLVideoElement>(null)
     const [data, setData] = useState<MvPlayable | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -50,19 +52,40 @@ function MvPage({ mvId, onBack }: MvPageProps) {
         }
     }, [mvId, retry])
 
-    // 切 MV 时停掉上一个
-    useEffect(() => {
-        return () => {
-            const el = videoRef.current
-            if (el) {
-                el.pause()
-                el.removeAttribute("src")
-                el.load()
-            }
-        }
-    }, [mvId])
-
     const profile = data?.profile
+
+    /** m3u8 为分片流，直链下载无意义 */
+    function isHlsStream(url: string): boolean {
+        return /\.m3u8(\?|$)/i.test(url)
+    }
+
+    async function handleDownload() {
+        const url = data?.url
+        if (!url) {
+            return
+        }
+        if (isHlsStream(url)) {
+            notifyInfo("该 MV 为分片流", {
+                description: "暂不支持直接下载，可尝试在浏览器中打开",
+            })
+            return
+        }
+        const title = profile?.title || "MV"
+        const name = `${title}.mp4`
+        try {
+            const saved = await invoke<string | null>("save_url_to_file", {
+                url,
+                defaultName: name,
+            })
+            if (!saved) {
+                notifyInfo("已取消下载")
+                return
+            }
+            notifySuccess("下载完成", { description: title })
+        } catch (error) {
+            notifyFromError("下载失败", error)
+        }
+    }
 
     return (
         <div className="space-y-5 pb-2">
@@ -89,14 +112,8 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                         )}
                     >
                         {data?.url ? (
-                            <video
-                                ref={videoRef}
-                                key={data.url}
-                                className="aspect-video w-full bg-black"
-                                src={data.url}
-                                controls
-                                playsInline
-                                autoPlay
+                            <MvPlayer
+                                url={data.url}
                                 poster={profile.coverUrl || undefined}
                             />
                         ) : (
@@ -163,6 +180,25 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                 </p>
                             ) : null}
                         </div>
+                        {data?.url ? (
+                            <button
+                                type="button"
+                                onClick={() => void handleDownload()}
+                                className={cn(
+                                    "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium",
+                                    "bg-black/[0.05] text-foreground transition-colors hover:bg-black/[0.08]",
+                                    "active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]",
+                                )}
+                                title={
+                                    isHlsStream(data.url)
+                                        ? "分片流暂不支持直接下载"
+                                        : "下载 MV 视频"
+                                }
+                            >
+                                <Download className="size-3.5" />
+                                下载
+                            </button>
+                        ) : null}
                     </header>
                 </>
             ) : null}

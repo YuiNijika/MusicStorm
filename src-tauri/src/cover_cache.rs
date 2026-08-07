@@ -10,6 +10,69 @@ use tauri::AppHandle;
 const MAX_COVER_BYTES: usize = 12 * 1024 * 1024;
 const THUMBNAIL_SIZE: u32 = 192;
 
+/// 封面缓存上限：文件数与总大小，超出后按最旧清理
+const MAX_COVER_FILES: usize = 4_000;
+const MAX_COVER_DIR_BYTES: u64 = 400 * 1024 * 1024;
+
+/// 清理封面缓存：超出数量/大小上限时删除最旧文件（原图 + 缩略图）。
+/// 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积。
+pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
+    use std::collections::HashMap;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let (originals, thumbnails) = cover_dirs(app)?;
+    // 按 hash 分组：同一封面的原图与缩略图成对存在
+    let mut groups: HashMap<String, Vec<(PathBuf, SystemTime)>> = HashMap::new();
+    let mut total: u64 = 0;
+    for dir in [originals, thumbnails] {
+        let entries = fs::read_dir(dir).map_err(|e| format!("read cover cache: {e}"))?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    total += meta.len();
+                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                        groups
+                            .entry(name.to_string())
+                            .or_default()
+                            .push((path, meta.modified().unwrap_or(UNIX_EPOCH)));
+                    }
+                }
+            }
+        }
+    }
+    let file_count: u64 = groups.values().map(|files| files.len() as u64).sum();
+    if file_count <= MAX_COVER_FILES as u64 && total <= MAX_COVER_DIR_BYTES {
+        return Ok(0);
+    }
+
+    // 整组按最旧时间排序，整组一起删，保证原图/缩略图同步回收
+    let mut group_list: Vec<(Vec<(PathBuf, SystemTime)>, SystemTime)> = groups
+        .into_values()
+        .map(|files| {
+            let oldest = files.iter().map(|(_, t)| *t).min().unwrap_or(UNIX_EPOCH);
+            (files, oldest)
+        })
+        .collect();
+    group_list.sort_by_key(|(_, oldest)| *oldest);
+
+    let mut removed: u64 = 0;
+    for (files, _) in group_list {
+        if file_count - removed <= MAX_COVER_FILES as u64 && total <= MAX_COVER_DIR_BYTES {
+            break;
+        }
+        for (path, _) in files {
+            if let Ok(meta) = fs::metadata(&path) {
+                total = total.saturating_sub(meta.len());
+            }
+            if fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    Ok(removed)
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CachedCover {
@@ -86,6 +149,29 @@ fn cache_cover_bytes_in_dirs(
         original_path: original.to_string_lossy().into_owned(),
         thumbnail_path: thumbnail.to_string_lossy().into_owned(),
     })
+}
+
+/// 清空封面缓存（原图 + 缩略图）；被 keep_hashes（仍在引用的内容 MD5）命中的文件保留，
+/// 避免清掉本地音乐补全/设置的封面。磁盘空间即刻回收，未保留的封面下次访问时重新生成。
+#[tauri::command]
+pub fn clear_cover_cache(app: AppHandle, keep_hashes: Vec<String>) -> Result<(), String> {
+    let keep: std::collections::HashSet<&str> =
+        keep_hashes.iter().map(String::as_str).collect();
+    let (originals, thumbnails) = cover_dirs(&app)?;
+    for dir in [originals, thumbnails] {
+        let entries = fs::read_dir(dir).map_err(|e| format!("read cover cache: {e}"))?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let keep_file = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(|hash| keep.contains(hash));
+            if !keep_file {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn cache_cover_bytes(app: &AppHandle, data: &[u8]) -> Result<CachedCover, String> {

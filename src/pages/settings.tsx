@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
+import { invoke } from "@tauri-apps/api/core"
+import { Check, Gauge, Pencil } from "lucide-react"
 
 import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
@@ -16,6 +18,17 @@ import { useAppUpdate } from "@/hooks/use-app-update"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
+import {
+    DEVTOOLS_EVENT,
+    getDevToolsEnabled,
+    setDevToolsEnabled,
+} from "@/lib/app/devtools-prefs"
+import {
+    MATERIAL_GLASS_MEMO_KEY,
+    PERFORMANCE_MODE_EVENT,
+    getPerformanceMode,
+    setPerformanceMode,
+} from "@/lib/app/performance-prefs"
 import { ACCENT_OPTIONS, accentSwatch, resolveAccentHue } from "@/lib/appearance/appearance-prefs"
 import {
     setPlaylistTracksView,
@@ -103,7 +116,27 @@ import {
 } from "@/lib/player/native-bridge"
 import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/notify"
 import { openExternalUrl } from "@/lib/open-external"
+import { getCloseToTray, setCloseToTray } from "@/lib/app/close-to-tray-prefs"
+import {
+    DEFAULT_SHORTCUTS,
+    SHORTCUT_ACTIONS,
+    keydownToShortcut,
+    loadGlobalShortcuts,
+    updateGlobalShortcut,
+    type ShortcutAction,
+} from "@/lib/app/global-shortcut-prefs"
+import {
+    IN_APP_ACTIONS,
+    getInAppShortcuts,
+    keydownToInAppShortcut,
+    setInAppShortcut,
+    type InAppShortcutAction,
+    type InAppShortcutMap,
+} from "@/lib/app/in-app-shortcut-prefs"
 import { getStoragePaths } from "@/lib/storage/paths"
+import { extractCoverHash } from "@/lib/local/cover"
+import { loadLocalLibrary } from "@/lib/local/library-store"
+import { collectCoverRefHashes } from "@/lib/music/cover-overrides"
 import { cn } from "@/lib/utils"
 import { readTitleBarStyle, TITLE_BAR_STORAGE_KEY, type SettingsTab } from "@/lib/app/title-bar-prefs"
 
@@ -114,6 +147,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
     { id: "account", label: "账号" },
     { id: "update", label: "更新" },
     { id: "hotkeys", label: "快捷键" },
+    { id: "other", label: "其他" },
 ]
 
 type SettingsPageProps = {
@@ -158,19 +192,26 @@ function SettingsPage({
                 ))}
             </div>
 
-            {tab === "source" ? <SourceTab /> : null}
-            {tab === "playback" ? <PlaybackTab /> : null}
-            {tab === "account" ? (
-                <AccountTab onLogin={() => setAuthOpen(true)} />
-            ) : null}
-            {tab === "appearance" ? (
-                <AppearanceTab
-                    titleBarStyle={titleBarStyle}
-                    onTitleBarStyleChange={onTitleBarStyleChange}
-                />
-            ) : null}
-            {tab === "update" ? <UpdateTab /> : null}
-            {tab === "hotkeys" ? <HotkeysTab /> : null}
+            {/* tab 切换：材料化过渡（淡入 + 轻微上移 + 优雅缓动），非生硬 fade */}
+            <div
+                key={tab}
+                className="animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-out"
+            >
+                {tab === "source" ? <SourceTab /> : null}
+                {tab === "playback" ? <PlaybackTab /> : null}
+                {tab === "account" ? (
+                    <AccountTab onLogin={() => setAuthOpen(true)} />
+                ) : null}
+                {tab === "appearance" ? (
+                    <AppearanceTab
+                        titleBarStyle={titleBarStyle}
+                        onTitleBarStyleChange={onTitleBarStyleChange}
+                    />
+                ) : null}
+                {tab === "update" ? <UpdateTab /> : null}
+                {tab === "hotkeys" ? <HotkeysTab /> : null}
+                {tab === "other" ? <OtherTab /> : null}
+            </div>
 
             <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
         </div>
@@ -187,12 +228,6 @@ function SourceTab() {
     const [speedHint, setSpeedHint] = useState<string | null>(null)
     const [speedLoading, setSpeedLoading] = useState(false)
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
-    const [cacheTtl, setCacheTtl] = useState(() => getApiCacheTtlMs())
-    const [autoPurge, setAutoPurge] = useState(() => getApiCacheAutoPurge())
-    const [cacheHint, setCacheHint] = useState<string | null>(null)
-    const [storagePaths, setStoragePaths] = useState<Awaited<
-        ReturnType<typeof getStoragePaths>
-    > | null>(null)
 
     useEffect(() => {
         function sync() {
@@ -204,33 +239,6 @@ function SourceTab() {
         }
         window.addEventListener(API_SETTINGS_EVENT, sync)
         return () => window.removeEventListener(API_SETTINGS_EVENT, sync)
-    }, [])
-
-    useEffect(() => {
-        function onTtl() {
-            setCacheTtl(getApiCacheTtlMs())
-        }
-        function onAutoPurge() {
-            setAutoPurge(getApiCacheAutoPurge())
-        }
-        window.addEventListener(TTL_EVENT, onTtl)
-        window.addEventListener(AUTO_PURGE_EVENT, onAutoPurge)
-        return () => {
-            window.removeEventListener(TTL_EVENT, onTtl)
-            window.removeEventListener(AUTO_PURGE_EVENT, onAutoPurge)
-        }
-    }, [])
-
-    useEffect(() => {
-        let cancelled = false
-        void getStoragePaths().then((paths) => {
-            if (!cancelled) {
-                setStoragePaths(paths)
-            }
-        })
-        return () => {
-            cancelled = true
-        }
     }, [])
 
     useEffect(() => {
@@ -320,26 +328,12 @@ function SourceTab() {
         }
     }
 
-    async function handleClearCache() {
-        try {
-            await apiCacheClear()
-            setCacheHint("已清空")
-            window.setTimeout(() => setCacheHint(null), 1600)
-            notifySuccess("已清空 API 缓存")
-        } catch (error) {
-            notifyError("清空缓存失败", {
-                description:
-                    error instanceof Error ? error.message : "请重试",
-            })
-        }
-    }
-
     const sourceLabel =
         EXTERNAL_SOURCES.find((item) => item.id === settings.source)?.label ??
         "API 源"
 
     return (
-        <Section title="音源" description="内置 API 或对接外部 NCM 源 · 缓存与音质">
+        <Section title="音源" description="内置 API 或对接外部 NCM 源 · 音质">
             <div className="space-y-3">
                 <div className="material-panel space-y-4 rounded-[20px] px-4 py-3.5">
                     <div className="space-y-3">
@@ -481,76 +475,6 @@ function SourceTab() {
                         ))}
                     </div>
                 </div>
-
-                <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                API 响应缓存
-                            </p>
-                            <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                列表类接口写入 exe 旁数据库与 cache 目录，默认{" "}
-                                {Math.round(DEFAULT_TTL_MS / 60_000)} 分钟
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => void handleClearCache()}
-                            className="h-8 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
-                        >
-                            清空缓存
-                        </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {TTL_PRESETS.map((preset) => (
-                            <ChoiceChip
-                                key={preset.id}
-                                label={preset.label}
-                                active={cacheTtl === preset.ms}
-                                onClick={() => {
-                                    setApiCacheTtlMs(preset.ms)
-                                    setCacheTtl(preset.ms)
-                                }}
-                            />
-                        ))}
-                    </div>
-                    <div className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.05]">
-                        <div className="min-w-0">
-                            <p className="text-[13px] font-medium">自动清理过期缓存</p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                超过上方时长后删除数据库与 cache 目录中的过期项
-                            </p>
-                        </div>
-                        <Switch
-                            checked={autoPurge}
-                            disabled={cacheTtl <= 0}
-                            onCheckedChange={(checked) => {
-                                setApiCacheAutoPurge(checked)
-                                setAutoPurge(checked)
-                            }}
-                        />
-                    </div>
-                    {cacheHint ? (
-                        <p className="text-[12px] text-muted-foreground">{cacheHint}</p>
-                    ) : null}
-                    {storagePaths ? (
-                        <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
-                            <p className="truncate" title={storagePaths.appDir}>
-                                运行目录 · {storagePaths.appDir}
-                            </p>
-                            <p className="truncate" title={storagePaths.databasePath}>
-                                数据库 · {storagePaths.databasePath}
-                            </p>
-                            <p className="truncate" title={storagePaths.cacheDir}>
-                                缓存 · {storagePaths.cacheDir}
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-[11px] text-muted-foreground">
-                            浏览器预览无本地路径；桌面端由 Tauri 解析 exe 目录
-                        </p>
-                    )}
-                </div>
             </div>
         </Section>
     )
@@ -566,6 +490,32 @@ function formatSettingsError(error: unknown): string {
     return "未知错误"
 }
 
+/** 清空封面缓存前收集仍在引用的内容 MD5（本地库专辑/艺人封面 + 歌曲封面覆盖） */
+function collectCoverKeepHashes(): string[] {
+    const hashes = new Set<string>()
+    try {
+        const lib = loadLocalLibrary()
+        for (const album of lib.albums) {
+            const hash = extractCoverHash(album.coverDataUrl)
+            if (hash) {
+                hashes.add(hash)
+            }
+        }
+        for (const artist of lib.artists) {
+            const hash = extractCoverHash(artist.coverDataUrl)
+            if (hash) {
+                hashes.add(hash)
+            }
+        }
+    } catch {
+        // 库读取失败时不保留专辑封面
+    }
+    for (const hash of collectCoverRefHashes()) {
+        hashes.add(hash)
+    }
+    return [...hashes]
+}
+
 function PlaybackTab() {
     const { engineStatus } = usePlayer()
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() => getEnginePref())
@@ -573,6 +523,9 @@ function PlaybackTab() {
     const [fadeMs, setFadeMsState] = useState(() => getFadePrefs().durationMs)
     const [autoPlayOnStartup, setAutoPlayOnStartup] = useState(
         () => getPlayerPreferences().autoPlayOnStartup,
+    )
+    const [closeToTray, setCloseToTrayState] = useState(() =>
+        getCloseToTray(),
     )
     const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
     const [audioMode, setAudioMode] = useState<AudioOutputMode | null>(null)
@@ -685,6 +638,24 @@ function PlaybackTab() {
                         onCheckedChange={(checked) => {
                             setStartupAutoPlay(checked)
                             setAutoPlayOnStartup(checked)
+                        }}
+                    />
+                </div>
+
+                <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
+                    <div className="min-w-0">
+                        <p className="text-[14px] font-medium tracking-[-0.01em]">
+                            关闭窗口时最小化到托盘
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                            关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单
+                        </p>
+                    </div>
+                    <Switch
+                        checked={closeToTray}
+                        onCheckedChange={(checked) => {
+                            setCloseToTrayState(checked)
+                            void setCloseToTray(checked)
                         }}
                     />
                 </div>
@@ -1078,12 +1049,26 @@ function AppearanceTab({
         setCustomHue,
         setGlassOpacity,
         setGlassBlur,
+        setMaterialGlass,
     } = useTheme()
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
+    const [performanceMode, setPerformanceModeState] = useState(() =>
+        getPerformanceMode(),
+    )
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
     const { playlistView, playlistTracksView } = useLibraryLayout()
+
+    // 性能模式开启时毛玻璃强制关闭（其他 tab 开关同步禁用）
+    useEffect(() => {
+        function onPerformance() {
+            setPerformanceModeState(getPerformanceMode())
+        }
+        window.addEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
+        return () =>
+            window.removeEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
+    }, [])
 
     useEffect(() => {
         function onLayout() {
@@ -1270,6 +1255,22 @@ function AppearanceTab({
                             玻璃透明度与模糊强度
                         </p>
                     </div>
+                    <label className="flex cursor-pointer items-center justify-between gap-4">
+                        <span className="min-w-0">
+                            <span className="block text-[13px] font-medium">
+                                常驻毛玻璃
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                                侧栏、底栏与面板的毛玻璃质感，开启可能有额外性能开销
+                            </span>
+                        </span>
+                        <Switch
+                            checked={appearance.materialGlass}
+                            disabled={performanceMode}
+                            onCheckedChange={setMaterialGlass}
+                            aria-label="常驻毛玻璃"
+                        />
+                    </label>
                     <label className="block space-y-2">
                         <div className="flex items-center justify-between text-[12px] text-muted-foreground">
                             <span>透明度</span>
@@ -1471,12 +1472,13 @@ function UpdateTab() {
     const body = status?.releaseBody?.trim() || ""
 
     return (
-        <Section
-            title="版本更新"
-            description="通过 GitHub Releases 检测，不自动安装"
-        >
-            <div className="space-y-3">
-                <div className="material-panel space-y-4 rounded-[20px] px-4 py-4">
+        <div className="space-y-7">
+            <Section
+                title="版本更新"
+                description="通过 GitHub Releases 检测，不自动安装"
+            >
+                <div className="space-y-3">
+                    <div className="material-panel space-y-4 rounded-[20px] px-4 py-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.04]">
                             <p className="text-[11px] font-medium text-muted-foreground">
@@ -1590,32 +1592,545 @@ function UpdateTab() {
                 </div>
             </div>
         </Section>
+        </div>
+    )
+}
+
+function OtherTab() {
+    const { appearance, setMaterialGlass } = useTheme()
+    const [devtoolsEnabled, setDevtoolsEnabledState] = useState(() =>
+        getDevToolsEnabled(),
+    )
+    const [performanceMode, setPerformanceModeState] = useState(() =>
+        getPerformanceMode(),
+    )
+    const [cacheTtl, setCacheTtl] = useState(() => getApiCacheTtlMs())
+    const [autoPurge, setAutoPurge] = useState(() => getApiCacheAutoPurge())
+    const [cacheHint, setCacheHint] = useState<string | null>(null)
+    const [storagePaths, setStoragePaths] = useState<Awaited<
+        ReturnType<typeof getStoragePaths>
+    > | null>(null)
+
+    useEffect(() => {
+        function onDevtools() {
+            setDevtoolsEnabledState(getDevToolsEnabled())
+        }
+        function onTtl() {
+            setCacheTtl(getApiCacheTtlMs())
+        }
+        function onAutoPurge() {
+            setAutoPurge(getApiCacheAutoPurge())
+        }
+        function onPerformance() {
+            setPerformanceModeState(getPerformanceMode())
+        }
+        window.addEventListener(DEVTOOLS_EVENT, onDevtools)
+        window.addEventListener(TTL_EVENT, onTtl)
+        window.addEventListener(AUTO_PURGE_EVENT, onAutoPurge)
+        window.addEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
+        return () => {
+            window.removeEventListener(DEVTOOLS_EVENT, onDevtools)
+            window.removeEventListener(TTL_EVENT, onTtl)
+            window.removeEventListener(AUTO_PURGE_EVENT, onAutoPurge)
+            window.removeEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
+        }
+    }, [])
+
+    useEffect(() => {
+        let cancelled = false
+        void getStoragePaths().then((paths) => {
+            if (!cancelled) {
+                setStoragePaths(paths)
+            }
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    async function handleClearApiCache() {
+        try {
+            await apiCacheClear()
+            setCacheHint("已清空")
+            window.setTimeout(() => setCacheHint(null), 1600)
+            notifySuccess("已清空 API 缓存")
+        } catch (error) {
+            notifyError("清空缓存失败", {
+                description:
+                    error instanceof Error ? error.message : "请重试",
+            })
+        }
+    }
+
+    async function handleClearCoverCache() {
+        try {
+            // 保留仍在引用的封面：本地库专辑/艺人封面 + 歌曲封面覆盖
+            const keep = collectCoverKeepHashes()
+            await invoke("clear_cover_cache", { keepHashes: keep })
+            notifySuccess("已清空封面缓存", {
+                description: "未被引用的封面已清理，引用中的封面保留",
+            })
+        } catch (error) {
+            notifyError("清空封面缓存失败", {
+                description:
+                    error instanceof Error ? error.message : "请重试",
+            })
+        }
+    }
+
+    async function handleTogglePerformance(enabled: boolean) {
+        setPerformanceModeState(enabled)
+        if (enabled) {
+            // 先记住当前毛玻璃状态，关闭性能模式时恢复原样
+            try {
+                window.localStorage.setItem(
+                    MATERIAL_GLASS_MEMO_KEY,
+                    appearance.materialGlass ? "1" : "0",
+                )
+            } catch {
+                // 记忆失败也不阻塞切换
+            }
+            // 性能模式强制关闭毛玻璃，外观设置开关同步
+            setMaterialGlass(false)
+        } else {
+            // 恢复记忆的毛玻璃状态：之前开着就重新打开
+            let memo = "0"
+            try {
+                memo = window.localStorage.getItem(MATERIAL_GLASS_MEMO_KEY) ?? "0"
+            } catch {
+                // 读不到记忆时保持现状
+            }
+            if (memo === "1") {
+                setMaterialGlass(true)
+            }
+        }
+        await setPerformanceMode(enabled)
+    }
+
+    const perfItems = [
+        { label: "关闭常驻毛玻璃", note: "立即生效，与外观设置联动" },
+        { label: "关闭界面动画与过渡", note: "立即生效" },
+        { label: "禁用 GPU 进程与硬件合成", note: "重启应用后生效" },
+    ]
+
+    return (
+        <div className="space-y-7">
+            <Section
+                title="性能模式"
+                description="牺牲视觉效果换更低的内存与 GPU 占用"
+            >
+                <div className="space-y-3">
+                    <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-4">
+                        <div className="min-w-0">
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                性能模式
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                一键关闭毛玻璃与动画，禁用 GPU 相关进程
+                            </p>
+                        </div>
+                        <Switch
+                            checked={performanceMode}
+                            onCheckedChange={(checked) =>
+                                void handleTogglePerformance(checked)
+                            }
+                            aria-label="性能模式"
+                        />
+                    </div>
+                    <div className="material-panel space-y-2 rounded-[20px] px-4 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                            <Gauge className="size-4 text-muted-foreground" />
+                            <p className="text-[12px] font-medium text-muted-foreground">
+                                开启后将应用
+                            </p>
+                        </div>
+                        {perfItems.map((item) => (
+                            <div
+                                key={item.label}
+                                className="flex items-start gap-2"
+                            >
+                                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-medium">
+                                        {item.label}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {item.note}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-3.5">
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-medium">常驻毛玻璃</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                与外观设置联动；性能模式下强制关闭
+                            </p>
+                        </div>
+                        <Switch
+                            checked={appearance.materialGlass}
+                            disabled={performanceMode}
+                            onCheckedChange={setMaterialGlass}
+                            aria-label="常驻毛玻璃"
+                        />
+                    </div>
+                </div>
+            </Section>
+
+            <Section
+                title="开发者工具"
+                description="调试界面布局与网络请求"
+            >
+                <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-4">
+                    <div className="min-w-0">
+                        <p className="text-[14px] font-medium tracking-[-0.01em]">
+                            启用 DevTools
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                            启用后按 F12 打开开发者工具（调试用）
+                        </p>
+                    </div>
+                    <Switch
+                        checked={devtoolsEnabled}
+                        onCheckedChange={(checked) => {
+                            setDevToolsEnabled(checked)
+                            setDevtoolsEnabledState(checked)
+                            if (checked) {
+                                void invoke("open_devtools")
+                            }
+                        }}
+                        aria-label="启用 DevTools"
+                    />
+                </div>
+            </Section>
+
+            <Section
+                title="缓存"
+                description="API 响应与本地封面缓存"
+            >
+                <div className="space-y-3">
+                    <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                    API 响应缓存
+                                </p>
+                                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                    列表类接口写入 exe 旁数据库与 cache 目录，默认{" "}
+                                    {Math.round(DEFAULT_TTL_MS / 60_000)} 分钟
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => void handleClearApiCache()}
+                                className="h-8 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                            >
+                                清空缓存
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {TTL_PRESETS.map((preset) => (
+                                <ChoiceChip
+                                    key={preset.id}
+                                    label={preset.label}
+                                    active={cacheTtl === preset.ms}
+                                    onClick={() => {
+                                        setApiCacheTtlMs(preset.ms)
+                                        setCacheTtl(preset.ms)
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.05]">
+                            <div className="min-w-0">
+                                <p className="text-[13px] font-medium">
+                                    自动清理过期缓存
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                    超过上方时长后删除数据库与 cache 目录中的过期项
+                                </p>
+                            </div>
+                            <Switch
+                                checked={autoPurge}
+                                disabled={cacheTtl <= 0}
+                                onCheckedChange={(checked) => {
+                                    setApiCacheAutoPurge(checked)
+                                    setAutoPurge(checked)
+                                }}
+                            />
+                        </div>
+                        {cacheHint ? (
+                            <p className="text-[12px] text-muted-foreground">
+                                {cacheHint}
+                            </p>
+                        ) : null}
+                        {storagePaths ? (
+                            <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
+                                <p className="truncate" title={storagePaths.appDir}>
+                                    运行目录 · {storagePaths.appDir}
+                                </p>
+                                <p className="truncate" title={storagePaths.databasePath}>
+                                    数据库 · {storagePaths.databasePath}
+                                </p>
+                                <p className="truncate" title={storagePaths.cacheDir}>
+                                    缓存 · {storagePaths.cacheDir}
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-[11px] text-muted-foreground">
+                                浏览器预览无本地路径；桌面端由 Tauri 解析 exe 目录
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-4">
+                        <div className="min-w-0">
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                封面缓存
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                原图与缩略图缓存，超出上限自动清理最旧文件
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => void handleClearCoverCache()}
+                            className="h-8 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                        >
+                            清空封面缓存
+                        </button>
+                    </div>
+                </div>
+            </Section>
+        </div>
     )
 }
 
 function HotkeysTab() {
+    const [globalShortcuts, setGlobalShortcuts] = useState<
+        Record<ShortcutAction, string>
+    >(() => ({ ...DEFAULT_SHORTCUTS }))
+    const [inAppShortcuts, setInAppShortcuts] = useState<InAppShortcutMap>(
+        () => getInAppShortcuts(),
+    )
+    const [recording, setRecording] = useState<{
+        kind: "global" | "in-app"
+        id: string
+    } | null>(null)
+
+    useEffect(() => {
+        let cancelled = false
+        void loadGlobalShortcuts().then((loaded) => {
+            if (!cancelled) {
+                setGlobalShortcuts(loaded)
+            }
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    async function saveGlobalShortcut(action: ShortcutAction, combo: string) {
+        setRecording(null)
+        try {
+            await updateGlobalShortcut(action, combo)
+            setGlobalShortcuts((prev) => ({ ...prev, [action]: combo }))
+            notifySuccess(
+                combo ? "全局快捷键已更新" : "已关闭该快捷键",
+                { description: combo || "该动作不再响应全局按键" },
+            )
+        } catch (error) {
+            notifyError("设置失败", {
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "组合键可能已被占用",
+            })
+        }
+    }
+
+    function saveInAppShortcut(action: InAppShortcutAction, combo: string) {
+        setRecording(null)
+        setInAppShortcuts((prev) => ({ ...prev, [action]: combo }))
+        setInAppShortcut(action, combo)
+        notifySuccess(
+            combo ? "应用内快捷键已更新" : "已关闭该快捷键",
+            { description: combo || "该动作不再响应按键" },
+        )
+    }
+
+    useEffect(() => {
+        if (!recording) {
+            return
+        }
+        const target = recording
+        function onKeyDown(event: KeyboardEvent) {
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.key === "Escape") {
+                setRecording(null)
+                return
+            }
+            if (event.key === "Backspace" || event.key === "Delete") {
+                if (target.kind === "global") {
+                    void saveGlobalShortcut(
+                        target.id as ShortcutAction,
+                        "",
+                    )
+                } else {
+                    saveInAppShortcut(
+                        target.id as InAppShortcutAction,
+                        "",
+                    )
+                }
+                return
+            }
+            const combo =
+                target.kind === "global"
+                    ? keydownToShortcut(event)
+                    : keydownToInAppShortcut(event)
+            if (!combo) {
+                return
+            }
+            if (target.kind === "global") {
+                // 冲突检测：同一组合不能绑到两个全局动作
+                const conflict = SHORTCUT_ACTIONS.find(
+                    (item) =>
+                        item.id !== target.id &&
+                        globalShortcuts[item.id] === combo,
+                )
+                if (conflict) {
+                    notifyWarning("组合键冲突", {
+                        description: `「${conflict.label}」已使用 ${combo}`,
+                    })
+                    setRecording(null)
+                    return
+                }
+                void saveGlobalShortcut(target.id as ShortcutAction, combo)
+            } else {
+                const conflict = IN_APP_ACTIONS.find(
+                    (item) =>
+                        item.id !== target.id &&
+                        inAppShortcuts[item.id] === combo,
+                )
+                if (conflict) {
+                    notifyWarning("组合键冲突", {
+                        description: `「${conflict.label}」已使用 ${combo}`,
+                    })
+                    setRecording(null)
+                    return
+                }
+                saveInAppShortcut(target.id as InAppShortcutAction, combo)
+            }
+        }
+        window.addEventListener("keydown", onKeyDown, true)
+        return () => window.removeEventListener("keydown", onKeyDown, true)
+    }, [recording, globalShortcuts, inAppShortcuts])
+
     return (
-        <Section title="快捷键" description="输入框聚焦时不响应">
-            <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
-                {[
-                    ["空格", "播放 / 暂停"],
-                    ["← / →", "快退 / 快进 5 秒"],
-                    ["↑ / ↓", "音量增减"],
-                    ["[ / ]", "上一首 / 下一首"],
-                    ["Esc", "关闭全屏播放"],
-                ].map(([key, desc]) => (
-                    <div
-                        key={key}
-                        className="flex items-center justify-between gap-3 px-4 py-2.5"
-                    >
-                        <span className="text-[13px] text-muted-foreground">{desc}</span>
-                        <kbd className="glass-chip rounded-lg px-2 py-0.5 font-mono text-[11px] text-foreground/80">
-                            {key}
-                        </kbd>
+        <Section title="快捷键" description="全局与应用内快捷键均支持自定义">
+            <div className="space-y-4">
+                <div>
+                    <p className="mb-1.5 text-[12px] font-medium text-muted-foreground">
+                        全局快捷键（任何应用下生效，需含 Ctrl/Alt 修饰或 F 键）
+                    </p>
+                    <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
+                        {SHORTCUT_ACTIONS.map((item) => (
+                            <ShortcutRow
+                                key={`global-${item.id}`}
+                                label={item.label}
+                                value={globalShortcuts[item.id]}
+                                active={
+                                    recording?.kind === "global" &&
+                                    recording.id === item.id
+                                }
+                                onStart={() =>
+                                    setRecording({
+                                        kind: "global",
+                                        id: item.id,
+                                    })
+                                }
+                            />
+                        ))}
                     </div>
-                ))}
+                </div>
+
+                <div>
+                    <p className="mb-1.5 text-[12px] font-medium text-muted-foreground">
+                        应用内快捷键（窗口聚焦时生效）
+                    </p>
+                    <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
+                        {IN_APP_ACTIONS.map((item) => (
+                            <ShortcutRow
+                                key={`in-app-${item.id}`}
+                                label={item.label}
+                                value={inAppShortcuts[item.id]}
+                                active={
+                                    recording?.kind === "in-app" &&
+                                    recording.id === item.id
+                                }
+                                onStart={() =>
+                                    setRecording({
+                                        kind: "in-app",
+                                        id: item.id,
+                                    })
+                                }
+                            />
+                        ))}
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        提示：录制时按 Esc 取消、按退格清除；输入框聚焦时应用内快捷键不生效
+                    </p>
+                </div>
             </div>
         </Section>
+    )
+}
+
+function ShortcutRow({
+    label,
+    value,
+    active,
+    onStart,
+}: {
+    label: string
+    value: string
+    active: boolean
+    onStart: () => void
+}) {
+    return (
+        <div
+            className={cn(
+                "flex items-center justify-between gap-3 px-4 py-2.5",
+                active && "bg-black/[0.03] dark:bg-white/[0.05]",
+            )}
+        >
+            <span className="text-[13px] text-foreground/90">{label}</span>
+            {active ? (
+                <span className="text-[12px] font-medium text-primary">
+                    按下组合键…（Esc 取消，退格清除）
+                </span>
+            ) : (
+                <button
+                    type="button"
+                    onClick={onStart}
+                    className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                    title="点击修改"
+                >
+                    {value ? (
+                        <kbd className="glass-chip rounded-lg px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+                            {value}
+                        </kbd>
+                    ) : (
+                        <span className="text-[12px] text-muted-foreground">
+                            未设置
+                        </span>
+                    )}
+                    <Pencil className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                </button>
+            )}
+        </div>
     )
 }
 

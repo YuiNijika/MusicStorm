@@ -33,6 +33,7 @@ type ThemeContextValue = {
     setCustomHue: (hue: number) => void
     setGlassOpacity: (value: number) => void
     setGlassBlur: (value: number) => void
+    setMaterialGlass: (enabled: boolean) => void
 }
 
 const STORAGE_KEY = "musicstorm-theme"
@@ -158,6 +159,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const setMaterialGlass = useCallback((enabled: boolean) => {
+        setAppearance((prev) => {
+            const next = { ...prev, materialGlass: enabled }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
     const value = useMemo(
         () => ({
             theme,
@@ -170,6 +179,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setCustomHue,
             setGlassOpacity,
             setGlassBlur,
+            setMaterialGlass,
         }),
         [
             theme,
@@ -182,6 +192,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setCustomHue,
             setGlassOpacity,
             setGlassBlur,
+            setMaterialGlass,
         ],
     )
 

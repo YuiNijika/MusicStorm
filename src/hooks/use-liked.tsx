@@ -42,7 +42,8 @@ type LikedContextValue = {
 const LikedContext = createContext<LikedContextValue | null>(null)
 
 function LikedProvider({ children }: { children: ReactNode }) {
-    const { ready: sessionReady, loggedIn, profile } = useNeteaseSession()
+    const { ready: sessionReady, loggedIn, profile, activeUserId } =
+        useNeteaseSession()
     const [ready, setReady] = useState(false)
     const [likedSongIds, setLikedSongIds] = useState<Set<string>>(() => new Set())
     const [likedSongPlaylistId, setLikedSongPlaylistId] = useState<string | null>(
@@ -85,24 +86,27 @@ function LikedProvider({ children }: { children: ReactNode }) {
     )
 
     const refresh = useCallback(async () => {
-        if (!loggedIn || !profile) {
+        // profile 暂缺时用 vault 里的 activeUserId 兜底，session 抖动不误清数据
+        const userId = profile?.userId ?? activeUserId
+        if (!loggedIn || !userId) {
             clear()
             return
         }
         try {
-            await applySync(profile.userId)
+            await applySync(userId)
         } catch {
             // 保持旧数据
         } finally {
             setReady(true)
         }
-    }, [applySync, clear, loggedIn, profile])
+    }, [applySync, clear, loggedIn, profile, activeUserId])
 
     useEffect(() => {
         if (!sessionReady) {
             return
         }
-        if (!loggedIn || !profile?.userId) {
+        const userId = profile?.userId ?? activeUserId
+        if (!loggedIn || !userId) {
             clear()
             return
         }
@@ -110,7 +114,7 @@ function LikedProvider({ children }: { children: ReactNode }) {
         setReady(false)
         void (async () => {
             try {
-                await applySync(profile.userId)
+                await applySync(userId)
             } catch {
                 // 保持旧数据
             } finally {
@@ -122,7 +126,7 @@ function LikedProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true
         }
-    }, [sessionReady, loggedIn, profile?.userId, clear, profile, applySync])
+    }, [sessionReady, loggedIn, profile?.userId, activeUserId, clear, applySync])
 
     const isTrackLiked = useCallback(
         (trackId: string) => likedSongIds.has(trackId),

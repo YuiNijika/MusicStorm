@@ -376,12 +376,20 @@ async function getListenStats(day?: string): Promise<ListenStats | null> {
     }
 }
 
-async function listListenStats(days = 7): Promise<ListenStats[]> {
+async function listListenStats(
+    days = 7,
+    fromDay?: string,
+    toDay?: string,
+): Promise<ListenStats[]> {
     if (!isTauriRuntime()) {
         return []
     }
     try {
-        return await invoke<ListenStats[]>("db_list_listen_stats", { days })
+        return await invoke<ListenStats[]>("db_list_listen_stats", {
+            days,
+            fromDay,
+            toDay,
+        })
     } catch {
         return []
     }
@@ -389,6 +397,8 @@ async function listListenStats(days = 7): Promise<ListenStats[]> {
 
 async function listListenSourceBreakdown(
     days: number | null = null,
+    fromDay?: string,
+    toDay?: string,
 ): Promise<ListenSourceStat[]> {
     if (!isTauriRuntime()) {
         return []
@@ -396,6 +406,8 @@ async function listListenSourceBreakdown(
     try {
         return await invoke<ListenSourceStat[]>("db_listen_source_breakdown", {
             days: days && days > 0 ? days : null,
+            fromDay,
+            toDay,
         })
     } catch {
         return []
@@ -409,6 +421,8 @@ async function listListenSourceBreakdown(
 async function listTopTrackClusters(
     limit = 20,
     days: number | null = null,
+    fromDay?: string,
+    toDay?: string,
 ): Promise<TopTrackCluster[]> {
     if (!isTauriRuntime()) {
         return []
@@ -418,6 +432,8 @@ async function listTopTrackClusters(
         const rows = await invoke<TopTrackStat[]>("db_list_top_tracks", {
             limit: fetchLimit,
             days: days && days > 0 ? days : null,
+            fromDay,
+            toDay,
         })
         const enriched = await enrichTopTrackStats(rows)
         return clusterTopTracks(enriched).slice(0, limit)

@@ -5,6 +5,8 @@ import { FullPlayer } from "@/components/layout/full-player"
 import { PlayerBar } from "@/components/layout/player-bar"
 import { Sidebar } from "@/components/layout/sidebar"
 import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
+import { useCloseToTray } from "@/hooks/use-close-to-tray"
+import { useTrayCommands } from "@/hooks/use-tray-commands"
 import type { AppRoute } from "@/lib/routes"
 
 type AppShellProps = {
@@ -25,6 +27,8 @@ function AppShell({
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     usePlayerHotkeys()
+    useCloseToTray()
+    useTrayCommands()
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">

@@ -191,6 +191,19 @@ function toAssetUrl(path: string | null | undefined): string {
     }
 }
 
+/**
+ * 本地封面 URL → 对应缩略图 URL。
+ * 缓存目录同 hash：originals/<hash>.<ext> 与 thumbnails/<hash>.jpg，
+ * 列表卡片走缩略图（192px）可显著降低图片解码内存；无缩略图时原样返回。
+ */
+function toThumbnailUrl(url: string): string {
+    const match = /\/originals\/([a-f0-9]{16,})\.[a-z0-9]+$/i.exec(url)
+    if (!match) {
+        return url
+    }
+    return url.replace(/\/originals\/[^/]+$/, `/thumbnails/${match[1]}.jpg`)
+}
+
 function normalizeAlbum(raw: Partial<LocalAlbum>): LocalAlbum | null {
     if (!raw || typeof raw.id !== "string" || !raw.id) {
         return null
@@ -1027,6 +1040,7 @@ export {
     saveLocalLibrary,
     storedToTrack,
     toAssetUrl,
+    toThumbnailUrl,
     updateAlbum,
     updateArtist,
     upsertArtist,

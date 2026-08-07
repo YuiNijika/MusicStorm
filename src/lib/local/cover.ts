@@ -114,9 +114,16 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     })
 }
 
+/** 从封面 URL / 路径提取缓存内容 MD5；非缓存路径返回 null */
+function extractCoverHash(url: string): string | null {
+    const match = /[\\/]originals[\\/]([a-f0-9]{16,})\.[a-z0-9]+$/i.exec(url)
+    return match?.[1] ?? null
+}
+
 export {
     cacheCoverUrl,
     coverPathToUrl,
+    extractCoverHash,
     fetchImageAsDataUrl,
     isTauriRuntime,
     migrateLegacyCover,

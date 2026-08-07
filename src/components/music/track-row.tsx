@@ -1,4 +1,20 @@
-import { Heart, MoreHorizontal, Pause, Play } from "lucide-react"
+import {
+    CloudDownload,
+    Download,
+    Eraser,
+    FilePlus2,
+    FolderOpen,
+    Heart,
+    ImageOff,
+    ImagePlus,
+    ListMinus,
+    ListPlus,
+    ListStart,
+    MoreHorizontal,
+    Pause,
+    Pencil,
+    Play,
+} from "lucide-react"
 import {
     useEffect,
     useState,
@@ -8,7 +24,15 @@ import {
 } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { LyricEditDialog } from "@/components/music/lyric-edit-dialog"
 import { SourceBadge } from "@/components/music/source-badge"
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +43,7 @@ import {
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlayer } from "@/hooks/use-player"
 import { formatDuration } from "@/lib/format"
 import { pickCoverImage } from "@/lib/local/cover"
 import { applyNeteaseMetadata } from "@/lib/local/netease-metadata"
@@ -89,7 +114,9 @@ function TrackRow({
     const { openArtist, openAlbum } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
+    const { playNext, addToQueue } = usePlayer()
     const [, setOverrideTick] = useState(0)
+    const [lyricEditOpen, setLyricEditOpen] = useState(false)
 
     const isNetease = track.source === "netease"
     const isLocal = track.source === "local"
@@ -235,13 +262,33 @@ function TrackRow({
         notifySuccess("已清除自定义封面", { description: track.title })
     }
 
+    async function handleRevealInFolder() {
+        if (!isLocal || !track.filePath) {
+            return
+        }
+        try {
+            const { revealItemInDir } = await import("@tauri-apps/plugin-opener")
+            await revealItemInDir(track.filePath)
+        } catch {
+            notifyError("打开文件夹失败", {
+                description: "系统未提供文件管理器",
+            })
+        }
+    }
+
     return (
+        <>
+        <ContextMenu>
+            <ContextMenuTrigger
+                render={(props) => (
         <div
+            {...props}
             role="button"
             tabIndex={0}
             onClick={() => onPlay(track)}
             onKeyDown={handleRowKey}
             className={cn(
+                props.className,
                 "group grid w-full min-w-0 cursor-pointer items-center text-left transition-colors duration-150",
                 dense
                     ? "gap-1.5 rounded-xl px-1.5 py-1.5 sm:gap-2"
@@ -447,23 +494,47 @@ function TrackRow({
                                 <DropdownMenuItem
                                     onClick={() => void handleRemove()}
                                 >
+                                    <ListMinus />
                                     从歌单移除
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                             </>
                         ) : null}
+                        <DropdownMenuItem onClick={() => playNext(track)}>
+                            <ListStart />
+                            下一首播放
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => addToQueue(track)}>
+                            <ListPlus />
+                            加入队列
+                        </DropdownMenuItem>
+                        {isLocal && track.filePath ? (
+                            <DropdownMenuItem
+                                onClick={() => void handleRevealInFolder()}
+                            >
+                                <FolderOpen />
+                                打开所在文件夹
+                            </DropdownMenuItem>
+                        ) : null}
                         {isNetease ? (
                             <DropdownMenuItem onClick={() => void handleDownload()}>
+                                <Download />
                                 下载歌曲
                             </DropdownMenuItem>
                         ) : null}
+                        <DropdownMenuItem onClick={() => setLyricEditOpen(true)}>
+                            <Pencil />
+                            编辑歌词
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={() => void handleOverrideLyric()}
                         >
+                            <FilePlus2 />
                             {isLocal ? "更换歌词" : "覆盖歌词"}
                         </DropdownMenuItem>
                         {hasLyricOverride ? (
                             <DropdownMenuItem onClick={handleClearLyric}>
+                                <Eraser />
                                 清除自定义歌词
                             </DropdownMenuItem>
                         ) : null}
@@ -473,15 +544,18 @@ function TrackRow({
                                 <DropdownMenuItem
                                     onClick={() => void handleNeteaseMetadata()}
                                 >
+                                    <CloudDownload />
                                     从网易云获取封面和歌词
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => void handleOverrideCover()}
                                 >
+                                    <ImagePlus />
                                     更换封面
                                 </DropdownMenuItem>
                                 {hasCoverOverride ? (
                                     <DropdownMenuItem onClick={handleClearCover}>
+                                        <ImageOff />
                                         清除自定义封面
                                     </DropdownMenuItem>
                                 ) : null}
@@ -491,6 +565,99 @@ function TrackRow({
                 </DropdownMenu>
             ) : null}
         </div>
+                )}
+            />
+            <ContextMenuContent side="right" sideOffset={4} className="min-w-48">
+                <ContextMenuItem onClick={() => onPlay(track)}>
+                    <Play />
+                    播放
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => playNext(track)}>
+                    <ListStart />
+                    下一首播放
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => addToQueue(track)}>
+                    <ListPlus />
+                    加入队列
+                </ContextMenuItem>
+                {isNetease ? (
+                    <ContextMenuItem onClick={(event) => void handleLike(event)}>
+                        <Heart
+                            className={cn(
+                                liked && "fill-current text-rose-500",
+                            )}
+                        />
+                        {liked ? "取消喜欢" : "喜欢"}
+                    </ContextMenuItem>
+                ) : null}
+                {playlistId ? (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onClick={() => void handleRemove()}>
+                            <ListMinus />
+                            从歌单移除
+                        </ContextMenuItem>
+                    </>
+                ) : null}
+                {isNetease ? (
+                    <ContextMenuItem onClick={() => void handleDownload()}>
+                        <Download />
+                        下载歌曲
+                    </ContextMenuItem>
+                ) : null}
+                {isLocal && track.filePath ? (
+                    <ContextMenuItem onClick={() => void handleRevealInFolder()}>
+                        <FolderOpen />
+                        打开所在文件夹
+                    </ContextMenuItem>
+                ) : null}
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => setLyricEditOpen(true)}>
+                    <Pencil />
+                    编辑歌词
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => void handleOverrideLyric()}>
+                    <FilePlus2 />
+                    {isLocal ? "更换歌词" : "覆盖歌词"}
+                </ContextMenuItem>
+                {hasLyricOverride ? (
+                    <ContextMenuItem onClick={handleClearLyric}>
+                        <Eraser />
+                        清除自定义歌词
+                    </ContextMenuItem>
+                ) : null}
+                {isLocal ? (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            onClick={() => void handleNeteaseMetadata()}
+                        >
+                            <CloudDownload />
+                            从网易云获取封面和歌词
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                            onClick={() => void handleOverrideCover()}
+                        >
+                            <ImagePlus />
+                            更换封面
+                        </ContextMenuItem>
+                        {hasCoverOverride ? (
+                            <ContextMenuItem onClick={handleClearCover}>
+                                <ImageOff />
+                                清除自定义封面
+                            </ContextMenuItem>
+                        ) : null}
+                    </>
+                ) : null}
+            </ContextMenuContent>
+        </ContextMenu>
+
+        <LyricEditDialog
+            track={track}
+            open={lyricEditOpen}
+            onOpenChange={setLyricEditOpen}
+        />
+        </>
     )
 }
 

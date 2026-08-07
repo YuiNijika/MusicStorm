@@ -1,4 +1,4 @@
-import { ChevronDown, Search } from "lucide-react"
+import { CalendarDays, ChevronDown, Search } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 
 import { TrackRow } from "@/components/music/track-row"
@@ -11,7 +11,13 @@ import {
     StatsSourceMixChart,
 } from "@/components/music/stats-charts"
 import { StateHero } from "@/components/music/state-hero"
+import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import { usePlayer } from "@/hooks/use-player"
 import {
     clusterToTrack,
@@ -27,7 +33,7 @@ import { formatDuration, formatListenDuration } from "@/lib/format"
 import { stripExtension } from "@/lib/local/audio-formats"
 import { cn } from "@/lib/utils"
 
-type PeriodKey = "7" | "30" | "all"
+type PeriodKey = "7" | "30" | "all" | "custom"
 type SourceFilter = "all" | "local" | "netease"
 type TrackSortKey = "plays" | "duration" | "title" | "artist"
 type LimitKey = "20" | "50" | "100"
@@ -41,7 +47,40 @@ const PERIODS: {
     { id: "7", label: "7 天", days: 7, chartDays: 7 },
     { id: "30", label: "30 天", days: 30, chartDays: 30 },
     { id: "all", label: "全部", days: null, chartDays: 30 },
+    { id: "custom", label: "自定义", days: null, chartDays: 30 },
 ]
+
+/** 相对今天偏移 N 天的 UTC 日期字符串（YYYY-MM-DD） */
+function dateStr(offsetDays: number): string {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - offsetDays)
+    return d.toISOString().slice(0, 10)
+}
+
+/** Date → YYYY-MM-DD（日历选择用本地时区，与用户所见一致） */
+function ymd(d: Date): string {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${y}-${m}-${day}`
+}
+
+/** YYYY-MM-DD → Date；非法输入返回 undefined */
+function parseYmd(s: string): Date | undefined {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        return undefined
+    }
+    const d = new Date(`${s}T00:00:00`)
+    return Number.isNaN(d.getTime()) ? undefined : d
+}
+
+/** 两个日期之间的天数差（含首尾） */
+function rangeDays(from: string, to: string): number {
+    const diff =
+        (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+        86_400_000
+    return Math.max(1, Math.min(90, Math.round(diff) + 1))
+}
 
 const SOURCE_OPTIONS = [
     { value: "all" as const, label: "全部来源" },
@@ -166,6 +205,8 @@ function splitListenDuration(ms: number): { primary: string; unit: string } {
 function StatsPage() {
     const { playTrack, currentTrack, isPlaying } = usePlayer()
     const [period, setPeriod] = useState<PeriodKey>("7")
+    const [fromDate, setFromDate] = useState(() => dateStr(29))
+    const [toDate, setToDate] = useState(() => dateStr(0))
     const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all")
     const [trackSort, setTrackSort] = useState<TrackSortKey>("plays")
     const [limitKey, setLimitKey] = useState<LimitKey>("20")
@@ -180,6 +221,14 @@ function StatsPage() {
     const tauri = isTauriRuntime()
 
     const periodMeta = PERIODS.find((p) => p.id === period) ?? PERIODS[0]!
+
+    const isCustom = period === "custom"
+    const from = isCustom ? fromDate : undefined
+    const to = isCustom ? toDate : undefined
+    const chartDays = isCustom
+        ? rangeDays(fromDate, toDate)
+        : periodMeta.chartDays
+    const topDays = isCustom ? null : periodMeta.days
 
     useEffect(() => {
         let cancelled = false
@@ -197,14 +246,16 @@ function StatsPage() {
                 return
             }
 
-            const chartDays = periodMeta.chartDays
-            const topDays = periodMeta.days
             const [day, chartList, periodList, tops, mix] = await Promise.all([
                 getListenStats(),
-                listListenStats(chartDays),
-                topDays ? listListenStats(topDays) : listListenStats(90),
-                listTopTrackClusters(100, topDays),
-                listListenSourceBreakdown(topDays),
+                listListenStats(chartDays, from, to),
+                isCustom
+                    ? listListenStats(90, from, to)
+                    : topDays
+                      ? listListenStats(topDays)
+                      : listListenStats(90),
+                listTopTrackClusters(100, topDays, from, to),
+                listListenSourceBreakdown(topDays, from, to),
             ])
 
             if (cancelled) return
@@ -215,10 +266,7 @@ function StatsPage() {
             if (topDays) {
                 setPeriodTotals(sumRows(fillRecentDays(periodList, topDays)))
             } else {
-                setPeriodTotals({
-                    plays: mix.reduce((s, r) => s + r.playCount, 0),
-                    ms: mix.reduce((s, r) => s + r.totalMs, 0),
-                })
+                setPeriodTotals(sumRows(periodList))
             }
             setTopTracks(tops)
             setSources(mix)
@@ -227,13 +275,14 @@ function StatsPage() {
         return () => {
             cancelled = true
         }
-    }, [periodMeta.chartDays, periodMeta.days, period])
+    }, [chartDays, topDays, from, to])
 
     const heroLabel = useMemo(() => {
+        if (period === "custom") return `${fromDate} 至 ${toDate}`
         if (period === "7") return "过去 7 天"
         if (period === "30") return "过去 30 天"
         return "全部时间"
-    }, [period])
+    }, [period, fromDate, toDate])
 
     const dailyAvgMs = useMemo(() => {
         const days = periodMeta.days ?? Math.max(recent.length, 1)
@@ -286,6 +335,50 @@ function StatsPage() {
                     ) : null
                 }
             />
+
+            {tauri && period === "custom" ? (
+                <Popover>
+                    <PopoverTrigger
+                        render={(props) => (
+                            <button
+                                {...props}
+                                type="button"
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium tabular-nums transition-colors hover:bg-black/[0.08] active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
+                            >
+                                <CalendarDays className="size-4 text-muted-foreground" />
+                                {fromDate} ~ {toDate}
+                            </button>
+                        )}
+                    />
+                    <PopoverContent
+                        align="start"
+                        sideOffset={8}
+                        className="w-fit p-2"
+                    >
+                        <Calendar
+                            mode="range"
+                            numberOfMonths={2}
+                            selected={{
+                                from: parseYmd(fromDate),
+                                to: parseYmd(toDate),
+                            }}
+                            onSelect={(range) => {
+                                if (range?.from) {
+                                    const from = ymd(range.from)
+                                    const to = range.to ? ymd(range.to) : from
+                                    if (from <= to) {
+                                        setFromDate(from)
+                                        setToDate(to)
+                                    } else {
+                                        setFromDate(to)
+                                        setToDate(from)
+                                    }
+                                }
+                            }}
+                        />
+                    </PopoverContent>
+                </Popover>
+            ) : null}
 
             {!tauri ? (
                 <StateHero

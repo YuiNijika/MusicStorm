@@ -20,6 +20,8 @@ import {
     removeAlbumsBulk,
     removeArtistsBulk,
     resolveAlbumCoverUrl,
+    saveLocalLibrary,
+    toThumbnailUrl,
     updateAlbum,
     updateArtist,
     upsertArtist,
@@ -114,6 +116,73 @@ function useLocalLibrary() {
             cancelled = true
         }
         // 仅启动时
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [desktop])
+
+    // 旧 base64 封面迁移到文件缓存（一次性）：base64 在 localStorage 与图片解码都吃内存
+    useEffect(() => {
+        if (!desktop) {
+            return
+        }
+        let cancelled = false
+        const pending: { kind: "album" | "artist"; id: string; cover: string }[] = []
+        for (const album of library.albums) {
+            if (album.coverDataUrl.startsWith("data:")) {
+                pending.push({ kind: "album", id: album.id, cover: album.coverDataUrl })
+            }
+        }
+        for (const artist of library.artists) {
+            if (artist.coverDataUrl.startsWith("data:")) {
+                pending.push({ kind: "artist", id: artist.id, cover: artist.coverDataUrl })
+            }
+        }
+        if (pending.length === 0) {
+            return
+        }
+        void (async () => {
+            const { coverPathToUrl, migrateLegacyCover } = await import(
+                "@/lib/local/cover"
+            )
+            let changed = false
+            const next = { ...library }
+            for (const item of pending) {
+                if (cancelled) {
+                    return
+                }
+                try {
+                    const cached = await migrateLegacyCover(item.cover)
+                    const asset = coverPathToUrl(cached.originalPath)
+                    if (!asset) {
+                        continue
+                    }
+                    changed = true
+                    if (item.kind === "album") {
+                        next.albums = next.albums.map((album) =>
+                            album.id === item.id
+                                ? { ...album, coverDataUrl: asset }
+                                : album,
+                        )
+                    } else {
+                        next.artists = next.artists.map((artist) =>
+                            artist.id === item.id
+                                ? { ...artist, coverDataUrl: asset }
+                                : artist,
+                        )
+                    }
+                } catch {
+                    // 迁移失败保留旧 base64，下次启动再试
+                }
+            }
+            if (cancelled || !changed) {
+                return
+            }
+            saveLocalLibrary(next)
+            setLibrary(next)
+        })()
+        return () => {
+            cancelled = true
+        }
+        // 仅启动时对初始库迁移一次
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [desktop])
 
@@ -463,6 +532,12 @@ function useLocalLibrary() {
         [library],
     )
 
+    /** 列表卡片封面：走 192px 缩略图，降低图片解码内存 */
+    const albumCoverThumb = useCallback(
+        (album: LocalAlbum) => toThumbnailUrl(resolveAlbumCoverUrl(album, library)),
+        [library],
+    )
+
     const subtitle =
         statusText ??
         (library.albums.length > 0
@@ -500,6 +575,7 @@ function useLocalLibrary() {
         deleteArtists,
         clearAll,
         albumCover,
+        albumCoverThumb,
     }
 }
 

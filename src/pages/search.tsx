@@ -1,4 +1,8 @@
-import { Search as SearchIcon } from "lucide-react"
+import {
+    History as HistoryIcon,
+    Search as SearchIcon,
+    X,
+} from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { SearchResultsSkeleton } from "@/components/music/loading-skeletons"
@@ -16,6 +20,13 @@ import {
     type NeteaseSearchBundle,
 } from "@/lib/netease/search"
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
+import {
+    SEARCH_HISTORY_EVENT,
+    addSearchHistory,
+    clearSearchHistory,
+    getSearchHistory,
+    removeSearchHistory,
+} from "@/lib/search-history"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -37,6 +48,8 @@ function SearchPage() {
     const [query, setQuery] = useState("")
     /** 网易云仅在点击搜索 / 回车后生效 */
     const [submittedQuery, setSubmittedQuery] = useState("")
+    const [history, setHistory] = useState<string[]>(() => getSearchHistory())
+    const [inputFocused, setInputFocused] = useState(false)
     const [mode, setMode] = useState<SearchMode>("netease")
     const [remote, setRemote] = useState<NeteaseSearchBundle>(EMPTY_BUNDLE)
     const [isLoading, setIsLoading] = useState(false)
@@ -170,6 +183,9 @@ function SearchPage() {
 
     function runSearch() {
         const keyword = query.trim()
+        if (keyword) {
+            addSearchHistory(keyword)
+        }
         if (mode === "netease") {
             setSubmittedQuery(keyword)
             return
@@ -203,6 +219,26 @@ function SearchPage() {
         }
     }
 
+    // 本页增删清空会触发事件，重读以免 state 落后于 localStorage
+    useEffect(() => {
+        function onHistory() {
+            setHistory(getSearchHistory())
+        }
+        window.addEventListener(SEARCH_HISTORY_EVENT, onHistory)
+        return () =>
+            window.removeEventListener(SEARCH_HISTORY_EVENT, onHistory)
+    }, [])
+
+    /** 点击历史词：填充输入并立即搜索 */
+    function runHistorySearch(keyword: string) {
+        setQuery(keyword)
+        if (mode === "netease") {
+            setSubmittedQuery(keyword)
+        }
+        // 本地模式随 query 即时过滤
+        setInputFocused(false)
+    }
+
     const remoteKeyword = submittedQuery.trim()
     const hasRemoteAny =
         remote.tracks.length > 0 ||
@@ -227,11 +263,19 @@ function SearchPage() {
                     />
                 </div>
 
+                <div className="relative">
                 <div className="flex gap-2">
                     <label className="material-field flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-3.5">
                         <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
                         <input
                             value={query}
+                            onFocus={() => setInputFocused(true)}
+                            onBlur={() =>
+                                window.setTimeout(
+                                    () => setInputFocused(false),
+                                    120,
+                                )
+                            }
                             onChange={(event) => setQuery(event.currentTarget.value)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") {
@@ -262,6 +306,48 @@ function SearchPage() {
                     >
                         {mode === "netease" && isLoading ? "搜索中…" : "搜索"}
                     </button>
+                </div>
+
+                {inputFocused && !query.trim() && history.length > 0 ? (
+                    <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.16)] ring-1 ring-foreground/10 backdrop-blur-2xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-200 ease-out">
+                        <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                            最近搜索
+                        </p>
+                        {history.map((item) => (
+                            <button
+                                key={item}
+                                type="button"
+                                onClick={() => runHistorySearch(item)}
+                                className="group flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                            >
+                                <HistoryIcon className="size-4 shrink-0 text-muted-foreground/50" />
+                                <span className="min-w-0 flex-1 truncate text-[13px]">
+                                    {item}
+                                </span>
+                                <span
+                                    role="button"
+                                    tabIndex={-1}
+                                    aria-label={`删除 ${item}`}
+                                    onClick={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        removeSearchHistory(item)
+                                    }}
+                                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-opacity hover:bg-black/10 hover:opacity-100 group-hover:opacity-100 dark:hover:bg-white/15"
+                                >
+                                    <X className="size-3.5" />
+                                </span>
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={clearSearchHistory}
+                            className="w-full cursor-pointer py-1.5 text-center text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            清空搜索记录
+                        </button>
+                    </div>
+                ) : null}
                 </div>
             </div>
 

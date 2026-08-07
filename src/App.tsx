@@ -7,6 +7,12 @@ import { Toaster, toast } from "@/components/ui/toast"
 import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
+import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
+import {
+    PERFORMANCE_MODE_EVENT,
+    applyPerformanceModeClass,
+    getPerformanceMode,
+} from "@/lib/app/performance-prefs"
 import {
     readTitleBarStyle,
     TITLE_BAR_STORAGE_KEY,
@@ -145,10 +151,40 @@ function App() {
     const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>()
 
     useApiCacheAutoPurge()
+    useDevtoolsShortcut()
 
     useEffect(() => {
         // 首帧 DOM 已提交：撤掉内联启动兜底画面
         document.getElementById("boot-loading")?.remove()
+    }, [])
+
+    // 性能模式：全局挂 html class（禁动画/过渡）；切换时即时生效
+    useEffect(() => {
+        applyPerformanceModeClass(getPerformanceMode())
+        function onMode() {
+            applyPerformanceModeClass(getPerformanceMode())
+        }
+        window.addEventListener(PERFORMANCE_MODE_EVENT, onMode)
+        return () =>
+            window.removeEventListener(PERFORMANCE_MODE_EVENT, onMode)
+    }, [])
+
+    // 禁用 WebView2 原生右键菜单：应用内自定义菜单接管；
+    // 文本输入区（歌词编辑等）保留原生复制/粘贴菜单
+    useEffect(() => {
+        function handleContextMenu(event: globalThis.MouseEvent) {
+            const target = event.target as HTMLElement | null
+            if (
+                target &&
+                target.closest("input, textarea, [contenteditable='true']")
+            ) {
+                return
+            }
+            event.preventDefault()
+        }
+        document.addEventListener("contextmenu", handleContextMenu)
+        return () =>
+            document.removeEventListener("contextmenu", handleContextMenu)
     }, [])
 
     const handleTitleBarStyleChange = useCallback((style: TitleBarStyle) => {

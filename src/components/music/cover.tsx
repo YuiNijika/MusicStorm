@@ -5,15 +5,24 @@ import { cn } from "@/lib/utils"
 type CoverProps = {
     src: string
     alt: string
-    size?: "sm" | "md" | "lg" | "xl"
+    size?: "xs" | "sm" | "md" | "lg" | "xl"
     className?: string
 }
 
 const SIZE_CLASS = {
+    xs: "size-9 rounded-[7px]",
     sm: "size-10 rounded-[8px]",
     md: "size-12 rounded-[10px]",
     lg: "size-[72px] rounded-[14px]",
     xl: "aspect-square w-full rounded-[14px]",
+} as const
+
+const SIZE_PX = {
+    xs: { width: 36, height: 36 },
+    sm: { width: 40, height: 40 },
+    md: { width: 48, height: 48 },
+    lg: { width: 72, height: 72 },
+    xl: { width: 320, height: 320 },
 } as const
 
 function Cover({ src, alt, size = "md", className }: CoverProps) {
@@ -23,6 +32,7 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
         setFailed(false)
     }, [src])
     const showImage = Boolean(src) && !failed
+    const px = SIZE_PX[size]
 
     return (
         <div
@@ -37,9 +47,12 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
                     key={src}
                     src={src}
                     alt={alt}
+                    width={px.width}
+                    height={px.height}
                     draggable={false}
-                    className="size-full object-cover"
                     loading="lazy"
+                    decoding="async"
+                    className="size-full object-cover"
                     onError={() => setFailed(true)}
                 />
             ) : (

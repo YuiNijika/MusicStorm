@@ -44,6 +44,10 @@ import {
 } from "@/lib/netease/quality"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import {
+    getInAppShortcuts,
+    keydownToInAppShortcut,
+} from "@/lib/app/in-app-shortcut-prefs"
+import {
     CHROME_EVENT,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
@@ -68,7 +72,9 @@ const LyricsView = lazy(() =>
 /** closed → entering → open → exiting → closed */
 type Phase = "closed" | "entering" | "open" | "exiting"
 
-const DRAWER_MS = 420
+// 时长与 App.css 的 motion token 对齐（--duration-enter/exit、reduced-motion cross-fade 150ms）
+const DRAWER_MS = 340
+const REDUCED_FADE_MS = 150
 
 function prefersReducedMotion(): boolean {
     if (typeof window === "undefined") {
@@ -157,7 +163,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         enterTimerRef.current = null
                         setPhase("open")
                     },
-                    reduce ? 0 : 16,
+                    // 留两帧让初始态渲染完成，transition 才有起点
+                    reduce ? 0 : 32,
                 )
             }
             return
@@ -175,7 +182,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         exitTimerRef.current = null
                         setPhase("closed")
                     },
-                    reduce ? 0 : DRAWER_MS,
+                    reduce ? REDUCED_FADE_MS : DRAWER_MS,
                 )
             }
         }
@@ -191,8 +198,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         if (phase === "closed" || phase === "exiting") {
             return
         }
+        // 关闭全屏快捷键可自定义（in-app-shortcut-prefs）
+        const closeCombo =
+            getInAppShortcuts().closeFullPlayer || "Esc"
         function onKey(event: KeyboardEvent) {
-            if (event.key === "Escape") {
+            const combo = keydownToInAppShortcut(event)
+            if (combo && combo === closeCombo) {
                 event.preventDefault()
                 onClose()
             }
@@ -221,12 +232,19 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const canOpenAlbum =
         displayTrack.source === "netease" && Boolean(displayTrack.albumId)
     const lyricsActive = phase === "open" || phase === "entering"
+    // 从底部升起/滑回（锚定底栏触发源，空间一致），全程无 blur（避免卡顿）
     const sheetMotion =
-        phase === "entering" || phase === "open"
-            ? "translate-y-0 opacity-100"
-            : "translate-y-full opacity-0"
+        phase === "exiting"
+            ? "full-player-exit"
+            : phase === "open"
+              ? "translate-y-0 opacity-100"
+              : "translate-y-full opacity-0"
     const scrimMotion =
-        phase === "entering" || phase === "open" ? "opacity-100" : "opacity-0"
+        phase === "exiting"
+            ? "full-player-scrim-exit"
+            : phase === "open"
+              ? "opacity-100"
+              : "opacity-0"
 
     function navigateArtist() {
         if (!primaryArtist?.id) {
@@ -350,19 +368,26 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         >
             <div
                 className={cn(
-                    "full-player-surface relative flex h-full min-h-0 flex-col overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)]",
-                    "transition-[transform,opacity]",
+                    "full-player-surface relative flex h-full min-h-0 flex-col overflow-hidden",
                     sheetMotion,
                 )}
-                style={{ transitionDuration: `${DRAWER_MS}ms` }}
+                style={{
+                    transitionProperty: "transform, opacity",
+                    transitionDuration: `${DRAWER_MS}ms`,
+                    transitionTimingFunction: "var(--ease-enter)",
+                }}
             >
                 <div
                     aria-hidden
                     className={cn(
-                        "full-player-backdrop pointer-events-none absolute inset-0 transition-opacity ease-out",
+                        "full-player-backdrop pointer-events-none absolute inset-0",
                         scrimMotion,
                     )}
-                    style={{ transitionDuration: `${DRAWER_MS}ms` }}
+                    style={{
+                        transitionProperty: "opacity",
+                        transitionDuration: `${DRAWER_MS}ms`,
+                        transitionTimingFunction: "var(--ease-enter)",
+                    }}
                 >
                     {displayCover ? (
                         <img

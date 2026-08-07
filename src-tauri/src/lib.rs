@@ -5,12 +5,16 @@ mod db;
 mod ffmpeg;
 mod local_meta;
 mod netease_proxy;
+mod tray;
 
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
     audio_seek, audio_set_device, audio_set_exclusive, audio_set_volume, audio_stop, AudioState,
 };
-use cover_cache::{cache_cover_data_url, cache_cover_url, pick_cover_image};
+use cover_cache::{
+    cache_cover_data_url, cache_cover_url, clear_cover_cache, pick_cover_image,
+    purge_cover_cache,
+};
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
@@ -65,6 +69,15 @@ struct LocalScanTrack {
     file_name: Option<String>,
     /// 内容 MD5，相同文件合并听歌统计
     content_hash: Option<String>,
+}
+
+/// 打开 WebView DevTools；release 构建需启用 tauri "devtools" feature
+#[tauri::command]
+fn open_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.open_devtools();
+    }
+    Ok(())
 }
 
 /// 系统文件夹选择器；取消时返回 null
@@ -594,6 +607,64 @@ fn parse_filename(stem: &str) -> (String, String) {
     ("未知艺人".into(), stem.trim().to_string())
 }
 
+/// 版本升级时清理 WebView2 可再生缓存（磁盘缓存 / JS 编译缓存 / GPU 缓存 / Service Worker）。
+/// 保留 Local Storage / Cookies / Network —— 网易云登录态依赖它们。
+/// 同版本重复启动不清理；升级或首次安装（无记录）才触发一次。
+/// 在后台线程执行，不阻塞首帧。
+fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
+    // 版本以 tauri.conf.json 为准（用户可见版本号），不用 Cargo.toml 的
+    let version = app.package_info().version.to_string();
+    let conn = open_db(app)?;
+
+    let stored: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_setting WHERE key = 'app_version'",
+            rusqlite::params![],
+            |row| row.get(0),
+        )
+        .ok();
+    if stored.as_deref() == Some(version.as_str()) {
+        return Ok(0);
+    }
+    conn.execute(
+        "INSERT INTO app_setting (key, value) VALUES ('app_version', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rusqlite::params![version],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let local_data = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?;
+    let ebwebview = local_data.join("EBWebView");
+    if !ebwebview.exists() {
+        return Ok(0);
+    }
+
+    // 只删可再生的缓存子目录；登录态（Local Storage / Cookies / Network）保留
+    const REMOVABLE_DIRS: [&str; 9] = [
+        "Default/Cache",
+        "Default/Code Cache",
+        "Default/GPUCache",
+        "Default/DawnCache",
+        "Default/DawnGraphiteCache",
+        "Default/DawnWebGPUCache",
+        "Default/ShaderCache",
+        "Default/GrShaderCache",
+        "Default/Service Worker",
+    ];
+    let mut removed = 0u64;
+    for rel in REMOVABLE_DIRS {
+        let dir = ebwebview.join(rel);
+        if dir.exists() {
+            let _ = std::fs::remove_dir_all(&dir);
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
 /// 后台清理过期 API 缓存；开独立连接避免锁主线程 DB
 fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String> {
     let conn = open_db(app)?;
@@ -604,27 +675,83 @@ fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String>
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
-            // main 窗口由 tauri.conf.json 注册并直接显示；setup 只做轻量状态初始化
+            // 窗口在 Rust 里创建（而非 conf 注册），以便按「性能模式」动态注入浏览器参数
             let conn = open_db(app.handle())?;
+
+            // 性能模式开启 → 禁用 GPU 相关进程（毛玻璃/动画在前端关闭）
+            let perf_mode: Option<String> = conn
+                .query_row(
+                    "SELECT value FROM app_setting WHERE key = 'performance_mode'",
+                    rusqlite::params![],
+                    |row| row.get(0),
+                )
+                .ok();
+            let performance = perf_mode.as_deref() == Some("1");
+
+            const BASE_ARGS: &str = "--disk-cache-size=524288 --disable-remote-fonts \
+                --disable-background-networking --disable-sync --disable-default-apps \
+                --disable-extensions --disable-component-update --disable-pdf-viewer \
+                --disable-breakpad --disable-hang-monitor --disable-speech-api --no-pings \
+                --aggressive-cache-discard \
+                --disable-features=TranslateUI,AutofillServerCommunication,CalculateNativeWinOcclusion,AudioServiceOutOfProcess \
+                --enable-aggressive-domstorage-flushing \
+                --enable-features=DestroyProfileOnBrowserClose \
+                --js-flags=--max-old-space-size=160";
+            let browser_args = if performance {
+                format!(
+                    "{BASE_ARGS} --disable-gpu --disable-gpu-compositing --disable-software-rasterizer"
+                )
+            } else {
+                BASE_ARGS.to_string()
+            };
+
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("MusicStorm")
+            .inner_size(1280.0, 800.0)
+            .min_inner_size(960.0, 640.0)
+            .decorations(false)
+            .center()
+            .additional_browser_args(&browser_args)
+            .build()
+            .map_err(|e| format!("create main window: {e}"))?;
+
             app.manage(DbState(Mutex::new(conn)));
             app.manage(AudioState::default());
 
             // 过期缓存清理移到后台线程，不阻塞窗口创建
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                // 版本升级时先清 WebView2 旧缓存，避免膨胀随版本迁移
+                let _ = purge_webview_caches_on_upgrade(&app_handle);
                 let _ = purge_expired_api_cache_in_background(&app_handle);
+                let _ = purge_cover_cache(&app_handle);
             });
+
+            // 系统托盘 + 全局媒体快捷键（失败不阻断启动）
+            if let Err(error) = tray::setup_tray(app.handle()) {
+                eprintln!("setup tray failed: {error}");
+            }
+            if let Err(error) = tray::setup_global_shortcuts(app.handle()) {
+                eprintln!("setup global shortcuts failed: {error}");
+            }
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            open_devtools,
             pick_music_folder,
             pick_music_files,
             pick_image_as_base64,
             pick_cover_image,
             cache_cover_url,
             cache_cover_data_url,
+            clear_cover_cache,
             pick_text_file,
             save_url_to_file,
             read_text_file,
@@ -662,6 +789,7 @@ pub fn run() {
             audio_set_volume,
             audio_stop,
             netease_http_post,
+            tray::update_global_shortcut,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

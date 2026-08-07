@@ -1,4 +1,4 @@
-import { Podcast, RefreshCw } from "lucide-react"
+import { Play, Podcast, RefreshCw } from "lucide-react"
 import {
     useCallback,
     useEffect,
@@ -21,6 +21,7 @@ import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlayer } from "@/hooks/use-player"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import { setRadioSort, setRadioView } from "@/lib/library/layout-prefs"
 import {
@@ -30,7 +31,7 @@ import {
     type RadioOrderScope,
 } from "@/lib/library/track-order"
 import { RADIO_SORT_OPTIONS, sortRadios } from "@/lib/library/sort"
-import { fetchDjSublist, fetchHomeRadios } from "@/lib/netease/dj"
+import { fetchDjPrograms, fetchDjSublist, fetchHomeRadios } from "@/lib/netease/dj"
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -47,11 +48,13 @@ function RadioList({
     scope,
     draggable,
     onOpen,
+    onPlay,
 }: {
     items: Radio[]
     scope: RadioOrderScope
     draggable: boolean
     onOpen: (id: string) => void
+    onPlay: (radio: Radio) => void
 }) {
     return (
         <DragList
@@ -65,19 +68,29 @@ function RadioList({
             }
             className="apple-list-surface space-y-0.5 p-1.5"
             renderItem={(radio, _index, handle) => (
-                <div className="flex items-center gap-1 rounded-2xl transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.07]">
+                <div className="group flex items-center gap-1 rounded-2xl transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.07]">
                     {handle ? <div className="ml-1 shrink-0">{handle}</div> : null}
                     <button
                         type="button"
                         onClick={() => onOpen(radio.id)}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
                     >
-                        <Cover
-                            src={radio.coverUrl}
-                            alt={radio.title}
-                            size="sm"
-                            className="size-12 rounded-xl"
-                        />
+                        <div className="relative shrink-0">
+                            <Cover
+                                src={radio.coverUrl}
+                                alt={radio.title}
+                                size="sm"
+                                className="size-12 rounded-xl"
+                            />
+                            <span
+                                className={cn(
+                                    "pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/35 text-white opacity-0 transition-opacity duration-150",
+                                    "group-hover:opacity-100 group-focus-visible:opacity-100",
+                                )}
+                            >
+                                <Play className="size-4 fill-current" />
+                            </span>
+                        </div>
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
                                 {radio.title}
@@ -86,6 +99,14 @@ function RadioList({
                                 {radioSubtitle(radio)}
                             </p>
                         </div>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onPlay(radio)}
+                        title="播放"
+                        className="mr-2.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.05] text-foreground/80 transition-colors hover:bg-black/[0.1] active:scale-95 dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
+                    >
+                        <Play className="size-3.5 fill-current" />
                     </button>
                 </div>
             )}
@@ -102,6 +123,7 @@ function RadioCollection({
     gridStyle,
     gridRef,
     onOpen,
+    onPlay,
 }: {
     items: Radio[]
     scope: RadioOrderScope
@@ -111,6 +133,7 @@ function RadioCollection({
     gridStyle: CSSProperties
     gridRef?: Ref<HTMLDivElement>
     onOpen: (id: string) => void
+    onPlay: (radio: Radio) => void
 }) {
     if (view === "list") {
         return (
@@ -119,6 +142,7 @@ function RadioCollection({
                 scope={scope}
                 draggable={draggable}
                 onOpen={onOpen}
+                onPlay={onPlay}
             />
         )
     }
@@ -141,10 +165,23 @@ function RadioCollection({
 
 function RadiosPage() {
     const { openRadio } = useMusicNavigation()
+    const { playTrack } = usePlayer()
     const { ready, loggedIn } = useNeteaseSession()
     const { subscribedRadioIds, refresh } = useLiked()
     const { radioSort, radioView } = useLibraryLayout()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+
+    /** 播放电台：拉取节目列表，播放最新一期 */
+    const playRadio = useCallback(async (radio: Radio) => {
+        try {
+            const queue = await fetchDjPrograms(radio.id)
+            if (queue[0]) {
+                playTrack(queue[0], queue)
+            }
+        } catch (err) {
+            notifyFromError("电台播放失败", err)
+        }
+    }, [playTrack])
 
     const [subscribed, setSubscribed] = useState<Radio[]>([])
     const [discover, setDiscover] = useState<Radio[]>([])
@@ -299,6 +336,7 @@ function RadiosPage() {
                                 gridStyle={gridStyle}
                                 gridRef={gridRef}
                                 onOpen={openRadio}
+                                onPlay={playRadio}
                             />
                         )}
                     </Section>
@@ -321,6 +359,7 @@ function RadiosPage() {
                                 gridClass={gridClass}
                                 gridStyle={gridStyle}
                                 onOpen={openRadio}
+                                onPlay={playRadio}
                             />
                         )}
                     </Section>

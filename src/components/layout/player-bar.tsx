@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { QueuePanel } from "@/components/layout/queue-panel"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
@@ -72,6 +73,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     }
 
     return (
+        <>
         <footer className="material-player shrink-0 border-t border-black/[0.06] dark:border-white/[0.06]">
             <div className="grid h-[84px] grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] items-center gap-4 px-4">
                 <div className="flex min-w-0 items-center gap-3">
@@ -242,6 +244,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
 
                 <div className="flex items-center justify-end gap-1">
+                    <QueuePanel />
                     <VolumeElasticSlider
                         volume={volume}
                         muted={isMuted}
@@ -253,6 +256,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
             </div>
         </footer>
+        </>
     )
 }
 

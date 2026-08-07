@@ -691,6 +691,28 @@ fn format_ymd(epoch_days: i64) -> String {
     format!("{:04}-{:02}-{:02}", y, m, d)
 }
 
+/// 解析 YYYY-MM-DD → 该日 UTC 0 点的 epoch 毫秒；非法输入返回 None
+fn parse_ymd_to_epoch_ms(day: &str) -> Option<i64> {
+    let parts: Vec<&str> = day.split('-').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let y: i64 = parts[0].parse().ok()?;
+    let m: i64 = parts[1].parse().ok()?;
+    let d: i64 = parts[2].parse().ok()?;
+    if !(1..=12).contains(&m) || d < 1 || d > 31 {
+        return None;
+    }
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u64;
+    let mp = ((m + 9) % 12) as u64;
+    let doy = (153 * mp + 2) / 5 + d as u64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let epoch_days = era * 146_097 + doe as i64 - 719_468;
+    Some(epoch_days * 86_400_000)
+}
+
 #[tauri::command]
 pub fn db_get_listen_stats(
     state: State<'_, DbState>,
@@ -722,19 +744,33 @@ pub fn db_get_listen_stats(
 pub fn db_list_listen_stats(
     state: State<'_, DbState>,
     days: Option<i64>,
+    from_day: Option<String>,
+    to_day: Option<String>,
 ) -> Result<Vec<ListenStats>, String> {
-    let days = days.unwrap_or(7).clamp(1, 90);
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     let today_epoch = (now_ms() / 1000) / 86_400;
-    let from_day = format_ymd(today_epoch - (days - 1));
+
+    // 自定义起止日期优先；否则按最近 N 天
+    let from_str = match from_day {
+        Some(f) if !f.is_empty() => f,
+        _ => {
+            let days = days.unwrap_or(7).clamp(1, 90);
+            format_ymd(today_epoch - (days - 1))
+        }
+    };
+    let to_str = match to_day {
+        Some(t) if !t.is_empty() => t,
+        _ => format_ymd(today_epoch),
+    };
+
     let mut stmt = conn
         .prepare(
             "SELECT day, play_count, unique_tracks, total_ms FROM listen_daily
-             WHERE day >= ?1 ORDER BY day DESC",
+             WHERE day >= ?1 AND day <= ?2 ORDER BY day DESC",
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![from_day], |row| {
+        .query_map(params![from_str, to_str], |row| {
             Ok(ListenStats {
                 day: row.get(0)?,
                 play_count: row.get(1)?,
@@ -756,16 +792,26 @@ pub fn db_list_top_tracks(
     state: State<'_, DbState>,
     limit: Option<i64>,
     days: Option<i64>,
+    from_day: Option<String>,
+    to_day: Option<String>,
 ) -> Result<Vec<TopTrackStat>, String> {
     let limit = limit.unwrap_or(50).clamp(1, 200);
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
 
-    // days 为空或 0 表示全部时间，否则只取近 N 日 ended_at
-    let min_ended: Option<i64> = match days {
-        Some(d) if d > 0 => {
-            let d = d.clamp(1, 365);
-            Some(now_ms() - d * 86_400_000)
-        }
+    // 自定义起止日期优先；否则按近 N 日 ended_at；都为空表示全部时间
+    let min_ended: Option<i64> = match from_day {
+        Some(f) if !f.is_empty() => parse_ymd_to_epoch_ms(&f),
+        _ => match days {
+            Some(d) if d > 0 => {
+                let d = d.clamp(1, 365);
+                Some(now_ms() - d * 86_400_000)
+            }
+            _ => None,
+        },
+    };
+    // to_day 含当日：上界取当日 23:59:59.999
+    let max_ended: Option<i64> = match to_day {
+        Some(t) if !t.is_empty() => parse_ymd_to_epoch_ms(&t).map(|v| v + 86_400_000 - 1),
         _ => None,
     };
 
@@ -792,6 +838,7 @@ pub fn db_list_top_tracks(
         WHERE s.ended_at IS NOT NULL
           AND (s.completed = 1 OR s.listened_ms >= 30000)
           AND (?1 IS NULL OR s.ended_at >= ?1)
+          AND (?3 IS NULL OR s.ended_at <= ?3)
         GROUP BY s.track_id, s.source
         ORDER BY play_count DESC, total_ms DESC
         LIMIT ?2
@@ -799,7 +846,7 @@ pub fn db_list_top_tracks(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![min_ended, limit], |row| {
+        .query_map(params![min_ended, limit, max_ended], |row| {
             Ok(TopTrackStat {
                 track_id: row.get(0)?,
                 source: row.get(1)?,
@@ -829,13 +876,22 @@ pub fn db_list_top_tracks(
 pub fn db_listen_source_breakdown(
     state: State<'_, DbState>,
     days: Option<i64>,
+    from_day: Option<String>,
+    to_day: Option<String>,
 ) -> Result<Vec<ListenSourceStat>, String> {
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
-    let min_ended: Option<i64> = match days {
-        Some(d) if d > 0 => {
-            let d = d.clamp(1, 365);
-            Some(now_ms() - d * 86_400_000)
-        }
+    let min_ended: Option<i64> = match from_day {
+        Some(f) if !f.is_empty() => parse_ymd_to_epoch_ms(&f),
+        _ => match days {
+            Some(d) if d > 0 => {
+                let d = d.clamp(1, 365);
+                Some(now_ms() - d * 86_400_000)
+            }
+            _ => None,
+        },
+    };
+    let max_ended: Option<i64> = match to_day {
+        Some(t) if !t.is_empty() => parse_ymd_to_epoch_ms(&t).map(|v| v + 86_400_000 - 1),
         _ => None,
     };
 
@@ -850,6 +906,7 @@ pub fn db_listen_source_breakdown(
             WHERE s.ended_at IS NOT NULL
               AND (s.completed = 1 OR s.listened_ms >= 30000)
               AND (?1 IS NULL OR s.ended_at >= ?1)
+              AND (?2 IS NULL OR s.ended_at <= ?2)
             GROUP BY s.source
             ORDER BY play_count DESC
             "#,
@@ -857,7 +914,7 @@ pub fn db_listen_source_breakdown(
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
-        .query_map(params![min_ended], |row| {
+        .query_map(params![min_ended, max_ended], |row| {
             Ok(ListenSourceStat {
                 source: row.get(0)?,
                 play_count: row.get(1)?,

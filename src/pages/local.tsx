@@ -70,11 +70,13 @@ import {
     setLocalAllOrder,
 } from "@/lib/library/track-order"
 import type { AlbumDraft, LocalAlbum, LocalArtist } from "@/lib/local/library-store"
-import { listTracksByAlbum } from "@/lib/local/library-store"
+import { listTracksByAlbum, toThumbnailUrl } from "@/lib/local/library-store"
 import {
     applyNeteaseMetadata,
     needsNeteaseMetadata,
 } from "@/lib/local/netease-metadata"
+import { getCoverOverride } from "@/lib/music/cover-overrides"
+import { coverPathToUrl } from "@/lib/local/cover"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -327,6 +329,33 @@ function LocalPage() {
                     if (result.value.lyricApplied) lyrics += 1
                 }
             }
+            // 专辑无封面时，用补全到的第一首曲目封面设置专辑封面（已设置过则不动）
+            if (
+                lib.nav.kind === "album" &&
+                lib.selectedAlbum &&
+                !lib.selectedAlbum.coverDataUrl
+            ) {
+                const album = lib.selectedAlbum
+                const withCover = pending.find((track) => getCoverOverride(track.id))
+                if (withCover) {
+                    const override = getCoverOverride(withCover.id)
+                    if (override) {
+                        try {
+                            await lib.editAlbum(album.id, {
+                                title: album.title,
+                                artist: album.artist,
+                                coverDataUrl:
+                                    coverPathToUrl(override.originalPath) ||
+                                    override.originalPath,
+                                folderPath: album.folderPath,
+                                artistId: album.artistId,
+                            })
+                        } catch {
+                            // 专辑封面设置失败不影响已完成的补全
+                        }
+                    }
+                }
+            }
             notifySuccess("网易云补全完成", {
                 description: `匹配 ${matched}/${pending.length} 首 · 封面 ${covers} · 歌词 ${lyrics}`,
             })
@@ -347,7 +376,7 @@ function LocalPage() {
         )
         const artistCover =
             artist.coverDataUrl ||
-            lib.albumCover(lib.artistAlbums[0] ?? ({} as LocalAlbum)) ||
+            lib.albumCoverThumb(lib.artistAlbums[0] ?? ({} as LocalAlbum)) ||
             ""
 
         return (
@@ -457,7 +486,7 @@ function LocalPage() {
                                 return (
                                     <div key={album.id} className="group relative">
                                         <MediaCard
-                                            coverUrl={lib.albumCover(album)}
+                                            coverUrl={lib.albumCoverThumb(album)}
                                             title={album.title}
                                             subtitle={`${album.artist || "未知艺人"} · ${count} 首`}
                                             widthClassName="w-full"
@@ -914,10 +943,13 @@ function LocalPage() {
                                     const albums = lib.library.albums.filter(
                                         (album) => album.artistId === artist.id,
                                     )
-                                    const cover =
+                                    const cover = toThumbnailUrl(
                                         artist.coverDataUrl ||
-                                        lib.albumCover(albums[0] ?? ({} as LocalAlbum)) ||
-                                        ""
+                                            lib.albumCover(
+                                                albums[0] ?? ({} as LocalAlbum),
+                                            ) ||
+                                            "",
+                                    )
                                     return (
                                         <div key={artist.id} className="group relative">
                                             <MediaCard
@@ -1032,7 +1064,7 @@ function LocalPage() {
                                             className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
                                         >
                                             <Cover
-                                                src={lib.albumCover(album)}
+                                                src={lib.albumCoverThumb(album)}
                                                 alt={album.title}
                                                 size="sm"
                                                 className="size-12 rounded-xl"
@@ -1094,7 +1126,7 @@ function LocalPage() {
                                 return (
                                     <div key={album.id} className="group relative">
                                         <MediaCard
-                                            coverUrl={lib.albumCover(album)}
+                                            coverUrl={lib.albumCoverThumb(album)}
                                             title={album.title}
                                             subtitle={`${album.artist || "未知艺人"} · ${count} 首`}
                                             widthClassName="w-full"
