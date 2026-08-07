@@ -205,6 +205,7 @@ pub fn ffmpeg_set_path(
     ffmpeg_detect(state)
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn pick_ffmpeg_executable() -> Result<Option<String>, String> {
     let mut dialog = rfd::FileDialog::new().set_title("选择 FFmpeg 可执行文件");

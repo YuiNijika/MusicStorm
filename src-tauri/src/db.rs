@@ -168,18 +168,31 @@ pub struct StoragePaths {
 }
 
 /// 运行目录取可执行文件所在目录
-/// 优先 executable_dir，失败再取 current_exe 父目录
+/// 优先 executable_dir，失败再取 current_exe 父目录。
+/// Android 无 exe 概念：直接使用应用专属数据目录。
 pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    if let Ok(dir) = app.path().executable_dir() {
+    #[cfg(target_os = "android")]
+    {
+        let dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("failed to resolve app data dir: {error}"))?;
         return Ok(dir);
     }
 
-    let executable_path = std::env::current_exe()
-        .map_err(|error| format!("failed to resolve executable path: {error}"))?;
-    executable_path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "failed to resolve application directory".to_string())
+    #[cfg(not(target_os = "android"))]
+    {
+        if let Ok(dir) = app.path().executable_dir() {
+            return Ok(dir);
+        }
+
+        let executable_path = std::env::current_exe()
+            .map_err(|error| format!("failed to resolve executable path: {error}"))?;
+        executable_path
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "failed to resolve application directory".to_string())
+    }
 }
 
 pub fn ensure_storage_paths(app: &AppHandle) -> Result<StoragePathsInner, String> {

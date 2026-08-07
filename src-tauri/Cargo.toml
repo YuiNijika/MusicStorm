@@ -13,27 +13,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rfd = "0.15"
 rusqlite = { version = "0.32", features = ["bundled"] }
-rodio = { version = "0.20", default-features = false, features = [
-    "symphonia-mp3",
-    "symphonia-wav",
-    "symphonia-flac",
-    "symphonia-aac",
-    "symphonia-isomp4",
-    "symphonia-vorbis",
-] }
 reqwest = { version = "0.12", default-features = false, features = [
     "blocking",
     "rustls-tls",
 ] }
-cpal = "0.15"
 tempfile = "3"
 base64 = "0.22"
 lofty = "0.22"
@@ -50,3 +40,19 @@ symphonia = { version = "0.5", default-features = false, features = [
     "vorbis",
     "pcm",
 ] }
+
+# 桌面专属依赖：托盘图标 / 文件对话框 / 本地音频输出引擎。
+# Android 无这些概念（文件选择走 SAF、播放走系统媒体通道），
+# 条件编译避免交叉编译失败，也让 Android 包更小。
+[target.'cfg(not(target_os = "android"))'.dependencies]
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+rfd = "0.15"
+rodio = { version = "0.20", default-features = false, features = [
+    "symphonia-mp3",
+    "symphonia-wav",
+    "symphonia-flac",
+    "symphonia-aac",
+    "symphonia-isomp4",
+    "symphonia-vorbis",
+] }
+cpal = "0.15"

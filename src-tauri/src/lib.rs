@@ -1,20 +1,24 @@
 // 本地扫描 / 存储 / 播放 / 网易云代理入口
+#[cfg(not(target_os = "android"))]
 mod audio;
 mod cover_cache;
 mod db;
 mod ffmpeg;
 mod local_meta;
 mod netease_proxy;
+#[cfg(not(target_os = "android"))]
 mod tray;
 
+#[cfg(not(target_os = "android"))]
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
     audio_seek, audio_set_device, audio_set_exclusive, audio_set_volume, audio_stop, AudioState,
 };
 use cover_cache::{
-    cache_cover_data_url, cache_cover_url, clear_cover_cache, pick_cover_image,
-    purge_cover_cache,
+    cache_cover_data_url, cache_cover_url, clear_cover_cache, purge_cover_cache,
 };
+#[cfg(not(target_os = "android"))]
+use cover_cache::pick_cover_image;
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
@@ -23,7 +27,9 @@ use db::{
     DbState,
 };
 use netease_proxy::netease_http_post;
-use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate, pick_ffmpeg_executable};
+use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate};
+#[cfg(not(target_os = "android"))]
+use ffmpeg::pick_ffmpeg_executable;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -82,10 +88,14 @@ fn open_devtools(app: AppHandle) -> Result<(), String> {
             window.open_devtools();
         }
     }
+    // release 下 app 参数未使用，保留签名以兼容前端 invoke
+    let _ = &app;
     Ok(())
 }
 
-/// 系统文件夹选择器；取消时返回 null
+/// 系统文件夹选择器；取消时返回 null。
+/// Android 无桌面文件对话框（走 SAF），此命令仅桌面端注册。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_music_folder() -> Result<Option<String>, String> {
     let folder = rfd::FileDialog::new()
@@ -94,7 +104,8 @@ fn pick_music_folder() -> Result<Option<String>, String> {
     Ok(folder.map(|path| path.to_string_lossy().into_owned()))
 }
 
-/// 多选音频文件；取消时返回 null
+/// 多选音频文件；取消时返回 null。仅桌面端。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_music_files() -> Result<Option<Vec<String>>, String> {
     let files = rfd::FileDialog::new()
@@ -109,7 +120,8 @@ fn pick_music_files() -> Result<Option<Vec<String>>, String> {
     }))
 }
 
-/// 选择本地封面图片并返回 data URL
+/// 选择本地封面图片并返回 data URL。仅桌面端。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_image_as_base64() -> Result<Option<String>, String> {
     let file = rfd::FileDialog::new()
@@ -123,7 +135,8 @@ fn pick_image_as_base64() -> Result<Option<String>, String> {
     Ok(Some(read_image_as_data_url(&path)?))
 }
 
-/// 选择 .lrc / 文本并返回全文
+/// 选择 .lrc / 文本并返回全文。仅桌面端。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_text_file() -> Result<Option<String>, String> {
     let file = rfd::FileDialog::new()
@@ -136,7 +149,8 @@ fn pick_text_file() -> Result<Option<String>, String> {
     Ok(Some(read_text_file(path.to_string_lossy().into_owned())?))
 }
 
-/// 下载远程 URL 到用户选择的保存路径
+/// 下载远程 URL 到用户选择的保存路径。仅桌面端（Android 用系统下载器）。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>, String> {
     let url = url.trim();
@@ -615,7 +629,8 @@ fn parse_filename(stem: &str) -> (String, String) {
 /// 版本升级时清理 WebView2 可再生缓存（磁盘缓存 / JS 编译缓存 / GPU 缓存 / Service Worker）。
 /// 保留 Local Storage / Cookies / Network —— 网易云登录态依赖它们。
 /// 同版本重复启动不清理；升级或首次安装（无记录）才触发一次。
-/// 在后台线程执行，不阻塞首帧。
+/// 在后台线程执行，不阻塞首帧。仅 Windows WebView2。
+#[cfg(not(target_os = "android"))]
 fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
     // 版本以 tauri.conf.json 为准（用户可见版本号），不用 Cargo.toml 的
     let version = app.package_info().version.to_string();
@@ -678,7 +693,8 @@ fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String>
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[cfg(not(target_os = "android"))]
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // 单实例：二次启动唤起已有窗口，而不是再开一个进程
@@ -688,68 +704,83 @@ pub fn run() {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
-        }))
+        }));
+
+    #[cfg(target_os = "android")]
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+
+    builder
         .setup(|app| {
-            // 窗口在 Rust 里创建（而非 conf 注册），以便按「性能模式」动态注入浏览器参数
             let conn = open_db(app.handle())?;
 
-            // 性能模式开启 → 禁用 GPU 相关进程（毛玻璃/动画在前端关闭）
-            let perf_mode: Option<String> = conn
-                .query_row(
-                    "SELECT value FROM app_setting WHERE key = 'performance_mode'",
-                    rusqlite::params![],
-                    |row| row.get(0),
-                )
-                .ok();
-            let performance = perf_mode.as_deref() == Some("1");
+            #[cfg(not(target_os = "android"))]
+            let browser_args: String = {
+                // 性能模式开启 → 禁用 GPU 相关进程（毛玻璃/动画在前端关闭）
+                let perf_mode: Option<String> = conn
+                    .query_row(
+                        "SELECT value FROM app_setting WHERE key = 'performance_mode'",
+                        rusqlite::params![],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                let performance = perf_mode.as_deref() == Some("1");
 
-            const BASE_ARGS: &str = "--disk-cache-size=524288 --disable-remote-fonts \
-                --disable-background-networking --disable-sync --disable-default-apps \
-                --disable-extensions --disable-component-update --disable-pdf-viewer \
-                --disable-breakpad --disable-hang-monitor --disable-speech-api --no-pings \
-                --aggressive-cache-discard \
-                --disable-features=TranslateUI,AutofillServerCommunication,CalculateNativeWinOcclusion,AudioServiceOutOfProcess \
-                --enable-aggressive-domstorage-flushing \
-                --enable-features=DestroyProfileOnBrowserClose \
-                --js-flags=--max-old-space-size=160";
-            let browser_args = if performance {
-                format!(
-                    "{BASE_ARGS} --disable-gpu --disable-gpu-compositing --disable-software-rasterizer"
-                )
-            } else {
-                BASE_ARGS.to_string()
+                const BASE_ARGS: &str = "--disk-cache-size=524288 --disable-remote-fonts \
+                    --disable-background-networking --disable-sync --disable-default-apps \
+                    --disable-extensions --disable-component-update --disable-pdf-viewer \
+                    --disable-breakpad --disable-hang-monitor --disable-speech-api --no-pings \
+                    --aggressive-cache-discard \
+                    --disable-features=TranslateUI,AutofillServerCommunication,CalculateNativeWinOcclusion,AudioServiceOutOfProcess \
+                    --enable-aggressive-domstorage-flushing \
+                    --enable-features=DestroyProfileOnBrowserClose \
+                    --js-flags=--max-old-space-size=160";
+                if performance {
+                    format!(
+                        "{BASE_ARGS} --disable-gpu --disable-gpu-compositing --disable-software-rasterizer"
+                    )
+                } else {
+                    BASE_ARGS.to_string()
+                }
             };
 
-            tauri::WebviewWindowBuilder::new(
-                app,
-                "main",
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .title("MusicStorm")
-            .inner_size(1280.0, 800.0)
-            .min_inner_size(960.0, 640.0)
-            .decorations(false)
-            .center()
-            .additional_browser_args(&browser_args)
-            .build()
-            .map_err(|e| format!("create main window: {e}"))?;
+            #[cfg(not(target_os = "android"))]
+            {
+                // Windows/macOS/Linux：Rust 里创建窗口，按「性能模式」动态注入浏览器参数
+                tauri::WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    tauri::WebviewUrl::App("index.html".into()),
+                )
+                .title("MusicStorm")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(960.0, 640.0)
+                .decorations(false)
+                .center()
+                .additional_browser_args(&browser_args)
+                .build()
+                .map_err(|e| format!("create main window: {e}"))?;
+            }
 
             app.manage(DbState(Mutex::new(conn)));
+            #[cfg(not(target_os = "android"))]
             app.manage(AudioState::default());
 
             // 过期缓存清理移到后台线程，不阻塞窗口创建
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 // 版本升级时先清 WebView2 旧缓存，避免膨胀随版本迁移
+                #[cfg(not(target_os = "android"))]
                 let _ = purge_webview_caches_on_upgrade(&app_handle);
                 let _ = purge_expired_api_cache_in_background(&app_handle);
                 let _ = purge_cover_cache(&app_handle);
             });
 
-            // 系统托盘 + 全局媒体快捷键（失败不阻断启动）
+            // 系统托盘 + 全局媒体快捷键（桌面专属，失败不阻断启动）
+            #[cfg(not(target_os = "android"))]
             if let Err(error) = tray::setup_tray(app.handle()) {
                 eprintln!("setup tray failed: {error}");
             }
+            #[cfg(not(target_os = "android"))]
             if let Err(error) = tray::setup_global_shortcuts(app.handle()) {
                 eprintln!("setup global shortcuts failed: {error}");
             }
@@ -758,14 +789,20 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             open_devtools,
+            #[cfg(not(target_os = "android"))]
             pick_music_folder,
+            #[cfg(not(target_os = "android"))]
             pick_music_files,
+            #[cfg(not(target_os = "android"))]
             pick_image_as_base64,
+            #[cfg(not(target_os = "android"))]
             pick_cover_image,
             cache_cover_url,
             cache_cover_data_url,
             clear_cover_cache,
+            #[cfg(not(target_os = "android"))]
             pick_text_file,
+            #[cfg(not(target_os = "android"))]
             save_url_to_file,
             read_text_file,
             scan_music_folder,
@@ -789,19 +826,32 @@ pub fn run() {
             ffmpeg_detect,
             ffmpeg_validate,
             ffmpeg_set_path,
+            #[cfg(not(target_os = "android"))]
             pick_ffmpeg_executable,
+            #[cfg(not(target_os = "android"))]
             audio_list_devices,
+            #[cfg(not(target_os = "android"))]
             audio_get_output_mode,
+            #[cfg(not(target_os = "android"))]
             audio_set_device,
+            #[cfg(not(target_os = "android"))]
             audio_set_exclusive,
+            #[cfg(not(target_os = "android"))]
             audio_probe,
+            #[cfg(not(target_os = "android"))]
             audio_load,
+            #[cfg(not(target_os = "android"))]
             audio_play,
+            #[cfg(not(target_os = "android"))]
             audio_pause,
+            #[cfg(not(target_os = "android"))]
             audio_seek,
+            #[cfg(not(target_os = "android"))]
             audio_set_volume,
+            #[cfg(not(target_os = "android"))]
             audio_stop,
             netease_http_post,
+            #[cfg(not(target_os = "android"))]
             tray::update_global_shortcut,
         ])
         .run(tauri::generate_context!())

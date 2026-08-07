@@ -183,6 +183,19 @@
         background: var(--background);
         font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
         text-rendering: optimizeLegibility;
+        /* 移动端去除触摸点击高亮与 300ms 延迟残留 */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        overscroll-behavior: none;
+    }
+
+    /* 移动端触屏可滚动区域交给浏览器原生滚动，手势不冲突 */
+    @media (pointer: coarse) {
+        .apple-scroll,
+        [data-sheet-scroll] {
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
+        }
     }
 
     ::selection {

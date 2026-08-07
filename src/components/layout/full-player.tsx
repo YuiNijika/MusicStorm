@@ -13,7 +13,7 @@ import {
     Volume2,
     VolumeX,
 } from "lucide-react"
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
@@ -115,6 +115,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
+    // 移动端下滑收起手势：跟手位移（px）+ 起始 Y（区分水平滚动）
+    const [dragDy, setDragDy] = useState(0)
+    const dragStartRef = useRef<{ y: number; startDy: number } | null>(null)
     // 进出场计时器不能挂在 phase 依赖的 effect 上：phase→exiting 会触发 cleanup 清掉 closed 定时器
     const enterTimerRef = useRef<number | null>(null)
     const exitTimerRef = useRef<number | null>(null)
@@ -236,12 +239,18 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         displayTrack.source === "netease" && Boolean(displayTrack.albumId)
     const lyricsActive = phase === "open" || phase === "entering"
     // 从底部升起/滑回（锚定底栏触发源，空间一致），全程无 blur（避免卡顿）
+    // 移动端下滑手势：跟手时用内联 transform 覆盖（禁 transition），松手恢复
     const sheetMotion =
         phase === "exiting"
             ? "full-player-exit"
             : phase === "open"
               ? "translate-y-0 opacity-100"
               : "translate-y-full opacity-0"
+    const sheetTransform =
+        dragDy > 0
+            ? `translateY(${Math.min(dragDy, window.innerHeight)}px)`
+            : undefined
+    const sheetTransition = dragDy > 0 ? "none" : undefined
     const scrimMotion =
         phase === "exiting"
             ? "full-player-scrim-exit"
@@ -257,6 +266,43 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         onClose()
     }
 
+    /** 移动端下滑收起手势：仅触屏、仅 phase=open、且按下处不在可滚动容器内 */
+    function handleSheetPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+        if (phase !== "open" || event.pointerType !== "touch") {
+            return
+        }
+        // 歌词/列表等滚动容器内按下 → 交给浏览器垂直滚动，不触发收起手势
+        const target = event.target as HTMLElement | null
+        if (target?.closest("[data-sheet-scroll], .apple-scroll")) {
+            return
+        }
+        dragStartRef.current = { y: event.clientY, startDy: dragDy }
+        ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+    }
+
+    function handleSheetPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        const dy = Math.max(0, event.clientY - start.y + start.startDy)
+        setDragDy(dy)
+    }
+
+    function handleSheetPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        dragStartRef.current = null
+        const dy = Math.max(0, event.clientY - start.y + start.startDy)
+        setDragDy(0)
+        // 跟手距离超过 1/4 屏高或松手速度较快 → 收起；否则回弹
+        const threshold = window.innerHeight * 0.25
+        if (dy > threshold) {
+            onClose()
+        }
+    }
     function navigateAlbum() {
         if (!displayTrack?.albumId) {
             return
@@ -375,10 +421,18 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     sheetMotion,
                 )}
                 style={{
-                    transitionProperty: "transform, opacity",
+                    transform: sheetTransform,
+                    transitionProperty: sheetTransform
+                        ? undefined
+                        : "transform, opacity",
                     transitionDuration: `${DRAWER_MS}ms`,
                     transitionTimingFunction: "var(--ease-enter)",
+                    transition: sheetTransition,
                 }}
+                onPointerDown={handleSheetPointerDown}
+                onPointerMove={handleSheetPointerMove}
+                onPointerUp={handleSheetPointerUp}
+                onPointerCancel={handleSheetPointerUp}
             >
                 <div
                     aria-hidden
@@ -533,7 +587,13 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 ) : null}
 
                 {/* 底栏播放条：进度 + 传输 + 音量/音质 */}
-                <div className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8">
+                <div
+                    className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"
+                    style={{
+                        // iOS 底部安全区：控制条贴在手势条上方
+                        paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)",
+                    }}
+                >
                     <div className="mx-auto flex max-w-3xl flex-col gap-2.5">
                         {progressRow}
                         {transport}

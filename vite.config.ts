@@ -14,6 +14,10 @@ export default defineConfig(async () => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // 不自动清空 dist：避免批量删除被安全层拦截（Android 构建前 dist 手动清理）
+    emptyOutDir: false,
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

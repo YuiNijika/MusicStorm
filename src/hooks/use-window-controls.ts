@@ -12,7 +12,14 @@ import {
 const DOUBLE_CLICK_MS = 300
 
 export function useWindowControls() {
-    const appWindow = useMemo(() => getCurrentWindow(), [])
+    // 移动端/浏览器预览无桌面窗口：getCurrentWindow 可能抛错，用兜底空窗口
+    const appWindow = useMemo(() => {
+        try {
+            return getCurrentWindow()
+        } catch {
+            return null
+        }
+    }, [])
     const [isMaximized, setIsMaximized] = useState(false)
     // 手动拖拽状态：系统 HTCAPTION 拖拽会吞掉双击事件，
     // 改用 pointer + setPosition 让双击语义完全归 JS 控制
@@ -27,16 +34,25 @@ export function useWindowControls() {
     const lastPressAtRef = useRef(0)
 
     useEffect(() => {
+        if (!appWindow) {
+            return
+        }
         void appWindow.isMaximized().then(setIsMaximized).catch(() => {
             setIsMaximized(false)
         })
     }, [appWindow])
 
     const minimize = useCallback(() => {
+        if (!appWindow) {
+            return
+        }
         void appWindow.minimize().catch(() => undefined)
     }, [appWindow])
 
     const toggleMaximize = useCallback(() => {
+        if (!appWindow) {
+            return
+        }
         void (async () => {
             try {
                 await appWindow.toggleMaximize()
@@ -48,6 +64,9 @@ export function useWindowControls() {
     }, [appWindow])
 
     const close = useCallback(() => {
+        if (!appWindow) {
+            return
+        }
         void appWindow.close().catch(() => undefined)
     }, [appWindow])
 
@@ -57,7 +76,11 @@ export function useWindowControls() {
      */
     const startDragging = useCallback(
         (event: ReactPointerEvent<HTMLElement>) => {
-            if (event.button !== 0) {
+            if (!appWindow || event.button !== 0) {
+                return
+            }
+            // 触屏（移动端）无窗口可拖，跳过拖拽与双击最小化判定
+            if (event.pointerType !== "mouse") {
                 return
             }
             const now = Date.now()
@@ -96,7 +119,7 @@ export function useWindowControls() {
     useEffect(() => {
         function onPointerMove(event: PointerEvent) {
             const drag = dragRef.current
-            if (!drag || event.pointerId !== drag.pointerId) {
+            if (!appWindow || !drag || event.pointerId !== drag.pointerId) {
                 return
             }
             const dx = event.clientX - drag.startClientX

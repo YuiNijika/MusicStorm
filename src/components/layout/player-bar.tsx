@@ -74,9 +74,16 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
 
     return (
         <>
-        <footer className="material-player shrink-0 border-t border-black/[0.06] dark:border-white/[0.06]">
-            <div className="grid h-[84px] grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] items-center gap-4 px-4">
-                <div className="flex min-w-0 items-center gap-3">
+        <footer
+            className="material-player shrink-0 border-t border-black/[0.06] dark:border-white/[0.06]"
+            style={{
+                // iOS 底部安全区：播放条贴在手势条上方（移动端 Tab 已含自身 safe-area）
+                paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+        >
+            {/* 移动端：两行紧凑（信息行 + 控制行）；桌面：三列完整布局 */}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2 md:h-[84px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center md:gap-4 md:px-4 md:py-0">
+                <div className="flex min-w-0 items-center gap-3 md:col-span-1">
                     {currentTrack ? (
                         <>
                             <button
@@ -178,13 +185,16 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                     )}
                 </div>
 
-                <div className="flex min-w-0 flex-col items-center gap-1.5">
+                {/* 移动端：仅显示切歌与播放核心；桌面完整控制 */}
+                <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
                     <div className="flex items-center gap-1">
+                        <span className="md:hidden" aria-hidden />
                         <ControlButton
                             title="随机"
                             active={shuffle}
                             onClick={toggleShuffle}
                             disabled={!currentTrack}
+                            className="hidden md:flex"
                         >
                             <Shuffle className="size-3.5" />
                         </ControlButton>
@@ -224,6 +234,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                             active={repeat !== "off"}
                             onClick={cycleRepeat}
                             disabled={!currentTrack}
+                            className="hidden md:flex"
                         >
                             {repeat === "one" ? (
                                 <Repeat1 className="size-3.5" />
@@ -233,7 +244,16 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                         </ControlButton>
                     </div>
 
-                    <div className="flex w-full max-w-[420px] items-center gap-2">
+                    {/* 进度条：移动端置于播放条第一行下方，跨整行 */}
+                    <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+                        <SeekElasticSlider
+                            positionMs={positionMs}
+                            durationMs={totalMs}
+                            onSeek={seek}
+                            disabled={!currentTrack}
+                        />
+                    </div>
+                    <div className="hidden w-full max-w-[420px] items-center gap-2 md:flex">
                         <SeekElasticSlider
                             positionMs={positionMs}
                             durationMs={totalMs}
@@ -243,7 +263,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-1">
+                <div className="hidden items-center justify-end gap-1 md:flex">
                     <QueuePanel />
                     <VolumeElasticSlider
                         volume={volume}
@@ -266,12 +286,14 @@ function ControlButton({
     onClick,
     active = false,
     disabled = false,
+    className,
 }: {
     children: ReactNode
     title: string
     onClick: () => void
     active?: boolean
     disabled?: boolean
+    className?: string
 }) {
     return (
         <button
@@ -286,6 +308,7 @@ function ControlButton({
                 "dark:hover:bg-white/[0.08]",
                 "disabled:pointer-events-none disabled:opacity-40",
                 active && "text-rose-600 dark:text-rose-300",
+                className,
             )}
         >
             {children}

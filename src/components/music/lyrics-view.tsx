@@ -214,6 +214,7 @@ function LyricsView({
         <div className={cn("flex min-h-0 min-w-0 flex-col", className)}>
             <div
                 ref={listRef}
+                data-sheet-scroll
                 className={cn(
                     "apple-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain",
                     isFull ? "px-4 py-6 sm:px-8" : "px-6 py-4",

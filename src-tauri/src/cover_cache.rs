@@ -206,6 +206,7 @@ pub fn cache_cover_file(app: &AppHandle, path: &Path) -> Result<CachedCover, Str
     cache_cover_bytes(app, &data)
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn pick_cover_image(app: AppHandle) -> Result<Option<CachedCover>, String> {
     let selected = rfd::FileDialog::new()
