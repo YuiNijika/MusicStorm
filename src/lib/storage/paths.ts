@@ -4,10 +4,7 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-/**
- * 与 G2M 一致：后端用 Tauri PathResolver.executable_dir()
- * 得到 exe 所在目录，再拼 resources/config + cache
- */
+// 与 G2M 一致：后端用 Tauri PathResolver.executable_dir() 得到 exe 目录，再拼 resources/config + cache
 type StoragePaths = {
     /** exe 运行目录 */
     appDir: string

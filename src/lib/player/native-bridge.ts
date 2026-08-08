@@ -1,5 +1,3 @@
-/** 原生音频桥：设备 / 独占 / probe / 播放控制 */
-
 import { invoke } from "@tauri-apps/api/core"
 
 function isTauriRuntime(): boolean {

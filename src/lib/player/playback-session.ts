@@ -1,5 +1,3 @@
-/** 播放会话持久化：队列 + 状态，启动续播 */
-
 import { listLocalPlayableTracks, loadLocalLibrary } from "@/lib/local/library-store"
 import type { RepeatMode, Track } from "@/lib/types"
 

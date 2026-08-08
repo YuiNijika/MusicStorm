@@ -1,7 +1,4 @@
-/**
- * 轻量 QR 转 SVG data URL，Byte 模式 ECC M。
- * 仅服务登录 qrurl 等短文本，不引入外部依赖。
- */
+// 轻量 QR 转 SVG data URL，Byte 模式 ECC M；仅服务登录 qrurl 等短文本，不引入外部依赖
 
 type EccLevel = 0 | 1 | 2 | 3 // L M Q H
 

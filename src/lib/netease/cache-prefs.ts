@@ -67,10 +67,7 @@ function setApiCacheAutoPurge(enabled: boolean): void {
     window.dispatchEvent(new CustomEvent(AUTO_PURGE_EVENT))
 }
 
-/**
- * 清理周期：约 TTL 一半，夹在 30s–5min。
- * TTL 关闭时仍用默认 5min 扫一次孤儿/历史过期。
- */
+// 清理周期：约 TTL 一半，夹在 30s–5min；TTL 关闭时仍用默认 5min 扫一次孤儿/历史过期
 function getApiCachePurgeIntervalMs(): number {
     const ttl = getApiCacheTtlMs()
     const base = ttl > 0 ? Math.floor(ttl / 2) : DEFAULT_TTL_MS

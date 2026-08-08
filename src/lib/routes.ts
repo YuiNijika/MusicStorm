@@ -13,7 +13,7 @@ export type NavItem = {
     description: string
 }
 
-/** 侧栏顺序：本地在资料库上；资料库 = 网易云 */
+// 侧栏顺序：本地在资料库上；资料库 = 网易云
 export const NAV_ITEMS: NavItem[] = [
     { id: "home", label: "现在就听", description: "推荐与精选" },
     { id: "local", label: "本地", description: "本机资料库" },
@@ -24,7 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
     { id: "settings", label: "设置", description: "偏好与来源" },
 ]
 
-/** 主内容详情栈，状态在 navigation hook */
+// 主内容详情栈，状态在 navigation hook
 export type MusicDetail =
     | { type: "playlist"; id: string }
     | { type: "artist"; id: string }

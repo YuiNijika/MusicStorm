@@ -1,5 +1,3 @@
-/** 原生 WASAPI 引擎：invoke + event */
-
 import { invoke } from "@tauri-apps/api/core"
 import { listen, type UnlistenFn } from "@tauri-apps/api/event"
 
