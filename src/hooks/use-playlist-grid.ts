@@ -12,7 +12,6 @@ const COL_4_MIN = 700
 
 const PLAYLIST_GRID_CLASS = "grid gap-3"
 
-/** 拉取推荐上限，为你推荐横滑与更多歌单分页 */
 const PLAYLIST_FETCH_MAX = 48
 
 type PlaylistGridState = {

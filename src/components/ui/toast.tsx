@@ -12,7 +12,7 @@ import {
     Loader2Icon,
 } from "lucide-react"
 
-/** 全局唯一 manager；notify.ts 与 Toaster 必须共用同一实例 */
+// 全局唯一 manager；notify.ts 与 Toaster 必须共用同一实例
 const toast = ToastPrimitive.createToastManager()
 
 function ToastProvider({ ...props }: ToastPrimitive.Provider.Props) {
@@ -38,9 +38,7 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
     )
 }
 
-/**
- * 相对定位 + 内容撑高；不依赖 --toast-height / absolute 叠放。
- */
+// 相对定位 + 内容撑高；不依赖 --toast-height / absolute 叠放
 function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
     return (
         <ToastPrimitive.Root

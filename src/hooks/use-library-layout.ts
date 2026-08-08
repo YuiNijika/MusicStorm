@@ -6,7 +6,6 @@ import {
     type LibraryLayoutPrefs,
 } from "@/lib/library/layout-prefs"
 
-/** 订阅歌单展示偏好，卡片或列表 */
 function useLibraryLayout(): LibraryLayoutPrefs {
     const [prefs, setPrefs] = useState<LibraryLayoutPrefs>(() => readLibraryLayout())
 

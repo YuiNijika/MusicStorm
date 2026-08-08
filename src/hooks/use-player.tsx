@@ -90,7 +90,7 @@ function formatInvokeError(error: unknown): string {
     }
 }
 
-/** 技术错误转成用户短句，不暴露引擎名 */
+// 技术错误转成用户短句，不暴露引擎名
 function friendlyPlayError(error: unknown, trackTitle?: string): string {
     const raw = formatInvokeError(error).toLowerCase()
     const prefix = trackTitle ? `${trackTitle} · ` : ""
@@ -107,7 +107,6 @@ function friendlyPlayError(error: unknown, trackTitle?: string): string {
     if (/timeout|超时/.test(raw)) {
         return `${prefix}加载超时`
     }
-    // 已是中文短句则直接用
     const original = formatInvokeError(error)
     if (/[\u4e00-\u9fff]/.test(original) && original.length < 80) {
         return trackTitle ? `${trackTitle} · ${original}` : original

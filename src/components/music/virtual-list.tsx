@@ -70,10 +70,7 @@ function readVisibleRange(
     return { start, end }
 }
 
-/**
- * 感知外层页面滚动的固定行高虚拟列表。
- * overscan 会在可视区上下提前挂载内容，避免快速滚动时出现空白。
- */
+// 感知外层页面滚动的固定行高虚拟列表；overscan 避免快速滚动空白
 function VirtualList<T>({
     items,
     itemHeight,

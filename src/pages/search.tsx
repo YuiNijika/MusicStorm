@@ -46,7 +46,7 @@ function SearchPage() {
         useMusicNavigation()
 
     const [query, setQuery] = useState("")
-    /** 网易云仅在点击搜索 / 回车后生效 */
+    // 网易云仅在点击搜索 / 回车后生效
     const [submittedQuery, setSubmittedQuery] = useState("")
     const [history, setHistory] = useState<string[]>(() => getSearchHistory())
     const [inputFocused, setInputFocused] = useState(false)

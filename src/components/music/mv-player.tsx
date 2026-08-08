@@ -8,11 +8,6 @@ type MvPlayerProps = {
     poster?: string
 }
 
-/**
- * MV 播放器：ArtPlayer + HLS 分片。
- * 网易云 MV 地址可能是 mp4 直链或 m3u8 分片流，
- * m3u8 走 hls.js 解码，其余交给原生能力。
- */
 function MvPlayer({ url, poster }: MvPlayerProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const artRef = useRef<Artplayer | null>(null)

@@ -75,10 +75,7 @@ export function useWindowControls() {
         void appWindow.close().catch(() => undefined)
     }, [appWindow])
 
-    /**
-     * 标题栏按下：300ms 内的第二次按下视为双击 → 最小化（macOS 双击标题栏语义）；
-     * 否则进入手动拖拽，1:1 跟随指针移动窗口。
-     */
+    // 300ms 内第二次按下视为双击最小化（macOS 双击标题栏语义）；否则进入手动拖拽
     const startDragging = useCallback(
         (event: ReactPointerEvent<HTMLElement>) => {
             if (!appWindow || event.button !== 0) {

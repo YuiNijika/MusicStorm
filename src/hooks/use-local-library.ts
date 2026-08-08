@@ -33,7 +33,7 @@ import {
 import { notifyError, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 
-/** 根页 = 艺人/专辑；artist = 艺人下专辑；album = 某专辑曲目；all = 全部歌曲 */
+// 根页 = 艺人/专辑；artist = 艺人下专辑；album = 某专辑曲目；all = 全部歌曲
 export type LocalNav =
     | { kind: "root" }
     | { kind: "artist"; artistId: string }

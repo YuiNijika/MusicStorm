@@ -32,10 +32,7 @@ const VARIANT_ICON: Record<StateHeroVariant, LucideIcon> = {
     search: SearchX,
 }
 
-/**
- * Apple 风格状态区：加载失败 / 空列表 / 需登录
- * 居中大留白 + 轻材质卡片，不用页面级大标题
- */
+// Apple 风格状态区：居中大留白 + 轻材质卡片，不用页面级大标题
 function StateHero({
     variant = "empty",
     title,

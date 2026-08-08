@@ -1334,7 +1334,6 @@ function BusyPill() {
     )
 }
 
-/** 多选勾选角标 */
 function SelectionBadge({ selected }: { selected: boolean }) {
     return (
         <div
@@ -1350,7 +1349,6 @@ function SelectionBadge({ selected }: { selected: boolean }) {
     )
 }
 
-/** 底部批量操作栏：类型切换 + 已选计数 + 全选/删除/完成 */
 function BulkActionBar({
     mode,
     count,

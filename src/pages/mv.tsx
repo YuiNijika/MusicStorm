@@ -54,7 +54,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
 
     const profile = data?.profile
 
-    /** m3u8 为分片流，直链下载无意义 */
+    // m3u8 为分片流，直链下载无意义
     function isHlsStream(url: string): boolean {
         return /\.m3u8(\?|$)/i.test(url)
     }

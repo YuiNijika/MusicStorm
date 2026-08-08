@@ -26,7 +26,7 @@ function chunkItems<T>(items: T[], size: number): T[][] {
     return pages
 }
 
-/** 区头左右按钮，依赖外部 embla api，避免外侧绝对定位被裁切 */
+// 区头左右按钮，依赖外部 embla api，避免外侧绝对定位被裁切
 function RailControls({
     api,
     className,

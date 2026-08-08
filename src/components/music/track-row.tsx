@@ -76,10 +76,7 @@ type TrackRowProps = {
     isPlaying?: boolean
     showSource?: boolean
     showAlbumColumn?: boolean
-    /**
-     * 是否展示专辑名。
-     * 首页三栏等窄布局应 false。
-     */
+    // 是否展示专辑名；首页三栏等窄布局应 false
     showAlbumMeta?: boolean
     showActions?: boolean
     /** 更紧凑的 padding 与字号，首页三栏 */

@@ -54,7 +54,6 @@ const initial: SessionState = {
     activeUserId: null,
 }
 
-/** 网易云明确返回「需要登录」的错误：消息形如「接口错误 code=301」或 HTTP 401 */
 function isSessionExpiredError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error)
     return (

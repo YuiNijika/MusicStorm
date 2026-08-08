@@ -1,6 +1,4 @@
-/**
- * 统计图表 — 与 material-panel 同系，标题内嵌不与 Section 抢戏
- */
+// 统计图表 — 与 material-panel 同系，标题内嵌不与 Section 抢戏
 
 import type { ReactNode } from "react"
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, XAxis } from "recharts"

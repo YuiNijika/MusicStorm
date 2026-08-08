@@ -50,14 +50,13 @@ const PERIODS: {
     { id: "custom", label: "自定义", days: null, chartDays: 30 },
 ]
 
-/** 相对今天偏移 N 天的 UTC 日期字符串（YYYY-MM-DD） */
 function dateStr(offsetDays: number): string {
     const d = new Date()
     d.setUTCDate(d.getUTCDate() - offsetDays)
     return d.toISOString().slice(0, 10)
 }
 
-/** Date → YYYY-MM-DD（日历选择用本地时区，与用户所见一致） */
+// Date → YYYY-MM-DD；日历选择用本地时区，与用户所见一致
 function ymd(d: Date): string {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, "0")
@@ -65,7 +64,6 @@ function ymd(d: Date): string {
     return `${y}-${m}-${day}`
 }
 
-/** YYYY-MM-DD → Date；非法输入返回 undefined */
 function parseYmd(s: string): Date | undefined {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
         return undefined
@@ -74,7 +72,6 @@ function parseYmd(s: string): Date | undefined {
     return Number.isNaN(d.getTime()) ? undefined : d
 }
 
-/** 两个日期之间的天数差（含首尾） */
 function rangeDays(from: string, to: string): number {
     const diff =
         (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
@@ -188,7 +185,7 @@ function sortClusters(
     return next
 }
 
-/** 大数字 + 单位，Screen Time 风格 */
+// 大数字 + 单位，Screen Time 风格
 function splitListenDuration(ms: number): { primary: string; unit: string } {
     const totalMin = Math.max(0, Math.floor(ms / 60_000))
     if (totalMin < 60) {

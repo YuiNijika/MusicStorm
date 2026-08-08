@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 
 import "./elastic-slider.css"
 
-/** 弹性仅在轨道内部表现，不向外撑破布局 */
+// 弹性仅在轨道内部表现，不向外撑破布局
 const MAX_SQUISH = 0.22
 
 type ElasticSliderProps = {
@@ -41,9 +41,7 @@ type ElasticSliderProps = {
 
 type Region = "left" | "middle" | "right"
 
-/**
- * 轨道内压扁回弹，不向容器外溢出。
- */
+// 轨道内压扁回弹，不向容器外溢出
 function ElasticSlider({
     value: valueProp,
     defaultValue = 50,

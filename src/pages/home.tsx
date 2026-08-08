@@ -35,7 +35,6 @@ type HomePageProps = {
 }
 
 const DAILY_LIMIT = 24
-/** 为你推荐横滑上限 */
 const FOR_YOU_MAX = 24
 const RADIO_LIMIT = 18
 

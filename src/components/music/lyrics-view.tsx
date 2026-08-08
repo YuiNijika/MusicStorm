@@ -28,7 +28,7 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-/** 任一步得到非空行即返回；空则继续下一条源 */
+// 任一步得到非空行即返回；空则继续下一条源
 async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
     if (track.lyricText?.trim()) {
         const lines = parseLyricText(track.lyricText)

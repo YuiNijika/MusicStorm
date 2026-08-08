@@ -11,13 +11,7 @@ function isRemoteUrl(url: string): boolean {
     return /^https?:\/\//i.test(url)
 }
 
-/**
- * 远程封面 → 本地缓存 URL 的透明升级：
- * - 本地 / data: / asset: 原样返回
- * - 远程且已缓存 → 立即用本地 asset URL（离线可用）
- * - 远程未缓存 → 先用远程渲染，后台下载完成后切换本地并触发重渲染
- * 供 Cover 与全屏背景等所有封面渲染点统一使用。
- */
+// 远程封面 → 本地缓存 URL 的透明升级：远程且已缓存立即用本地 asset（离线可用），未缓存先用远程渲染后台下载后切换
 function useCachedCoverUrl(
     src: string,
     kind: "original" | "thumbnail" = "original",

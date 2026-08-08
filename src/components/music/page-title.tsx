@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 
-/** 页级标题：与资料库 Section 同量级，避免 34px 过重 */
+// 页级标题：与资料库 Section 同量级，避免 34px 过重
 type PageTitleProps = {
     title: string
     subtitle?: string

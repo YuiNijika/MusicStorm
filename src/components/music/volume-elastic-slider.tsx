@@ -15,10 +15,7 @@ type VolumeElasticSliderProps = {
     showIcons?: boolean
 }
 
-/**
- * 音量弹性滑条：内部 0–100 连续值，对外 0–1。
- * 静音时仍显示真实 volume，避免从 0 拖出时爆音。
- */
+// 内部 0–100 连续值，对外 0–1；静音时仍显示真实 volume，避免从 0 拖出时爆音
 function VolumeElasticSlider({
     volume,
     muted = false,
