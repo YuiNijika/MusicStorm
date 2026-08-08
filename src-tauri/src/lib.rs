@@ -182,6 +182,7 @@ fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>,
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+#[cfg(not(target_os = "android"))]
 fn read_image_as_data_url(path: &Path) -> Result<String, String> {
     if !path.is_file() {
         return Err("图片文件不存在".into());
