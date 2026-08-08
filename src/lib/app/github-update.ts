@@ -2,10 +2,13 @@ import { GITHUB_REPO_URL } from "@/lib/open-external"
 
 const OWNER = "YuiNijika"
 const REPO = "MusicStorm"
-const CACHE_KEY = "musicstorm-github-release-cache"
 const CACHE_TTL_MS = 5 * 60 * 60 * 1000
 const STATUS_EVENT = "musicstorm:update-status"
-const API_LATEST = `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`
+const API_RELEASES = `https://api.github.com/repos/${OWNER}/${REPO}/releases`
+
+// Android 独立版本线：tag 带 -android 后缀，与桌面 vX.Y.Z 分开，
+// 避免 releases/latest 按时间排序导致跨平台串台
+const ANDROID_TAG_SUFFIX = "-android"
 
 type GithubReleaseRaw = {
     tag_name?: string
@@ -60,6 +63,27 @@ function normalizeSemver(raw: string): string | null {
     return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`
 }
 
+// Android：tag 形如 v0.0.1-android；桌面：纯 vX.Y.Z
+function isAndroidPlatform(): boolean {
+    try {
+        return /android/i.test(navigator.userAgent)
+    } catch {
+        return false
+    }
+}
+
+function tagMatchesPlatform(tag: string): boolean {
+    const isAndroid = isAndroidPlatform()
+    const hasSuffix = tag.trim().endsWith(ANDROID_TAG_SUFFIX)
+    return isAndroid ? hasSuffix : !hasSuffix
+}
+
+function cacheKeyForPlatform(): string {
+    return isAndroidPlatform()
+        ? "musicstorm-github-release-cache-android"
+        : "musicstorm-github-release-cache"
+}
+
 function parseSemverTuple(raw: string): [number, number, number] | null {
     const normalized = normalizeSemver(raw)
     if (!normalized) {
@@ -105,7 +129,7 @@ function readCache(): CachePayload | null {
         return null
     }
     try {
-        const raw = window.localStorage.getItem(CACHE_KEY)
+        const raw = window.localStorage.getItem(cacheKeyForPlatform())
         if (!raw) {
             return null
         }
@@ -125,7 +149,10 @@ function readCache(): CachePayload | null {
 
 function writeCache(payload: CachePayload): void {
     try {
-        window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+        window.localStorage.setItem(
+            cacheKeyForPlatform(),
+            JSON.stringify(payload),
+        )
     } catch {
         // 缓存写入失败不阻塞更新检查
     }
@@ -176,7 +203,7 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
     }
 
     try {
-        const response = await fetch(API_LATEST, {
+        const response = await fetch(API_RELEASES, {
             method: "GET",
             headers: {
                 Accept: "application/vnd.github+json",
@@ -190,9 +217,15 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
             throw new Error(`GitHub API HTTP ${response.status}`)
         }
 
-        const data = (await response.json()) as GithubReleaseRaw
-        if (data.draft) {
-            throw new Error("最新 Release 仍为 draft")
+        const all = (await response.json()) as GithubReleaseRaw[]
+        // 平台隔离：桌面只看 vX.Y.Z，Android 只看 vX.Y.Z-android
+        const data = all.find(
+            (r) =>
+                !r.draft &&
+                tagMatchesPlatform(r.tag_name ?? ""),
+        )
+        if (!data) {
+            throw new Error("当前平台暂无发布版本")
         }
 
         const latestTag = (data.tag_name ?? "").trim()
