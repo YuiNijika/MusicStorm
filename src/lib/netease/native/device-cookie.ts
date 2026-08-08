@@ -7,18 +7,6 @@ import CryptoJS from "crypto-js"
 const PC_APPVER = "3.1.17.204416"
 const DESKTOP_UA_APPVER = "3.1.29.205117"
 
-// Android 设备指纹；os/osver 与 UA 必须匹配，否则风控拦截（「有风险」）
-const ANDROID_OSVER = "android-14"
-const ANDROID_APPVER = "9.0.90"
-
-function isAndroid(): boolean {
-    try {
-        return /android/i.test(navigator.userAgent)
-    } catch {
-        return false
-    }
-}
-
 const DEVICE_ID_KEY = "netease-device-id"
 const NMTID_KEY = "netease-nmtid"
 const WNMCID_KEY = "netease-wnmcid"
@@ -173,21 +161,12 @@ function ensureDeviceCookies(
     if (!next.WEVNSM) {
         next.WEVNSM = "1.0.0"
     }
-    // 平台指纹：os/osver 必须与请求 UA 一致，否则风控拦截（「有风险」）
-    if (isAndroid()) {
-        next.os = next.os || "android"
-        next.osver = next.osver || ANDROID_OSVER
-        next.appver = next.appver || ANDROID_APPVER
-        next.mobilename = next.mobilename || "android"
-        next.versioncode = next.versioncode || "140"
-        next.resolution = next.resolution || "1080x2400"
-    } else {
-        next.os = next.os || "pc"
-        next.appver = next.appver || PC_APPVER
-        next.osver =
-            next.osver || "Microsoft-Windows-10-Professional-build-19045-64bit"
-        next.resolution = next.resolution || "1920x1080"
-    }
+
+    next.os = next.os || "pc"
+    next.appver = next.appver || PC_APPVER
+    next.osver =
+        next.osver || "Microsoft-Windows-10-Professional-build-19045-64bit"
+    next.resolution = next.resolution || "1920x1080"
     next.channel = next.channel || "netease"
     next.deviceId = isCanonicalDeviceId(next.deviceId)
         ? (next.deviceId as string)
