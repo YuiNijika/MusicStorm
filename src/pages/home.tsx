@@ -226,9 +226,11 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                         "group relative flex w-full cursor-pointer overflow-hidden rounded-[22px] text-left",
                         "bg-black/[0.03] ring-1 ring-black/[0.04] transition-transform duration-200",
                         "active:scale-[0.99] dark:bg-white/[0.04] dark:ring-white/[0.06]",
+                        "flex-col sm:flex-row",
                     )}
                 >
-                    <div className="relative hidden aspect-square w-[168px] shrink-0 sm:block md:w-[200px]">
+                    {/* 移动端封面在上、文字在下；桌面端并排 */}
+                    <div className="relative aspect-[4/3] w-full shrink-0 sm:aspect-square sm:w-[168px] md:w-[200px]">
                         <Cover
                             src={featured.coverUrl}
                             alt={featured.title}
@@ -236,14 +238,14 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                             className="size-full rounded-none"
                         />
                     </div>
-                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 p-5 sm:p-6">
-                        <p className="text-[12px] font-semibold tracking-[0.04em] text-primary uppercase">
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-4 sm:gap-2 sm:p-6">
+                        <p className="text-[11px] font-semibold tracking-[0.04em] text-primary uppercase sm:text-[12px]">
                             精选歌单
                         </p>
-                        <p className="line-clamp-2 text-[26px] font-bold tracking-[-0.04em] text-foreground sm:text-[30px]">
+                        <p className="line-clamp-2 text-[20px] font-bold tracking-[-0.04em] text-foreground sm:text-[26px] md:text-[30px]">
                             {featured.title}
                         </p>
-                        <p className="line-clamp-2 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
+                        <p className="line-clamp-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground sm:text-[14px]">
                             {featured.description ||
                                 (featured.trackCount
                                     ? `${featured.trackCount} 首歌曲`

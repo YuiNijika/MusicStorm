@@ -14,7 +14,20 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 
+function isMobile(): boolean {
+    try {
+        return /android|iphone|ipad|mobile/i.test(navigator.userAgent)
+    } catch {
+        return false
+    }
+}
+
 type AuthTab = "phone" | "qr"
+
+const DEFAULT_TAB: AuthTab = isMobile() ? "phone" : "qr"
+const TAB_ORDER: [AuthTab, string][] = isMobile()
+    ? [["phone", "手机号"], ["qr", "扫码"]]
+    : [["qr", "扫码"], ["phone", "手机号"]]
 
 type NeteaseAuthDialogProps = {
     open: boolean
@@ -23,7 +36,7 @@ type NeteaseAuthDialogProps = {
 
 function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
     const { refresh } = useNeteaseSession()
-    const [tab, setTab] = useState<AuthTab>("qr")
+    const [tab, setTab] = useState<AuthTab>(DEFAULT_TAB)
     const [phone, setPhone] = useState("")
     const [captcha, setCaptcha] = useState("")
     const [sending, setSending] = useState(false)
@@ -43,7 +56,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
         if (!open) {
             reset()
             setError(null)
-            setTab("qr")
+            setTab(DEFAULT_TAB)
             return
         }
     }, [open, reset])
@@ -117,17 +130,12 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                 <DialogHeader>
                     <DialogTitle>登录网易云</DialogTitle>
                     <DialogDescription>
-                        默认扫码登录到MusicStorm
+                        {isMobile() ? "手机号登录" : "默认扫码登录到 MusicStorm"}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex gap-1 rounded-full bg-black/[0.04] p-1 dark:bg-white/[0.06]">
-                    {(
-                        [
-                            ["qr", "扫码"],
-                            ["phone", "手机号"],
-                        ] as const
-                    ).map(([id, label]) => (
+                    {TAB_ORDER.map(([id, label]) => (
                         <button
                             key={id}
                             type="button"

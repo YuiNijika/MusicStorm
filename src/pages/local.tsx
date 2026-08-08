@@ -383,19 +383,19 @@ function LocalPage() {
             <div className="space-y-6 pb-4">
                 <BackButton onClick={lib.goRoot} label="资料库" />
 
-                <header className="flex flex-wrap items-end justify-between gap-4">
-                    <div className="flex flex-wrap items-end gap-5">
+                <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
                         <Cover
                             src={artistCover}
                             alt={artist.name}
                             size="lg"
-                            className="size-36 rounded-full shadow-md ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                            className="size-28 shrink-0 rounded-full shadow-md ring-1 ring-black/[0.06] dark:ring-white/[0.1] sm:size-36"
                         />
                         <div className="min-w-0 space-y-2 pb-1">
-                            <p className="text-[12px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+                            <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人 / 合集
                             </p>
-                            <h1 className="text-[32px] font-semibold tracking-[-0.04em]">
+                            <h1 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
                                 {artist.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -589,10 +589,10 @@ function LocalPage() {
 
                 <header className="flex flex-wrap items-end justify-between gap-3 px-0.5">
                     <div className="min-w-0">
-                        <h1 className="text-[28px] font-semibold tracking-[-0.04em]">
+                        <h1 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px] md:text-[28px]">
                             {title}
                         </h1>
-                        <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        <p className="mt-0.5 text-[12px] text-muted-foreground sm:text-[13px]">
                             {description}
                         </p>
                     </div>

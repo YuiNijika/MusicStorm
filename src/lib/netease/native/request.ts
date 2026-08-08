@@ -164,12 +164,12 @@ async function ensureAnonymousToken(): Promise<void> {
                 const header: Record<string, string> = {
                     osver: jar.osver || "",
                     deviceId,
-                    os: "pc",
-                    appver: PC_APPVER,
-                    versioncode: "140",
-                    mobilename: "",
+                    os: jar.os || "pc",
+                    appver: jar.appver || PC_APPVER,
+                    versioncode: jar.versioncode || "140",
+                    mobilename: jar.mobilename || "",
                     buildver: String(Date.now()).slice(0, 10),
-                    resolution: "1920x1080",
+                    resolution: jar.resolution || "1920x1080",
                     __csrf: "",
                     channel: "netease",
                     requestId: `${Date.now()}_${Math.floor(Math.random() * 1000)

@@ -227,18 +227,18 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 />
             ) : profile ? (
                 <>
-                    <header className="flex flex-wrap items-end gap-5">
+                    <header className="flex flex-col gap-5 sm:flex-row sm:items-end">
                         <Cover
                             src={profile.coverUrl}
                             alt={profile.name}
                             size="lg"
-                            className="size-36 rounded-full shadow-md ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                            className="size-32 shrink-0 rounded-full shadow-md ring-1 ring-black/[0.06] dark:ring-white/[0.1] sm:size-36"
                         />
                         <div className="min-w-0 flex-1 space-y-2 pb-1">
-                            <p className="text-[12px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+                            <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人
                             </p>
-                            <h1 className="text-[32px] font-semibold tracking-[-0.04em]">
+                            <h1 className="text-[24px] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
                                 {profile.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
