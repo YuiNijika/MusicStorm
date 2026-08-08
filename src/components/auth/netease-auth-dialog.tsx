@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { useQrLogin } from "@/hooks/use-qr-login"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
@@ -43,6 +43,9 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
     const [loggingIn, setLoggingIn] = useState(false)
     const [cooldown, setCooldown] = useState(0)
     const [error, setError] = useState<string | null>(null)
+    // 同步守卫 state 更新是异步的，移动端快速双击会读到旧值触发两次发送
+    const sendingRef = useRef(false)
+    const loggingInRef = useRef(false)
 
     const handleSuccess = async () => {
         await refresh()
@@ -76,6 +79,9 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
     }, [cooldown])
 
     async function handleSendCaptcha() {
+        if (sendingRef.current || cooldown > 0) {
+            return
+        }
         setError(null)
         if (!/^\d{11}$/.test(phone.trim())) {
             const message = "请输入 11 位手机号"
@@ -83,6 +89,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
             notifyError("验证码发送失败", { description: message })
             return
         }
+        sendingRef.current = true
         setSending(true)
         try {
             await sendCaptcha(phone)
@@ -93,11 +100,15 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
             setError(message)
             notifyError("验证码发送失败", { description: message })
         } finally {
+            sendingRef.current = false
             setSending(false)
         }
     }
 
     async function handleLogin() {
+        if (loggingInRef.current) {
+            return
+        }
         setError(null)
         if (!/^\d{11}$/.test(phone.trim())) {
             const message = "请输入 11 位手机号"
@@ -111,6 +122,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
             notifyError("登录失败", { description: message })
             return
         }
+        loggingInRef.current = true
         setLoggingIn(true)
         try {
             await loginWithCellphone({ phone, captcha })
@@ -120,6 +132,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
             setError(message)
             notifyError("登录失败", { description: message })
         } finally {
+            loggingInRef.current = false
             setLoggingIn(false)
         }
     }
