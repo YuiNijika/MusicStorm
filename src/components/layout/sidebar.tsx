@@ -27,7 +27,7 @@ import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
-/** 登录弹窗按需加载，避免登录表单进启动包 */
+// 登录弹窗按需加载，避免登录表单进启动包
 const NeteaseAuthDialog = lazy(() =>
     import("@/components/auth/netease-auth-dialog").then(m => ({
         default: m.NeteaseAuthDialog,
@@ -79,7 +79,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                                 )}
                                 strokeWidth={isActive ? 2.2 : 1.9}
                             />
-                            <span className="min-w-0">
+                            <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[13px] font-medium tracking-[-0.01em]">
                                     {item.label}
                                 </span>
