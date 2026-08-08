@@ -380,7 +380,7 @@ def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
         gradlew, ":app:assembleUniversalRelease",
         "-x", "rustBuildArm64Release",
         "-x", "rustBuildArmRelease",
-        "-x", "rustBuildX8664Release",
+        "-x", "rustBuildX86_64Release",
         "-x", "rustBuildX86Release",
         "-x", "rustBuildUniversalRelease",
     ]
