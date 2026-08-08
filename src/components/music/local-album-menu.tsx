@@ -94,7 +94,7 @@ type LocalArtistMenuProps = {
     onDelete: (artist: LocalArtist) => void
 }
 
-/** 艺人卡片操作菜单：形态与专辑菜单一致（右上角 ⋯ → 编辑/删除分组） */
+// 艺人卡片操作菜单：形态与专辑菜单一致（右上角 ⋯ → 编辑/删除分组）
 function LocalArtistMenu({
     artist,
     overlay = false,

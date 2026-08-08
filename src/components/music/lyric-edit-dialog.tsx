@@ -24,7 +24,7 @@ type LyricEditDialogProps = {
     onOpenChange: (open: boolean) => void
 }
 
-/** 歌词在线编辑：保存后写入本地覆盖，优先于网易云 / 本地原歌词显示 */
+// 歌词在线编辑：保存后写入本地覆盖，优先于网易云 / 本地原歌词显示
 function LyricEditDialog({ track, open, onOpenChange }: LyricEditDialogProps) {
     const [text, setText] = useState("")
     const [loading, setLoading] = useState(false)

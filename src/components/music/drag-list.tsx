@@ -17,10 +17,7 @@ type DragListProps<T extends { id: string }> = {
     className?: string
 }
 
-/**
- * 轻量指针拖拽排序：按住 Grip 拖动。
- * 仅 list 视图 / 自定义排序时启用。
- */
+// 轻量指针拖拽排序：按住 Grip 拖动；仅 list 视图 / 自定义排序时启用
 function DragList<T extends { id: string }>({
     items,
     enabled,

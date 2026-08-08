@@ -18,7 +18,7 @@ import type { NeteaseAlbumHit } from "@/lib/netease/search"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
-/** 仅新建 / 编辑元数据；文件夹导入不经抽屉 */
+// 仅新建 / 编辑元数据；文件夹导入不经抽屉
 export type LocalAlbumDrawerMode = "create" | "edit"
 
 export type LocalAlbumDrawerProps = {

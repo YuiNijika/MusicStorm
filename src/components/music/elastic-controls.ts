@@ -1,10 +1,3 @@
-/**
- * 弹性控制条组件库
- * - ElasticSlider：通用弹性滑条
- * - VolumeElasticSlider：音量 0–1
- * - SeekElasticSlider：播放进度
- */
-
 export { ElasticSlider } from "@/components/ui/elastic-slider"
 export type { ElasticSliderProps } from "@/components/ui/elastic-slider"
 
