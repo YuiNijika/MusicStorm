@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 
+import { useTheme } from "@/components/app/theme-provider"
 import { Cover } from "@/components/music/cover"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
@@ -22,9 +23,16 @@ import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
 import {
+    ACCENT_OPTIONS,
+    accentSwatch,
+    resolveAccentHue,
+} from "@/lib/appearance/appearance-prefs"
+import { useIsMobile } from "@/hooks/use-mobile"
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -108,12 +116,22 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
+    const { appearance, setAccent, setCustomHue } = useTheme()
+    const isMobile = useIsMobile()
 
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
+    // 移动端只保留 封面/歌词 两种布局；classic 是桌面分栏，窄屏降级到封面
+    const availableLayouts = isMobile
+        ? FULL_PLAYER_LAYOUTS.filter((item) => item.id !== "classic")
+        : FULL_PLAYER_LAYOUTS
+    const effectiveLayout: FullPlayerLayout =
+        isMobile && layout === "classic" ? "cover" : layout
+    const customHue = resolveAccentHue(appearance)
+    const customActive = appearance.accent === "custom"
     // 移动端下滑收起手势：跟手位移（px）+ 起始 Y（区分水平滚动）
     const [dragDy, setDragDy] = useState(0)
     const dragStartRef = useRef<{ y: number; startDy: number } | null>(null)
@@ -495,32 +513,101 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             title="播放样式"
                         >
                             <LayoutTemplate className="size-3.5" />
-                            {FULL_PLAYER_LAYOUTS.find((item) => item.id === layout)?.label ??
-                                "样式"}
+                            {availableLayouts.find((item) => item.id === effectiveLayout)
+                                ?.label ?? "样式"}
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="min-w-[160px]">
-                            {FULL_PLAYER_LAYOUTS.map((item) => (
-                                <DropdownMenuItem
-                                    key={item.id}
-                                    className="cursor-pointer flex-col items-start gap-0.5"
-                                    onClick={() => handleLayoutChange(item.id)}
-                                >
-                                    <span className="text-[13px] font-medium">
-                                        {item.label}
-                                        {layout === item.id ? " · 当前" : ""}
-                                    </span>
-                                    <span className="text-[11px] text-muted-foreground">
-                                        {item.description}
-                                    </span>
-                                </DropdownMenuItem>
-                            ))}
+                        <DropdownMenuContent align="center" className="w-60 p-3">
+                            <p className="mb-2 text-[12px] font-medium text-foreground">
+                                主题色
+                            </p>
+                            <div className="flex flex-wrap gap-2.5">
+                                {ACCENT_OPTIONS.map((option) => {
+                                    const active = appearance.accent === option.id
+                                    return (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            aria-label={option.label}
+                                            onClick={() => setAccent(option.id)}
+                                            className={cn(
+                                                "size-7 cursor-pointer rounded-full transition-transform duration-150",
+                                                "ring-offset-2 ring-offset-background active:scale-95",
+                                                active
+                                                    ? "ring-2 ring-foreground/80"
+                                                    : "ring-1 ring-black/10 dark:ring-white/15",
+                                            )}
+                                            style={{
+                                                background: accentSwatch(
+                                                    option.hue,
+                                                    option.id === "neutral",
+                                                ),
+                                            }}
+                                        />
+                                    )
+                                })}
+                                <button
+                                    type="button"
+                                    aria-label="自定义色相"
+                                    onClick={() => setCustomHue(customHue)}
+                                    className={cn(
+                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
+                                        "ring-offset-2 ring-offset-background active:scale-95",
+                                        customActive
+                                            ? "ring-2 ring-foreground/80"
+                                            : "ring-1 ring-black/10 dark:ring-white/15",
+                                    )}
+                                    style={{
+                                        background: `conic-gradient(
+                                            oklch(0.7 0.16 0),
+                                            oklch(0.7 0.16 60),
+                                            oklch(0.7 0.16 120),
+                                            oklch(0.7 0.16 180),
+                                            oklch(0.7 0.16 240),
+                                            oklch(0.7 0.16 300),
+                                            oklch(0.7 0.16 360)
+                                        )`,
+                                    }}
+                                />
+                            </div>
+                            {customActive ? (
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={359}
+                                    step={1}
+                                    value={customHue}
+                                    onChange={(event) =>
+                                        setCustomHue(Number(event.currentTarget.value))
+                                    }
+                                    className="progress-range mt-3 w-full"
+                                    aria-label="自定义色相"
+                                />
+                            ) : null}
+                            <DropdownMenuSeparator className="my-2.5" />
+                            <div className="space-y-0.5">
+                                {availableLayouts.map((item) => (
+                                    <DropdownMenuItem
+                                        key={item.id}
+                                        className="cursor-pointer flex-col items-start gap-0.5"
+                                        onClick={() => handleLayoutChange(item.id)}
+                                    >
+                                        <span className="text-[13px] font-medium">
+                                            {item.label}
+                                            {effectiveLayout === item.id ? " · 当前" : ""}
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {item.description}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </div>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
                     <div className="w-[72px]" aria-hidden />
                 </div>
 
-                {layout === "classic" ? (
+                {effectiveLayout === "classic" ? (
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
                         <div className="flex min-h-0 flex-col items-center justify-center gap-6">
                             <div className="w-full max-w-[min(400px,78vw)]">
@@ -553,7 +640,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     </div>
                 ) : null}
 
-                {layout === "cover" ? (
+                {effectiveLayout === "cover" ? (
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
                         <div className="w-full max-w-[min(440px,82vw)]">
                             <Cover
@@ -572,7 +659,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     </div>
                 ) : null}
 
-                {layout === "lyrics" ? (
+                {effectiveLayout === "lyrics" ? (
                     <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
                         {lyricsActive ? (
                             <Suspense fallback={null}>
