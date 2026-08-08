@@ -40,9 +40,7 @@ function AppShell({
             <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
 
             <div className="flex min-h-0 flex-1">
-                <div className="hidden md:block h-full">
-                    <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
-                </div>
+                <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
 
                 <main className="apple-scroll min-w-0 flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-8 md:pb-10 lg:px-10">
