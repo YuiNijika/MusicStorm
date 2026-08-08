@@ -223,14 +223,12 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                     type="button"
                     onClick={() => onOpenPlaylist(featured.id)}
                     className={cn(
-                        "group relative flex w-full cursor-pointer overflow-hidden rounded-[22px] text-left",
+                        "group relative flex w-full cursor-pointer flex-row overflow-hidden rounded-[22px] text-left",
                         "bg-black/[0.03] ring-1 ring-black/[0.04] transition-transform duration-200",
                         "active:scale-[0.99] dark:bg-white/[0.04] dark:ring-white/[0.06]",
-                        "flex-col sm:flex-row",
                     )}
                 >
-                    {/* 移动端封面在上、文字在下；桌面端并排 */}
-                    <div className="relative aspect-[4/3] w-full shrink-0 sm:aspect-square sm:w-[168px] md:w-[200px]">
+                    <div className="relative aspect-square w-28 shrink-0 sm:w-[168px] md:w-[200px]">
                         <Cover
                             src={featured.coverUrl}
                             alt={featured.title}
@@ -242,7 +240,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                         <p className="text-[11px] font-semibold tracking-[0.04em] text-primary uppercase sm:text-[12px]">
                             精选歌单
                         </p>
-                        <p className="line-clamp-2 text-[20px] font-bold tracking-[-0.04em] text-foreground sm:text-[26px] md:text-[30px]">
+                        <p className="line-clamp-2 text-[18px] font-bold tracking-[-0.04em] text-foreground sm:text-[26px] md:text-[30px]">
                             {featured.title}
                         </p>
                         <p className="line-clamp-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground sm:text-[14px]">
