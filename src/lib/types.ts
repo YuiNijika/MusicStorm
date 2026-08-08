@@ -43,7 +43,6 @@ export type Playlist = {
     trackCount?: number
 }
 
-/** 网易云播客 / 电台 */
 export type Radio = {
     id: string
     title: string
@@ -56,7 +55,6 @@ export type Radio = {
     category?: string
 }
 
-/** 电台单期节目 */
 export type RadioProgram = {
     id: string
     title: string

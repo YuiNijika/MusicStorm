@@ -12,7 +12,7 @@ import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
-/** 移动端顶部导航：Apple Music 风格 tab（仅 <md 显示；≥md 由侧边栏接管） */
+// Apple Music 风格 tab；仅 <md 显示，≥md 侧边栏接管
 const MOBILE_TABS: AppRoute[] = ["home", "library", "search", "radios", "local"]
 
 const ICONS: Record<AppRoute, LucideIcon> = {

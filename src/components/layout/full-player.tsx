@@ -65,7 +65,7 @@ type FullPlayerProps = {
     onClose: () => void
 }
 
-/** 歌词模块只在播放器展开时按需加载，避免进启动包 */
+// 歌词模块只在播放器展开时按需加载，避免进启动包
 const LyricsView = lazy(() =>
     import("@/components/music/lyrics-view").then(m => ({ default: m.LyricsView })),
 )
@@ -267,7 +267,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         onClose()
     }
 
-    /** 移动端下滑收起手势：仅触屏、仅移动端视口、仅 phase=open、且按下处不在可滚动容器内 */
     function handleSheetPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
         if (
             phase !== "open" ||
@@ -795,7 +794,7 @@ function IconBtn({
     )
 }
 
-/** 全屏背景封面：远程 URL 透明升级为本地缓存，避免每次打开都拉 CDN */
+// 远程 URL 透明升级为本地缓存，避免每次打开都拉 CDN
 function CachedBackdropImage({ src }: { src: string }) {
     const resolved = useCachedCoverUrl(src, "original")
     return <img src={resolved} alt="" className="full-player-backdrop-image" />

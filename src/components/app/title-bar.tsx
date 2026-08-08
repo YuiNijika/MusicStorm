@@ -479,7 +479,7 @@ function BrandMark() {
     return <img src="/icon.svg" alt="MusicStorm" className="size-7" />
 }
 
-/** lucide 新版本已移除品牌图标，本地内联 GitHub mark */
+// lucide 新版本已移除品牌图标，本地内联 GitHub mark
 function GitHubMark({ className }: { className?: string }) {
     return (
         <svg

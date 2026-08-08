@@ -12,7 +12,7 @@ import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
-/** 窄屏（移动端）底部 Tab 导航。仅 <md 显示；≥md 由侧边栏接管。 */
+// 仅 <md 显示；≥md 侧边栏接管
 const MOBILE_TABS: AppRoute[] = ["home", "library", "search", "radios", "local"]
 
 const ICONS: Record<AppRoute, LucideIcon> = {
