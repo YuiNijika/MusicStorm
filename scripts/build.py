@@ -364,8 +364,10 @@ def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
     # 排除全部 ABI 的 rustBuild 避免重编译。
     gradlew = _gradlew()
     gen_dir = Path("src-tauri/gen/android")
+    # --no-daemon：一次性构建不需要守护进程，且 Kotlin daemon 偶发连不上
+    # （僵尸进程）导致编译失败，直接前台编译更稳
     gradle_args = [
-        gradlew, ":app:assembleUniversalRelease",
+        gradlew, "--no-daemon", ":app:assembleUniversalRelease",
         "-x", "rustBuildArm64Release",
         "-x", "rustBuildArmRelease",
         "-x", "rustBuildX86_64Release",
