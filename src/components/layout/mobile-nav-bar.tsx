@@ -5,6 +5,7 @@ import {
     Library,
     LogIn,
     LogOut,
+    Palette,
     Podcast,
     Search,
     Settings2,
@@ -21,8 +22,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useTheme } from "@/components/app/theme-provider"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
+import {
+    ACCENT_OPTIONS,
+    accentSwatch,
+    resolveAccentHue,
+} from "@/lib/appearance/appearance-prefs"
 import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
@@ -60,7 +67,10 @@ type MobileNavBarProps = {
 
 function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSession()
+    const { appearance, setAccent, setCustomHue } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
+    const customActive = appearance.accent === "custom"
+    const customHue = resolveAccentHue(appearance)
 
     return (
         <nav
@@ -68,7 +78,7 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
             className="mobile-nav-bar md:hidden"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
-            <div className="flex items-center justify-between px-2 py-2">
+            <div className="flex items-center justify-between gap-1 px-2 py-2">
                 {/* Segmented tabs — Apple Music 风格滑动指示器 */}
                 <SegmentedTabs
                     tabs={MOBILE_TABS}
@@ -77,8 +87,95 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                     onNavigate={onNavigate}
                 />
 
-                {/* 账号入口 */}
-                <DropdownMenu>
+                <div className="flex shrink-0 items-center">
+                    {/* 调色板：移动端快捷换主题色，不打断当前页面 */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger
+                            aria-label="主题色"
+                            className={cn(
+                                "flex size-9 cursor-pointer items-center justify-center rounded-full",
+                                "text-foreground/60 transition-colors duration-100 active:scale-[0.95]",
+                                "hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]",
+                            )}
+                        >
+                            <Palette className="size-4" strokeWidth={1.9} />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            side="bottom"
+                            align="end"
+                            className="w-56 p-3"
+                        >
+                            <p className="mb-2 text-[12px] font-medium text-foreground">
+                                主题色
+                            </p>
+                            <div className="flex flex-wrap gap-2.5">
+                                {ACCENT_OPTIONS.map((option) => {
+                                    const active = appearance.accent === option.id
+                                    return (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            aria-label={option.label}
+                                            onClick={() => setAccent(option.id)}
+                                            className={cn(
+                                                "size-7 cursor-pointer rounded-full transition-transform duration-150",
+                                                "ring-offset-2 ring-offset-background active:scale-95",
+                                                active
+                                                    ? "ring-2 ring-foreground/80"
+                                                    : "ring-1 ring-black/10 dark:ring-white/15",
+                                            )}
+                                            style={{
+                                                background: accentSwatch(
+                                                    option.hue,
+                                                    option.id === "neutral",
+                                                ),
+                                            }}
+                                        />
+                                    )
+                                })}
+                                <button
+                                    type="button"
+                                    aria-label="自定义色相"
+                                    onClick={() => setCustomHue(customHue)}
+                                    className={cn(
+                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
+                                        "ring-offset-2 ring-offset-background active:scale-95",
+                                        customActive
+                                            ? "ring-2 ring-foreground/80"
+                                            : "ring-1 ring-black/10 dark:ring-white/15",
+                                    )}
+                                    style={{
+                                        background: `conic-gradient(
+                                            oklch(0.7 0.16 0),
+                                            oklch(0.7 0.16 60),
+                                            oklch(0.7 0.16 120),
+                                            oklch(0.7 0.16 180),
+                                            oklch(0.7 0.16 240),
+                                            oklch(0.7 0.16 300),
+                                            oklch(0.7 0.16 360)
+                                        )`,
+                                    }}
+                                />
+                            </div>
+                            {customActive ? (
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={359}
+                                    step={1}
+                                    value={customHue}
+                                    onChange={(event) =>
+                                        setCustomHue(Number(event.currentTarget.value))
+                                    }
+                                    className="progress-range mt-3 w-full"
+                                    aria-label="自定义色相"
+                                />
+                            ) : null}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* 账号入口 */}
+                    <DropdownMenu>
                     <DropdownMenuTrigger
                         className={cn(
                             "ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full",
@@ -135,6 +232,7 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
             </div>
 
             {authOpen ? (
