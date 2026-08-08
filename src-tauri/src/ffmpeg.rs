@@ -138,6 +138,7 @@ fn status_for(path: PathBuf, source: &str) -> FfmpegStatus {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn resolve_ffmpeg_path(state: &DbState) -> Result<Option<PathBuf>, String> {
     if let Some(path) = configured_path(state)? {
         if version_line(&path).is_ok() {
