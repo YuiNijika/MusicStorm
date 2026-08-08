@@ -40,7 +40,7 @@ function AppShell({
             <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
 
             <div className="flex min-h-0 flex-1">
-                <div className="hidden md:block">
+                <div className="hidden md:block h-full">
                     <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
                 </div>
 
