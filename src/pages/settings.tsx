@@ -6,6 +6,7 @@ import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { NeteaseAuthDialog } from "@/components/auth/netease-auth-dialog"
 import { Section } from "@/components/music/section"
+import { SegmentedControl } from "@/components/ui/segmented-control"
 import {
     Select,
     SelectContent,
@@ -172,24 +173,12 @@ function SettingsPage({
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap gap-1 rounded-full bg-black/[0.04] p-1 dark:bg-white/[0.06]">
-                {TABS.map((item) => (
-                    <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setTab(item.id)}
-                        className={cn(
-                            "cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-150",
-                            "active:scale-[0.97]",
-                            tab === item.id
-                                ? "bg-background text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {item.label}
-                    </button>
-                ))}
-            </div>
+            <SegmentedControl
+                items={TABS}
+                value={tab}
+                onChange={(id) => setTab(id as SettingsTab)}
+                className="md:max-w-md"
+            />
 
             <div
                 key={tab}

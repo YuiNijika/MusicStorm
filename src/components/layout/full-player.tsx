@@ -457,7 +457,11 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
                 <div className="relative z-[1] flex h-full min-h-0 flex-col">
                     <div
-                        className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                        className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-4"
+                        style={{
+                            // 顶部安全区
+                            paddingTop: "env(safe-area-inset-top)",
+                        }}
                         onPointerDown={(event) => {
                             if ((event.target as HTMLElement).closest("button")) return
                             if (event.pointerType !== "mouse") return

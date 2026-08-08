@@ -80,6 +80,12 @@ fn open_devtools(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// 移动端返回手势处理链末端：前端已退回顶层时调用，结束进程
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    app.exit(0)
+}
+
 // Android 无桌面文件对话框（走 SAF），此命令仅桌面端注册
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
@@ -780,6 +786,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             open_devtools,
+            exit_app,
             #[cfg(not(target_os = "android"))]
             pick_music_folder,
             #[cfg(not(target_os = "android"))]

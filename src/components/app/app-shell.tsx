@@ -1,12 +1,14 @@
-import { useState, type ReactNode } from "react"
+import { useCallback, useState, type ReactNode } from "react"
 
 import { TitleBar, type TitleBarStyle } from "@/components/app/title-bar"
 import { FullPlayer } from "@/components/layout/full-player"
 import { MobileNavBar } from "@/components/layout/mobile-nav-bar"
 import { PlayerBar } from "@/components/layout/player-bar"
 import { Sidebar } from "@/components/layout/sidebar"
-import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
+import { useAndroidBack } from "@/hooks/use-android-back"
 import { useCloseToTray } from "@/hooks/use-close-to-tray"
+import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
 import type { AppRoute } from "@/lib/routes"
 
@@ -27,9 +29,25 @@ function AppShell({
     onOpenUpdate,
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
+    const { detail, back } = useMusicNavigation()
     usePlayerHotkeys()
     useCloseToTray()
     useTrayCommands()
+
+    // Android 返回手势：全屏播放器 → 详情页 → 顶层退出
+    useAndroidBack({
+        onBack: useCallback(() => {
+            if (fullPlayerOpen) {
+                setFullPlayerOpen(false)
+                return true
+            }
+            if (detail) {
+                back()
+                return true
+            }
+            return false
+        }, [fullPlayerOpen, detail, back]),
+    })
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
