@@ -7,6 +7,7 @@ import {
     LogOut,
     Podcast,
     Search,
+    Settings2,
     User,
     UserPlus,
     type LucideIcon,
@@ -27,7 +28,14 @@ import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
 // 仅 <md 显示的核心 tab；≥md 侧边栏接管
-const MOBILE_TABS: AppRoute[] = ["home", "local", "library", "radios", "search"]
+const MOBILE_TABS: AppRoute[] = [
+    "home",
+    "local",
+    "library",
+    "radios",
+    "search",
+    "settings",
+]
 
 const ICONS: Record<AppRoute, LucideIcon> = {
     home: Home,
@@ -36,7 +44,7 @@ const ICONS: Record<AppRoute, LucideIcon> = {
     search: Search,
     local: FolderOpen,
     stats: BarChart3,
-    settings: Home,
+    settings: Settings2,
 }
 
 const NeteaseAuthDialog = lazy(() =>
@@ -163,15 +171,15 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate }: SegmentedTabsPr
                         ref={isActive ? indicatorRef : undefined}
                         onClick={() => onNavigate(id)}
                         className={cn(
-                            "relative z-[1] flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full px-3",
-                            "text-[13px] font-medium transition-colors duration-200",
+                            "relative z-[1] flex min-h-9 cursor-pointer items-center gap-1 rounded-full px-2.5 sm:gap-1.5 sm:px-3",
+                            "text-[12px] font-medium transition-colors duration-200 sm:text-[13px]",
                             isActive
                                 ? "text-foreground"
                                 : "text-foreground/55 hover:text-foreground/75",
                         )}
                     >
                         <Icon
-                            className="size-3.5 shrink-0"
+                            className="size-4 shrink-0 sm:size-3.5"
                             strokeWidth={isActive ? 2.2 : 1.8}
                         />
                         <span className="hidden sm:inline">{item?.label ?? id}</span>
