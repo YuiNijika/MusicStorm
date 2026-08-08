@@ -197,6 +197,7 @@ pub fn cache_cover_file_at(
     cache_cover_bytes_at(covers_dir, &data)
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn cache_cover_file(app: &AppHandle, path: &Path) -> Result<CachedCover, String> {
     if !path.is_file() {
         return Err("封面文件不存在".into());
