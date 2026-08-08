@@ -17,8 +17,7 @@
     --scrollbar-thumb: rgb(60 60 67 / 24%);
     --scrollbar-thumb-hover: rgb(60 60 67 / 40%);
 
-    /* Apple motion tokens 全局唯一真源，组件内不得自定义缓动
-     * enter/exit 互为镜像 inverse cubic-bezier，保证可逆过渡路径对称 */
+    /* enter/exit 互为镜像（inverse cubic-bezier），保证可逆过渡路径对称 */
     --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
     --ease-exit: cubic-bezier(1, 0, 0.68, 0.28);
     --ease-press: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -46,8 +45,6 @@
     --scrollbar-thumb-hover: rgb(235 235 245 / 40%);
 }
 
-/* ===== Base 层自定义 ===== */
-
 @layer base {
     html {
         font-family: var(--font-sans), sans-serif;
@@ -71,7 +68,7 @@
         overscroll-behavior: none;
     }
 
-    /* 移动端触屏可滚动区域交给浏览器原生滚动 */
+    /* 触屏设备走原生 pan，防止全屏播放器下滑手势与滚动冲突 */
     @media (pointer: coarse) {
         .apple-scroll,
         [data-sheet-scroll] {
@@ -104,7 +101,6 @@
         -webkit-user-drag: none;
     }
 
-    /* Apple 风格滚动条 */
     *::-webkit-scrollbar {
         width: 9px;
         height: 9px;
@@ -131,8 +127,6 @@
         background: transparent;
     }
 }
-
-/* ===== Components 层自定义 ===== */
 
 @layer components {
     .app-root {
@@ -285,9 +279,7 @@
     }
 }
 
-/* ===== 玻璃 / 毛玻璃 材质 ===== */
-/* backdrop-filter + -webkit- 双写：Chromium 走 -webkit-backdrop-filter，其他引擎走标准属性 */
-
+/* backdrop-filter 与 -webkit- 双写：Chromium 内核走 -webkit- 前缀，Firefox/Safari 走标准属性 */
 .glass,
 .glass-panel,
 .glass-chip,
@@ -317,8 +309,6 @@
     border: 1px solid var(--glass-border);
     box-shadow: 0 1px 0 var(--glass-highlight) inset;
 }
-
-/* ===== 全屏播放器 ===== */
 
 .full-player-surface {
     isolation: isolate;
@@ -350,6 +340,7 @@
     width: 120%;
     height: 120%;
     object-fit: cover;
+    /* blur 动画每帧重绘整个 surface——全屏模糊是 GPU 合成杀手 */
     filter: blur(58px) saturate(125%) brightness(1.18);
     opacity: 0.38;
     transform: scale(1.08);
@@ -390,8 +381,6 @@
     background: transparent;
 }
 
-/* ===== 桌面端毛玻璃布局组件 ===== */
-
 .material-chrome {
     background: color-mix(in oklab, var(--glass-bg-strong) 94%, transparent);
     border-bottom: 1px solid var(--separator);
@@ -410,7 +399,6 @@
         0 1px 0 var(--glass-highlight) inset;
 }
 
-/* 移动端顶部导航栏：Apple Music 风格毛玻璃 sticky 顶栏 */
 .mobile-nav-bar {
     position: sticky;
     top: 0;
@@ -439,8 +427,6 @@
         0 1px 2px rgb(0 0 0 / 4%);
 }
 
-/* ===== 动画 ===== */
-
 @keyframes cover-breathe {
     0%,
     100% {
@@ -451,7 +437,6 @@
     }
 }
 
-/* 全屏播放器退出动画 */
 .full-player-exit {
     animation: full-player-exit var(--duration-exit) var(--ease-exit) forwards;
 }
@@ -477,9 +462,8 @@
     }
 }
 
-/* ===== 可访问性 ===== */
-
-/* reduced-motion：位移/缩放/keyframes 关停，仅保留色彩/透明度过渡（cross-fade） */
+/* reduced-motion 非"零反馈"——用短 cross-fade（150ms opacity）保留状态反馈，
+ * 同时关闭移位/缩放/关键帧动画，避免前庭性触发器（Apple HIG） */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -507,7 +491,6 @@
     to { opacity: 0; }
 }
 
-/* reduced-transparency：毛玻璃降级为实色，省 GPU 合成内存 */
 @media (prefers-reduced-transparency: reduce) {
     .glass,
     .glass-panel,
@@ -542,7 +525,6 @@
     }
 }
 
-/* ===== 设置：常驻毛玻璃开关 ===== */
 html.glass-disabled .glass,
 html.glass-disabled .glass-panel,
 html.glass-disabled .glass-chip,
@@ -564,7 +546,6 @@ html.glass-disabled .full-player-backdrop-tint {
     background: var(--background, #f5f5f7) !important;
 }
 
-/* ===== 性能模式 ===== */
 html.performance-mode *,
 html.performance-mode *::before,
 html.performance-mode *::after {
@@ -577,7 +558,6 @@ html.performance-mode [class*="animate-out"] {
     animation: none !important;
 }
 
-/* ===== MV 播放器（ArtPlayer） ===== */
 .art-shell .art-app {
     background: #000;
 }
