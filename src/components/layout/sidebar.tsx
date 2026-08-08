@@ -54,7 +54,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
     const [authOpen, setAuthOpen] = useState(false)
 
     return (
-        <aside className="material-sidebar flex w-[224px] shrink-0 flex-col">
+        <aside className="material-sidebar hidden w-[224px] shrink-0 flex-col md:flex">
             <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-2 pb-2">
                 {NAV_ITEMS.map((item) => {
                     const Icon = ICONS[item.id]
