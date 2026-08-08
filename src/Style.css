@@ -1,0 +1,615 @@
+:root {
+    --surface-raised: oklch(1 0 0 / 88%);
+    --surface-fill: rgb(0 0 0 / 4.5%);
+    --surface-fill-hover: rgb(0 0 0 / 7%);
+    --surface-fill-pressed: rgb(0 0 0 / 10%);
+    --separator: rgb(60 60 67 / 18%);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 5%), 0 8px 24px rgb(0 0 0 / 8%);
+    --shadow-float: 0 12px 36px rgb(0 0 0 / 14%), 0 2px 8px rgb(0 0 0 / 8%);
+    --glass-bg: color-mix(in oklab, white 66%, transparent);
+    --glass-bg-strong: color-mix(in oklab, white 82%, transparent);
+    --glass-border: rgb(255 255 255 / 46%);
+    --glass-highlight: rgb(255 255 255 / 62%);
+    --glass-shadow: 0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset;
+    --glass-blur: 24px;
+    --glass-opacity: 0.66;
+    --accent-hue: 250;
+    --scrollbar-thumb: rgb(60 60 67 / 24%);
+    --scrollbar-thumb-hover: rgb(60 60 67 / 40%);
+
+    /* Apple motion tokens 全局唯一真源，组件内不得自定义缓动
+     * enter/exit 互为镜像 inverse cubic-bezier，保证可逆过渡路径对称 */
+    --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-exit: cubic-bezier(1, 0, 0.68, 0.28);
+    --ease-press: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --duration-press: 100ms;
+    --duration-control: 140ms;
+    --duration-hover: 200ms;
+    --duration-enter: 340ms;
+    --duration-exit: 320ms;
+}
+
+.dark {
+    --surface-raised: oklch(0.235 0.005 260 / 90%);
+    --surface-fill: rgb(255 255 255 / 7%);
+    --surface-fill-hover: rgb(255 255 255 / 11%);
+    --surface-fill-pressed: rgb(255 255 255 / 15%);
+    --separator: rgb(84 84 88 / 65%);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 26%);
+    --shadow-float: 0 16px 44px rgb(0 0 0 / 48%), 0 2px 10px rgb(0 0 0 / 30%);
+    --glass-bg: color-mix(in oklab, oklch(0.22 0.005 260) 68%, transparent);
+    --glass-bg-strong: color-mix(in oklab, oklch(0.25 0.005 260) 82%, transparent);
+    --glass-border: rgb(255 255 255 / 10%);
+    --glass-highlight: rgb(255 255 255 / 9%);
+    --glass-shadow: 0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset;
+    --scrollbar-thumb: rgb(235 235 245 / 24%);
+    --scrollbar-thumb-hover: rgb(235 235 245 / 40%);
+}
+
+/* ===== Base 层自定义 ===== */
+
+@layer base {
+    html {
+        font-family: var(--font-sans), sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--foreground);
+        overflow: hidden;
+        user-select: none;
+        background: var(--background);
+        font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+        text-rendering: optimizeLegibility;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        overscroll-behavior: none;
+    }
+
+    /* 移动端触屏可滚动区域交给浏览器原生滚动 */
+    @media (pointer: coarse) {
+        .apple-scroll,
+        [data-sheet-scroll] {
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    ::selection {
+        color: var(--foreground);
+        background: color-mix(in oklab, var(--primary) 24%, transparent);
+    }
+
+    :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+        outline: 3px solid color-mix(in oklab, var(--ring) 34%, transparent);
+        outline-offset: 2px;
+    }
+
+    #root {
+        min-height: 100vh;
+    }
+
+    button,
+    input,
+    textarea {
+        font: inherit;
+    }
+
+    img {
+        -webkit-user-drag: none;
+    }
+
+    /* Apple 风格滚动条 */
+    *::-webkit-scrollbar {
+        width: 9px;
+        height: 9px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb);
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background-color: var(--scrollbar-thumb-hover);
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    *::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+}
+
+/* ===== Components 层自定义 ===== */
+
+@layer components {
+    .app-root {
+        position: relative;
+        background:
+            radial-gradient(
+                900px 480px at 12% -12%,
+                color-mix(in oklab, var(--primary) 7%, transparent),
+                transparent 62%
+            ),
+            linear-gradient(180deg, color-mix(in oklab, white 22%, transparent), transparent 28%),
+            var(--background);
+    }
+
+    .dark .app-root {
+        background:
+            radial-gradient(
+                760px 420px at 16% -10%,
+                color-mix(in oklab, var(--primary) 8%, transparent),
+                transparent 60%
+            ),
+            linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 26%),
+            var(--background);
+    }
+
+    .apple-scroll {
+        scrollbar-gutter: stable;
+    }
+
+    .apple-control {
+        min-height: 36px;
+        border-radius: 10px;
+        background: var(--surface-fill);
+        transition:
+            background-color var(--duration-control) var(--ease-press),
+            transform var(--duration-press) var(--ease-press),
+            color var(--duration-control) var(--ease-press);
+    }
+
+    .apple-control:hover {
+        background: var(--surface-fill-hover);
+    }
+
+    .apple-control:active {
+        background: var(--surface-fill-pressed);
+        transform: scale(0.98);
+    }
+
+    .apple-segmented {
+        display: inline-flex;
+        padding: 2px;
+        border-radius: 10px;
+        background: var(--surface-fill);
+        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 60%, transparent);
+    }
+
+    .apple-segmented-item {
+        min-width: 32px;
+        min-height: 32px;
+        border-radius: 8px;
+        transition:
+            background-color var(--duration-control) var(--ease-press),
+            box-shadow var(--duration-control) var(--ease-press),
+            color var(--duration-control) var(--ease-press);
+    }
+
+    .apple-segmented-item[aria-pressed="true"] {
+        color: var(--foreground);
+        background: var(--surface-raised);
+        box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 0 0 0.5px rgb(0 0 0 / 8%);
+    }
+
+    .dark .apple-segmented-item[aria-pressed="true"] {
+        box-shadow: 0 1px 4px rgb(0 0 0 / 32%), 0 0 0 0.5px rgb(255 255 255 / 10%);
+    }
+
+    .apple-list-surface {
+        overflow: hidden;
+        border-radius: 14px;
+        background: var(--surface-fill);
+        box-shadow: inset 0 0 0 0.5px var(--separator);
+    }
+
+    .apple-card-shadow {
+        box-shadow: var(--shadow-card);
+    }
+
+    .apple-primary-action {
+        color: var(--primary-foreground);
+        background: var(--primary);
+        box-shadow: 0 1px 2px color-mix(in oklab, var(--primary) 24%, transparent);
+        transition: filter var(--duration-control) var(--ease-press);
+    }
+
+    .apple-primary-action:hover {
+        filter: brightness(1.04);
+    }
+
+    .progress-range {
+        --progress: 0%;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        width: 100%;
+        border-radius: 999px;
+        background: linear-gradient(
+            90deg,
+            var(--primary) 0%,
+            var(--primary) var(--progress),
+            color-mix(in oklab, var(--muted-foreground) 28%, transparent) var(--progress),
+            color-mix(in oklab, var(--muted-foreground) 28%, transparent) 100%
+        );
+        outline: none;
+        cursor: pointer;
+    }
+
+    .progress-range:disabled {
+        cursor: default;
+        opacity: 0.45;
+    }
+
+    .progress-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--primary);
+        border: none;
+        box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+        transition: transform var(--duration-press) var(--ease-press);
+    }
+
+    .progress-range:active::-webkit-slider-thumb {
+        transform: scale(0.96);
+    }
+
+    .progress-range::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--primary);
+        border: none;
+        box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+    }
+
+    .progress-range::-moz-range-track {
+        height: 4px;
+        background: transparent;
+    }
+}
+
+/* ===== 玻璃 / 毛玻璃 材质 ===== */
+/* backdrop-filter + -webkit- 双写：Chromium 走 -webkit-backdrop-filter，其他引擎走标准属性 */
+
+.glass,
+.glass-panel,
+.glass-chip,
+.material-chrome,
+.material-sidebar,
+.material-player,
+.material-panel,
+.material-field {
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
+}
+
+.glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.glass-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.glass-chip {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 1px 0 var(--glass-highlight) inset;
+}
+
+/* ===== 全屏播放器 ===== */
+
+.full-player-surface {
+    isolation: isolate;
+    background: #f4f6fb;
+    color: var(--foreground);
+}
+
+.dark .full-player-surface {
+    background: #11141c;
+}
+
+.full-player-backdrop {
+    z-index: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.94), transparent 42%),
+        linear-gradient(145deg, #f7f8fc 0%, #eef2f8 55%, #f8f4f6 100%);
+}
+
+.dark .full-player-backdrop {
+    background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.06), transparent 38%),
+        linear-gradient(145deg, #181c27 0%, #11141c 58%, #19141b 100%);
+}
+
+.full-player-backdrop-image {
+    position: absolute;
+    inset: -10%;
+    width: 120%;
+    height: 120%;
+    object-fit: cover;
+    filter: blur(58px) saturate(125%) brightness(1.18);
+    opacity: 0.38;
+    transform: scale(1.08);
+}
+
+.dark .full-player-backdrop-image {
+    filter: blur(54px) saturate(145%) brightness(0.72);
+    opacity: 0.58;
+}
+
+.full-player-backdrop-tint {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(246, 248, 252, 0.7)),
+        rgba(248, 249, 253, 0.36);
+    backdrop-filter: blur(34px) saturate(135%);
+    -webkit-backdrop-filter: blur(34px) saturate(135%);
+}
+
+.dark .full-player-backdrop-tint {
+    background:
+        linear-gradient(180deg, rgba(17, 20, 28, 0.28), rgba(17, 20, 28, 0.62)),
+        rgba(20, 23, 31, 0.38);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    .full-player-backdrop-tint {
+        background: rgba(248, 249, 253, 0.82);
+    }
+
+    .dark .full-player-backdrop-tint {
+        background: rgba(20, 23, 31, 0.86);
+    }
+}
+
+.full-player-surface > .relative.z-\[1\] {
+    background: transparent;
+}
+
+/* ===== 桌面端毛玻璃布局组件 ===== */
+
+.material-chrome {
+    background: color-mix(in oklab, var(--glass-bg-strong) 94%, transparent);
+    border-bottom: 1px solid var(--separator);
+    box-shadow: 0 1px 0 var(--glass-highlight) inset;
+}
+
+.material-sidebar {
+    background: color-mix(in oklab, var(--sidebar) 94%, transparent);
+    box-shadow: 1px 0 0 var(--separator);
+}
+
+.material-player {
+    background: color-mix(in oklab, var(--glass-bg-strong) 92%, transparent);
+    box-shadow:
+        0 -1px 0 var(--separator),
+        0 1px 0 var(--glass-highlight) inset;
+}
+
+/* 移动端顶部导航栏：Apple Music 风格毛玻璃 sticky 顶栏 */
+.mobile-nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklab, var(--glass-bg-strong) 90%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+        0 0.5px 0 var(--separator),
+        0 1px 4px rgb(0 0 0 / 4%),
+        0 -1px 0 var(--glass-highlight) inset;
+}
+.dark .mobile-nav-bar {
+    background: color-mix(in oklab, var(--glass-bg-strong) 94%, transparent);
+    box-shadow:
+        0 0.5px 0 var(--separator),
+        0 1px 4px rgb(0 0 0 / 18%),
+        0 -1px 0 var(--glass-highlight) inset;
+}
+
+.material-panel,
+.material-field {
+    background: var(--surface-raised);
+    box-shadow:
+        inset 0 0 0 0.5px var(--separator),
+        0 1px 2px rgb(0 0 0 / 4%);
+}
+
+/* ===== 动画 ===== */
+
+@keyframes cover-breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.012);
+    }
+}
+
+/* 全屏播放器退出动画 */
+.full-player-exit {
+    animation: full-player-exit var(--duration-exit) var(--ease-exit) forwards;
+}
+@keyframes full-player-exit {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+.full-player-scrim-exit {
+    animation: full-player-scrim-exit var(--duration-exit) var(--ease-exit) forwards;
+}
+@keyframes full-player-scrim-exit {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* ===== 可访问性 ===== */
+
+/* reduced-motion：位移/缩放/keyframes 关停，仅保留色彩/透明度过渡（cross-fade） */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 150ms !important;
+        transition-property:
+            color, background-color, border-color, opacity, box-shadow, outline-color !important;
+    }
+
+    .full-player-exit {
+        animation-name: full-player-fade-exit;
+        animation-duration: 150ms !important;
+        animation-timing-function: ease-out;
+    }
+    .full-player-scrim-exit {
+        animation-name: full-player-scrim-exit;
+        animation-duration: 150ms !important;
+    }
+}
+@keyframes full-player-fade-exit {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* reduced-transparency：毛玻璃降级为实色，省 GPU 合成内存 */
+@media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .glass-panel,
+    .glass-chip,
+    .material-chrome,
+    .material-sidebar,
+    .material-player,
+    .material-panel,
+    .material-field,
+    .full-player-backdrop,
+    .full-player-backdrop-tint {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .full-player-backdrop-image {
+        opacity: 0;
+    }
+
+    .material-sidebar {
+        background: var(--sidebar);
+    }
+
+    .material-player,
+    .full-player-backdrop-tint {
+        background: var(--background);
+    }
+
+    .app-root,
+    .dark .app-root {
+        background: var(--background);
+    }
+}
+
+/* ===== 设置：常驻毛玻璃开关 ===== */
+html.glass-disabled .glass,
+html.glass-disabled .glass-panel,
+html.glass-disabled .glass-chip,
+html.glass-disabled .material-chrome,
+html.glass-disabled .material-sidebar,
+html.glass-disabled .material-player,
+html.glass-disabled .material-panel,
+html.glass-disabled .material-field,
+html.glass-disabled .full-player-backdrop,
+html.glass-disabled .full-player-backdrop-tint {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html.glass-disabled .material-sidebar {
+    background: var(--sidebar, #f5f5f7) !important;
+}
+html.glass-disabled .material-player,
+html.glass-disabled .full-player-backdrop-tint {
+    background: var(--background, #f5f5f7) !important;
+}
+
+/* ===== 性能模式 ===== */
+html.performance-mode *,
+html.performance-mode *::before,
+html.performance-mode *::after {
+    animation: none !important;
+    transition: none !important;
+}
+html.performance-mode .animate-pulse,
+html.performance-mode [class*="animate-in"],
+html.performance-mode [class*="animate-out"] {
+    animation: none !important;
+}
+
+/* ===== MV 播放器（ArtPlayer） ===== */
+.art-shell .art-app {
+    background: #000;
+}
+.art-shell .art-controls {
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.68) 0%,
+        rgba(0, 0, 0, 0.38) 55%,
+        transparent 100%
+    );
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    transition: opacity 0.25s ease;
+}
+.art-shell .art-progress-played,
+.art-shell .art-progress-buffer,
+.art-shell .art-progress-indicator {
+    border-radius: 999px;
+}
+.art-shell .art-settings,
+.art-shell .art-menu {
+    border-radius: 14px;
+    background: rgba(28, 28, 30, 0.9);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.art-shell .art-tooltip {
+    border-radius: 8px;
+    background: rgba(28, 28, 30, 0.9);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    font-size: 12px;
+}

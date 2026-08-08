@@ -59,6 +59,7 @@ const SearchPage = lazy(() => import("@/pages/search").then(m => ({ default: m.S
 const StatsPage = lazy(() => import("@/pages/stats").then(m => ({ default: m.StatsPage })))
 
 import "./App.css"
+import "./Style.css"
 
 function AppRoutes({
     route,
