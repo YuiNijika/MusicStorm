@@ -25,10 +25,15 @@ export function useWindowControls() {
     // 改用 pointer + setPosition 让双击语义完全归 JS 控制
     const dragRef = useRef<{
         pointerId: number
-        startClientX: number
-        startClientY: number
+        // 用屏幕坐标（screenX/Y）而非视口坐标：视口随窗口移动，
+        // 用 clientX/Y 会形成反馈循环导致拖动抖动闪烁
+        startScreenX: number
+        startScreenY: number
         startWindowX: number
         startWindowY: number
+        // rAF 节流：setPosition 是 IPC 调用，逐帧调用可能跟不上指针频率
+        pending: { x: number; y: number } | null
+        frameScheduled: boolean
     } | null>(null)
     // 双击判定：macOS 双击标题栏 = 缩放/最小化
     const lastPressAtRef = useRef(0)
@@ -101,10 +106,12 @@ export function useWindowControls() {
                     const pos = await appWindow.outerPosition()
                     dragRef.current = {
                         pointerId: event.pointerId,
-                        startClientX: event.clientX,
-                        startClientY: event.clientY,
+                        startScreenX: event.screenX,
+                        startScreenY: event.screenY,
                         startWindowX: pos.x,
                         startWindowY: pos.y,
+                        pending: null,
+                        frameScheduled: false,
                     }
                     const win = event.currentTarget as HTMLElement
                     win.setPointerCapture?.(event.pointerId)
@@ -122,22 +129,49 @@ export function useWindowControls() {
             if (!appWindow || !drag || event.pointerId !== drag.pointerId) {
                 return
             }
-            const dx = event.clientX - drag.startClientX
-            const dy = event.clientY - drag.startClientY
+            const dx = event.screenX - drag.startScreenX
+            const dy = event.screenY - drag.startScreenY
+            // 只记录最新位置，rAF 里统一发送，避免高频 IPC 抖动
+            drag.pending = {
+                x: drag.startWindowX + dx,
+                y: drag.startWindowY + dy,
+            }
+            if (!drag.frameScheduled) {
+                drag.frameScheduled = true
+                requestAnimationFrame(() => {
+                    const current = dragRef.current
+                    if (current) {
+                        current.frameScheduled = false
+                    }
+                    flushPendingPosition()
+                })
+            }
+        }
+
+        function flushPendingPosition() {
+            const drag = dragRef.current
+            if (!appWindow || !drag?.pending) {
+                return
+            }
+            const { x, y } = drag.pending
+            drag.pending = null
             void appWindow
-                .setPosition(
-                    new PhysicalPosition(
-                        drag.startWindowX + dx,
-                        drag.startWindowY + dy,
-                    ),
-                )
+                .setPosition(new PhysicalPosition(x, y))
                 .catch(() => undefined)
         }
 
         function endDrag(event: PointerEvent) {
             const drag = dragRef.current
-            if (!drag || event.pointerId !== drag.pointerId) {
+            if (!appWindow || !drag || event.pointerId !== drag.pointerId) {
                 return
+            }
+            // 松手前把最后一次 pending 位置落定
+            if (drag.pending) {
+                const { x, y } = drag.pending
+                drag.pending = null
+                void appWindow
+                    .setPosition(new PhysicalPosition(x, y))
+                    .catch(() => undefined)
             }
             dragRef.current = null
         }

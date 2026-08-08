@@ -36,7 +36,6 @@ import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
-import { useWindowControls } from "@/hooks/use-window-controls"
 import {
     QUALITY_OPTIONS,
     getNeteaseQualityBr,
@@ -106,7 +105,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         reloadCurrent,
     } = usePlayer()
     const { loggedIn } = useNeteaseSession()
-    const { startDragging } = useWindowControls()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
 
@@ -239,18 +237,22 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         displayTrack.source === "netease" && Boolean(displayTrack.albumId)
     const lyricsActive = phase === "open" || phase === "entering"
     // 从底部升起/滑回（锚定底栏触发源，空间一致），全程无 blur（避免卡顿）
-    // 移动端下滑手势：跟手时用内联 transform 覆盖（禁 transition），松手恢复
-    const sheetMotion =
+    // 位移统一用 transform 内联：Tailwind v4 的 translate-y-* 走 CSS translate 属性，
+    // 与手势 transform 属性不一致会导致动画跳变闪烁。这里全部走 transform + transition。
+    const baseTransform =
         phase === "exiting"
-            ? "full-player-exit"
+            ? "translateY(100%)"
             : phase === "open"
-              ? "translate-y-0 opacity-100"
-              : "translate-y-full opacity-0"
+              ? "translateY(0)"
+              : "translateY(100%)"
     const sheetTransform =
         dragDy > 0
             ? `translateY(${Math.min(dragDy, window.innerHeight)}px)`
-            : undefined
-    const sheetTransition = dragDy > 0 ? "none" : undefined
+            : baseTransform
+    const sheetTransition =
+        dragDy > 0
+            ? "none"
+            : `transform ${DRAWER_MS}ms var(--ease-enter), opacity ${DRAWER_MS}ms var(--ease-enter)`
     const scrimMotion =
         phase === "exiting"
             ? "full-player-scrim-exit"
@@ -266,14 +268,18 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         onClose()
     }
 
-    /** 移动端下滑收起手势：仅触屏、仅 phase=open、且按下处不在可滚动容器内 */
+    /** 移动端下滑收起手势：仅触屏、仅移动端视口、仅 phase=open、且按下处不在可滚动容器内 */
     function handleSheetPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-        if (phase !== "open" || event.pointerType !== "touch") {
+        if (
+            phase !== "open" ||
+            event.pointerType !== "touch" ||
+            window.innerWidth >= 768
+        ) {
             return
         }
         // 歌词/列表等滚动容器内按下 → 交给浏览器垂直滚动，不触发收起手势
         const target = event.target as HTMLElement | null
-        if (target?.closest("[data-sheet-scroll], .apple-scroll")) {
+        if (target?.closest("[data-sheet-scroll], .apple-scroll, button")) {
             return
         }
         dragStartRef.current = { y: event.clientY, startDy: dragDy }
@@ -418,15 +424,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             <div
                 className={cn(
                     "full-player-surface relative flex h-full min-h-0 flex-col overflow-hidden",
-                    sheetMotion,
+                    phase === "open" || phase === "entering"
+                        ? "opacity-100"
+                        : "opacity-0",
                 )}
                 style={{
                     transform: sheetTransform,
-                    transitionProperty: sheetTransform
-                        ? undefined
-                        : "transform, opacity",
-                    transitionDuration: `${DRAWER_MS}ms`,
-                    transitionTimingFunction: "var(--ease-enter)",
                     transition: sheetTransition,
                 }}
                 onPointerDown={handleSheetPointerDown}
@@ -453,18 +456,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 </div>
 
                 <div className="relative z-[1] flex h-full min-h-0 flex-col">
-                    <div
-                        className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
-                        onPointerDown={(event) => {
-                            // 可交互元素（按钮/菜单项）不参与拖拽与双击判定，
-                            // 否则按下按钮会被双击检测误判为「双击 → 最小化」
-                            if ((event.target as HTMLElement).closest("button")) {
-                                return
-                            }
-                            // 顶栏空白拖拽：双击 = 最小化，与主标题栏一致
-                            startDragging(event)
-                        }}
-                    >
+                    {/* 顶栏纯 UI 区：全屏播放器是 fixed 覆盖层，无窗口可拖，
+                        不挂 startDragging，避免按钮/菜单操作被双击判定误触发最小化 */}
+                    <div className="flex h-12 shrink-0 items-center justify-between gap-2 px-4">
                     <button
                         type="button"
                         onClick={onClose}

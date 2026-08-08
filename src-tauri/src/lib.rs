@@ -761,6 +761,20 @@ pub fn run() {
                 .map_err(|e| format!("create main window: {e}"))?;
             }
 
+            #[cfg(target_os = "android")]
+            {
+                // Android：同样由 Rust 创建 WebView 窗口（经 JNI 挂到 Activity）。
+                // 不能调 additional_browser_args（仅 WebView2 有）。
+                tauri::WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    tauri::WebviewUrl::App("index.html".into()),
+                )
+                .title("MusicStorm")
+                .build()
+                .map_err(|e| format!("create android webview: {e}"))?;
+            }
+
             app.manage(DbState(Mutex::new(conn)));
             #[cfg(not(target_os = "android"))]
             app.manage(AudioState::default());

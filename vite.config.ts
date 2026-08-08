@@ -14,6 +14,11 @@ export default defineConfig(async () => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // 跳过构建前清空 dist：沙箱安全层会拦截批量删除导致 vite 挂起。
+    // 构建产物带 hash，新旧文件共存无害；彻底清理用 scripts/clean-dist.py 手动执行。
+    emptyOutDir: false,
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

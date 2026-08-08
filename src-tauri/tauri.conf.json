@@ -25,6 +25,9 @@
       "icons/icon.png",
       "icons/icon-128.ico"
     ],
+    "android": {
+      "versionCode": 1
+    },
     "windows": {
       "nsis": {
         "languages": ["SimpChinese"],

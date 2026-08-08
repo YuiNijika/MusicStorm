@@ -13,9 +13,30 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// release 签名：keystore 文件不入库（gitignore），密码用环境变量覆盖
+val releaseStoreFile = file("keystore/musicstorm-release.jks")
+val releaseStorePassword = providers.gradleProperty("MUSICSTORM_STORE_PASSWORD")
+    .orElse(providers.environmentVariable("MUSICSTORM_STORE_PASSWORD"))
+    .orElse("musicstorm123")
+val releaseKeyAlias = "musicstorm"
+val releaseKeyPassword = providers.gradleProperty("MUSICSTORM_KEY_PASSWORD")
+    .orElse(providers.environmentVariable("MUSICSTORM_KEY_PASSWORD"))
+    .orElse("musicstorm123")
+
 android {
     compileSdk = 36
     namespace = "com.yuinijika.musicstorm"
+    // release 签名配置：keystore 存在时启用，缺失时退回 unsigned（便于 CI/调试）
+    signingConfigs {
+        if (releaseStoreFile.exists()) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword.get()
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword.get()
+            }
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.yuinijika.musicstorm"
@@ -37,12 +58,18 @@ android {
             }
         }
         getByName("release") {
-            isMinifyEnabled = true
+            // 暂时关闭 R8/ProGuard minify：默认 minify=true 但 tauri Android 模板
+            // 没带 keep 规则，会误移除 Rust.shouldOverride / MainActivity / PluginManager
+            // 等关键 JNI 入口，导致 release 闪退。后续引入 tauri 官方 proguard 后再开。
+            isMinifyEnabled = false
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
+            if (releaseStoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     kotlinOptions {
@@ -55,6 +82,31 @@ android {
 
 rust {
     rootDirRel = "../../../"
+}
+
+// Windows 修复：tauri CLI（cargo-mobile2）用 symlink 链接 .so 到 jniLibs，
+// 但 Windows 打包 APK 时 symlink 会被当成 0 字节文件 → 启动闪退。
+// 这里在打包前把 symlink 替换为真实文件（从 cargo release 产物复制）。
+tasks.configureEach {
+    if (name.startsWith("mergeUniversalReleaseJniLibFolders") ||
+        name.startsWith("mergeUniversalDebugJniLibFolders")) {
+        doFirst {
+            val abiToTarget = mapOf(
+                "arm64-v8a" to "aarch64-linux-android",
+                "armeabi-v7a" to "armv7-linux-androideabi",
+                "x86" to "i686-linux-android",
+                "x86_64" to "x86_64-linux-android",
+            )
+            for ((abi, target) in abiToTarget) {
+                val jniFile = file("src/main/jniLibs/$abi/libmusic_storm_lib.so")
+                val cargoSo = file("../../../target/$target/release/libmusic_storm_lib.so")
+                if (jniFile.exists() && cargoSo.exists()) {
+                    cargoSo.copyTo(jniFile, overwrite = true)
+                    println("Replaced jniLibs $abi with real file (${cargoSo.length()} bytes)")
+                }
+            }
+        }
+    }
 }
 
 dependencies {
