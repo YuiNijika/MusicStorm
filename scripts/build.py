@@ -305,6 +305,21 @@ def build_windows() -> tuple[int, str]:
     return rc, out
 
 
+_ANDROID_ABI_MAP: dict[str, tuple[str, str]] = {
+    "aarch64":  ("aarch64-linux-android", "arm64-v8a"),
+    "armv7":    ("armv7-linux-androideabi", "armeabi-v7a"),
+    "x86_64":   ("x86_64-linux-android",   "x86_64"),
+    "x86":      ("i686-linux-android",      "x86"),
+}
+
+
+def _gradlew() -> str:
+    """返回 gradlew 绝对路径（Windows 下 .bat）。"""
+    base = Path("src-tauri/gen/android")
+    script = "gradlew.bat" if os.name == "nt" else "gradlew"
+    return str((base / script).resolve())
+
+
 def build_android(java: str, sdk: str) -> tuple[int, str]:
     """Android APK。"""
     env = _env_for_android(java, sdk)
@@ -318,7 +333,6 @@ def build_android(java: str, sdk: str) -> tuple[int, str]:
 
     print("\n[1/2] 清理 dist …")
     _clean_dist()
-    # Android 独立版本 0.0.1（与 PC 的 0.0.x 分开发布）
     print(f"[2/2] 编译 + 打包 (target {_DEFAULT_ANDROID_TARGET}) …")
     rc = _run_pnpm(
         "tauri", "android", "build",
@@ -327,11 +341,51 @@ def build_android(java: str, sdk: str) -> tuple[int, str]:
         "--config", _APK_CONFIG,
         env=env,
     )
+
+    # Windows 不开开发者模式时 tauri 的 symlink .so → jniLibs 会失败。
+    # Rust 编译产物仍完整，手动复制后直接跑 Gradle 打包。
+    if rc != 0 and os.name == "nt":
+        print("\n  Symlink 失败，使用文件复制兜底 …")
+        rc = _android_fallback_gradle(java, sdk, env)
+
     apk = (
         "src-tauri/gen/android/app/build/outputs/apk"
         f"/universal/release/app-universal-release.apk"
     )
     return rc, apk if rc == 0 else ""
+
+
+def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
+    """Symlink 失败时的兜底：手动复制 .so + 直接跑 Gradle assemble。"""
+    target_dir = f"src-tauri/target/{_ANDROID_ABI_MAP[_DEFAULT_ANDROID_TARGET][0]}/release"
+    so_src = Path(target_dir) / "libmusic_storm_lib.so"
+    jni_dst = Path("src-tauri/gen/android/app/src/main/jniLibs") / \
+              _ANDROID_ABI_MAP[_DEFAULT_ANDROID_TARGET][1]
+    jni_dst.mkdir(parents=True, exist_ok=True)
+
+    # 确保 jniLibs 下是真文件（非残留 symlink）
+    so_dst = jni_dst / "libmusic_storm_lib.so"
+    try:
+        so_dst.unlink()
+    except FileNotFoundError:
+        pass
+    shutil.copy2(so_src, so_dst)
+    print(f"  已复制 {so_src.stat().st_size // 1024 // 1024} MB → {so_dst}")
+
+    # Rust 已在上一步编译完成；Gradle 的 rustBuild 任务需要调 pnpm，
+    # 但子进程 PATH 可能找不到。排除所有 rustBuild 避免重编译。
+    gradlew = _gradlew()
+    gen_dir = Path("src-tauri/gen/android")
+    gradle_args = [
+        gradlew, ":app:assembleUniversalRelease",
+        "-x", "rustBuildArm64Release",
+        "-x", "rustBuildArmRelease",
+        "-x", "rustBuildX8664Release",
+        "-x", "rustBuildX86Release",
+        "-x", "rustBuildUniversalRelease",
+    ]
+    print(f"  执行 {' '.join(gradle_args)} …")
+    return subprocess.call(gradle_args, env=env, shell=False, cwd=str(gen_dir))
 
 
 # ─── 主菜单 ────────────────────────────────────────────────
