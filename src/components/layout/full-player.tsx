@@ -456,9 +456,14 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 </div>
 
                 <div className="relative z-[1] flex h-full min-h-0 flex-col">
-                    {/* 顶栏纯 UI 区：全屏播放器是 fixed 覆盖层，无窗口可拖，
-                        不挂 startDragging，避免按钮/菜单操作被双击判定误触发最小化 */}
-                    <div className="flex h-12 shrink-0 items-center justify-between gap-2 px-4">
+                    <div
+                        className="flex h-12 shrink-0 items-center justify-between gap-2 px-4"
+                        onPointerDown={(event) => {
+                            if ((event.target as HTMLElement).closest("button")) return
+                            if (event.pointerType !== "mouse") return
+                            startDragging(event)
+                        }}
+                    >
                     <button
                         type="button"
                         onClick={onClose}
