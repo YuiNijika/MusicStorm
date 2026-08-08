@@ -85,7 +85,7 @@ def _java_major_version(java_bin: str) -> Optional[int]:
 
 def _scan_jdk_roots() -> list[tuple[int, str]]:
     """扫描 _JDK_SEARCH_ROOTS 返回 [(major, path), ...]，已按版本降序。"""
-    candidates: list[tuple[int, str]] = []
+    candidates: list[tuple[int, str]] = []2
     for root in _JDK_SEARCH_ROOTS:
         if not root.is_dir():
             continue
