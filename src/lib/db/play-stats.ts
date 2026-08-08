@@ -89,7 +89,7 @@ type TopTrackStat = {
     durationMs?: number
 }
 
-/** 默认展示：同 MD5 或同文件名归为一组 */
+// 默认展示：同 MD5 或同文件名归为一组
 type TopTrackCluster = {
     key: string
     title: string
@@ -127,7 +127,7 @@ function needsNeteaseEnrich(row: TopTrackStat): boolean {
     return !cover || !title || title === row.trackId || !artist
 }
 
-/** 历史网易云会话缺封面/歌名时批量 song/detail，并写回 track 表 */
+// 历史网易云会话缺封面/歌名时批量 song/detail，并写回 track 表
 async function enrichTopTrackStats(rows: TopTrackStat[]): Promise<TopTrackStat[]> {
     const need = rows.filter(needsNeteaseEnrich)
     if (need.length === 0) {
@@ -199,7 +199,7 @@ async function enrichTopTrackStats(rows: TopTrackStat[]): Promise<TopTrackStat[]
     }
 }
 
-/** 本地按 MD5 或无后缀文件名并集归类；网易云按 trackId */
+// 本地按 MD5 或无后缀文件名并集归类；网易云按 trackId
 function clusterTopTracks(rows: TopTrackStat[]): TopTrackCluster[] {
     if (rows.length === 0) {
         return []
@@ -411,10 +411,6 @@ async function listListenSourceBreakdown(
     }
 }
 
-/**
- * 拉取 top tracks 并做本地归类。
- * 网易云缺元数据时批量补齐。
- */
 async function listTopTrackClusters(
     limit = 20,
     days: number | null = null,

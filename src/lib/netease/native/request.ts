@@ -1,13 +1,5 @@
-/**
- * 应用内置网易云 API：TS 加密 + 模块映射 + Tauri HTTP 代理
- *
- * 扫码登录对齐 CloudMusicAPI 外置能过、内置被 App 判风险的差异点
- * - eapi 走 interfacepc.music.163.com 不是 interface3/xeapi
- * - deviceId 与 MUSIC_A 游客注册全程同一枚 52-hex
- * - pc cookie 用 osMap.pc appver 3.1.17.204416
- * - eapi 默认 UA 与 CloudMusicAPI 一致 api/iphone
- * - eapi 不强制带 Origin/Referer CloudMusicAPI eapi 分支也不设
- */
+// 应用内置网易云 API：TS 加密 + 模块映射 + Tauri HTTP 代理
+// 详细对齐 CloudMusicAPI 扫码登录差异：eapi 走 interfacepc、deviceId 52-hex、pc cookie appver、UA 一致
 
 import { invoke } from "@tauri-apps/api/core"
 
@@ -27,7 +19,7 @@ import {
 import { resolveNativeModule } from "@/lib/netease/native/modules"
 import { resolveRealIp } from "@/lib/netease/native/real-ip"
 
-/** weapi/eapi 加密（node-forge + crypto-js）较重，首个加密请求时才加载 */
+// weapi/eapi 加密较重，首个加密请求时才懒加载
 let cryptoModule: Promise<typeof import("@/lib/netease/native/crypto")> | null = null
 function loadCrypto() {
     cryptoModule ??= import("@/lib/netease/native/crypto")
@@ -35,14 +27,14 @@ function loadCrypto() {
 }
 
 const DOMAIN = "https://music.163.com"
-/** CloudMusicAPI APP_CONF.eapiDomain — PC 客户端 eapi，扫码 unikey 必须走这域 */
+// CloudMusicAPI APP_CONF.eapiDomain — PC 客户端 eapi，扫码 unikey 必须走这域
 const EAPI_DOMAIN = "https://interfacepc.music.163.com"
 
-/** weapi UA：对齐 userAgentMap.weapi.pc Mac Edge 形态 */
+// weapi UA：对齐 userAgentMap.weapi.pc Mac Edge 形态
 const UA_WEAPI =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
 
-/** eapi UA：对齐 CloudMusicAPI chooseUserAgent('api','iphone') 非 osx 时 eapi 默认就是这条，外置扫码能过 */
+// eapi UA：对齐 CloudMusicAPI chooseUserAgent('api','iphone')，外置扫码能过
 const UA_EAPI_IPHONE = "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)"
 
 // 部分非登录接口

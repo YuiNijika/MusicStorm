@@ -1,5 +1,3 @@
-/** 网易云 API 路径约定，内置与对接共用 */
-
 export const NETEASE_PATHS = {
     songUrl: "/song/url",
     songDetail: "/song/detail",

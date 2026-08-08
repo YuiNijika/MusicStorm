@@ -1,10 +1,6 @@
-/**
- * 网易云 song/url 条目：外层 code 常为 200，可播性看 data[0].url / data[0].code / fee / payed。
- * 参考 CloudMusicAPI check_music：data[0].code === 200 才可播。
- *
- * fee 常见：0 免费 · 1 试听/VIP · 4 会员专享 · 8 数字专辑
- * 条目 code -110 常见于无版权或无播放权；与 fee 同时出现时优先提示付费/VIP。
- */
+// 网易云 song/url 条目：外层 code 常为 200，可播性看 data[0].url/data[0].code/fee/payed
+// 参考 CloudMusicAPI check_music：data[0].code === 200 才可播
+// fee 常见：0 免费 · 1 试听/VIP · 4 会员专享 · 8 数字专辑
 
 export type SongUrlItem = {
     id?: number
@@ -32,7 +28,6 @@ export type SongUrlItem = {
     flag?: number
 }
 
-/** data[0].code：200 可播；其它常见为无版权 / 需付费 */
 function isSongUrlPlayable(item: SongUrlItem | undefined | null): boolean {
     if (!item) {
         return false
@@ -54,7 +49,6 @@ function hasUsableTrial(item: SongUrlItem): boolean {
     )
 }
 
-/** 付费未购且无试听 → VIP / 数字专辑文案；否则 null */
 function describePaywall(item: SongUrlItem): string | null {
     const fee = item.fee ?? 0
     const payed = item.payed ?? 0
@@ -73,11 +67,7 @@ function describePaywall(item: SongUrlItem): string | null {
     return "该歌曲需购买或开通会员后才能播放"
 }
 
-/**
- * 用户可读失败原因。
- * 优先级：message → 付费 VIP fee → 条目 code → 无 url
- * fee 优先于 -110，避免 VIP 误报暂无版权
- */
+// 用户可读失败原因；fee 优先于 -110，避免 VIP 误报暂无版权
 function describeSongUrlFailure(item: SongUrlItem | undefined | null): string {
     if (!item) {
         return "无法获取播放地址"
@@ -110,7 +100,7 @@ function describeSongUrlFailure(item: SongUrlItem | undefined | null): string {
     return "暂时无法播放该歌曲"
 }
 
-/** 多档 br 失败时选信息更完整的一条 */
+// 多档 br 失败时选信息更完整的一条
 function pickRicherSongUrlEntry(
     a: SongUrlItem | undefined,
     b: SongUrlItem | undefined,

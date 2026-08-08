@@ -124,7 +124,7 @@ function isCollectionSortKey(value: unknown): value is CollectionSortKey {
     )
 }
 
-/** 稳定排序：default 原样，custom 按 order，其余按字段 */
+// 稳定排序：default 原样，custom 按 order，其余按字段
 function sortTracks<T extends SortableTrack>(
     tracks: readonly T[],
     key: TrackSortKey,

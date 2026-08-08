@@ -1,7 +1,4 @@
-/**
- * 本地音频后缀表，与 src-tauri AUDIO_EXTS 对齐。
- * 扫描可收录；能否解码由播放链路判定。
- */
+// 本地音频后缀表，与 src-tauri AUDIO_EXTS 对齐；扫描可收录，能否解码由播放链路判定
 
 const LOCAL_AUDIO_EXTS = [
     // 常用
@@ -52,7 +49,7 @@ const LOCAL_AUDIO_EXTS = [
 
 const LOCAL_AUDIO_EXT_SET = new Set<string>(LOCAL_AUDIO_EXTS)
 
-/** 默认视为高音质或无损，用于 WASAPI auto */
+// 默认视为高音质或无损，用于 WASAPI auto
 const HIGH_QUALITY_EXTS = new Set([
     "flac",
     "wav",
@@ -69,7 +66,7 @@ const HIGH_QUALITY_EXTS = new Set([
     "raw",
 ])
 
-/** 当前 Symphonia 构建可直接解码的扩展名；其余本地格式需进入 FFmpeg 回退。 */
+// 当前 Symphonia 构建可直接解码的扩展名；其余本地格式需进入 FFmpeg 回退
 const NATIVE_DECODER_EXTS = new Set([
     "mp1",
     "mp2",
@@ -113,7 +110,6 @@ function isLocalAudioExt(ext: string): boolean {
     return LOCAL_AUDIO_EXT_SET.has(ext.trim().toLowerCase())
 }
 
-// 供统计归类
 function fileStemFromPath(path: string | null | undefined): string | null {
     if (!path) {
         return null

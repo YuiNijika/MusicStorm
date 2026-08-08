@@ -1,7 +1,4 @@
-/**
- * 网易云 weapi / eapi 加密 移植自 CloudMusicAPI/util/crypto.js
- * 浏览器 + Tauri 共用；实际 HTTP 由 Rust 代理绕开 CORS。
- */
+// 网易云 weapi/eapi 加密，移植自 CloudMusicAPI/util/crypto.js；浏览器+Tauri 共用，HTTP 由 Rust 代理绕开 CORS
 
 import CryptoJS from "crypto-js"
 import forge from "node-forge"

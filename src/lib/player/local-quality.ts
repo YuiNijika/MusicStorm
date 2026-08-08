@@ -1,5 +1,3 @@
-/** 本地高音质判定与 WASAPI 路由 */
-
 import {
     extensionOf,
     HIGH_QUALITY_EXTS,
@@ -9,10 +7,7 @@ import { isTauriRuntime } from "@/lib/player/native-bridge"
 import type { EnginePref } from "@/lib/player/engine-policy"
 import type { Track } from "@/lib/types"
 
-/**
- * 本地高音质：无损扩展名，或 mp3 带足够码率。
- * 无 bitrate 时普通有损不算高音质，避免 auto 误开 WASAPI。
- */
+// 无 bitrate 时普通有损不算高音质，避免 auto 误开 WASAPI
 function isLocalHighQualityTrack(track: Track): boolean {
     if (track.source !== "local" || !track.filePath) {
         return false
@@ -41,11 +36,7 @@ function isLocalHighQualityTrack(track: Track): boolean {
     return false
 }
 
-/**
- * 是否对该曲尝试 WASAPI。
- * html5 强制关。wasapi 凡本地 path。auto 仅高音质。
- * 远程地址永不进 native。
- */
+// 远程地址永不进 native；auto 仅高音质
 function shouldUseWasapiForTrack(track: Track, pref: EnginePref): boolean {
     if (pref === "html5" || !isTauriRuntime()) {
         return false

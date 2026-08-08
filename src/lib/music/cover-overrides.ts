@@ -1,4 +1,4 @@
-/** 歌曲封面覆盖：SQLite 保存短路径索引，图片二进制在 cache/covers。 */
+// 歌曲封面覆盖：SQLite 保存短路径索引，图片二进制在 cache/covers
 
 import { dbGetSetting, dbSetSetting } from "@/lib/db/play-stats"
 import { coverPathToUrl, type CachedCover } from "@/lib/local/cover"
@@ -84,7 +84,7 @@ async function clearCoverOverride(trackId: string): Promise<void> {
     await writeMap(next)
 }
 
-/** 列表使用缩略图；播放器等大图场景使用原图。 */
+// 列表使用缩略图；播放器等大图场景使用原图
 function resolveTrackCoverUrl(
     trackId: string,
     coverUrl: string,
@@ -99,7 +99,7 @@ function resolveTrackCoverUrl(
     )
 }
 
-/** 旧 Base64 不再参与新写入；迁移成功后由调用方清理。 */
+// 旧 Base64 不再参与新写入；迁移成功后由调用方清理
 function readLegacyCoverOverrides(): Record<string, string> {
     if (typeof window === "undefined") {
         return {}
@@ -121,7 +121,7 @@ function readLegacyCoverOverrides(): Record<string, string> {
     }
 }
 
-/** 迁移完成后清理旧 localStorage base64 条目，释放 WebView 存储。 */
+// 迁移完成后清理旧 localStorage base64 条目，释放 WebView 存储
 function clearLegacyCoverOverrides(): void {
     if (typeof window === "undefined") {
         return
@@ -160,7 +160,7 @@ async function migrateLegacyOverrides(): Promise<number> {
     return count
 }
 
-/** 收集歌曲封面覆盖引用的缓存内容 MD5，供清空封面缓存时保留这些文件 */
+// 收集歌曲封面覆盖引用的缓存内容 MD5，供清空封面缓存时保留这些文件
 function collectCoverRefHashes(): string[] {
     const hashes = new Set<string>()
     for (const item of Object.values(cache)) {

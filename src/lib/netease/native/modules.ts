@@ -1,8 +1,3 @@
-/**
- * 将 MusicStorm 的 NETEASE_PATHS 映射为 CloudMusicAPI 同款上游请求。
- * 只覆盖应用实际使用的接口。
- */
-
 import { NETEASE_PATHS } from "@/lib/netease/paths"
 import { md5Hex } from "@/lib/netease/native/md5"
 

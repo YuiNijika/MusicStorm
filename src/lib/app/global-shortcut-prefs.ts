@@ -1,10 +1,3 @@
-/**
- * 全局快捷键偏好（设置页自定义）
- * 配置存 SQLite app_setting(global_shortcuts)，Rust 启动时读取注册；
- * 修改走 invoke("update_global_shortcut", { action, combo })——Rust 侧动态注销+注册+落盘。
- * 动作：toggle（播放/暂停）| previous（上一首）| next（下一首）
- */
-
 import { invoke } from "@tauri-apps/api/core"
 
 export const SHORTCUT_ACTIONS = [
@@ -27,7 +20,6 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-/** 读取已保存的快捷键配置；无配置时返回默认 */
 export async function loadGlobalShortcuts(): Promise<Record<ShortcutAction, string>> {
     if (!isTauriRuntime()) {
         return { ...DEFAULT_SHORTCUTS }
@@ -50,11 +42,6 @@ export async function loadGlobalShortcuts(): Promise<Record<ShortcutAction, stri
     return { ...DEFAULT_SHORTCUTS }
 }
 
-/**
- * 更新单个动作快捷键（Rust 动态注册）。
- * combo 为空串 = 关闭该动作的快捷键。
- * 失败抛错（如与其他应用冲突），由调用方 toast。
- */
 export async function updateGlobalShortcut(
     action: ShortcutAction,
     combo: string,
@@ -65,11 +52,7 @@ export async function updateGlobalShortcut(
     await invoke("update_global_shortcut", { action, combo })
 }
 
-/**
- * 把 keydown 事件翻译成插件格式字符串（如 "Ctrl+Alt+Space"）。
- * 返回 null 表示该按键不支持或缺少必要修饰键。
- * 规则：必须含 Ctrl/Alt/Super 之一（避免单键全局快捷键干扰其他应用）。
- */
+// 必须含 Ctrl/Alt/Super 之一，避免单键全局快捷键干扰其他应用
 export function keydownToShortcut(event: KeyboardEvent): string | null {
     const mods: string[] = []
     if (event.ctrlKey) mods.push("Ctrl")

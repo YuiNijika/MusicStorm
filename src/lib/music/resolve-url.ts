@@ -14,11 +14,7 @@ export type ResolvePlayableResult =
     | { ok: true; url: string }
     | { ok: false; reason: string; entry?: SongUrlItem }
 
-/**
- * 解析可播放 URL。
- * - 本地 filePath：convertFileSrc → asset 协议
- * - netease：始终重新取链；无 url / code≠200 / VIP 未购 → ok:false + 原因
- */
+// 本地直接 convertFileSrc；网易云始终重新取链，无 url / 无版权 / VIP 未购 → ok:false
 async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> {
     if (track.filePath && track.source === "local") {
         try {

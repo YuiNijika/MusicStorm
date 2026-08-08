@@ -1,4 +1,4 @@
-/** 启动时探测内置 API；失败仅提示，不静默改设置 */
+// 启动时探测内置 API；失败仅提示，不静默改设置
 
 import { ensureIntegratedApiIfNeeded } from "@/lib/netease/integrated-api"
 import { notifyWarning } from "@/lib/notify"

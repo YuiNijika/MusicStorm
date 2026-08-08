@@ -1,9 +1,3 @@
-/**
- * 网易云多账号保险库
- * - 活跃 cookie 仍走 auth-cookie，供 API 请求
- * - 本模块只负责多账号快照与切换
- */
-
 import {
     applyNeteaseCredentials,
     clearNeteaseSession,
@@ -103,7 +97,6 @@ function getActiveUserId(): number | null {
     return readVault().activeUserId
 }
 
-/** 将当前 cookie 与资料写入保险库并标为活跃，不派发事件由调用方 setState */
 function upsertActiveAccount(profile: NeteaseProfile): void {
     const credentials = snapshotNeteaseCredentials()
     if (!credentials) {
@@ -128,10 +121,7 @@ function upsertActiveAccount(profile: NeteaseProfile): void {
     writeVault(vault)
 }
 
-/**
- * 切换到已保存账号。
- * 若仍登录则先把当前活跃 cookie 回写保险库，再应用目标凭证。
- */
+// 切换账号：若仍登录则先把当前活跃 cookie 回写保险库，再应用目标凭证
 function switchNeteaseAccount(userId: number): boolean {
     const vault = readVault()
     const target = vault.accounts.find((a) => a.userId === userId)
@@ -161,7 +151,6 @@ function switchNeteaseAccount(userId: number): boolean {
     return true
 }
 
-/** 仅清当前 cookie，账号仍留在列表可再切换 */
 function deactivateNeteaseSession(): void {
     clearNeteaseSession()
     const vault = readVault()
@@ -169,7 +158,6 @@ function deactivateNeteaseSession(): void {
     writeVault(vault)
 }
 
-/** 从保险库移除；命中活跃标记或当前 cookie 则一并清会话 */
 function removeNeteaseAccount(userId: number): void {
     const vault = readVault()
     const removed = vault.accounts.find((a) => a.userId === userId)
@@ -187,7 +175,6 @@ function removeNeteaseAccount(userId: number): void {
         vault.activeUserId = null
     }
 
-    // 指向已删账号的 active 归零
     if (
         vault.activeUserId != null &&
         !vault.accounts.some((a) => a.userId === vault.activeUserId)
@@ -198,10 +185,6 @@ function removeNeteaseAccount(userId: number): void {
     writeVault(vault)
 }
 
-/**
- * 启动时：若有 cookie 但 vault 无 active，尽量对齐；
- * 若 vault 有 active 但 cookie 空，恢复 active 凭证。
- */
 function reconcileNeteaseVaultOnBoot(): void {
     const vault = readVault()
     const musicU = getCookie("MUSIC_U")

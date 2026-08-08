@@ -1,4 +1,4 @@
-/** 淡入淡出增益 ramp，不写 UI 音量 */
+// 淡入淡出增益 ramp，不写 UI 音量
 
 type FadeGainController = {
     getGain: () => number

@@ -24,7 +24,7 @@ function coverPathToUrl(path: string | null | undefined): string {
     }
 }
 
-/** 桌面端直接缓存原图和缩略图；浏览器预览仅返回临时 data URL。 */
+// 桌面端直接缓存原图和缩略图；浏览器预览仅返回临时 data URL
 async function pickCoverImage(): Promise<CachedCover | null> {
     if (isTauriRuntime()) {
         return invoke<CachedCover | null>("pick_cover_image")
@@ -49,10 +49,7 @@ async function cacheCoverUrl(url: string): Promise<CachedCover> {
     return { originalPath: dataUrl, thumbnailPath: dataUrl }
 }
 
-/**
- * 兼容旧调用 返回 data URL 字符串，供专辑抽屉等仅需要可展示封面的场景使用。
- * 桌面端会先缓存到文件再转 asset URL，避免 base64 进 localStorage。
- */
+// 兼容旧调用：桌面端先缓存到文件再转 asset URL，避免 base64 进 localStorage
 async function pickImageAsDataUrl(): Promise<string | null> {
     const cached = await pickCoverImage()
     if (!cached) {
@@ -61,7 +58,6 @@ async function pickImageAsDataUrl(): Promise<string | null> {
     return coverPathToUrl(cached.originalPath) || cached.originalPath
 }
 
-/** 兼容旧调用：下载远程封面并返回可展示 URL。 */
 async function fetchImageAsDataUrl(url: string): Promise<string> {
     const cached = await cacheCoverUrl(url)
     return coverPathToUrl(cached.originalPath) || cached.originalPath
@@ -113,7 +109,6 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     })
 }
 
-/** 从封面 URL / 路径提取缓存内容 MD5；非缓存路径返回 null */
 function extractCoverHash(url: string): string | null {
     const match = /[\\/]originals[\\/]([a-f0-9]{16,})\.[a-z0-9]+$/i.exec(url)
     return match?.[1] ?? null

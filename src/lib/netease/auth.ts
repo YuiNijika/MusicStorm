@@ -40,7 +40,7 @@ async function fetchQrKey(): Promise<string> {
     return key
 }
 
-/** 内置 create 只给 qrurl；对接源可能直接给 qrimg base64 */
+// 内置 create 只给 qrurl；对接源可能直接给 qrimg base64
 function resolveQrImage(qrimg: string, qrurl: string): string {
     const img = qrimg.trim()
     if (img) {

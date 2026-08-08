@@ -10,7 +10,6 @@ type RecommendSongsData = {
     recommend?: NeteaseSong[]
 }
 
-/** 需登录：每日推荐曲 */
 async function fetchDailyRecommendSongs(): Promise<Track[]> {
     const data = await neteaseRequest<RecommendSongsData>({
         path: NETEASE_PATHS.recommendSongs,

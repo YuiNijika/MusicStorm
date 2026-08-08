@@ -1,13 +1,9 @@
-/**
- * 设备 / 访客 cookie 对齐 CloudMusicAPI processCookieObject
- *
- * 扫码风控关键：MUSIC_A 必须与签发它的 deviceId 全程一致；
- * 外置 API 在 register_anonimous 后用 global.deviceId 贯穿所有请求。
- */
+// 设备/访客 cookie 对齐 CloudMusicAPI processCookieObject
+// 扫码风控关键：MUSIC_A 必须与签发它的 deviceId 全程一致
 
 import CryptoJS from "crypto-js"
 
-/** CloudMusicAPI osMap.pc.appver — 与 eapi 登录链路一致 */
+// CloudMusicAPI osMap.pc.appver — 与 eapi 登录链路一致
 const PC_APPVER = "3.1.17.204416"
 const DESKTOP_UA_APPVER = "3.1.29.205117"
 
@@ -52,7 +48,7 @@ function randomHex(len: number, upper = false): string {
     return out
 }
 
-/** 对齐 CloudMusicAPI generateDeviceId：52 位大写 hex */
+// 对齐 CloudMusicAPI generateDeviceId：52 位大写 hex
 function generateDeviceId(): string {
     return randomHex(52, true)
 }
@@ -71,10 +67,7 @@ function getOrCreate(key: string, factory: () => string): string {
     return next
 }
 
-/**
- * 全局唯一 deviceId（游客注册 + 全部 eapi/weapi 共用）。
- * 旧版 20 位字母数字会与 MUSIC_A 错位触发「登录有风险」，强制迁移。
- */
+// 全局唯一 deviceId；旧版 20 位字母数字与 MUSIC_A 错位触发风控，强制迁移
 function getOrCreateDeviceId(): string {
     const existing = readLocal(DEVICE_ID_KEY)
     if (isCanonicalDeviceId(existing)) {
@@ -141,10 +134,7 @@ function clearAnonymousSession(): void {
     removeLocal(MUSIC_A_KEY)
 }
 
-/**
- * 对齐 processCookieObject。
- * 登录路径不加 NMTID。
- */
+// 对齐 processCookieObject；登录路径不加 NMTID
 function ensureDeviceCookies(
     jar: Record<string, string>,
     options?: { isLoginPath?: boolean },

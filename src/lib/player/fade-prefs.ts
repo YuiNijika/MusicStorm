@@ -1,5 +1,3 @@
-/** 播放淡入淡出偏好 */
-
 const FADE_ENABLED_KEY = "musicstorm-player-fade-enabled"
 const FADE_MS_KEY = "musicstorm-player-fade-ms"
 
@@ -40,7 +38,6 @@ function setFadeDurationMs(durationMs: number): void {
     window.localStorage.setItem(FADE_MS_KEY, String(clampFadeMs(durationMs)))
 }
 
-/** 实际 ramp 时长，关闭或 0 为瞬时 */
 function resolveFadeDurationMs(prefs: FadePrefs = getFadePrefs()): number {
     if (!prefs.enabled || prefs.durationMs <= 0) {
         return 0

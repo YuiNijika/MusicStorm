@@ -1,7 +1,4 @@
-/**
- * Cookie 存取对齐 YesPlayMusic/src/utils/auth.js
- * CloudMusicAPI 跨域时通过 query.cookie 透传 MUSIC_U
- */
+// Cookie 存取对齐 YesPlayMusic/src/utils/auth.js；CloudMusicAPI 跨域时通过 query.cookie 透传 MUSIC_U
 
 type NeteaseCredentials = {
     musicU: string
@@ -78,7 +75,6 @@ function clearNeteaseSession(): void {
     removeCookie("__csrf")
 }
 
-/** 当前活跃凭证快照，多账号切换用 */
 function snapshotNeteaseCredentials(): NeteaseCredentials | null {
     const musicU = getCookie("MUSIC_U")
     if (!musicU) {

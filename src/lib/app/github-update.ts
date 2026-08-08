@@ -1,9 +1,3 @@
-/**
- * GitHub Releases 更新检测（方案 B：检测 + 引导下载）
- * - semver 比较，tag 去 v
- * - 默认缓存 5 小时，可 force 刷新
- */
-
 import { GITHUB_REPO_URL } from "@/lib/open-external"
 
 const OWNER = "YuiNijika"
@@ -57,7 +51,6 @@ type CachePayload = {
     hasUpdate: boolean
 }
 
-/** 去掉前导 v/V，只取 x.y.z 主版本 */
 function normalizeSemver(raw: string): string | null {
     const cleaned = raw.trim().replace(/^v/i, "")
     const match = /^(\d+)\.(\d+)\.(\d+)/.exec(cleaned)
@@ -79,7 +72,6 @@ function parseSemverTuple(raw: string): [number, number, number] | null {
     return [a, b, c]
 }
 
-/** latest > current 才算有更新 */
 function isNewerVersion(latest: string, current: string): boolean {
     const a = parseSemverTuple(latest)
     const b = parseSemverTuple(current)
@@ -167,10 +159,6 @@ function isCacheFresh(cache: CachePayload, now = Date.now()): boolean {
     return now - cache.checkedAt < CACHE_TTL_MS
 }
 
-/**
- * 检测更新。
- * @param force 忽略 5h 缓存，强制打 GitHub API
- */
 async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
     const currentVersion = await readAppVersion()
     const cached = readCache()
@@ -273,7 +261,6 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
     }
 }
 
-/** 读缓存快照（不发网）；无缓存则 null */
 function peekCachedUpdate(): UpdateCheckResult | null {
     const cached = readCache()
     if (!cached) {

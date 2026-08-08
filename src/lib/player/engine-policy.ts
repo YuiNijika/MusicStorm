@@ -1,5 +1,3 @@
-/** 播放引擎偏好与状态文案 */
-
 import { audioProbe, isTauriRuntime } from "@/lib/player/native-bridge"
 
 const ENGINE_PREF_KEY = "musicstorm-player-engine"
@@ -40,10 +38,7 @@ function labelForEngineStatus(status: EngineStatus): string {
     return "HTML5"
 }
 
-/**
- * 仅判断原生 probe 是否可用；具体是否对某曲用 WASAPI 由 shouldUseWasapiForTrack 决定。
- * 不再「一上来全局 wasapi」。
- */
+// 仅判断原生 probe 是否可用；不再「一上来全局 wasapi」
 async function resolveEngineChoice(
     pref: EnginePref = getEnginePref(),
 ): Promise<{ nativeReady: boolean; status: EngineStatus; message?: string }> {
@@ -53,7 +48,6 @@ async function resolveEngineChoice(
 
     const probe = await audioProbe()
     if (probe.available) {
-        // 默认状态 html5，真正切曲时再标 wasapi
         return { nativeReady: true, status: "html5" }
     }
 

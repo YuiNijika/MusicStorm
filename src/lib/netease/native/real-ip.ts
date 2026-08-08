@@ -1,8 +1,4 @@
-/**
- * 会话级中国 realIP，对齐 CloudMusicAPI global.cnIp
- * - 启动抽一次，进程会话内复用
- * - 数据为 china_ip_ranges.txt 精简 CIDR 子集，避免全量 65KB 进 bundle
- */
+// 会话级中国 realIP，对齐 CloudMusicAPI global.cnIp；进程会话内复用，CIDR 精简子集避免 65KB 进 bundle
 
 type CidrRange = {
     start: number
@@ -11,7 +7,7 @@ type CidrRange = {
     cidr: string
 }
 
-/** 精简 CN 段，覆盖电信联通移动常见前缀约 60 段 */
+// 精简 CN 段，覆盖电信联通移动常见前缀约 60 段
 const CN_CIDR_SUBSET = [
     "1.80.0.0/12",
     "1.192.0.0/13",
@@ -141,7 +137,7 @@ function randomInt(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-/** 对齐 CloudMusicAPI generateRandomChineseIP */
+// 对齐 CloudMusicAPI generateRandomChineseIP
 function generateRandomChineseIp(): string {
     if (!CN_TOTAL || CN_RANGES.length === 0) {
         return `116.${randomInt(25, 94)}.${randomInt(1, 255)}.${randomInt(1, 255)}`
@@ -167,7 +163,7 @@ function generateRandomChineseIp(): string {
 
 let sessionRealIp: string | null = null
 
-/** 会话内固定；对齐 global.cnIp */
+// 会话内固定；对齐 global.cnIp
 function getSessionRealIp(): string {
     if (sessionRealIp) {
         return sessionRealIp
@@ -188,9 +184,6 @@ function resetSessionRealIp(): string {
     return getSessionRealIp()
 }
 
-/**
- * query.realIP 优先，否则会话 IP。
- */
 function resolveRealIp(override?: string | number | boolean): string {
     if (typeof override === "string" && override.trim()) {
         return override.trim()

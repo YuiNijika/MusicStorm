@@ -8,7 +8,7 @@ type ApiCacheEntry = {
     expiresAt: number
 }
 
-/** 进程内去重：同一 key 并发只打一次网 */
+// 进程内去重：同一 key 并发只打一次网
 const inflight = new Map<string, Promise<unknown>>()
 
 async function apiCacheGet(key: string): Promise<string | null> {

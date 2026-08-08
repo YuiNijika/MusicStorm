@@ -1,6 +1,5 @@
 const STORAGE_KEY = "musicstorm-appearance"
 
-/** 预设 id；`custom` 时使用 customHue */
 type AccentTone =
     | "neutral"
     | "rose"
@@ -37,7 +36,7 @@ type AccentOption = {
     hue: number
 }
 
-/** 默认色调，标题栏与设置共用 */
+// 默认色调，标题栏与设置共用
 const ACCENT_OPTIONS: AccentOption[] = [
     { id: "neutral", label: "中性", hue: 260 },
     { id: "rose", label: "玫瑰", hue: 350 },
@@ -131,21 +130,17 @@ function resolveAccentHue(prefs: AppearancePrefs): number {
     return ACCENT_OPTIONS.find((item) => item.id === prefs.accent)?.hue ?? 260
 }
 
-/** 中性预设：低 chroma；自定义 / 彩色预设：正常 chroma */
+// 中性预设：低 chroma；自定义 / 彩色预设：正常 chroma
 function isNeutralAccent(prefs: AppearancePrefs): boolean {
     return prefs.accent === "neutral"
 }
 
-/** 色点预览色，标题栏与设置共用 */
+// 色点预览色，标题栏与设置共用
 function accentSwatch(hue: number, neutral = false): string {
     return neutral ? `oklch(0.72 0.02 ${hue})` : `oklch(0.62 0.14 ${hue})`
 }
 
-/**
- * 把色调 + 玻璃参数写到 :root。
- * 日间必须给背景 / 玻璃 / primary 上 chroma，否则「色调」几乎看不出来。
- * 浮层单独走高不透明度，保证菜单可读。
- */
+// 日间必须给背景/玻璃/primary 上 chroma，否则色调看不出；浮层走高不透明度保证菜单可读
 function applyAppearanceToDom(prefs: AppearancePrefs): void {
     const root = document.documentElement
     const hue = resolveAccentHue(prefs)

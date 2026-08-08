@@ -196,7 +196,7 @@ async function fetchDjHot(limit = 24, offset = 0): Promise<Radio[]> {
         .filter((item): item is Radio => item != null)
 }
 
-/** 首页：精选优先，不足用热门补齐 */
+// 首页：精选优先，不足用热门补齐
 async function fetchHomeRadios(limit = 18): Promise<Radio[]> {
     try {
         const recommend = await fetchDjRecommend(limit)
@@ -326,7 +326,6 @@ type DjSublistData = {
     data?: DjRadioRaw[]
 }
 
-/** 已订阅电台列表，需登录 */
 async function fetchDjSublist(limit = 1000, offset = 0): Promise<Radio[]> {
     const data = await neteaseRequest<DjSublistData>({
         path: NETEASE_PATHS.djSublist,
@@ -339,7 +338,6 @@ async function fetchDjSublist(limit = 1000, offset = 0): Promise<Radio[]> {
         .filter((item): item is Radio => item != null)
 }
 
-/** t=true 订阅 / false 取消 */
 async function subscribeDjRadio(rid: string, subscribe: boolean): Promise<void> {
     const id = rid.trim()
     if (!/^\d+$/.test(id)) {

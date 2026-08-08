@@ -117,7 +117,7 @@ function setProgramOrder(radioId: string, ids: string[]): void {
     emitOrder()
 }
 
-/** 按 order 重排；order 中没有的 id 保持相对顺序接在末尾 */
+// 按 order 重排；order 中没有的 id 保持相对顺序接在末尾
 function applyIdOrder<T extends { id: string }>(
     items: readonly T[],
     order: readonly string[],

@@ -61,11 +61,7 @@ export function setInAppShortcut(
     window.dispatchEvent(new CustomEvent(IN_APP_SHORTCUT_EVENT))
 }
 
-/**
- * keydown → 组合串（"Space" / "Ctrl+Alt+Space"）。
- * 与全局快捷键共用 keydownToShortcut，但允许无修饰单键（应用内快捷键）。
- * 返回 null 表示不支持该键。
- */
+// 与全局快捷键共用 keydownToShortcut，但允许无修饰单键（应用内快捷键）
 export function keydownToInAppShortcut(event: KeyboardEvent): string | null {
     const mods: string[] = []
     if (event.ctrlKey) mods.push("Ctrl")

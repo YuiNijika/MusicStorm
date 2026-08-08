@@ -95,7 +95,6 @@ export type AlbumCard = {
     trackCount?: number
 }
 
-/** 已收藏专辑，需登录 */
 async function fetchAlbumSublist(limit = 1000, offset = 0): Promise<AlbumCard[]> {
     const data = await neteaseRequest<AlbumSublistData>({
         path: NETEASE_PATHS.albumSublist,

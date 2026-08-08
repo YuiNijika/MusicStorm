@@ -10,13 +10,9 @@ import { resolveRealIp } from "@/lib/netease/native/real-ip"
 import { nativeNeteaseRequest } from "@/lib/netease/native/request"
 import { NETEASE_PATHS } from "@/lib/netease/paths"
 
-/**
- * 网易云请求入口
- * - integrated：应用内 TS 加密 + Tauri HTTP 代理，直连 music.163.com
- * - external：HTTP 对接官方、锦木祈杰或自定义 NCM API
- */
+// 网易云请求入口：integrated = TS 直连 music.163.com，external = 对接第三方 NCM API
 
-/** 不走磁盘缓存的路径：登录/写操作/时效 URL */
+// 不走磁盘缓存的路径：登录/写操作/时效 URL
 const NO_CACHE_PATHS = new Set<string>([
     NETEASE_PATHS.songUrl,
     NETEASE_PATHS.loginQrKey,

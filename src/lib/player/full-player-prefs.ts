@@ -1,5 +1,3 @@
-/** 全屏播放器布局模板 + 歌词对齐 */
-
 const LAYOUT_STORAGE_KEY = "musicstorm-full-player-layout"
 const CHROME_STORAGE_KEY = "musicstorm-full-player-chrome"
 const LAYOUT_EVENT = "musicstorm:full-player-layout"
@@ -8,7 +6,6 @@ const CHROME_EVENT = "musicstorm:full-player-chrome"
 type FullPlayerLayout = "classic" | "cover" | "lyrics"
 type LyricsAlign = "left" | "center" | "right"
 
-/** 歌词模式对齐，不显示封面 */
 type FullPlayerChrome = {
     lyricsAlign: LyricsAlign
 }

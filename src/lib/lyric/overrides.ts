@@ -1,4 +1,4 @@
-/** 按 trackId 覆盖歌词，优先于网易云与本地原链 */
+// 按 trackId 覆盖歌词，优先于网易云与本地原链
 
 const STORAGE_KEY = "musicstorm-lyric-overrides"
 const LYRIC_OVERRIDE_EVENT = "musicstorm-lyric-override"

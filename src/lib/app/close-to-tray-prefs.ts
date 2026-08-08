@@ -1,9 +1,4 @@
-/**
- * 关闭到托盘偏好
- * - localStorage 供前端即时生效
- * - SQLite app_setting（close_to_tray）供 Rust 拦截 CloseRequested 时读取
- * 默认开启：关闭窗口 = 隐藏到系统托盘继续播放，退出走托盘菜单「退出」
- */
+// 默认开启：关闭窗口 = 隐藏到系统托盘继续播放；退出走托盘菜单「退出」
 
 import { invoke } from "@tauri-apps/api/core"
 
