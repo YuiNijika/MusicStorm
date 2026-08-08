@@ -109,7 +109,6 @@ async function searchNeteaseTracks(keywords: string, limit = 30): Promise<Track[
     return songs.map(mapNeteaseSongToTrack)
 }
 
-/** type=10 专辑搜索 */
 async function searchNeteaseAlbums(
     keywords: string,
     limit = 20,
@@ -264,7 +263,7 @@ async function searchNeteaseRadios(
         .filter((item): item is Radio => item != null)
 }
 
-/** 多类型并行搜索；单项失败不影响其他分区 */
+// 单项失败不影响其他分区
 async function searchNeteaseAll(
     keywords: string,
 ): Promise<NeteaseSearchBundle> {

@@ -27,7 +27,6 @@ import { NeteaseSessionProvider } from "@/hooks/use-netease-session"
 import { LikedProvider } from "@/hooks/use-liked"
 import { PlayerProvider } from "@/hooks/use-player"
 import type { AppRoute } from "@/lib/routes"
-// 首屏必须的页面保持静态 import，其他页面按需拆分以减小初始 bundle
 import { HomePage } from "@/pages/home"
 import {
     AlbumDetailSkeleton,
@@ -44,7 +43,6 @@ import {
     StatsPageSkeleton,
 } from "@/components/music/loading-skeletons"
 
-// 非首屏页面 React.lazy 拆分 chunk，冷启动时 V8 只需解析首屏代码
 const SettingsPage = lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage })))
 const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
 const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
@@ -74,7 +72,6 @@ function AppRoutes({
 }) {
     const { detail, openPlaylist, openRadio, back } = useMusicNavigation()
 
-    // 分包加载期间的占位骨架：每个页面按自己的真实布局定制，互不相同
     const playlistFallback = <PlaylistDetailSkeleton />
     const albumFallback = <AlbumDetailSkeleton />
     const artistFallback = <ArtistDetailSkeleton />
@@ -155,11 +152,9 @@ function App() {
     useDevtoolsShortcut()
 
     useEffect(() => {
-        // 首帧 DOM 已提交：撤掉内联启动兜底画面
         document.getElementById("boot-loading")?.remove()
     }, [])
 
-    // 性能模式：全局挂 html class（禁动画/过渡）；切换时即时生效
     useEffect(() => {
         applyPerformanceModeClass(getPerformanceMode())
         function onMode() {

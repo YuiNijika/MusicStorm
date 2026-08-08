@@ -1,5 +1,3 @@
-/** 打开网易云官网注册 */
-
 const NETEASE_REGISTER_URL = "https://music.163.com"
 
 async function openNeteaseRegister(): Promise<void> {

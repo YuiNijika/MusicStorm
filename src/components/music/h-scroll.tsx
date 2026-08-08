@@ -2,7 +2,6 @@ import type { ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 
-/** 横向内容带：Apple Music 式可横滑、隐藏滚动条 */
 type HScrollProps = {
     children: ReactNode
     className?: string

@@ -1,4 +1,3 @@
-/** 手机号验证码登录 */
 
 import { setCookiesFromApi } from "@/lib/netease/auth-cookie"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"

@@ -908,7 +908,6 @@ fn requires_external_decoder(path: &Path) -> bool {
     )
 }
 
-/// 从 offset_ms 装入 sink：原生支持格式走 Symphonia，其余格式才走外部 FFmpeg
 fn start_playback_from(
     sink: &Sink,
     source: &str,
@@ -966,7 +965,6 @@ fn start_playback_from(
     Ok(())
 }
 
-/// 轻量时长探测：优先 lofty（已有），失败则 0 由播放时更新
 fn compute_duration_hint(path: &Path) -> Option<Duration> {
     // 复用 lofty 读取时长，避免重复打开做全量解码
     if let Ok(probe) = lofty::probe::Probe::open(path) {

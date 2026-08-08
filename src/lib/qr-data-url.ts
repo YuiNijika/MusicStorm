@@ -5,7 +5,6 @@
 
 type EccLevel = 0 | 1 | 2 | 3 // L M Q H
 
-// ECC M：各 version 的 [ecPerBlock, block1Count, dataPerBlock1, block2Count, dataPerBlock2]
 const ECC_M_TABLE: Array<[number, number, number, number, number]> = [
     [0, 0, 0, 0, 0],
     [10, 1, 16, 0, 0],
@@ -406,7 +405,6 @@ function matrixToSvgDataUrl(mod: number[][], modulePx = 6, margin = 2): string {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-/** 将文本编码为可放入 <img src> 的 QR data URL */
 function qrTextToDataUrl(text: string): string {
     const value = text.trim()
     if (!value) {

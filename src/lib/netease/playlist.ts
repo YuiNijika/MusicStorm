@@ -91,10 +91,7 @@ async function fetchPlaylistDetail(id: string): Promise<{
     return { playlist, tracks }
 }
 
-/**
- * 收藏 / 取消收藏歌单
- * t=1 收藏，t=2 取消
- */
+
 async function subscribePlaylist(id: string, subscribe: boolean): Promise<void> {
     const data = await neteaseRequest<{ code?: number }>({
         path: NETEASE_PATHS.playlistSubscribe,

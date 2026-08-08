@@ -1,5 +1,3 @@
-// 原生音频：设备枚举与 rodio 回放
-
 mod player;
 
 use crate::db::DbState;
@@ -259,12 +257,10 @@ pub fn audio_stop(state: State<'_, AudioState>) -> Result<(), String> {
     Ok(())
 }
 
-/// 启动 tick 广播，由 PlayerInner 内部线程调用
 pub fn emit_tick(app: &AppHandle, payload: AudioTickPayload) {
     let _ = app.emit("audio://tick", payload);
 }
 
-/// 显式 ended 通知
 pub fn emit_ended(app: &AppHandle) {
     let _ = app.emit("audio://ended", ());
 }

@@ -21,8 +21,6 @@ fn build_client() -> Result<Client, String> {
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))
 }
 
-/// 向 music.163.com / interface 域 POST form-urlencoded 体
-/// UA / Referer / Origin / X-Real-IP 对齐 CloudMusicAPI 风控绕过形态
 #[tauri::command]
 pub fn netease_http_post(
     url: String,

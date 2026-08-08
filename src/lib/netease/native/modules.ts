@@ -36,7 +36,6 @@ function qNum(query: Query, key: string, fallback: number): number {
     return Number.isFinite(n) ? n : fallback
 }
 
-/** path 为客户端路径如 /song/url */
 function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
     switch (path) {
         case NETEASE_PATHS.songUrl: {
@@ -335,7 +334,6 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 crypto: "weapi",
             }
         case NETEASE_PATHS.djSub: {
-            // t=1 订阅，t=0 取消
             const t = qNum(query, "t", 1)
             return {
                 uri: "/api/djradio/sub",

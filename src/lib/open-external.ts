@@ -1,5 +1,3 @@
-/** 在系统浏览器打开外链，Tauri opener 失败则 window.open */
-
 async function openExternalUrl(url: string): Promise<void> {
     try {
         const { openUrl } = await import("@tauri-apps/plugin-opener")

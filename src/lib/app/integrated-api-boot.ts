@@ -5,7 +5,6 @@ import { notifyWarning } from "@/lib/notify"
 
 const BOOT_TOAST_ID = "integrated-api-boot"
 
-/** 在 Toaster 就绪后调用；integrated 且不可用时 toast */
 async function bootIntegratedApiProbe(): Promise<void> {
     const status = await ensureIntegratedApiIfNeeded()
     if (!status || status.ready) {

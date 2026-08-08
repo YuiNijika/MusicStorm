@@ -1,12 +1,3 @@
-/**
- * 应用内快捷键偏好（窗口聚焦时生效，可自定义）
- * 与全局快捷键（global-shortcut-prefs.ts）不同：
- * - 应用内快捷键只在窗口聚焦时响应，无需系统级注册
- * - 支持无修饰的单键（空格、方向键、字母等），也支持组合
- * - 存储用 localStorage（前端即时生效，无需 Rust 参与）
- * 事件通知：IN_APP_SHORTCUT_EVENT，监听者重新读取配置
- */
-
 export const IN_APP_SHORTCUT_EVENT = "musicstorm-in-app-shortcut-change"
 
 export const IN_APP_ACTIONS = [
@@ -57,7 +48,6 @@ export function getInAppShortcuts(): InAppShortcutMap {
     }
 }
 
-/** 修改单个动作；combo 为空串 = 关闭该动作 */
 export function setInAppShortcut(
     action: InAppShortcutAction,
     combo: string,
@@ -90,7 +80,6 @@ export function keydownToInAppShortcut(event: KeyboardEvent): string | null {
     return [...mods, key].join("+")
 }
 
-/** 浏览器 code → 插件键名；不支持的返回 null */
 function codeToKeyName(code: string): string | null {
     const match = /^Key([A-Z])$/.exec(code)
     if (match) {

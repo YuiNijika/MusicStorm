@@ -70,7 +70,6 @@ const LyricsView = lazy(() =>
     import("@/components/music/lyrics-view").then(m => ({ default: m.LyricsView })),
 )
 
-/** closed → entering → open → exiting → closed */
 type Phase = "closed" | "entering" | "open" | "exiting"
 
 // 时长与 App.css 的 motion token 对齐（--duration-enter/exit、reduced-motion cross-fade 150ms）
@@ -511,7 +510,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div className="w-[72px]" aria-hidden />
                 </div>
 
-                {/* 主区：按模板 */}
                 {layout === "classic" ? (
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
                         <div className="flex min-h-0 flex-col items-center justify-center gap-6">
@@ -580,7 +578,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     </div>
                 ) : null}
 
-                {/* 底栏播放条：进度 + 传输 + 音量/音质 */}
                 <div
                     className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"
                     style={{
@@ -640,7 +637,6 @@ function TransportBar({
 }) {
     return (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            {/* 左 喜欢 */}
             <div className="flex items-center justify-start">
                 {canLike ? (
                     <IconBtn
@@ -657,7 +653,6 @@ function TransportBar({
                 )}
             </div>
 
-            {/* 中 传输 */}
             <div className="flex items-center justify-center gap-1 sm:gap-1.5">
                 <IconBtn title="随机" active={shuffle} onClick={onToggleShuffle}>
                     <Shuffle className="size-4" />
@@ -701,7 +696,6 @@ function TransportBar({
                 </IconBtn>
             </div>
 
-            {/* 右 音量 音质 */}
             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 <Popover>
                     <PopoverTrigger

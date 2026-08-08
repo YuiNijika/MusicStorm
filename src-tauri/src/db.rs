@@ -167,9 +167,6 @@ pub struct StoragePaths {
     pub database_path: String,
 }
 
-/// 运行目录取可执行文件所在目录
-/// 优先 executable_dir，失败再取 current_exe 父目录。
-/// Android 无 exe 概念：直接使用应用专属数据目录。
 pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
     #[cfg(target_os = "android")]
     {
@@ -245,7 +242,6 @@ fn migrate_legacy_app_data_db(app: &AppHandle, target: &Path) -> Result<(), Stri
     Ok(())
 }
 
-/// 旧版可能落在 Tauri app_local_data / 环境变量路径
 fn legacy_db_candidates(app: &AppHandle) -> Vec<PathBuf> {
     let mut out = Vec::new();
 
@@ -704,7 +700,6 @@ fn format_ymd(epoch_days: i64) -> String {
     format!("{:04}-{:02}-{:02}", y, m, d)
 }
 
-/// 解析 YYYY-MM-DD → 该日 UTC 0 点的 epoch 毫秒；非法输入返回 None
 fn parse_ymd_to_epoch_ms(day: &str) -> Option<i64> {
     let parts: Vec<&str> = day.split('-').collect();
     if parts.len() != 3 {
@@ -752,7 +747,6 @@ pub fn db_get_listen_stats(
     }
 }
 
-/// 近 N 日听歌日汇总，按 day 降序
 #[tauri::command]
 pub fn db_list_listen_stats(
     state: State<'_, DbState>,
@@ -799,7 +793,6 @@ pub fn db_list_listen_stats(
     Ok(out)
 }
 
-/// 听得最多，按 track_id 聚合；本地归类在前端
 #[tauri::command]
 pub fn db_list_top_tracks(
     state: State<'_, DbState>,
@@ -884,7 +877,6 @@ pub fn db_list_top_tracks(
     Ok(out)
 }
 
-/// 有效听歌按来源汇总
 #[tauri::command]
 pub fn db_listen_source_breakdown(
     state: State<'_, DbState>,
@@ -1040,7 +1032,6 @@ fn remove_cache_file(cache_dir: &Path, key: &str) {
     let _ = fs::remove_file(file);
 }
 
-/// 删除已过期的 DB 行，并移除对应 cache 目录文件
 pub fn purge_expired_api_cache(app: &AppHandle, conn: &Connection) -> Result<u64, String> {
     let now = now_ms();
     let mut expired_keys: Vec<String> = Vec::new();

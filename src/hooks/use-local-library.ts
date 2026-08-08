@@ -81,7 +81,6 @@ function useLocalLibrary() {
         return []
     }, [allTracks, library, nav])
 
-    // 旧库缺元数据时自动补扫一次
     useEffect(() => {
         if (!desktop || !libraryNeedsMetaRescan(library)) {
             return
@@ -115,7 +114,6 @@ function useLocalLibrary() {
         return () => {
             cancelled = true
         }
-        // 仅启动时
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [desktop])
 
@@ -182,11 +180,10 @@ function useLocalLibrary() {
         return () => {
             cancelled = true
         }
-        // 仅启动时对初始库迁移一次
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [desktop])
 
-    // 订阅 Rust 扫描进度，实时显示「正在扫描… n/m · 文件名」
+    // Rust 扫描进度事件订阅
     useEffect(() => {
         if (!desktop) {
             return
@@ -258,7 +255,6 @@ function useLocalLibrary() {
         }
     }, [desktop])
 
-    /** 手动创建艺人分组（无文件夹） */
     const createArtist = useCallback(
         (draft: { name: string; coverDataUrl?: string }) => {
             const { state, artist } = upsertArtist(loadLocalLibrary(), {
@@ -306,7 +302,6 @@ function useLocalLibrary() {
         [library],
     )
 
-    /** 批量删除专辑（连同曲目索引） */
     const deleteAlbums = useCallback(
         (albumIds: string[]) => {
             if (albumIds.length === 0) {

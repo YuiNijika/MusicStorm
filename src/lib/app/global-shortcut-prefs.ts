@@ -90,7 +90,6 @@ export function keydownToShortcut(event: KeyboardEvent): string | null {
     return [...mods, key].join("+")
 }
 
-/** 浏览器 code → 插件键名；不支持的返回 null */
 function codeToKeyName(code: string): string | null {
     const match = /^Key([A-Z])$/.exec(code)
     if (match) {

@@ -45,7 +45,6 @@ async function apiCacheClear(): Promise<void> {
     }
 }
 
-/** 删除已超过 expires_at 的条目与对应文件；返回删除条数 */
 async function apiCachePurgeExpired(): Promise<number> {
     if (!isTauriRuntime()) {
         return 0

@@ -1,7 +1,3 @@
-/**
- * 应用更新状态：启动静默检测 + 手动刷新
- */
-
 import {
     createContext,
     useCallback,

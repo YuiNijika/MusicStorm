@@ -81,7 +81,7 @@ async function checkQrLogin(key: string): Promise<QrCheckData> {
     })
 }
 
-/** 803 时写入 cookie；返回本次 check 的 code */
+// 803 时写入 cookie
 async function pollQrLogin(key: string): Promise<number> {
     const data = await checkQrLogin(key)
     const code = data.code ?? 0

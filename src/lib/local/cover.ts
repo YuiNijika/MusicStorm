@@ -67,7 +67,6 @@ async function fetchImageAsDataUrl(url: string): Promise<string> {
     return coverPathToUrl(cached.originalPath) || cached.originalPath
 }
 
-/** 将旧版 Base64 封面迁移到文件缓存。 */
 async function migrateLegacyCover(dataUrl: string): Promise<CachedCover> {
     if (!dataUrl.startsWith("data:")) {
         return { originalPath: dataUrl, thumbnailPath: dataUrl }

@@ -1,10 +1,10 @@
-/** 网易云 API 设置：模式 + 外部源；单一 localStorage 真相源 */
+// 单一 localStorage 真相源
 
 const SETTINGS_KEY = "musicstorm-api-settings"
 const LEGACY_BASE_URL_KEY = "musicstorm-netease-base-url"
 const LEGACY_PRESET_KEY = "musicstorm-netease-base-preset"
 
-/** 官方源常量，自定义空值与集成降级回落 */
+// 自定义空值与集成降级回落
 const DEFAULT_BASE_URL = "https://cloud-music-api.miomoe.cn"
 
 const EXTERNAL_SOURCES = [
@@ -187,7 +187,7 @@ function setIntegratedBaseUrl(_url: string): ApiSettings {
     return setApiSettings({})
 }
 
-/** 当前请求应使用的 base URL；内置模式返回 native 标记作缓存键，非真实 HTTP */
+// 内置模式返回 native 标记作缓存键，非真实 HTTP
 function resolveEffectiveBaseUrl(settings: ApiSettings = readRaw()): string {
     if (settings.mode === "integrated") {
         return "native://musicstorm"

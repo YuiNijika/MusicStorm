@@ -107,13 +107,11 @@ function useRailApi() {
 
 type CardsRailProps = {
     children: ReactNode
-    /** 卡宽；默认固定 152 */
     cardWidthClassName?: string
     className?: string
     setApi?: (api: CarouselApi | undefined) => void
 }
 
-/** 单行卡片横滑，为你推荐与播客 */
 function CardsRail({
     children,
     cardWidthClassName = "w-[152px]",
@@ -151,7 +149,6 @@ type GridPageRailProps<T> = {
     setApi?: (api: CarouselApi | undefined) => void
 }
 
-/** 每页 cols 张的分页横滑，更多歌单 */
 function GridPageRail<T>({
     items,
     cols,

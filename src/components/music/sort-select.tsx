@@ -16,12 +16,10 @@ type SortSelectProps<T extends string> = {
     value: T
     options: ReadonlyArray<SortOption<T>>
     onChange: (value: T) => void
-    /** 无障碍 / 占位前缀 */
     label?: string
     className?: string
 }
 
-/** 紧凑排序下拉，挂 Section / 标题右侧 */
 function SortSelect<T extends string>({
     value,
     options,

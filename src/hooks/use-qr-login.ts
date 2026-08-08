@@ -10,7 +10,6 @@ type QrUiState =
     | { kind: "waiting"; qrimg: string; hint: string }
     | { kind: "error"; message: string }
 
-/** 扫码登录轮询；成功后调用 onSuccess */
 function useQrLogin(onSuccess: () => void | Promise<void>) {
     const [qrState, setQrState] = useState<QrUiState>({ kind: "idle" })
     const pollKeyRef = useRef<string | null>(null)

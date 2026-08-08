@@ -45,7 +45,7 @@ const UA_WEAPI =
 /** eapi UA：对齐 CloudMusicAPI chooseUserAgent('api','iphone') 非 osx 时 eapi 默认就是这条，外置扫码能过 */
 const UA_EAPI_IPHONE = "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)"
 
-/** 桌面 eapi 备用 部分非登录接口 */
+// 部分非登录接口
 const UA_EAPI_PC = `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/${DESKTOP_UA_APPVER}`
 
 type Query = Record<string, string | number | boolean | undefined>
@@ -289,7 +289,6 @@ async function nativeNeteaseRequest<T>(
         return parseProxyBody<T>(path, responseEapi)
     }
 
-    // 非 eapi 的明文请求：走常规表单 POST
     const response = await proxyPost({
         url: `${DOMAIN}${spec.uri}`,
         body: formBody(

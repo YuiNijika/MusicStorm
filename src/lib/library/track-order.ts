@@ -1,4 +1,3 @@
-/** 自定义曲目顺序：本地专辑 / 全部 / 网易云歌单 */
 
 const LOCAL_ORDER_KEY = "musicstorm.local.track-order"
 const PLAYLIST_ORDER_KEY = "musicstorm.playlist.track-order"

@@ -9,7 +9,7 @@ type LikeData = {
     code?: number
 }
 
-/** 已红心歌曲 id 列表 */
+
 async function fetchLikelist(uid: number): Promise<string[]> {
     const data = await neteaseRequest<LikelistData>({
         path: NETEASE_PATHS.likelist,
@@ -21,11 +21,7 @@ async function fetchLikelist(uid: number): Promise<string[]> {
     return (data.ids ?? []).map(String)
 }
 
-/**
- * 喜欢 / 取消喜欢
- * @param trackId 网易云数字 id 字符串
- * @param like true=红心 false=取消
- */
+
 async function setTrackLiked(trackId: string, like: boolean): Promise<void> {
     const data = await neteaseRequest<LikeData>({
         path: NETEASE_PATHS.like,

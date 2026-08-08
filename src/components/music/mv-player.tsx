@@ -48,7 +48,6 @@ function MvPlayer({ url, poster }: MvPlayerProps) {
                     } else if (
                         video.canPlayType("application/vnd.apple.mpegurl")
                     ) {
-                        // Safari 原生 HLS
                         video.src = src
                     } else {
                         player.notice.show = "当前环境不支持 HLS 播放"

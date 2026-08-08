@@ -8,12 +8,9 @@ type NeteaseCredentials = {
     csrf: string | null
 }
 
-/**
- * 写入登录 cookie。
- * 兼容两种上游格式：
- * - CloudMusicAPI / 外部源：`a=1;;b=2`，双分号分隔整条 Set-Cookie
- * - 仅 `;` 分隔的 `name=value` 列表
- */
+// 兼容两种上游格式：
+// - CloudMusicAPI / 外部源：`a=1;;b=2`，双分号分隔整条 Set-Cookie
+// - 仅 `;` 分隔的 `name=value` 列表
 function setCookiesFromApi(cookieString: string): void {
     const raw = cookieString.trim()
     if (!raw) {
@@ -93,7 +90,6 @@ function snapshotNeteaseCredentials(): NeteaseCredentials | null {
     }
 }
 
-/** 恢复某账号凭证为当前会话 */
 function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     try {
         document.cookie = `MUSIC_U=${credentials.musicU}`
@@ -114,7 +110,6 @@ function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     }
 }
 
-/** 拼给 API 的 cookie 参数 */
 function getNeteaseCookieParam(): string | undefined {
     const musicU = getCookie("MUSIC_U")
     if (!musicU) {

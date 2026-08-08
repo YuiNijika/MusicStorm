@@ -62,7 +62,6 @@ function SearchPage() {
 
     const localCatalog = useMemo(() => listLocalPlayableTracks(), [])
 
-    // 本地：输入即过滤
     const localResults = useMemo(() => {
         const keyword = query.trim().toLowerCase()
         if (!keyword) {
@@ -191,7 +190,7 @@ function SearchPage() {
             return
         }
 
-        // 本地：即时过滤已生效；按钮/回车给出一次明确反馈
+        // 本地即时过滤已生效；按钮/回车给出明确反馈
         if (!keyword) {
             notifyInfo("输入关键词筛选本地", {
                 description: `资料库共 ${localCatalog.length} 首`,
@@ -229,13 +228,11 @@ function SearchPage() {
             window.removeEventListener(SEARCH_HISTORY_EVENT, onHistory)
     }, [])
 
-    /** 点击历史词：填充输入并立即搜索 */
     function runHistorySearch(keyword: string) {
         setQuery(keyword)
         if (mode === "netease") {
             setSubmittedQuery(keyword)
         }
-        // 本地模式随 query 即时过滤
         setInputFocused(false)
     }
 

@@ -81,7 +81,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 paddingBottom: "env(safe-area-inset-bottom)",
             }}
         >
-            {/* 移动端：两行紧凑（信息行 + 控制行）；桌面：三列完整布局 */}
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2 md:h-[84px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center md:gap-4 md:px-4 md:py-0">
                 <div className="flex min-w-0 items-center gap-3 md:col-span-1">
                     {currentTrack ? (
@@ -185,7 +184,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                     )}
                 </div>
 
-                {/* 移动端：仅显示切歌与播放核心；桌面完整控制 */}
                 <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
                     <div className="flex items-center gap-1">
                         <span className="md:hidden" aria-hidden />
@@ -244,7 +242,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                         </ControlButton>
                     </div>
 
-                    {/* 进度条：移动端置于播放条第一行下方，跨整行 */}
                     <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
                         <SeekElasticSlider
                             positionMs={positionMs}

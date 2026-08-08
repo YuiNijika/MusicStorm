@@ -60,7 +60,6 @@ function notifyError(title: string, options: NotifyOptions = {}): string {
     })
 }
 
-/** 失败场景：标题 + 错误详情 */
 function notifyFromError(
     title: string,
     error: unknown,

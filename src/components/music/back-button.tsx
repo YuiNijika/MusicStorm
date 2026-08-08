@@ -2,7 +2,6 @@ import { ChevronLeft } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/** 详情页返回：轻量胶囊，Apple 导航习惯 */
 function BackButton({
     onClick,
     label = "返回",

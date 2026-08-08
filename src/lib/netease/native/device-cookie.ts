@@ -9,7 +9,6 @@ import CryptoJS from "crypto-js"
 
 /** CloudMusicAPI osMap.pc.appver — 与 eapi 登录链路一致 */
 const PC_APPVER = "3.1.17.204416"
-/** UA 里桌面版号（userAgentMap.api.pc） */
 const DESKTOP_UA_APPVER = "3.1.29.205117"
 
 const DEVICE_ID_KEY = "netease-device-id"
@@ -223,7 +222,6 @@ function cookieHeader(jar: Record<string, string>): string {
         .join("; ")
 }
 
-/** eapi createHeaderCookie */
 function eapiHeaderCookie(header: Record<string, string>): string {
     return Object.entries(header)
         .map(

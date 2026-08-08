@@ -16,11 +16,9 @@ import { cn } from "@/lib/utils"
 type LyricsAlign = "left" | "center" | "right"
 
 type LyricsViewProps = {
-    /** compact 底栏条，full 全屏右栏 */
     variant?: "compact" | "full"
     /** false 时不拉接口，用于面板关闭 */
     active?: boolean
-    /** 歌词行对齐，默认 left */
     align?: LyricsAlign
     className?: string
     listClassName?: string
@@ -32,14 +30,12 @@ function isTauriRuntime(): boolean {
 
 /** 任一步得到非空行即返回；空则继续下一条源 */
 async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
-    // 扫描写入的短文本
     if (track.lyricText?.trim()) {
         const lines = parseLyricText(track.lyricText)
         if (lines.length > 0) {
             return lines
         }
     }
-    // sidecar / 缓存路径
     if (track.lrcPath && isTauriRuntime()) {
         try {
             const text = await invoke<string>("read_text_file", {
@@ -50,10 +46,8 @@ async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
                 return lines
             }
         } catch {
-            // fall through
         }
     }
-    // 同目录同名 .lrc
     if (track.filePath && isTauriRuntime()) {
         for (const path of sidecarLrcCandidates(track.filePath)) {
             try {
@@ -63,7 +57,6 @@ async function loadLocalLyricLines(track: Track): Promise<LyricLine[]> {
                     return lines
                 }
             } catch {
-                // try next
             }
         }
     }

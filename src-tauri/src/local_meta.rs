@@ -28,7 +28,6 @@ pub struct FileMeta {
     pub lrc_path: Option<String>,
 }
 
-/// covers_dir 与 lyrics_dir 均为 cache 下子目录
 pub fn read_audio_meta(path: &Path, covers_dir: &Path, lyrics_dir: &Path) -> FileMeta {
     let mut meta = FileMeta::default();
 
@@ -129,11 +128,11 @@ fn is_cjk_char(c: char) -> bool {
     )
 }
 
-/// 修复「按 ISO-8859-1 误读」的标签文本
-/// 大量中文 MP3 的 ID3v2.3 标签把 GBK / UTF-8 字节声明为 ISO-8859-1，
-/// lofty 会逐字节映射成 U+0080..U+00FF 字符造成乱码
-/// 启发式：整串落在 Latin-1 范围且含高字节 → 还原字节 → 先试 UTF-8 再试 GB18030，
-/// 仅当还原结果包含 CJK 字符（或消除了替换符）时采用
+// 修复「按 ISO-8859-1 误读」的标签文本
+// 大量中文 MP3 的 ID3v2.3 标签把 GBK / UTF-8 字节声明为 ISO-8859-1，
+// lofty 会逐字节映射成 U+0080..U+00FF 字符造成乱码
+// 启发式：整串落在 Latin-1 范围且含高字节 → 还原字节 → 先试 UTF-8 再试 GB18030，
+// 仅当还原结果包含 CJK 字符（或消除了替换符）时采用
 fn fix_tag_text(raw: &str) -> String {
     if raw.is_empty() || raw.contains('\u{FFFD}') {
         return raw.to_string();
@@ -316,7 +315,6 @@ fn path_hash(path: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// 按 UTF-8、BOM、UTF-16、GB18030 解码歌词文本
 pub fn decode_text_bytes(data: &[u8]) -> Option<String> {
     if data.is_empty() || data.len() > 1024 * 1024 {
         return None;

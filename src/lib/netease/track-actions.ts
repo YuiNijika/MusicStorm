@@ -10,7 +10,6 @@ function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-/** 从歌单移除歌曲 op=del */
 async function removeTracksFromPlaylist(
     playlistId: string,
     trackIds: string[],

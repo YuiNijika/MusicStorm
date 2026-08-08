@@ -95,7 +95,6 @@ function TrackListSkeleton({
     )
 }
 
-/** 详情页顶栏：封面 + 文案骨架 */
 function DetailHeroSkeleton({
     coverShape = "rounded",
 }: {
@@ -119,7 +118,6 @@ function DetailHeroSkeleton({
     )
 }
 
-/** 歌手 / 专辑 / 歌单详情整页骨架 */
 function DetailPageSkeleton({
     coverShape = "rounded",
 }: {
@@ -136,7 +134,6 @@ function DetailPageSkeleton({
     )
 }
 
-/** 首页每日推荐三栏骨架 */
 function DailyColumnsSkeleton({ columns = 3 }: { columns?: number }) {
     return (
         <div
@@ -189,7 +186,6 @@ function SearchResultsSkeleton() {
     return <TrackListSkeleton count={8} />
 }
 
-/** 统计页骨架 */
 function StatsPageSkeleton() {
     return (
         <div className="space-y-11" aria-busy aria-label="加载中">
@@ -243,7 +239,6 @@ function StatsPageSkeleton() {
     )
 }
 
-/** 歌单详情骨架：标签条 + 大标题 + 描述 + 播放按钮 + 带序号曲目 */
 function PlaylistDetailSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="歌单加载中">
@@ -267,7 +262,6 @@ function PlaylistDetailSkeleton() {
     )
 }
 
-/** 专辑详情骨架：封面 + 专辑标签 + 标题 + 歌手年份 + 播放按钮 + 曲目 */
 function AlbumDetailSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="专辑加载中">
@@ -288,7 +282,6 @@ function AlbumDetailSkeleton() {
     )
 }
 
-/** 歌手详情骨架：圆形头像 + 名字 + 统计 + Tab 条 + 热门曲目 + 专辑网格 */
 function ArtistDetailSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="歌手加载中">
@@ -318,7 +311,6 @@ function ArtistDetailSkeleton() {
     )
 }
 
-/** 电台详情骨架：封面 + 电台标签 + 标题 + DJ 信息 + 简介 + 按钮 + 曲目 */
 function RadioDetailSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="电台加载中">
@@ -343,7 +335,6 @@ function RadioDetailSkeleton() {
     )
 }
 
-/** 电台节目骨架：大封面 + 节目标签 + 标题 + 电台/时长 + 多行简介 + 播放按钮 + 曲目 */
 function RadioProgramDetailSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="电台节目加载中">
@@ -377,7 +368,6 @@ function RadioProgramDetailSkeleton() {
     )
 }
 
-/** MV 详情骨架：16:9 视频块 + 小封面 + 标签 + 标题 + 歌手 */
 function MvDetailSkeleton() {
     return (
         <div className="space-y-5" aria-busy aria-label="MV 加载中">
@@ -394,7 +384,6 @@ function MvDetailSkeleton() {
     )
 }
 
-/** 本地音乐骨架：标题 + 工具栏 + 专辑网格 */
 function LocalPageSkeleton() {
     return (
         <div className="space-y-6" aria-busy aria-label="本地音乐加载中">
@@ -413,7 +402,6 @@ function LocalPageSkeleton() {
     )
 }
 
-/** 电台列表骨架：订阅 + 发现两段网格 */
 function RadiosPageSkeleton() {
     return (
         <div className="space-y-7" aria-busy aria-label="电台列表加载中">
@@ -436,7 +424,6 @@ function RadiosPageSkeleton() {
     )
 }
 
-/** 设置页骨架：左侧 tab 列表 + 右侧内容区 */
 function SettingsPageSkeleton() {
     return (
         <div className="flex gap-10" aria-busy aria-label="设置加载中">

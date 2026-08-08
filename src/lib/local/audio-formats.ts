@@ -95,7 +95,6 @@ function extensionOf(pathOrName: string): string {
     return base.slice(dot + 1).toLowerCase()
 }
 
-/** 去掉已知音频后缀；已是无后缀名则原样返回 */
 function stripExtension(nameOrPath: string): string {
     const base = nameOrPath.split(/[/\\]/).pop() ?? nameOrPath
     const dot = base.lastIndexOf(".")
@@ -114,7 +113,7 @@ function isLocalAudioExt(ext: string): boolean {
     return LOCAL_AUDIO_EXT_SET.has(ext.trim().toLowerCase())
 }
 
-/** 路径取无扩展名文件名，供统计归类 */
+// 供统计归类
 function fileStemFromPath(path: string | null | undefined): string | null {
     if (!path) {
         return null

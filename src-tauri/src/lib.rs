@@ -1,4 +1,3 @@
-// 本地扫描 / 存储 / 播放 / 网易云代理入口
 #[cfg(not(target_os = "android"))]
 mod audio;
 mod cover_cache;
@@ -38,15 +37,10 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
 const AUDIO_EXTS: &[&str] = &[
-    // 常用
     "mp3", "wav", "aac", "m4a", "flac", "ogg", "wma",
-    // 无损与高保真，diff 与 dff 均收录
     "aif", "aiff", "ape", "alac", "wv", "dsf", "dff", "diff", "tta",
-    // 有损
     "mp2", "mp1", "ra", "rm", "ram", "m4p", "opus",
-    // 模块与合成
     "mid", "midi", "mod", "xm", "s3m", "it",
-    // 其他
     "au", "voc", "cda", "amr", "gsm", "raw", "pcm", "mpga", "3gp", "3g2",
 ];
 const MAX_TRACKS: usize = 2_000;
@@ -77,9 +71,7 @@ struct LocalScanTrack {
     content_hash: Option<String>,
 }
 
-/// 打开 WebView DevTools。
-/// release 构建默认禁用 devtools：open_devtools 仅 debug 构建实际生效，
-/// 避免 WebView2 原生 F12 / 右键「检查」绕过前端开关。
+// release 构建仅 debug 实际生效，避免 WebView2 原生 F12 绕过前端开关
 #[tauri::command]
 fn open_devtools(app: AppHandle) -> Result<(), String> {
     #[cfg(debug_assertions)]
@@ -93,8 +85,7 @@ fn open_devtools(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 系统文件夹选择器；取消时返回 null。
-/// Android 无桌面文件对话框（走 SAF），此命令仅桌面端注册。
+// Android 无桌面文件对话框（走 SAF），此命令仅桌面端注册
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_music_folder() -> Result<Option<String>, String> {
@@ -104,7 +95,6 @@ fn pick_music_folder() -> Result<Option<String>, String> {
     Ok(folder.map(|path| path.to_string_lossy().into_owned()))
 }
 
-/// 多选音频文件；取消时返回 null。仅桌面端。
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_music_files() -> Result<Option<Vec<String>>, String> {
@@ -120,7 +110,6 @@ fn pick_music_files() -> Result<Option<Vec<String>>, String> {
     }))
 }
 
-/// 选择本地封面图片并返回 data URL。仅桌面端。
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_image_as_base64() -> Result<Option<String>, String> {
@@ -135,7 +124,6 @@ fn pick_image_as_base64() -> Result<Option<String>, String> {
     Ok(Some(read_image_as_data_url(&path)?))
 }
 
-/// 选择 .lrc / 文本并返回全文。仅桌面端。
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn pick_text_file() -> Result<Option<String>, String> {
@@ -149,7 +137,7 @@ fn pick_text_file() -> Result<Option<String>, String> {
     Ok(Some(read_text_file(path.to_string_lossy().into_owned())?))
 }
 
-/// 下载远程 URL 到用户选择的保存路径。仅桌面端（Android 用系统下载器）。
+// Android 用系统下载器，此命令仅桌面端注册
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>, String> {
@@ -227,7 +215,6 @@ fn read_image_as_data_url(path: &Path) -> Result<String, String> {
     Ok(format!("data:{mime_type};base64,{b64}"))
 }
 
-/// 读取本地文本，兼容 BOM 与常见编码
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     let path = PathBuf::from(path.trim());
@@ -238,7 +225,6 @@ fn read_text_file(path: String) -> Result<String, String> {
     local_meta::decode_text_bytes(&data).ok_or_else(|| "歌词文件为空或编码不受支持".into())
 }
 
-/// 递归扫描音频：先收集路径，再用有界线程池并行读取元数据
 #[tauri::command]
 async fn scan_music_folder(
     app: AppHandle,
@@ -265,7 +251,6 @@ async fn scan_music_folder(
     .map_err(|error| format!("扫描任务失败: {error}"))?
 }
 
-/// 扫描指定音频文件列表（不限同一文件夹）
 #[tauri::command]
 async fn scan_music_files(
     app: AppHandle,
@@ -310,8 +295,6 @@ struct ArtistScanResult {
     tracks: Vec<LocalScanTrack>,
 }
 
-/// 艺人文件夹扫描：直接子文件夹 = 专辑，根目录散曲归入全部歌曲
-/// 一次收集所有音频路径，复用并行扫描池
 #[tauri::command]
 async fn scan_music_artist_folder(
     app: AppHandle,
@@ -414,7 +397,6 @@ struct ScanProgressPayload {
     current_path: String,
 }
 
-/// 向主窗口广播扫描进度；失败静默（如窗口未就绪）
 fn emit_scan_progress(app: &AppHandle, done: usize, total: usize, current_path: &str) {
     let _ = app.emit(
         "musicstorm:scan-progress",
@@ -532,7 +514,6 @@ fn is_audio_file(path: &Path) -> bool {
             .is_some_and(|extension| AUDIO_EXTS.contains(&extension.as_str()))
 }
 
-/// 单文件 → LocalScanTrack；非音频或失败返回 None
 fn scan_audio_file(
     path: &Path,
     album_root: &Path,
@@ -626,10 +607,10 @@ fn parse_filename(stem: &str) -> (String, String) {
     ("未知艺人".into(), stem.trim().to_string())
 }
 
-/// 版本升级时清理 WebView2 可再生缓存（磁盘缓存 / JS 编译缓存 / GPU 缓存 / Service Worker）。
-/// 保留 Local Storage / Cookies / Network —— 网易云登录态依赖它们。
-/// 同版本重复启动不清理；升级或首次安装（无记录）才触发一次。
-/// 在后台线程执行，不阻塞首帧。仅 Windows WebView2。
+// 版本升级时清理 WebView2 可再生缓存（磁盘缓存 / JS 编译缓存 / GPU 缓存 / Service Worker）。
+// 保留 Local Storage / Cookies / Network —— 网易云登录态依赖它们。
+// 同版本重复启动不清理；升级或首次安装（无记录）才触发一次。
+// 在后台线程执行，不阻塞首帧。仅 Windows WebView2。
 #[cfg(not(target_os = "android"))]
 fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
     // 版本以 tauri.conf.json 为准（用户可见版本号），不用 Cargo.toml 的
@@ -685,7 +666,7 @@ fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
     Ok(removed)
 }
 
-/// 后台清理过期 API 缓存；开独立连接避免锁主线程 DB
+// 开独立连接避免锁主线程 DB
 fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String> {
     let conn = open_db(app)?;
     purge_expired_api_cache(app, &conn)

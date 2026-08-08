@@ -1,7 +1,3 @@
-/**
- * 搜索历史：localStorage 持久化，最多保留 12 条，同词去重并置顶
- */
-
 const HISTORY_KEY = "musicstorm-search-history"
 const MAX_ITEMS = 12
 
@@ -39,7 +35,6 @@ function writeHistory(items: string[]): void {
     window.dispatchEvent(new CustomEvent(SEARCH_HISTORY_EVENT))
 }
 
-/** 记录一次搜索：非空、去重、置顶、截断 */
 export function addSearchHistory(keyword: string): void {
     const clean = keyword.trim()
     if (!clean) {

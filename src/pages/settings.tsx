@@ -153,7 +153,6 @@ const TABS: { id: SettingsTab; label: string }[] = [
 type SettingsPageProps = {
     titleBarStyle: TitleBarStyle
     onTitleBarStyleChange: (style: TitleBarStyle) => void
-    /** 从标题栏 NEW 等入口跳入指定 tab */
     initialTab?: SettingsTab
 }
 
@@ -192,7 +191,6 @@ function SettingsPage({
                 ))}
             </div>
 
-            {/* tab 切换：材料化过渡（淡入 + 轻微上移 + 优雅缓动），非生硬 fade */}
             <div
                 key={tab}
                 className="animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-out"
@@ -490,7 +488,6 @@ function formatSettingsError(error: unknown): string {
     return "未知错误"
 }
 
-/** 清空封面缓存前收集仍在引用的内容 MD5（本地库专辑/艺人封面 + 歌曲封面覆盖） */
 function collectCoverKeepHashes(): string[] {
     const hashes = new Set<string>()
     try {
@@ -1060,7 +1057,7 @@ function AppearanceTab({
     const customActive = appearance.accent === "custom"
     const { playlistView, playlistTracksView } = useLibraryLayout()
 
-    // 性能模式开启时毛玻璃强制关闭（其他 tab 开关同步禁用）
+    // 毛玻璃由性能模式联动控制：开启时强制关闭、关闭时恢复记忆状态
     useEffect(() => {
         function onPerformance() {
             setPerformanceModeState(getPerformanceMode())

@@ -18,7 +18,7 @@ type MusicNavigationValue = {
     openRadio: (id: string) => void
     openRadioProgram: (programId: string, radioId?: string) => void
     openMv: (id: string) => void
-    /** 返回上一层；栈空则关闭详情 */
+    /** 返回上一层；无更多历史时关闭详情 */
     back: () => void
     /** 清空详情栈，侧栏切页时用 */
     closeDetail: () => void

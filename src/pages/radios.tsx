@@ -171,7 +171,6 @@ function RadiosPage() {
     const { radioSort, radioView } = useLibraryLayout()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
 
-    /** 播放电台：拉取节目列表，播放最新一期 */
     const playRadio = useCallback(async (radio: Radio) => {
         try {
             const queue = await fetchDjPrograms(radio.id)

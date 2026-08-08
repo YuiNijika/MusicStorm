@@ -7,11 +7,9 @@ type ViewModeToggleProps = {
     value: ViewMode
     onChange: (mode: ViewMode) => void
     className?: string
-    /** 无障碍标签前缀 */
     label?: string
 }
 
-/** Apple 风格 卡片/列表 分段控件，挂标题右侧 */
 function ViewModeToggle({
     value,
     onChange,

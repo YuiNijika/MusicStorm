@@ -183,7 +183,6 @@ function getSessionRealIp(): string {
     return sessionRealIp
 }
 
-/** 测试或强制刷新会话 IP */
 function resetSessionRealIp(): string {
     sessionRealIp = null
     return getSessionRealIp()

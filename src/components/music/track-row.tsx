@@ -71,26 +71,22 @@ import { cn } from "@/lib/utils"
 type TrackRowProps = {
     track: Track
     index?: number
-    /** 拖拽手柄等前缀 */
     leading?: ReactNode
     isActive?: boolean
     isPlaying?: boolean
     showSource?: boolean
-    /** 独立专辑列，默认 netease 开 */
     showAlbumColumn?: boolean
     /**
      * 是否展示专辑名。
      * 首页三栏等窄布局应 false。
      */
     showAlbumMeta?: boolean
-    /** 喜欢与更多菜单，默认 netease 开，local 为元数据菜单 */
     showActions?: boolean
     /** 更紧凑的 padding 与字号，首页三栏 */
     dense?: boolean
     /** 传入时可从歌单移除 */
     playlistId?: string
     onRemoved?: (trackId: string) => void
-    /** 右侧附加信息（例如统计页播放次数） */
     trailing?: ReactNode
     onPlay: (track: Track) => void
 }

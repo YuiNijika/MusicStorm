@@ -14,8 +14,7 @@ const THUMBNAIL_SIZE: u32 = 192;
 const MAX_COVER_FILES: usize = 4_000;
 const MAX_COVER_DIR_BYTES: u64 = 400 * 1024 * 1024;
 
-/// 清理封面缓存：超出数量/大小上限时删除最旧文件（原图 + 缩略图）。
-/// 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积。
+// 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积
 pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -151,8 +150,8 @@ fn cache_cover_bytes_in_dirs(
     })
 }
 
-/// 清空封面缓存（原图 + 缩略图）；被 keep_hashes（仍在引用的内容 MD5）命中的文件保留，
-/// 避免清掉本地音乐补全/设置的封面。磁盘空间即刻回收，未保留的封面下次访问时重新生成。
+// 被 keep_hashes（仍在引用的内容 MD5）命中的文件保留，避免清掉本地音乐补全/设置的封面。
+// 磁盘空间即刻回收，未保留的封面下次访问时重新生成。
 #[tauri::command]
 pub fn clear_cover_cache(app: AppHandle, keep_hashes: Vec<String>) -> Result<(), String> {
     let keep: std::collections::HashSet<&str> =

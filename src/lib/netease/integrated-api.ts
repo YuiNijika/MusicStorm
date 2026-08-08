@@ -1,4 +1,3 @@
-/** 内置 API 运行时状态 */
 
 import { getApiSettings } from "@/lib/netease/api-settings"
 import { isTauriRuntime, nativeNeteaseRequest } from "@/lib/netease/native/request"
@@ -10,7 +9,6 @@ export type IntegratedApiStatus = {
     message: string
 }
 
-/** 探测内置运行时是否可用，桌面端 */
 async function probeNativeApi(): Promise<IntegratedApiStatus> {
     if (!isTauriRuntime()) {
         return {

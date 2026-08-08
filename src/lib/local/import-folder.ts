@@ -29,7 +29,6 @@ async function pickMusicFolder(): Promise<string | null> {
     return invoke<string | null>("pick_music_folder")
 }
 
-/** 多选音频；取消 null */
 async function pickMusicFiles(): Promise<string[] | null> {
     if (!isTauriRuntime()) {
         throw new Error("DESKTOP_ONLY")
@@ -67,7 +66,6 @@ async function scanMusicArtistFolder(path: string): Promise<ArtistScanResultDto>
     return invoke<ArtistScanResultDto>("scan_music_artist_folder", { path })
 }
 
-/** 路径前缀匹配：filePath 以 folderPath 开头且不在更深层其他组内 */
 function pathBelongsToFolder(filePath: string, folderPath: string): boolean {
     const file = filePath.replace(/\\/g, "/")
     const folder = folderPath.replace(/\\/g, "/").replace(/\/+$/, "")

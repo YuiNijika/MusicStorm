@@ -1,17 +1,13 @@
-/** 网易云 API 缓存 TTL + 自动清理配置 */
-
 const TTL_STORAGE_KEY = "musicstorm-api-cache-ttl-ms"
 const TTL_EVENT = "musicstorm:api-cache-ttl"
 
 const AUTO_PURGE_KEY = "musicstorm-api-cache-auto-purge"
 const AUTO_PURGE_EVENT = "musicstorm:api-cache-auto-purge"
 
-/** 默认 5 分钟 */
 const DEFAULT_TTL_MS = 5 * 60 * 1000
 const TTL_MIN_MS = 30 * 1000
 const TTL_MAX_MS = 24 * 60 * 60 * 1000
 
-/** 定时清理最小/最大间隔 */
 const PURGE_INTERVAL_MIN_MS = 30_000
 const PURGE_INTERVAL_MAX_MS = 5 * 60_000
 
@@ -55,7 +51,6 @@ function setApiCacheTtlMs(ms: number): void {
     window.dispatchEvent(new CustomEvent(TTL_EVENT))
 }
 
-/** 默认开启：过期后自动删除 */
 function getApiCacheAutoPurge(): boolean {
     if (typeof window === "undefined") {
         return true

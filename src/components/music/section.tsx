@@ -8,7 +8,6 @@ type SectionProps = {
     action?: ReactNode
     children: ReactNode
     className?: string
-    /** Apple Music：分区标题更紧、可横向滚动 */
     variant?: "default" | "listen"
 }
 

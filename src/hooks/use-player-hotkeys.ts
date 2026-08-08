@@ -19,7 +19,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 }
 
-/** 全局播放快捷键（可自定义）：空格 / 方向键 / [ ] 音量 */
 function usePlayerHotkeys() {
     const {
         currentTrack,

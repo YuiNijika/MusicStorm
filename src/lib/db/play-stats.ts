@@ -74,7 +74,6 @@ type ListenSourceStat = {
     totalMs: number
 }
 
-/** 后端按 track_id 聚合的一行 */
 type TopTrackStat = {
     trackId: string
     source: string
@@ -106,7 +105,6 @@ type TopTrackCluster = {
     members: TopTrackStat[]
 }
 
-/** 路径或旧库带后缀名转为无扩展名归类键 */
 function fileBaseName(path: string | null | undefined): string | null {
     if (!path) {
         return null
@@ -301,7 +299,6 @@ function clusterTopTracks(rows: TopTrackStat[]): TopTrackCluster[] {
     return clusters
 }
 
-/** 统计行 → 可播放 Track */
 function clusterToTrack(cluster: TopTrackCluster): Track {
     const primary = cluster.members[0]
     const source = (cluster.source === "local" ? "local" : "netease") as MusicSource

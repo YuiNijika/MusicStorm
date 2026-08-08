@@ -67,7 +67,6 @@ fn emit_command(app: &AppHandle, command: &str) {
     let _ = app.emit(PLAYER_COMMAND_EVENT, command);
 }
 
-/// 读取已保存的快捷键配置；无配置时返回默认
 fn load_config(app: &AppHandle) -> ShortcutConfig {
     if let Ok(conn) = crate::db::open_db(app) {
         let stored: Option<String> = conn
@@ -90,7 +89,6 @@ fn load_config(app: &AppHandle) -> ShortcutConfig {
     }
 }
 
-/// 持久化配置到 DB（失败不阻断当前会话）
 fn persist_config(app: &AppHandle, config: &ShortcutConfig) {
     if let Ok(conn) = crate::db::open_db(app) {
         if let Ok(json) = serde_json::to_string(config) {
@@ -103,7 +101,6 @@ fn persist_config(app: &AppHandle, config: &ShortcutConfig) {
     }
 }
 
-/// 启动时注册已配置的全局快捷键
 pub fn setup_global_shortcuts(app: &AppHandle) -> Result<(), String> {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
@@ -133,8 +130,6 @@ pub fn setup_global_shortcuts(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 更新单个动作的全局快捷键：注销旧 → 注册新 → 写 DB。
-/// 返回前端用于提示的错误；combo 为空串视为「不设置」。
 #[tauri::command]
 pub fn update_global_shortcut(
     app: AppHandle,
@@ -189,7 +184,6 @@ pub fn update_global_shortcut(
     Ok(())
 }
 
-/// 构建托盘：左键单击显示主窗口，右键菜单含播放控制与退出
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
     let play_pause =

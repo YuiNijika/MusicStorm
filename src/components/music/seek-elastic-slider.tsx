@@ -10,7 +10,6 @@ type SeekElasticSliderProps = {
     onSeek: (ms: number) => void
     disabled?: boolean
     className?: string
-    /** 两侧时间文案，默认开启 */
     showTime?: boolean
 }
 

@@ -3,7 +3,6 @@ import type { ReactNode } from "react"
 import { Cover } from "@/components/music/cover"
 import { cn } from "@/lib/utils"
 
-/** Apple Music 专辑/歌单卡片：封面主导 + 两行文案 */
 type MediaCardProps = {
     coverUrl: string
     title: string

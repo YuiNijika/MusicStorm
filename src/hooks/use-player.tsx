@@ -51,9 +51,7 @@ type PlayerContextValue = PlayerSnapshot & {
     playNext: (track: Track) => void
     /** 追加到队列末尾（不打断当前播放） */
     addToQueue: (track: Track) => void
-    /** 移除队列指定索引 */
     removeFromQueue: (index: number) => void
-    /** 跳转到队列指定索引播放 */
     jumpTo: (index: number) => void
     /** 队列内拖动排序 */
     reorderQueue: (from: number, to: number) => void
@@ -246,7 +244,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             window.removeEventListener(LOCAL_LIBRARY_EVENT, refreshLocalQueueMetadata)
     }, [])
 
-    // 播放会话落盘，进度节流
     useEffect(() => {
         if (queue.length === 0 || currentIndex < 0) {
             return
@@ -442,7 +439,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         activeRef.current?.seek(0)
     }, [hardStopEngines])
 
-    // 引擎初始化
     useEffect(() => {
         function onPrefChange() {
             setEngineEpoch((value) => value + 1)
@@ -1182,7 +1178,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
     }, [])
 
-    /** 跳转到队列指定索引播放 */
     const jumpTo = useCallback((index: number) => {
         const list = queueRef.current
         if (index < 0 || index >= list.length) {
@@ -1224,7 +1219,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setCurrentIndex(newIndex)
     }, [])
 
-    /** 清空整个队列并停止播放 */
     const clearQueue = useCallback(() => {
         loadedTrackIdRef.current = null
         mediaReadyRef.current = false

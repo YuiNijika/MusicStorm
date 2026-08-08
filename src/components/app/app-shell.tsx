@@ -33,21 +33,17 @@ function AppShell({
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
-            {/* 桌面端：标题栏 + 侧边栏布局 */}
             <div className="hidden md:block">
                 <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
             </div>
 
-            {/* 移动端顶部导航：Apple Music 风格 tab（毛玻璃 + safe-area-top） */}
             <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
 
             <div className="flex min-h-0 flex-1">
-                {/* 桌面端侧边栏 */}
                 <div className="hidden md:block">
                     <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
                 </div>
 
-                {/* 主内容区：移动端在毛玻璃导航栏下方自然排列，桌面端在侧边栏右侧 */}
                 <main className="apple-scroll min-w-0 flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-8 md:pb-10 lg:px-10">
                         {children}

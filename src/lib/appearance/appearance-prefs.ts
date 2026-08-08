@@ -124,7 +124,6 @@ function writeAppearancePrefs(prefs: AppearancePrefs): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
 }
 
-/** 当前生效的色相角 */
 function resolveAccentHue(prefs: AppearancePrefs): number {
     if (prefs.accent === "custom") {
         return normalizeHue(prefs.customHue)

@@ -4,7 +4,6 @@ import { ElasticSlider } from "@/components/ui/elastic-slider"
 import { cn } from "@/lib/utils"
 
 type VolumeElasticSliderProps = {
-    /** 0–1 */
     volume: number
     muted?: boolean
     onVolume: (volume: number) => void
@@ -13,7 +12,6 @@ type VolumeElasticSliderProps = {
     compact?: boolean
     fluid?: boolean
     showValue?: boolean
-    /** 是否显示左右音量图标 */
     showIcons?: boolean
 }
 
