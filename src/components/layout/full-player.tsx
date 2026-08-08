@@ -36,6 +36,7 @@ import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { useWindowControls } from "@/hooks/use-window-controls"
 import {
     QUALITY_OPTIONS,
     getNeteaseQualityBr,
@@ -103,6 +104,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         cycleRepeat,
         reloadCurrent,
     } = usePlayer()
+    const { startDragging } = useWindowControls()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
@@ -584,7 +586,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)",
                     }}
                 >
-                    <div className="mx-auto flex max-w-3xl flex-col gap-2.5">
+                    <div className="mx-auto flex w-full max-w-[min(92vw,1100px)] flex-col gap-2.5">
                         {progressRow}
                         {transport}
                     </div>

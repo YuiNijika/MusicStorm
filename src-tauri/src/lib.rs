@@ -74,14 +74,9 @@ struct LocalScanTrack {
 // release 构建仅 debug 实际生效，避免 WebView2 原生 F12 绕过前端开关
 #[tauri::command]
 fn open_devtools(app: AppHandle) -> Result<(), String> {
-    #[cfg(debug_assertions)]
-    {
-        if let Some(window) = app.get_webview_window("main") {
-            window.open_devtools();
-        }
+    if let Some(window) = app.get_webview_window("main") {
+        window.open_devtools();
     }
-    // release 下 app 参数未使用，保留签名以兼容前端 invoke
-    let _ = &app;
     Ok(())
 }
 
