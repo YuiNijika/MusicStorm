@@ -73,6 +73,12 @@
     opacity: 0.75;
 }
 
+.download__version-skeleton {
+    width: 44px;
+    height: 12px;
+    margin-top: 4px;
+}
+
 .download__button--disabled {
     border: 1px solid var(--color-separator);
     color: var(--color-text-tertiary);

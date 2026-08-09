@@ -88,6 +88,14 @@
     transition: transform var(--duration-hover) var(--ease-enter);
 }
 
+/* 骨架与真实头像同尺寸，切换时不跳动 */
+.open-source__avatar-skeleton {
+    display: block;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+}
+
 .open-source__contributors-list a:hover img {
     transform: scale(1.1);
 }

@@ -1,26 +1,15 @@
-import { useEffect, useState } from "react"
-
-import { fetchContributors, LICENSE_URL, REPO_URL } from "../../lib/github"
-import type { Contributor } from "../../lib/github"
+import { LICENSE_URL, REPO_URL } from "../../lib/github"
+import { useContributors } from "../../hooks/use-github"
 import { BlurText } from "../blur-text/blur-text"
 import { StarBorder } from "../star-border/star-border"
 
 import "./open-source.css"
 
-function OpenSource() {
-    const [contributors, setContributors] = useState<Contributor[]>([])
+// 骨架占位数量：接近真实贡献者量级，避免加载完成时布局跳动
+const SKELETON_COUNT = 6
 
-    useEffect(() => {
-        let cancelled = false
-        fetchContributors().then((list) => {
-            if (!cancelled) {
-                setContributors(list)
-            }
-        })
-        return () => {
-            cancelled = true
-        }
-    }, [])
+function OpenSource() {
+    const { data: contributors, loading } = useContributors()
 
     return (
         <section className="open-source" id="open-source">
@@ -62,7 +51,20 @@ function OpenSource() {
                         MIT License
                     </a>
                 </div>
-                {contributors.length > 0 ? (
+                {loading ? (
+                    <div
+                        className="open-source__contributors"
+                        aria-hidden="true"
+                    >
+                        <ul className="open-source__contributors-list">
+                            {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+                                <li key={i}>
+                                    <span className="skeleton open-source__avatar-skeleton" />
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : contributors && contributors.length > 0 ? (
                     <div className="open-source__contributors">
                         <p className="open-source__contributors-label">
                             感谢以下贡献者

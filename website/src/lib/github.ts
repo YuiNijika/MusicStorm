@@ -2,8 +2,8 @@ const OWNER = "YuiNijika"
 const REPO = "MusicStorm"
 const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`
 
-// 未认证请求限额 60 次/小时/IP，短缓存避免反复触发
-const CACHE_TTL_MS = 5 * 60 * 1000
+// 未认证请求限额 60 次/小时/IP；localStorage 持久缓存 1 小时，跨会话命中
+const CACHE_TTL_MS = 60 * 60 * 1000
 
 const REPO_URL = `https://github.com/${OWNER}/${REPO}`
 const RELEASES_URL = `${REPO_URL}/releases`
@@ -20,24 +20,26 @@ interface Contributor {
     profileUrl: string
 }
 
+/** SWR 结果：cached 同步可用（可能过期），refreshed 后台回源 */
+interface SwrResult<T> {
+    cached: T | null
+    refreshed: Promise<T | null>
+}
+
 interface CacheEnvelope<T> {
     at: number
     data: T
 }
 
-function readCache<T>(key: string): T | null {
+function readCache<T>(key: string): CacheEnvelope<T> | null {
     try {
-        const raw = sessionStorage.getItem(key)
+        const raw = localStorage.getItem(key)
         if (!raw) {
             return null
         }
-        const parsed = JSON.parse(raw) as CacheEnvelope<T>
-        if (Date.now() - parsed.at > CACHE_TTL_MS) {
-            return null
-        }
-        return parsed.data
+        return JSON.parse(raw) as CacheEnvelope<T>
     } catch {
-        // sessionStorage 可能被禁用（隐私模式），静默回退到网络请求
+        // 隐私模式禁用 localStorage 时静默退化为无缓存
         return null
     }
 }
@@ -45,9 +47,9 @@ function readCache<T>(key: string): T | null {
 function writeCache<T>(key: string, data: T): void {
     try {
         const envelope: CacheEnvelope<T> = { at: Date.now(), data }
-        sessionStorage.setItem(key, JSON.stringify(envelope))
+        localStorage.setItem(key, JSON.stringify(envelope))
     } catch {
-        // 同上，缓存失败不影响主流程
+        // 缓存失败不影响主流程
     }
 }
 
@@ -67,13 +69,7 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 }
 
 /** 最新桌面版：Android 版本线走独立 -android 后缀 tag，官网下载按钮只认桌面版 */
-async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
-    const cacheKey = "musicstorm-web.latest-release"
-    const cached = readCache<ReleaseInfo>(cacheKey)
-    if (cached) {
-        return cached
-    }
-
+async function requestLatestRelease(): Promise<ReleaseInfo | null> {
     const releases = await fetchJson<{ tag_name: string; html_url: string }[]>(
         `${API_BASE}/releases?per_page=20`,
     )
@@ -86,22 +82,16 @@ async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
         version: desktop.tag_name.replace(/^v/, ""),
         url: desktop.html_url,
     }
-    writeCache(cacheKey, info)
+    writeCache(CACHE_KEY_RELEASE, info)
     return info
 }
 
-async function fetchContributors(): Promise<Contributor[]> {
-    const cacheKey = "musicstorm-web.contributors"
-    const cached = readCache<Contributor[]>(cacheKey)
-    if (cached) {
-        return cached
-    }
-
+async function requestContributors(): Promise<Contributor[] | null> {
     const list = await fetchJson<
         { login: string; avatar_url: string; html_url: string; type: string }[]
     >(`${API_BASE}/contributors?per_page=30`)
     if (!list) {
-        return []
+        return null
     }
 
     // 过滤 bot 账号，只展示真人贡献者
@@ -112,9 +102,35 @@ async function fetchContributors(): Promise<Contributor[]> {
             avatarUrl: c.avatar_url,
             profileUrl: c.html_url,
         }))
-    writeCache(cacheKey, contributors)
+    writeCache(CACHE_KEY_CONTRIBUTORS, contributors)
     return contributors
 }
 
-export { REPO_URL, RELEASES_URL, LICENSE_URL, fetchLatestRelease, fetchContributors }
-export type { ReleaseInfo, Contributor }
+const CACHE_KEY_RELEASE = "musicstorm-web.latest-release"
+const CACHE_KEY_CONTRIBUTORS = "musicstorm-web.contributors"
+
+function swr<T>(cacheKey: string, request: () => Promise<T | null>): SwrResult<T> {
+    const cached = readCache<T>(cacheKey)
+    // 新鲜缓存直接命中，不再回源
+    if (cached && Date.now() - cached.at <= CACHE_TTL_MS) {
+        return { cached: cached.data, refreshed: Promise.resolve(cached.data) }
+    }
+    return { cached: cached?.data ?? null, refreshed: request() }
+}
+
+function loadLatestRelease(): SwrResult<ReleaseInfo> {
+    return swr(CACHE_KEY_RELEASE, requestLatestRelease)
+}
+
+function loadContributors(): SwrResult<Contributor[]> {
+    return swr(CACHE_KEY_CONTRIBUTORS, requestContributors)
+}
+
+export {
+    REPO_URL,
+    RELEASES_URL,
+    LICENSE_URL,
+    loadLatestRelease,
+    loadContributors,
+}
+export type { ReleaseInfo, Contributor, SwrResult }
