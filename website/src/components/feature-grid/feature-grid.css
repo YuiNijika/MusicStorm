@@ -18,10 +18,9 @@
     gap: 20px;
 }
 
+/* 底色/边框/圆角由 SpotlightCard 提供，这里只管内容与 hover 反馈 */
 .feature-card {
     padding: 32px 28px;
-    border-radius: var(--radius-card);
-    background: var(--color-bg-subtle);
     transition:
         transform var(--duration-hover) var(--ease-enter),
         box-shadow var(--duration-hover) var(--ease-enter);

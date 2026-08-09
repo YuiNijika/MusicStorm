@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 
 import { fetchLatestRelease, RELEASES_URL } from "../../lib/github"
 import type { ReleaseInfo } from "../../lib/github"
-import { SplitText } from "../split-text/split-text"
+import { ShinyText } from "../shiny-text/shiny-text"
+import { StarBorder } from "../star-border/star-border"
 
 import "./download-section.css"
 
@@ -27,36 +28,43 @@ function DownloadSection() {
     return (
         <section className="download" id="download">
             <div className="download__inner reveal">
-                <SplitText
-                    tag="h2"
-                    className="display-lg download__title"
-                    text="现在就开始。"
-                    duration={0.8}
-                    from={{ opacity: 0, y: 24 }}
-                    to={{ opacity: 1, y: 0 }}
-                />
+                <h2 className="display-lg download__title">
+                    <ShinyText
+                        text="现在就开始。"
+                        color="var(--color-text)"
+                        shineColor="var(--color-accent)"
+                        speed={3}
+                    />
+                </h2>
                 <p className="section-lead download__lead">
                     {release
                         ? `最新版本 v${release.version}，免费下载，即刻体验。`
                         : "免费下载，即刻体验。"}
                 </p>
                 <div className="download__actions">
-                    <a
-                        className="download__button"
+                    <StarBorder
+                        as="a"
                         href={windowsUrl}
                         target="_blank"
                         rel="noreferrer"
+                        color="var(--color-accent)"
+                        speed="5s"
+                        className="download__star"
                     >
-                        <WindowsIcon />
-                        <span className="download__button-text">
-                            <span className="download__button-label">下载 Windows 版</span>
-                            {release ? (
-                                <span className="download__button-version">
-                                    v{release.version}
+                        <span className="download__button-content">
+                            <WindowsIcon />
+                            <span className="download__button-text">
+                                <span className="download__button-label">
+                                    下载 Windows 版
                                 </span>
-                            ) : null}
+                                {release ? (
+                                    <span className="download__button-version">
+                                        v{release.version}
+                                    </span>
+                                ) : null}
+                            </span>
                         </span>
-                    </a>
+                    </StarBorder>
                     <span
                         className="download__button download__button--disabled"
                         aria-disabled="true"

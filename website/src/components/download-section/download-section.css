@@ -40,18 +40,24 @@
         transform var(--duration-press) var(--ease-press);
 }
 
-.download__button--primary {
-    background: var(--color-accent);
-    color: var(--color-accent-text);
+/* StarBorder 形态的 Windows 主按钮：内部 flex 布局 + 按压反馈 */
+.download__star {
+    font-weight: 500;
+    transition: transform var(--duration-press) var(--ease-press);
 }
 
-.download__button--primary:hover {
-    background: var(--color-accent-hover);
+.download__star:hover {
     text-decoration: none;
 }
 
-.download__button--primary:active {
+.download__star:active {
     transform: scale(0.96);
+}
+
+.download__button-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .download__button-text {

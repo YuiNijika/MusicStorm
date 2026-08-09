@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { SplitText } from "../split-text/split-text"
+import { SpotlightCard } from "../spotlight-card/spotlight-card"
 
 import "./feature-grid.css"
 
@@ -39,7 +40,7 @@ const FEATURES: Feature[] = [
     {
         icon: <DevicesIcon />,
         title: "跨平台",
-        description: "Windows 开箱即用，Android 版本正在路上，音乐不止于桌面。",
+        description: "Windows 开箱即用，Android、macOS 版本正在路上，音乐不止于桌面。",
     },
 ]
 
@@ -60,7 +61,10 @@ function FeatureGrid() {
                 </div>
                 <div className="feature-grid__cards">
                     {FEATURES.map((feature) => (
-                        <article className="feature-card reveal" key={feature.title}>
+                        <SpotlightCard
+                            className="feature-card reveal"
+                            key={feature.title}
+                        >
                             <div className="feature-card__icon" aria-hidden="true">
                                 {feature.icon}
                             </div>
@@ -68,7 +72,7 @@ function FeatureGrid() {
                             <p className="feature-card__description">
                                 {feature.description}
                             </p>
-                        </article>
+                        </SpotlightCard>
                     ))}
                 </div>
             </div>

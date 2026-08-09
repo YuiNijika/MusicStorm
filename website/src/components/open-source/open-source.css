@@ -10,6 +10,8 @@
 
 .open-source__title {
     margin: 0;
+    /* BlurText 渲染为 flex 容器，居中要靠主轴对齐而非 text-align */
+    justify-content: center;
 }
 
 .open-source__lead {
@@ -26,24 +28,17 @@
     flex-wrap: wrap;
 }
 
-.open-source__button {
-    padding: 12px 28px;
-    border-radius: var(--radius-control);
-    background: var(--color-text);
-    color: var(--color-bg);
-    font-size: 16px;
+/* StarBorder 形态的仓库入口：按压反馈即可，底色由内层 content 提供 */
+.open-source__star {
     font-weight: 500;
-    transition:
-        opacity var(--duration-control) var(--ease-enter),
-        transform var(--duration-press) var(--ease-press);
+    transition: transform var(--duration-press) var(--ease-press);
 }
 
-.open-source__button:hover {
-    opacity: 0.85;
+.open-source__star:hover {
     text-decoration: none;
 }
 
-.open-source__button:active {
+.open-source__star:active {
     transform: scale(0.96);
 }
 

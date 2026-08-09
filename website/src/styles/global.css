@@ -25,6 +25,7 @@
     --color-card-shadow: rgba(0, 0, 0, 0.04);
     --color-placeholder-from: #e8e8ed;
     --color-placeholder-to: #d2d2d7;
+    --color-spotlight: rgba(0, 113, 227, 0.14);
 
     /* Layout */
     --content-max-width: 1080px;
@@ -52,6 +53,7 @@
         --color-card-shadow: rgba(0, 0, 0, 0.3);
         --color-placeholder-from: #2c2c2e;
         --color-placeholder-to: #1c1c1e;
+        --color-spotlight: rgba(41, 151, 255, 0.22);
 
         color-scheme: dark;
     }

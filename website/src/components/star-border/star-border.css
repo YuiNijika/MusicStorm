@@ -1,0 +1,76 @@
+.star-border-container {
+    display: inline-block;
+    position: relative;
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    text-decoration: none;
+}
+
+.border-gradient-bottom {
+    position: absolute;
+    width: 300%;
+    height: 50%;
+    opacity: 0.7;
+    bottom: -11px;
+    right: -250%;
+    border-radius: 50%;
+    animation: star-movement-bottom linear infinite alternate;
+    z-index: 0;
+}
+
+.border-gradient-top {
+    position: absolute;
+    opacity: 0.7;
+    width: 300%;
+    height: 50%;
+    top: -10px;
+    left: -250%;
+    border-radius: 50%;
+    animation: star-movement-top linear infinite alternate;
+    z-index: 0;
+}
+
+.inner-content {
+    position: relative;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-separator);
+    color: var(--color-text);
+    font-size: 16px;
+    text-align: center;
+    padding: 14px 28px;
+    border-radius: var(--radius-control);
+    z-index: 1;
+}
+
+@keyframes star-movement-bottom {
+    0% {
+        transform: translate(0%, 0%);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-100%, 0%);
+        opacity: 0;
+    }
+}
+
+@keyframes star-movement-top {
+    0% {
+        transform: translate(0%, 0%);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(100%, 0%);
+        opacity: 0;
+    }
+}
+
+/* 减少动态：流光静止为常亮微光，不再循环移动 */
+@media (prefers-reduced-motion: reduce) {
+    .border-gradient-bottom,
+    .border-gradient-top {
+        animation: none;
+        opacity: 0.35;
+    }
+}
