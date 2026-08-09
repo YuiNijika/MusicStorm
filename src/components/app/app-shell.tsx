@@ -7,6 +7,7 @@ import { PlayerBar } from "@/components/layout/player-bar"
 import { Sidebar } from "@/components/layout/sidebar"
 import { useAndroidBack } from "@/hooks/use-android-back"
 import { useCloseToTray } from "@/hooks/use-close-to-tray"
+import { useMacOSNowPlaying } from "@/hooks/use-macos-now-playing"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
@@ -34,6 +35,7 @@ function AppShell({
     usePlayerHotkeys()
     useCloseToTray()
     useTrayCommands()
+    useMacOSNowPlaying()
     const nativeMacOS = isNativeMacOS()
 
     // Android 返回手势：全屏播放器 → 详情页 → 顶层退出
