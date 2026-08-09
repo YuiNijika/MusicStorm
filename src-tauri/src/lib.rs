@@ -613,7 +613,7 @@ fn parse_filename(stem: &str) -> (String, String) {
 // 保留 Local Storage / Cookies / Network —— 网易云登录态依赖它们。
 // 同版本重复启动不清理；升级或首次安装（无记录）才触发一次。
 // 在后台线程执行，不阻塞首帧。仅 Windows WebView2。
-#[cfg(not(target_os = "android"))]
+#[cfg(target_os = "windows")]
 fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
     // 版本以 tauri.conf.json 为准（用户可见版本号），不用 Cargo.toml 的
     let version = app.package_info().version.to_string();
@@ -682,21 +682,17 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // 单实例：二次启动唤起已有窗口，而不是再开一个进程
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            tray::show_main_window(app);
         }));
 
     #[cfg(target_os = "android")]
     let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
 
-    builder
+    let app = builder
         .setup(|app| {
             let conn = open_db(app.handle())?;
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(target_os = "windows")]
             let browser_args: String = {
                 // 性能模式开启 → 禁用 GPU 相关进程（毛玻璃/动画在前端关闭）
                 let perf_mode: Option<String> = conn
@@ -728,8 +724,8 @@ pub fn run() {
 
             #[cfg(not(target_os = "android"))]
             {
-                // Windows/macOS/Linux：Rust 里创建窗口，按「性能模式」动态注入浏览器参数
-                tauri::WebviewWindowBuilder::new(
+                // 桌面端统一由 Rust 创建窗口；WebView2 参数仅在 Windows 注入。
+                let window_builder = tauri::WebviewWindowBuilder::new(
                     app,
                     "main",
                     tauri::WebviewUrl::App("index.html".into()),
@@ -737,9 +733,14 @@ pub fn run() {
                 .title("MusicStorm")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(960.0, 640.0)
-                .decorations(false)
-                .center()
-                .additional_browser_args(&browser_args)
+                .center();
+                #[cfg(target_os = "macos")]
+                let window_builder = window_builder.decorations(true);
+                #[cfg(not(target_os = "macos"))]
+                let window_builder = window_builder.decorations(false);
+                #[cfg(target_os = "windows")]
+                let window_builder = window_builder.additional_browser_args(&browser_args);
+                window_builder
                 .build()
                 .map_err(|e| format!("create main window: {e}"))?;
             }
@@ -762,11 +763,16 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             app.manage(AudioState::default());
 
+            #[cfg(target_os = "macos")]
+            if let Err(error) = tray::setup_macos_menu(app.handle()) {
+                eprintln!("setup macOS menu failed: {error}");
+            }
+
             // 过期缓存清理移到后台线程，不阻塞窗口创建
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 // 版本升级时先清 WebView2 旧缓存，避免膨胀随版本迁移
-                #[cfg(not(target_os = "android"))]
+                #[cfg(target_os = "windows")]
                 let _ = purge_webview_caches_on_upgrade(&app_handle);
                 let _ = purge_expired_api_cache_in_background(&app_handle);
                 let _ = purge_cover_cache(&app_handle);
@@ -852,6 +858,19 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             tray::update_global_shortcut,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        // macOS：窗口隐藏到托盘后，点击 Dock 图标会触发 Reopen。
+        // Tauri 不会自动显示被 hide() 的窗口，需要应用主动恢复。
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen {
+            has_visible_windows: false,
+            ..
+        } = event
+        {
+            tray::show_main_window(app_handle);
+        }
+    });
 }

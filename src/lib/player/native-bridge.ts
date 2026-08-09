@@ -12,6 +12,7 @@ type AudioDeviceInfo = {
 
 type AudioOutputMode = {
     exclusive: boolean
+    supportsExclusive: boolean
     deviceId: string
     lastError: string | null
     backend: string

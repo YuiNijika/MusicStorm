@@ -7,7 +7,7 @@ import { isTauriRuntime } from "@/lib/player/native-bridge"
 import type { EnginePref } from "@/lib/player/engine-policy"
 import type { Track } from "@/lib/types"
 
-// 无 bitrate 时普通有损不算高音质，避免 auto 误开 WASAPI
+// 无 bitrate 时普通有损不算高音质，避免 auto 误开原生引擎
 function isLocalHighQualityTrack(track: Track): boolean {
     if (track.source !== "local" || !track.filePath) {
         return false
@@ -37,7 +37,7 @@ function isLocalHighQualityTrack(track: Track): boolean {
 }
 
 // 远程地址永不进 native；auto 仅高音质
-function shouldUseWasapiForTrack(track: Track, pref: EnginePref): boolean {
+function shouldUseNativeForTrack(track: Track, pref: EnginePref): boolean {
     if (pref === "html5" || !isTauriRuntime()) {
         return false
     }
@@ -47,7 +47,7 @@ function shouldUseWasapiForTrack(track: Track, pref: EnginePref): boolean {
     if (/^https?:\/\//i.test(track.filePath)) {
         return false
     }
-    if (pref === "wasapi") {
+    if (pref === "native") {
         return true
     }
     const extension = extensionOf(track.filePath)
@@ -57,4 +57,4 @@ function shouldUseWasapiForTrack(track: Track, pref: EnginePref): boolean {
     return isLocalHighQualityTrack(track)
 }
 
-export { isLocalHighQualityTrack, shouldUseWasapiForTrack }
+export { isLocalHighQualityTrack, shouldUseNativeForTrack }

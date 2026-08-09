@@ -5,7 +5,7 @@
 <h1 align="center">MusicStorm</h1>
 
 <p align="center">
-  一款基于 Tauri 2、React 与 Rust 构建的 Windows 桌面音乐播放器。
+  一款基于 Tauri 2、React 与 Rust 构建的桌面音乐播放器。
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 MusicStorm 将本地音乐管理与网易云音乐服务整合在同一个桌面应用中，提供接近 Apple Music 的界面、原生本地音频播放、歌词展示和可定制的外观体验。
 
-项目目前主要面向 Windows，仍处于持续开发阶段。部分在线能力依赖网易云音乐接口和账号状态，可能因服务端策略调整而发生变化。
+项目目前主要面向 Windows，macOS 支持正在开发和验证中。部分在线能力依赖网易云音乐接口和账号状态，可能因服务端策略调整而发生变化。
 
 ## 功能特性
 
@@ -73,9 +73,25 @@ Windows 安装包使用当前用户模式安装，不需要管理员权限。首
 - Node.js
 - [pnpm](https://pnpm.io/)
 - Rust stable 工具链
-- Tauri 2 在 Windows 下所需的系统依赖
+- Tauri 2 对应平台所需的系统依赖
 
 具体系统依赖请参考 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)。
+
+#### macOS
+
+macOS 桌面开发需要 Xcode Command Line Tools。Rust 建议通过 rustup 安装，FFmpeg 为部分格式转码和探测能力所需：
+
+```bash
+xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+brew install node pnpm ffmpeg
+```
+
+安装完成后可运行 `rustc --version`、`cargo --version`、`pnpm --version` 和 `ffmpeg -version` 检查环境。通过 Finder 启动时，MusicStorm 会额外探测 Apple Silicon Homebrew 的 `/opt/homebrew/bin/ffmpeg` 和 Intel Homebrew 的 `/usr/local/bin/ffmpeg`。
+
+当前 macOS 支持仍处于开发阶段，已验证 Apple Silicon 上的 `.app` 构建、CoreAudio 本地播放和 FFmpeg 自动发现；签名、公证、DMG 与最低系统版本仍待完善。
+
+macOS 的数据库与持久化配置位于 `~/Library/Application Support/com.yuinijika.musicstorm/`，缓存位于 `~/Library/Caches/com.yuinijika.musicstorm/`；应用不会向 `.app` 包内部写入用户数据。
 
 ### 启动开发环境
 
@@ -99,6 +115,12 @@ pnpm tauri build
 ```
 
 构建产物由 Tauri 写入 `src-tauri/target/release/bundle/`。
+
+macOS 仅构建 `.app`、跳过其他安装包格式时，可运行：
+
+```bash
+pnpm tauri build --bundles app
+```
 
 ## 技术栈
 

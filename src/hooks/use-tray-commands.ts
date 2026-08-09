@@ -3,7 +3,17 @@ import { useEffect } from "react"
 import { usePlayer } from "@/hooks/use-player"
 
 function useTrayCommands() {
-    const { togglePlay, next, previous } = usePlayer()
+    const {
+        currentTrack,
+        durationMs,
+        positionMs,
+        volume,
+        togglePlay,
+        next,
+        previous,
+        seek,
+        setVolume,
+    } = usePlayer()
 
     useEffect(() => {
         let unlisten: (() => void) | null = null
@@ -24,6 +34,23 @@ function useTrayCommands() {
                     case "next":
                         next()
                         break
+                    case "seek-backward":
+                        seek(Math.max(0, positionMs - 5_000))
+                        break
+                    case "seek-forward": {
+                        const total =
+                            durationMs > 0
+                                ? durationMs
+                                : (currentTrack?.durationMs ?? positionMs + 5_000)
+                        seek(Math.min(total, positionMs + 5_000))
+                        break
+                    }
+                    case "volume-up":
+                        setVolume(Math.min(1, volume + 0.05))
+                        break
+                    case "volume-down":
+                        setVolume(Math.max(0, volume - 0.05))
+                        break
                     case "show":
                     default:
                         break
@@ -41,7 +68,17 @@ function useTrayCommands() {
             cancelled = true
             unlisten?.()
         }
-    }, [togglePlay, next, previous])
+    }, [
+        currentTrack,
+        durationMs,
+        next,
+        positionMs,
+        previous,
+        seek,
+        setVolume,
+        togglePlay,
+        volume,
+    ])
 }
 
 export { useTrayCommands }

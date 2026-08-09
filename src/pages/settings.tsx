@@ -73,6 +73,7 @@ import {
     ENGINE_PREF_OPTIONS,
     getEnginePref,
     labelForEngineStatus,
+    labelForNativeBackend,
     setEnginePref,
     type EnginePref,
 } from "@/lib/player/engine-policy"
@@ -121,6 +122,7 @@ import { getCloseToTray, setCloseToTray } from "@/lib/app/close-to-tray-prefs"
 import {
     DEFAULT_SHORTCUTS,
     SHORTCUT_ACTIONS,
+    formatShortcut,
     keydownToShortcut,
     loadGlobalShortcuts,
     updateGlobalShortcut,
@@ -138,6 +140,7 @@ import { getStoragePaths } from "@/lib/storage/paths"
 import { extractCoverHash } from "@/lib/local/cover"
 import { loadLocalLibrary } from "@/lib/local/library-store"
 import { collectCoverRefHashes } from "@/lib/music/cover-overrides"
+import { isMacOS, isNativeMacOS } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { readTitleBarStyle, TITLE_BAR_STORAGE_KEY, type SettingsTab } from "@/lib/app/title-bar-prefs"
 
@@ -517,6 +520,7 @@ function PlaybackTab() {
     const [audioMode, setAudioMode] = useState<AudioOutputMode | null>(null)
     const [ffmpegStatus, setFfmpegStatus] = useState<FfmpegStatus | null>(null)
     const [ffmpegBusy, setFfmpegBusy] = useState(false)
+    const nativeBackendLabel = labelForNativeBackend(audioMode?.backend)
 
     useEffect(() => {
         let cancelled = false
@@ -631,10 +635,14 @@ function PlaybackTab() {
                 <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
                     <div className="min-w-0">
                         <p className="text-[14px] font-medium tracking-[-0.01em]">
-                            关闭窗口时最小化到托盘
+                            {isMacOS()
+                                ? "关闭窗口后保留在菜单栏"
+                                : "关闭窗口时最小化到托盘"}
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单
+                            {isMacOS()
+                                ? "关闭后音乐继续播放；点击 Dock 或菜单栏图标恢复，⌘Q 退出"
+                                : "关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单"}
                         </p>
                     </div>
                     <Switch
@@ -650,11 +658,11 @@ function PlaybackTab() {
                     <div>
                         <p className="text-[14px] font-medium tracking-[-0.01em]">播放引擎</p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            当前：{labelForEngineStatus(engineStatus)}
+                            当前：{labelForEngineStatus(engineStatus, audioMode?.backend)}
                             {audioMode?.note ? ` · ${audioMode.note}` : ""}
                         </p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                            无损/高规格本地走 WASAPI，在线与普通 mp3 走 H5
+                            无损/高规格本地走{nativeBackendLabel}，在线与普通 mp3 走 H5
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -794,7 +802,7 @@ function PlaybackTab() {
                     <div>
                         <p className="text-[14px] font-medium tracking-[-0.01em]">输出设备</p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            WASAPI 接通后可切换设备
+                            {nativeBackendLabel} 接通后可切换设备
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -813,25 +821,27 @@ function PlaybackTab() {
                     </div>
                 </div>
 
-                <SettingsCard
-                    title="WASAPI 独占"
-                    description={
-                        audioMode?.exclusive
-                            ? "已开启（设备支持时生效）"
-                            : "共享模式（当前）"
-                    }
-                >
-                    <ChoiceChip
-                        label={audioMode?.exclusive ? "独占开" : "独占关"}
-                        active={Boolean(audioMode?.exclusive)}
-                        onClick={() => {
-                            const next = !audioMode?.exclusive
-                            void setAudioExclusive(next).then(() =>
-                                getAudioOutputMode().then(setAudioMode),
-                            )
-                        }}
-                    />
-                </SettingsCard>
+                {audioMode?.supportsExclusive ? (
+                    <SettingsCard
+                        title="WASAPI 独占"
+                        description={
+                            audioMode.exclusive
+                                ? "已开启（设备支持时生效）"
+                                : "共享模式（当前）"
+                        }
+                    >
+                        <ChoiceChip
+                            label={audioMode.exclusive ? "独占开" : "独占关"}
+                            active={audioMode.exclusive}
+                            onClick={() => {
+                                const next = !audioMode.exclusive
+                                void setAudioExclusive(next).then(() =>
+                                    getAudioOutputMode().then(setAudioMode),
+                                )
+                            }}
+                        />
+                    </SettingsCard>
+                ) : null}
             </div>
         </Section>
     )
@@ -1044,6 +1054,7 @@ function AppearanceTab({
     )
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
+    const nativeMacOS = isNativeMacOS()
     const { playlistView, playlistTracksView } = useLibraryLayout()
 
     // 毛玻璃由性能模式联动控制：开启时强制关闭、关闭时恢复记忆状态
@@ -1293,20 +1304,22 @@ function AppearanceTab({
                     </label>
                 </div>
 
-                <SettingsCard title="标题栏样式" description="无边框窗口控件布局">
-                    <div className="flex flex-wrap gap-2">
-                        <ChoiceChip
-                            active={titleBarStyle === "mac"}
-                            onClick={() => onTitleBarStyleChange("mac")}
-                            label="MAC"
-                        />
-                        <ChoiceChip
-                            active={titleBarStyle === "windows"}
-                            onClick={() => onTitleBarStyleChange("windows")}
-                            label="Windows"
-                        />
-                    </div>
-                </SettingsCard>
+                {!nativeMacOS ? (
+                    <SettingsCard title="标题栏样式" description="无边框窗口控件布局">
+                        <div className="flex flex-wrap gap-2">
+                            <ChoiceChip
+                                active={titleBarStyle === "mac"}
+                                onClick={() => onTitleBarStyleChange("mac")}
+                                label="MAC"
+                            />
+                            <ChoiceChip
+                                active={titleBarStyle === "windows"}
+                                onClick={() => onTitleBarStyleChange("windows")}
+                                label="Windows"
+                            />
+                        </div>
+                    </SettingsCard>
+                ) : null}
 
                 <SettingsCard title="歌单展示" description="资料库里歌单用卡片或列表">
                     <div className="flex flex-wrap gap-2">
@@ -1584,6 +1597,7 @@ function UpdateTab() {
 
 function OtherTab() {
     const { appearance, setMaterialGlass } = useTheme()
+    const nativeMacOS = isNativeMacOS()
     const [devtoolsEnabled, setDevtoolsEnabledState] = useState(() =>
         getDevToolsEnabled(),
     )
@@ -1803,7 +1817,9 @@ function OtherTab() {
                                     API 响应缓存
                                 </p>
                                 <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                    列表类接口写入 exe 旁数据库与 cache 目录，默认{" "}
+                                    {nativeMacOS
+                                        ? "列表类接口写入用户数据库与系统缓存目录，默认 "
+                                        : "列表类接口写入 exe 旁数据库与 cache 目录，默认 "}
                                     {Math.round(DEFAULT_TTL_MS / 60_000)} 分钟
                                 </p>
                             </div>
@@ -1854,7 +1870,8 @@ function OtherTab() {
                         {storagePaths ? (
                             <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
                                 <p className="truncate" title={storagePaths.appDir}>
-                                    运行目录 · {storagePaths.appDir}
+                                    {nativeMacOS ? "应用数据" : "运行目录"} ·{" "}
+                                    {storagePaths.appDir}
                                 </p>
                                 <p className="truncate" title={storagePaths.databasePath}>
                                     数据库 · {storagePaths.databasePath}
@@ -2019,7 +2036,9 @@ function HotkeysTab() {
             <div className="space-y-4">
                 <div>
                     <p className="mb-1.5 text-[12px] font-medium text-muted-foreground">
-                        全局快捷键（任何应用下生效，需含 Ctrl/Alt 修饰或 F 键）
+                        {isMacOS()
+                            ? "全局快捷键（默认关闭，避免抢占系统按键；自定义时需含 ⌘/⌥/⌃）"
+                            : "全局快捷键（任何应用下生效，需含 Ctrl/Alt/Super 修饰或 F 键）"}
                     </p>
                     <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
                         {SHORTCUT_ACTIONS.map((item) => (
@@ -2106,7 +2125,7 @@ function ShortcutRow({
                 >
                     {value ? (
                         <kbd className="glass-chip rounded-lg px-2 py-0.5 font-mono text-[11px] text-foreground/80">
-                            {value}
+                            {formatShortcut(value)}
                         </kbd>
                     ) : (
                         <span className="text-[12px] text-muted-foreground">

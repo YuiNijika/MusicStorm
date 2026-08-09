@@ -11,7 +11,7 @@ type AudioEngine = {
     load: (url: string) => void | Promise<void>
     play: () => Promise<void>
     pause: () => void
-    /** opts.resume：本地 WASAPI 快进后是否继续播 */
+    /** opts.resume：本地原生引擎快进后是否继续播 */
     seek: (positionMs: number, opts?: { resume?: boolean }) => void | Promise<void>
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
@@ -21,6 +21,7 @@ type AudioEngine = {
 }
 
 function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
+    const MEDIA_READY_TIMEOUT_MS = 15_000
     const audio = new Audio()
     audio.preload = "metadata"
     audio.setAttribute("playsinline", "")
@@ -69,7 +70,8 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             // 移动端 WebView 中，load() 尚未完成时 play() 会抛 AbortError。
             // 等待 canplay 事件确认媒体可播后再调用 play()。
             if (audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA && !readyPromise) {
-                readyPromise = new Promise<void>((resolve) => {
+                readyPromise = new Promise<void>((resolve, reject) => {
+                    let timer: ReturnType<typeof setTimeout> | undefined
                     const onReady = () => {
                         cleanup()
                         if (readyCancel) return
@@ -81,6 +83,9 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
                         resolve()
                     }
                     const cleanup = () => {
+                        if (timer !== undefined) {
+                            clearTimeout(timer)
+                        }
                         audio.removeEventListener("canplay", onReady)
                         audio.removeEventListener("canplaythrough", onReady)
                         audio.removeEventListener("error", onErr)
@@ -94,6 +99,11 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
                     audio.addEventListener("canplay", onReady)
                     audio.addEventListener("canplaythrough", onReady)
                     audio.addEventListener("error", onErr)
+                    timer = setTimeout(() => {
+                        cleanup()
+                        readyPromise = null
+                        reject(new Error("在线音频加载超时"))
+                    }, MEDIA_READY_TIMEOUT_MS)
                 })
             }
             if (readyPromise) {

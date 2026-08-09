@@ -265,6 +265,29 @@ function AppWithNav({
         setRoute("settings")
     }, [closeDetail, setRoute, setSettingsTab])
 
+    useEffect(() => {
+        let unlisten: (() => void) | null = null
+        let cancelled = false
+        void import("@tauri-apps/api/event").then(({ listen }) => {
+            if (cancelled) {
+                return
+            }
+            void listen("musicstorm:open-settings", () => {
+                handleNavigate("settings")
+            }).then((stop) => {
+                if (cancelled) {
+                    stop()
+                } else {
+                    unlisten = stop
+                }
+            })
+        })
+        return () => {
+            cancelled = true
+            unlisten?.()
+        }
+    }, [handleNavigate])
+
     return (
         <AppShell
             activeRoute={route}

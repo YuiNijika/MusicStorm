@@ -14,6 +14,28 @@ export type ResolvePlayableResult =
     | { ok: true; url: string }
     | { ok: false; reason: string; entry?: SongUrlItem }
 
+/**
+ * 网易云仍可能下发 HTTP CDN 地址。macOS WKWebView 会按 App Transport
+ * Security 拒绝这类混合内容，而同一签名地址的 HTTPS 端点可直接使用。
+ * 仅升级网易云媒体域，避免擅自改写不确定是否支持 TLS 的第三方地址。
+ */
+function normalizeNeteaseMediaUrl(url: string): string {
+    try {
+        const parsed = new URL(url)
+        if (
+            parsed.protocol === "http:" &&
+            (parsed.hostname === "music.126.net" ||
+                parsed.hostname.endsWith(".music.126.net"))
+        ) {
+            parsed.protocol = "https:"
+            return parsed.toString()
+        }
+    } catch {
+        // 保留原值，由音频引擎报告格式错误。
+    }
+    return url
+}
+
 // 本地直接 convertFileSrc；网易云始终重新取链，无 url / 无版权 / VIP 未购 → ok:false
 async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> {
     if (track.filePath && track.source === "local") {
@@ -42,7 +64,10 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
                 const entry = result.data?.[0]
                 bestEntry = pickRicherSongUrlEntry(bestEntry, entry)
                 if (isSongUrlPlayable(entry) && entry?.url) {
-                    return { ok: true, url: entry.url }
+                    return {
+                        ok: true,
+                        url: normalizeNeteaseMediaUrl(entry.url),
+                    }
                 }
             } catch {
                 // 尝试下一档

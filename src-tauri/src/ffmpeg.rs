@@ -64,6 +64,12 @@ fn executable_candidates() -> Vec<PathBuf> {
             candidates.push(directory.join("ffmpeg"));
         }
     }
+    #[cfg(target_os = "macos")]
+    {
+        // Finder 启动的 .app 通常拿不到 shell 的 Homebrew PATH。
+        candidates.push(PathBuf::from("/opt/homebrew/bin/ffmpeg"));
+        candidates.push(PathBuf::from("/usr/local/bin/ffmpeg"));
+    }
     candidates
 }
 
@@ -209,11 +215,9 @@ pub fn ffmpeg_set_path(
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn pick_ffmpeg_executable() -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new().set_title("选择 FFmpeg 可执行文件");
+    let dialog = rfd::FileDialog::new().set_title("选择 FFmpeg 可执行文件");
     #[cfg(windows)]
-    {
-        dialog = dialog.add_filter("FFmpeg", &["exe"]);
-    }
+    let dialog = dialog.add_filter("FFmpeg", &["exe"]);
     Ok(dialog
         .pick_file()
         .map(|path| path.to_string_lossy().into_owned()))
