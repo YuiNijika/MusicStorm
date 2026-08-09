@@ -1,14 +1,16 @@
+import { isMacOS } from "@/lib/platform"
+
 export const IN_APP_SHORTCUT_EVENT = "musicstorm-in-app-shortcut-change"
 
 export const IN_APP_ACTIONS = [
-    { id: "togglePlay", label: "播放 / 暂停", default: "Space" },
-    { id: "seekBackward", label: "快退 5 秒", default: "Left" },
-    { id: "seekForward", label: "快进 5 秒", default: "Right" },
-    { id: "volumeDown", label: "音量减", default: "Down" },
-    { id: "volumeUp", label: "音量加", default: "Up" },
-    { id: "previous", label: "上一首", default: "[" },
-    { id: "next", label: "下一首", default: "]" },
-    { id: "closeFullPlayer", label: "关闭全屏播放", default: "Esc" },
+    { id: "togglePlay", label: "播放 / 暂停" },
+    { id: "seekBackward", label: "快退 5 秒" },
+    { id: "seekForward", label: "快进 5 秒" },
+    { id: "volumeDown", label: "音量减" },
+    { id: "volumeUp", label: "音量加" },
+    { id: "previous", label: "上一首" },
+    { id: "next", label: "下一首" },
+    { id: "closeFullPlayer", label: "关闭全屏播放" },
 ] as const
 
 export type InAppShortcutAction = (typeof IN_APP_ACTIONS)[number]["id"]
@@ -17,13 +19,37 @@ const STORAGE_KEY = "musicstorm-in-app-shortcuts"
 
 export type InAppShortcutMap = Record<InAppShortcutAction, string>
 
-export const DEFAULT_IN_APP_SHORTCUTS: InAppShortcutMap = IN_APP_ACTIONS.reduce(
-    (acc, item) => {
-        acc[item.id] = item.default
-        return acc
-    },
-    {} as InAppShortcutMap,
-)
+const LEGACY_IN_APP_SHORTCUTS: InAppShortcutMap = {
+    togglePlay: "Space",
+    seekBackward: "Left",
+    seekForward: "Right",
+    volumeDown: "Down",
+    volumeUp: "Up",
+    previous: "[",
+    next: "]",
+    closeFullPlayer: "Esc",
+}
+
+const MACOS_IN_APP_SHORTCUTS: InAppShortcutMap = {
+    togglePlay: "Space",
+    seekBackward: "Alt+Super+Left",
+    seekForward: "Alt+Super+Right",
+    volumeDown: "Super+Down",
+    volumeUp: "Super+Up",
+    previous: "Left",
+    next: "Right",
+    closeFullPlayer: "Esc",
+}
+
+export const DEFAULT_IN_APP_SHORTCUTS: InAppShortcutMap = isMacOS()
+    ? MACOS_IN_APP_SHORTCUTS
+    : LEGACY_IN_APP_SHORTCUTS
+
+function isLegacyShortcutMap(value: Partial<InAppShortcutMap>): boolean {
+    return Object.entries(LEGACY_IN_APP_SHORTCUTS).every(
+        ([key, combo]) => value[key as InAppShortcutAction] === combo,
+    )
+}
 
 export function getInAppShortcuts(): InAppShortcutMap {
     if (typeof window === "undefined") {
@@ -35,6 +61,13 @@ export function getInAppShortcuts(): InAppShortcutMap {
             return { ...DEFAULT_IN_APP_SHORTCUTS }
         }
         const parsed = JSON.parse(raw) as Partial<InAppShortcutMap>
+        if (isMacOS() && isLegacyShortcutMap(parsed)) {
+            window.localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(MACOS_IN_APP_SHORTCUTS),
+            )
+            return { ...MACOS_IN_APP_SHORTCUTS }
+        }
         return {
             ...DEFAULT_IN_APP_SHORTCUTS,
             ...Object.fromEntries(

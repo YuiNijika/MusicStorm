@@ -2,11 +2,11 @@ mod player;
 
 use crate::db::DbState;
 use crate::ffmpeg::resolve_ffmpeg_path;
+use cpal::traits::HostTrait;
 use player::{PlayerHandle, PlayerInner};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
-use cpal::traits::HostTrait;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,11 +41,40 @@ impl Default for AudioState {
 #[serde(rename_all = "camelCase")]
 pub struct AudioRuntimeDto {
     pub exclusive: bool,
+    pub supports_exclusive: bool,
     pub device_id: String,
     pub last_error: Option<String>,
     pub backend: String,
     pub note: String,
 }
+
+#[cfg(target_os = "windows")]
+const AUDIO_BACKEND: &str = "wasapi";
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const AUDIO_BACKEND: &str = "coreaudio";
+#[cfg(target_os = "linux")]
+const AUDIO_BACKEND: &str = "cpal";
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "linux"
+)))]
+const AUDIO_BACKEND: &str = "cpal";
+
+#[cfg(target_os = "windows")]
+const AUDIO_BACKEND_NOTE: &str = "原生 cpal/WASAPI 输出（rodio）";
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const AUDIO_BACKEND_NOTE: &str = "原生 cpal/CoreAudio 输出（rodio）";
+#[cfg(target_os = "linux")]
+const AUDIO_BACKEND_NOTE: &str = "原生 cpal 音频输出（rodio）";
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "linux"
+)))]
+const AUDIO_BACKEND_NOTE: &str = "原生 cpal 音频输出（rodio）";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,11 +155,12 @@ fn list_output_devices() -> Result<Vec<AudioDeviceInfo>, String> {
 pub fn audio_get_output_mode(state: State<'_, AudioState>) -> Result<AudioRuntimeDto, String> {
     let guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
     Ok(AudioRuntimeDto {
-        exclusive: guard.exclusive,
+        exclusive: cfg!(target_os = "windows") && guard.exclusive,
+        supports_exclusive: cfg!(target_os = "windows"),
         device_id: guard.device_id.clone().unwrap_or_else(|| "default".into()),
         last_error: guard.last_error.clone(),
-        backend: "wasapi-rodio".into(),
-        note: "原生 cpal/WASAPI 输出（rodio）".into(),
+        backend: AUDIO_BACKEND.into(),
+        note: AUDIO_BACKEND_NOTE.into(),
     })
 }
 
@@ -143,14 +173,24 @@ pub fn audio_set_device(state: State<'_, AudioState>, device_id: String) -> Resu
 
 #[tauri::command]
 pub fn audio_set_exclusive(state: State<'_, AudioState>, exclusive: bool) -> Result<(), String> {
-    let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
-    guard.exclusive = exclusive;
-    if exclusive {
-        guard.last_error = Some("独占模式将尽力启用；不支持时回退共享".into());
-    } else {
-        guard.last_error = None;
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = state;
+        let _ = exclusive;
+        return Err("当前平台不支持 WASAPI 独占模式".into());
     }
-    Ok(())
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+        guard.exclusive = exclusive;
+        if exclusive {
+            guard.last_error = Some("独占模式将尽力启用；不支持时回退共享".into());
+        } else {
+            guard.last_error = None;
+        }
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -160,7 +200,7 @@ pub fn audio_probe() -> Result<AudioProbeResult, String> {
     Ok(AudioProbeResult {
         available: host_ok,
         backend: if host_ok {
-            "wasapi".into()
+            AUDIO_BACKEND.into()
         } else {
             "none".into()
         },

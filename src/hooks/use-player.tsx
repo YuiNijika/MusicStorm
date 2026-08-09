@@ -28,7 +28,7 @@ import {
 import { createFadeGainController } from "@/lib/player/fade-gain"
 import { isFfmpegRequiredError } from "@/lib/player/ffmpeg"
 import { resolveFadeDurationMs } from "@/lib/player/fade-prefs"
-import { shouldUseWasapiForTrack } from "@/lib/player/local-quality"
+import { shouldUseNativeForTrack } from "@/lib/player/local-quality"
 import {
     getPlayerPreferences,
     setPlayerPreferences,
@@ -288,7 +288,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         engine.setVolume(perceptual * gain)
     }, [])
 
-    /** 双引擎都 pause，不改 fade / pauseGen；切 H5↔WASAPI 时用 */
+    /** 双引擎都 pause，不改 fade / pauseGen；切 H5↔原生引擎时用 */
     const pauseBothEngines = useCallback(() => {
         html5Ref.current?.pause()
         nativeRef.current?.pause()
@@ -508,7 +508,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             nativeAvailableRef.current = false
             nativeRef.current = null
 
-            // 仅探测并挂载 native 实例；默认显示 H5，按曲再切 WASAPI
+            // 仅探测并挂载 native 实例；默认显示 H5，按曲再切原生输出
             if (choice.nativeReady) {
                 try {
                     nativeRef.current = createNativeEngine(handlers)
@@ -517,10 +517,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     engineStatusRef.current = choice.status
                 } catch {
                     setEngineStatus(
-                        getEnginePref() === "wasapi" ? "degraded" : "html5",
+                        getEnginePref() === "native" ? "degraded" : "html5",
                     )
                     engineStatusRef.current =
-                        getEnginePref() === "wasapi" ? "degraded" : "html5"
+                        getEnginePref() === "native" ? "degraded" : "html5"
                 }
             } else {
                 setEngineStatus(choice.status)
@@ -593,17 +593,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 return
             }
 
-            // 作废进行中的 resume/fade，避免旧会话 hardStop 误伤新 WASAPI
+            // 作废进行中的 resume/fade，避免旧会话 hardStop 误伤新原生会话
             pauseGenRef.current += 1
             fadeRef.current.cancel()
-            // 云端 H5 → 本地 WASAPI：必须双停，否则旧引擎抢设备/旧 play 回调乱入
+            // 云端 H5 → 本地原生输出：必须双停，否则旧引擎抢设备/旧 play 回调乱入
             pauseBothEngines()
 
             const pref = getEnginePref()
             const wantNative =
                 nativeAvailableRef.current &&
                 Boolean(nativeRef.current) &&
-                shouldUseWasapiForTrack(track, pref)
+                shouldUseNativeForTrack(track, pref)
 
             let engine: AudioEngine = html5
             let status: EngineStatus = "html5"
@@ -611,10 +611,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
             if (wantNative) {
                 engine = nativeRef.current!
-                status = "wasapi"
+                status = "native"
                 usedNative = true
-            } else if (pref === "wasapi" && track.filePath && !nativeAvailableRef.current) {
-                // 用户强制本地 WASAPI 但 probe 失败
+            } else if (pref === "native" && track.filePath && !nativeAvailableRef.current) {
+                // 用户强制本地原生输出但 probe 失败
                 status = "degraded"
             }
 
@@ -1010,7 +1010,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const previous = useCallback(() => {
         if (positionMs > 3000) {
-            // 走统一 seek，播放中带 resume，避免本地 WASAPI 停在 pause
+            // 走统一 seek，播放中带 resume，避免本地原生引擎停在 pause
             const engine = activeRef.current
             const resume = isPlayingRef.current && mediaReadyRef.current
             setPositionMs(0)

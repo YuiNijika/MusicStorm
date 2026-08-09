@@ -10,6 +10,7 @@ import { useCloseToTray } from "@/hooks/use-close-to-tray"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
+import { isNativeMacOS } from "@/lib/platform"
 import type { AppRoute } from "@/lib/routes"
 
 type AppShellProps = {
@@ -33,6 +34,7 @@ function AppShell({
     usePlayerHotkeys()
     useCloseToTray()
     useTrayCommands()
+    const nativeMacOS = isNativeMacOS()
 
     // Android 返回手势：全屏播放器 → 详情页 → 顶层退出
     useAndroidBack({
@@ -51,9 +53,11 @@ function AppShell({
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
-            <div className="hidden md:block">
-                <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
-            </div>
+            {!nativeMacOS ? (
+                <div className="hidden md:block">
+                    <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
+                </div>
+            ) : null}
 
             <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
 

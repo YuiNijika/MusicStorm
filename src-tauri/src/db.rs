@@ -157,7 +157,7 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
     Ok(conn)
 }
 
-/// 对齐 G2M：exe 同级目录下 resources/config + cache
+/// Windows/Linux 延续便携式目录；macOS 使用系统标准的用户数据目录。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoragePaths {
@@ -168,7 +168,7 @@ pub struct StoragePaths {
 }
 
 pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "macos"))]
     {
         let dir = app
             .path()
@@ -177,7 +177,7 @@ pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
         return Ok(dir);
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "macos")))]
     {
         if let Ok(dir) = app.path().executable_dir() {
             return Ok(dir);
@@ -192,14 +192,33 @@ pub(crate) fn resolve_app_dir(app: &AppHandle) -> Result<PathBuf, String> {
     }
 }
 
+#[cfg(any(test, target_os = "macos"))]
+fn standard_user_storage_dirs(
+    app_data_dir: PathBuf,
+    app_cache_dir: PathBuf,
+) -> (PathBuf, PathBuf, PathBuf) {
+    let config_dir = app_data_dir.join("config");
+    (app_data_dir, config_dir, app_cache_dir)
+}
+
 pub fn ensure_storage_paths(app: &AppHandle) -> Result<StoragePathsInner, String> {
     let app_dir = resolve_app_dir(app)?;
 
-    // G2M: <exe_dir>/resources/config/database.db
-    let resources_dir = app_dir.join("resources");
-    let config_dir = resources_dir.join("config");
-    // 文件缓存旁挂：<exe_dir>/cache
-    let cache_dir = app_dir.join("cache");
+    #[cfg(target_os = "macos")]
+    let (app_dir, config_dir, cache_dir) = standard_user_storage_dirs(
+        app_dir,
+        app.path()
+            .app_cache_dir()
+            .map_err(|error| format!("failed to resolve app cache dir: {error}"))?,
+    );
+
+    #[cfg(not(target_os = "macos"))]
+    let (app_dir, config_dir, cache_dir) = {
+        // Windows/Linux/Android 保持现有结构，避免改变已发布平台的数据位置。
+        let config_dir = app_dir.join("resources").join("config");
+        let cache_dir = app_dir.join("cache");
+        (app_dir, config_dir, cache_dir)
+    };
 
     fs::create_dir_all(&config_dir)
         .map_err(|error| format!("failed to create config directory: {error}"))?;
@@ -234,12 +253,36 @@ fn migrate_legacy_app_data_db(app: &AppHandle, target: &Path) -> Result<(), Stri
             if let Some(parent) = target.parent() {
                 let _ = fs::create_dir_all(parent);
             }
-            if fs::copy(&candidate, target).is_ok() {
+            if copy_sqlite_database(&candidate, target).is_ok() {
                 return Ok(());
             }
+            remove_sqlite_database_files(target);
         }
     }
     Ok(())
+}
+
+fn sqlite_sidecar(path: &Path, suffix: &str) -> PathBuf {
+    let mut value = path.as_os_str().to_os_string();
+    value.push(suffix);
+    PathBuf::from(value)
+}
+
+fn copy_sqlite_database(source: &Path, target: &Path) -> Result<(), std::io::Error> {
+    fs::copy(source, target)?;
+
+    // WAL 可能包含尚未 checkpoint 的最新事务；SHM 是临时索引，可由 SQLite 重建。
+    let source_wal = sqlite_sidecar(source, "-wal");
+    if source_wal.is_file() {
+        fs::copy(source_wal, sqlite_sidecar(target, "-wal"))?;
+    }
+    Ok(())
+}
+
+fn remove_sqlite_database_files(path: &Path) {
+    let _ = fs::remove_file(path);
+    let _ = fs::remove_file(sqlite_sidecar(path, "-wal"));
+    let _ = fs::remove_file(sqlite_sidecar(path, "-shm"));
 }
 
 fn legacy_db_candidates(app: &AppHandle) -> Vec<PathBuf> {
@@ -252,6 +295,12 @@ fn legacy_db_candidates(app: &AppHandle) -> Vec<PathBuf> {
     if let Ok(dir) = app.path().app_data_dir() {
         out.push(dir.join("musicstorm.db"));
         out.push(dir.join("data").join("musicstorm.db"));
+    }
+    // macOS 旧开发包把可写数据放进 .app/Contents/MacOS/resources/config。
+    // 新版本首次启动时迁移到 ~/Library/Application Support/<bundle id>/config。
+    #[cfg(target_os = "macos")]
+    if let Ok(dir) = app.path().executable_dir() {
+        out.push(dir.join("resources").join("config").join("musicstorm.db"));
     }
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         out.push(
@@ -269,6 +318,43 @@ fn legacy_db_candidates(app: &AppHandle) -> Vec<PathBuf> {
         );
     }
     out
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use super::{copy_sqlite_database, sqlite_sidecar, standard_user_storage_dirs};
+    use std::fs;
+
+    #[test]
+    fn standard_user_layout_keeps_config_and_cache_outside_app_bundle() {
+        let app_data = std::path::PathBuf::from("/Users/test/Library/Application Support/app");
+        let app_cache = std::path::PathBuf::from("/Users/test/Library/Caches/app");
+        let (app_dir, config_dir, cache_dir) =
+            standard_user_storage_dirs(app_data.clone(), app_cache.clone());
+
+        assert_eq!(app_dir, app_data);
+        assert_eq!(config_dir, app_data.join("config"));
+        assert_eq!(cache_dir, app_cache);
+        assert!(!config_dir.to_string_lossy().contains(".app/Contents"));
+    }
+
+    #[test]
+    fn sqlite_migration_copies_pending_wal_transactions() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("old.db");
+        let target = temp.path().join("new.db");
+        fs::write(&source, b"database").expect("source db");
+        fs::write(sqlite_sidecar(&source, "-wal"), b"pending wal").expect("source wal");
+
+        copy_sqlite_database(&source, &target).expect("copy database");
+
+        assert_eq!(fs::read(&target).expect("target db"), b"database");
+        assert_eq!(
+            fs::read(sqlite_sidecar(&target, "-wal")).expect("target wal"),
+            b"pending wal"
+        );
+        assert!(!sqlite_sidecar(&target, "-shm").exists());
+    }
 }
 
 fn migrate(conn: &Connection) -> Result<(), String> {

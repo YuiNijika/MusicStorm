@@ -13,7 +13,7 @@ type SeekElasticSliderProps = {
     showTime?: boolean
 }
 
-// 拖动只改 UI 预览，松手再 seek；本地 WASAPI 重解码 seek 很重，拖动中 thrash 会空 sink 误 ended
+// 拖动只改 UI 预览，松手再 seek；本地原生引擎重解码 seek 很重，拖动中 thrash 会空 sink 误 ended
 function SeekElasticSlider({
     positionMs,
     durationMs,

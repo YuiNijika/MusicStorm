@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 
+import { isMacOS } from "@/lib/platform"
+
 export const SHORTCUT_ACTIONS = [
     { id: "toggle", label: "播放 / 暂停" },
     { id: "previous", label: "上一首" },
@@ -8,11 +10,16 @@ export const SHORTCUT_ACTIONS = [
 
 export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number]["id"]
 
-export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
+const WINDOWS_DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
     toggle: "Ctrl+Alt+Space",
     previous: "Ctrl+Alt+Left",
     next: "Ctrl+Alt+Right",
 }
+
+// macOS 不默认抢占系统级组合键；应用内播放快捷键遵循 Apple Music。
+export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = isMacOS()
+    ? { toggle: "", previous: "", next: "" }
+    : WINDOWS_DEFAULT_SHORTCUTS
 
 type ShortcutConfig = Partial<Record<ShortcutAction, string>>
 
@@ -71,6 +78,28 @@ export function keydownToShortcut(event: KeyboardEvent): string | null {
         return null
     }
     return [...mods, key].join("+")
+}
+
+export function formatShortcut(combo: string): string {
+    if (!isMacOS()) {
+        return combo
+    }
+    const symbols: Record<string, string> = {
+        Ctrl: "⌃",
+        Alt: "⌥",
+        Shift: "⇧",
+        Super: "⌘",
+        Left: "←",
+        Right: "→",
+        Up: "↑",
+        Down: "↓",
+        Space: "Space",
+        Esc: "Esc",
+    }
+    return combo
+        .split("+")
+        .map((part) => symbols[part] ?? part)
+        .join("")
 }
 
 function codeToKeyName(code: string): string | null {

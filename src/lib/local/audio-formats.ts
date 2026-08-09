@@ -49,7 +49,7 @@ const LOCAL_AUDIO_EXTS = [
 
 const LOCAL_AUDIO_EXT_SET = new Set<string>(LOCAL_AUDIO_EXTS)
 
-// 默认视为高音质或无损，用于 WASAPI auto
+// 默认视为高音质或无损，用于原生引擎 auto
 const HIGH_QUALITY_EXTS = new Set([
     "flac",
     "wav",

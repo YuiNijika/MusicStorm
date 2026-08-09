@@ -6,18 +6,23 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State,
 };
 
 /// 前端监听的事件名：payload 为 "toggle" | "previous" | "next" | "show"
 const PLAYER_COMMAND_EVENT: &str = "musicstorm:player-command";
+const OPEN_SETTINGS_EVENT: &str = "musicstorm:open-settings";
 /// 全局快捷键配置的 DB key：JSON { "toggle": "Ctrl+Alt+Space", ... }
 pub const SHORTCUT_SETTING_KEY: &str = "global_shortcuts";
 /// 播放器控制动作（与前端 use-tray-commands 的 payload 一致）
 pub const COMMANDS: [&str; 3] = ["toggle", "previous", "next"];
-/// 默认快捷键（无自定义配置时）
+/// 默认快捷键（无自定义配置时）。macOS 默认不抢占系统级按键，
+/// 播放快捷键由前台应用按 Apple Music 习惯处理。
+#[cfg(target_os = "macos")]
+const DEFAULT_SHORTCUTS: [(&str, &str); 3] = [("toggle", ""), ("previous", ""), ("next", "")];
+#[cfg(not(target_os = "macos"))]
 const DEFAULT_SHORTCUTS: [(&str, &str); 3] = [
     ("toggle", "Ctrl+Alt+Space"),
     ("previous", "Ctrl+Alt+Left"),
@@ -55,12 +60,85 @@ impl ShortcutConfig {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
+fn default_shortcut_config() -> ShortcutConfig {
+    ShortcutConfig {
+        toggle: Some(DEFAULT_SHORTCUTS[0].1.to_string()),
+        previous: Some(DEFAULT_SHORTCUTS[1].1.to_string()),
+        next: Some(DEFAULT_SHORTCUTS[2].1.to_string()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn is_legacy_default_config(config: &ShortcutConfig) -> bool {
+    config.toggle.as_deref() == Some("Ctrl+Alt+Space")
+        && config.previous.as_deref() == Some("Ctrl+Alt+Left")
+        && config.next.as_deref() == Some("Ctrl+Alt+Right")
+}
+
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+#[cfg(target_os = "macos")]
+pub fn setup_macos_menu(app: &AppHandle) -> tauri::Result<()> {
+    let menu = Menu::default(app)?;
+    let settings = MenuItem::with_id(app, "open-settings", "设置…", true, Some("Super+,"))?;
+
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        // About 之后、Services 之前是 macOS 标准的 Settings 位置。
+        app_menu.insert(&settings, 1)?;
+    }
+
+    // 播放按键由 WebView 在非输入控件聚焦时处理，避免原生菜单快捷键
+    // 抢占搜索框中的空格、方向键，同时菜单仍提供完整可发现入口。
+    let play_pause = MenuItem::with_id(app, "menu-play-pause", "播放 / 暂停", true, None::<&str>)?;
+    let previous = MenuItem::with_id(app, "menu-previous", "上一首", true, None::<&str>)?;
+    let next = MenuItem::with_id(app, "menu-next", "下一首", true, None::<&str>)?;
+    let seek_backward =
+        MenuItem::with_id(app, "menu-seek-backward", "快退 5 秒", true, None::<&str>)?;
+    let seek_forward =
+        MenuItem::with_id(app, "menu-seek-forward", "快进 5 秒", true, None::<&str>)?;
+    let volume_up = MenuItem::with_id(app, "menu-volume-up", "增大音量", true, None::<&str>)?;
+    let volume_down = MenuItem::with_id(app, "menu-volume-down", "减小音量", true, None::<&str>)?;
+    let playback_menu = Submenu::with_items(
+        app,
+        "播放",
+        true,
+        &[
+            &play_pause,
+            &previous,
+            &next,
+            &PredefinedMenuItem::separator(app)?,
+            &seek_backward,
+            &seek_forward,
+            &PredefinedMenuItem::separator(app)?,
+            &volume_up,
+            &volume_down,
+        ],
+    )?;
+    menu.insert(&playback_menu, 3)?;
+    app.set_menu(menu)?;
+
+    app.on_menu_event(|app, event| match event.id().as_ref() {
+        "open-settings" => {
+            show_main_window(app);
+            let _ = app.emit(OPEN_SETTINGS_EVENT, ());
+        }
+        "menu-play-pause" => emit_command(app, "toggle"),
+        "menu-previous" => emit_command(app, "previous"),
+        "menu-next" => emit_command(app, "next"),
+        "menu-seek-backward" => emit_command(app, "seek-backward"),
+        "menu-seek-forward" => emit_command(app, "seek-forward"),
+        "menu-volume-up" => emit_command(app, "volume-up"),
+        "menu-volume-down" => emit_command(app, "volume-down"),
+        _ => {}
+    });
+
+    Ok(())
 }
 
 fn emit_command(app: &AppHandle, command: &str) {
@@ -78,15 +156,15 @@ fn load_config(app: &AppHandle) -> ShortcutConfig {
             .ok();
         if let Some(raw) = stored {
             if let Ok(config) = serde_json::from_str::<ShortcutConfig>(&raw) {
+                #[cfg(target_os = "macos")]
+                if is_legacy_default_config(&config) {
+                    return default_shortcut_config();
+                }
                 return config;
             }
         }
     }
-    ShortcutConfig {
-        toggle: Some(DEFAULT_SHORTCUTS[0].1.to_string()),
-        previous: Some(DEFAULT_SHORTCUTS[1].1.to_string()),
-        next: Some(DEFAULT_SHORTCUTS[2].1.to_string()),
-    }
+    default_shortcut_config()
 }
 
 fn persist_config(app: &AppHandle, config: &ShortcutConfig) {
@@ -111,8 +189,9 @@ pub fn setup_global_shortcuts(app: &AppHandle) -> Result<(), String> {
         if combo.is_empty() {
             continue;
         }
-        let shortcut: tauri_plugin_global_shortcut::Shortcut =
-            combo.parse().map_err(|error| format!("快捷键解析失败: {error}"))?;
+        let shortcut: tauri_plugin_global_shortcut::Shortcut = combo
+            .parse()
+            .map_err(|error| format!("快捷键解析失败: {error}"))?;
         let action_owned = action.to_string();
         app.global_shortcut()
             .on_shortcut(shortcut, move |app, _shortcut, event| {
@@ -126,6 +205,8 @@ pub fn setup_global_shortcuts(app: &AppHandle) -> Result<(), String> {
             .map_err(|error| format!("注册快捷键 {combo} 失败: {error}"))?;
         registry.insert(action.to_string(), shortcut);
     }
+    // 保存平台默认值，也负责把旧的 Windows 默认组合迁移出 macOS。
+    persist_config(app, &config);
     app.manage(ShortcutRegistry(Mutex::new(registry)));
     Ok(())
 }
@@ -166,18 +247,18 @@ pub fn update_global_shortcut(
         .parse()
         .map_err(|error| format!("无效快捷键组合: {error}"))?;
 
-        let action_owned = action.clone();
-        app.global_shortcut()
-            .on_shortcut(shortcut, move |app, _shortcut, event| {
-                if event.state != ShortcutState::Pressed {
-                    return;
-                }
-                show_main_window(app);
-                emit_command(app, &action_owned);
-            })
-            .map_err(|error| format!("注册失败，可能与其他应用或本应用冲突: {error}"))?;
+    let action_owned = action.clone();
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            show_main_window(app);
+            emit_command(app, &action_owned);
+        })
+        .map_err(|error| format!("注册失败，可能与其他应用或本应用冲突: {error}"))?;
 
-        guard.insert(action.clone(), shortcut);
+    guard.insert(action.clone(), shortcut);
     let mut config = load_config(&app);
     config.set(&action, combo.trim().to_string());
     persist_config(&app, &config);
@@ -186,8 +267,7 @@ pub fn update_global_shortcut(
 
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
-    let play_pause =
-        MenuItem::with_id(app, "play-pause", "播放 / 暂停", true, None::<&str>)?;
+    let play_pause = MenuItem::with_id(app, "play-pause", "播放 / 暂停", true, None::<&str>)?;
     let previous = MenuItem::with_id(app, "previous", "上一首", true, None::<&str>)?;
     let next = MenuItem::with_id(app, "next", "下一首", true, None::<&str>)?;
     let quit = PredefinedMenuItem::quit(app, Some("退出"))?;
