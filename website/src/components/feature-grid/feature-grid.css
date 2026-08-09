@@ -1,0 +1,71 @@
+.feature-grid {
+    padding: var(--section-gap) 24px 0;
+}
+
+.feature-grid__inner {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+}
+
+.feature-grid__title {
+    margin: 0 0 clamp(2.5rem, 5vw, 4rem);
+    text-align: center;
+}
+
+.feature-grid__cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.feature-card {
+    padding: 32px 28px;
+    border-radius: var(--radius-card);
+    background: var(--color-bg-subtle);
+    transition:
+        transform var(--duration-hover) var(--ease-enter),
+        box-shadow var(--duration-hover) var(--ease-enter);
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px var(--color-card-shadow);
+}
+
+.feature-card__icon {
+    color: var(--color-accent);
+    margin-bottom: 16px;
+}
+
+.feature-card__title {
+    margin: 0 0 8px;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.feature-card__description {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+    .feature-grid__cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .feature-grid__cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* hover 位移降级为纯透明度反馈，避免前庭敏感 */
+@media (prefers-reduced-motion: reduce) {
+    .feature-card:hover {
+        transform: none;
+    }
+}

@@ -1,0 +1,167 @@
+/* Design tokens —— 全站唯一真源，组件一律引用 token，禁止自定义缓动/时长 */
+
+:root {
+    /* Motion：enter/exit 互为镜像，保证可逆过渡路径对称 */
+    --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-exit: cubic-bezier(1, 0, 0.68, 0.28);
+    --ease-press: cubic-bezier(0.5, 0, 0.75, 0);
+    --duration-press: 100ms;
+    --duration-control: 140ms;
+    --duration-hover: 200ms;
+    --duration-enter: 340ms;
+
+    /* Color —— 亮色系默认值 */
+    --color-bg: #fbfbfd;
+    --color-bg-elevated: #ffffff;
+    --color-bg-subtle: #f5f5f7;
+    --color-text: #1d1d1f;
+    --color-text-secondary: #6e6e73;
+    --color-text-tertiary: #86868b;
+    --color-separator: rgba(0, 0, 0, 0.08);
+    --color-accent: #0071e3;
+    --color-accent-hover: #0077ed;
+    --color-accent-text: #ffffff;
+    --color-nav-bg: rgba(251, 251, 253, 0.72);
+    --color-card-shadow: rgba(0, 0, 0, 0.04);
+    --color-placeholder-from: #e8e8ed;
+    --color-placeholder-to: #d2d2d7;
+
+    /* Layout */
+    --content-max-width: 1080px;
+    --section-gap: clamp(4rem, 10vw, 7.5rem);
+    --nav-height: 52px;
+    --radius-card: 18px;
+    --radius-control: 999px;
+
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-bg: #000000;
+        --color-bg-elevated: #1c1c1e;
+        --color-bg-subtle: #161617;
+        --color-text: #f5f5f7;
+        --color-text-secondary: #a1a1a6;
+        --color-text-tertiary: #86868b;
+        --color-separator: rgba(255, 255, 255, 0.12);
+        --color-accent: #2997ff;
+        --color-accent-hover: #147ce5;
+        --color-accent-text: #ffffff;
+        --color-nav-bg: rgba(22, 22, 23, 0.72);
+        --color-card-shadow: rgba(0, 0, 0, 0.3);
+        --color-placeholder-from: #2c2c2e;
+        --color-placeholder-to: #1c1c1e;
+
+        color-scheme: dark;
+    }
+}
+
+/* Base */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--nav-height) + 16px);
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Text",
+        "PingFang SC", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+img,
+svg {
+    display: block;
+}
+
+a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+}
+
+/* 大标题负字距：字号越大字距越紧，正文保持 0 */
+.display-xl {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    line-height: 1.05;
+    letter-spacing: -0.022em;
+    font-weight: 700;
+}
+
+.display-lg {
+    font-size: clamp(2rem, 4.5vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+}
+
+.section-lead {
+    font-size: clamp(1.05rem, 2vw, 1.25rem);
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+/* 滚动进入：仅 transform/opacity，合成器友好 */
+.reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+        opacity var(--duration-enter) var(--ease-enter),
+        transform var(--duration-enter) var(--ease-enter);
+}
+
+.reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+/* Reduced motion：非全灭，降级为短 cross-fade */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .reveal {
+        transform: none;
+        transition: opacity 150ms ease;
+    }
+
+    *,
+    *::before,
+    *::after {
+        transition-duration: 150ms !important;
+        animation-duration: 150ms !important;
+    }
+}
+
+/* 低透明度偏好：材质降模糊、提不透明度保证可读 */
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --color-nav-bg: var(--color-bg-elevated);
+    }
+}

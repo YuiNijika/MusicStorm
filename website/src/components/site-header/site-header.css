@@ -1,0 +1,90 @@
+/* 半透明浮动导航：内容从其下方滚过，用材质而非实色条区分层级 */
+.site-header {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    height: var(--nav-height);
+    background: var(--color-nav-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.site-header__inner {
+    max-width: var(--content-max-width);
+    height: 100%;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.site-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--color-text);
+}
+
+.site-header__brand:hover {
+    text-decoration: none;
+}
+
+.site-header__links {
+    display: flex;
+    gap: 28px;
+    margin: 0 auto 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.site-header__links a {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    transition: color var(--duration-hover) var(--ease-enter);
+}
+
+.site-header__links a:hover {
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.site-header__cta {
+    padding: 6px 16px;
+    border-radius: var(--radius-control);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+    font-size: 13px;
+    font-weight: 500;
+    transition:
+        background-color var(--duration-control) var(--ease-enter),
+        transform var(--duration-press) var(--ease-press);
+}
+
+.site-header__cta:hover {
+    background: var(--color-accent-hover);
+    text-decoration: none;
+}
+
+.site-header__cta:active {
+    transform: scale(0.96);
+}
+
+@media (max-width: 640px) {
+    .site-header__links {
+        display: none;
+    }
+
+    .site-header__cta {
+        margin-left: auto;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .site-header {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}

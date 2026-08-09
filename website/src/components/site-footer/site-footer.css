@@ -1,0 +1,30 @@
+.site-footer {
+    margin-top: var(--section-gap);
+    border-top: 1px solid var(--color-separator);
+    padding: 28px 24px;
+}
+
+.site-footer__inner {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.site-footer__copy {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.site-footer__link {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.site-footer__link:hover {
+    color: var(--color-text);
+    text-decoration: none;
+}

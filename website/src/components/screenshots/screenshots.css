@@ -1,0 +1,13 @@
+.screenshots {
+    padding: var(--section-gap) 24px 0;
+}
+
+.screenshots__inner {
+    margin: 0 auto;
+    /* 画廊全宽铺到视口，只留 section 的 24px 边距，标题仍居中 */
+}
+
+.screenshots__title {
+    margin: 0 0 clamp(2.5rem, 5vw, 4rem);
+    text-align: center;
+}
