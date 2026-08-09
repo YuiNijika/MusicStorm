@@ -54,17 +54,17 @@ function useMacOSNowPlaying() {
 
         let cancelled = false
         const override = getCoverOverride(currentTrack.id)
-        if (override?.originalPath) {
-            setCoverPath(override.originalPath)
+        if (override?.thumbnailPath) {
+            setCoverPath(override.thumbnailPath)
             return
         }
 
         if (/^https?:\/\//i.test(currentTrack.coverUrl)) {
             const cached = getCachedRemoteCover(currentTrack.coverUrl)
-            setCoverPath(cached?.originalPath ?? null)
+            setCoverPath(cached?.thumbnailPath ?? null)
             void ensureRemoteCoverCached(currentTrack.coverUrl).then((result) => {
                 if (!cancelled) {
-                    setCoverPath(result?.originalPath ?? null)
+                    setCoverPath(result?.thumbnailPath ?? null)
                 }
             })
         } else {

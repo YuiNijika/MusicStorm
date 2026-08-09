@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager};
 
 const PLAYER_COMMAND_EVENT: &str = "musicstorm:player-command";
 
@@ -47,15 +47,19 @@ mod platform {
             }
         }
 
-        fn resolve(&mut self, path: Option<&str>) -> Option<Artwork> {
+        fn resolve(&mut self, path: Option<&str>) -> Result<Option<Artwork>, String> {
             let normalized = path.map(str::trim).filter(|value| !value.is_empty());
             if self.path.as_deref() == normalized {
-                return self.artwork.clone();
+                return Ok(self.artwork.clone());
             }
 
+            let artwork = normalized
+                .map(Artwork::from_path)
+                .transpose()
+                .map_err(|error| error.to_string())?;
             self.path = normalized.map(ToOwned::to_owned);
-            self.artwork = normalized.and_then(|value| Artwork::from_path(value).ok());
-            self.artwork.clone()
+            self.artwork = artwork.clone();
+            Ok(artwork)
         }
     }
 
@@ -195,7 +199,7 @@ mod platform {
                 .artwork
                 .lock()
                 .map_err(|_| "now playing artwork lock".to_string())?
-                .resolve(payload.cover_path.as_deref());
+                .resolve(payload.cover_path.as_deref())?;
             self.center
                 .set_now_playing_info_with_artwork(&info, artwork.as_ref());
             self.center.set_playback_state(if payload.is_playing {
@@ -247,15 +251,22 @@ pub use platform::{setup, NowPlayingState};
 
 #[cfg(target_os = "macos")]
 #[tauri::command]
-pub fn macos_now_playing_update(
-    state: State<'_, NowPlayingState>,
-    payload: NowPlayingPayload,
-) -> Result<(), String> {
-    state.update(payload)
+pub fn macos_now_playing_update(app: AppHandle, payload: NowPlayingPayload) -> Result<(), String> {
+    let main_thread_app = app.clone();
+    app.run_on_main_thread(move || {
+        if let Err(error) = main_thread_app.state::<NowPlayingState>().update(payload) {
+            eprintln!("update macOS Now Playing failed: {error}");
+        }
+    })
+    .map_err(|error| format!("schedule macOS Now Playing update: {error}"))
 }
 
 #[cfg(target_os = "macos")]
 #[tauri::command]
-pub fn macos_now_playing_clear(state: State<'_, NowPlayingState>) {
-    state.clear();
+pub fn macos_now_playing_clear(app: AppHandle) -> Result<(), String> {
+    let main_thread_app = app.clone();
+    app.run_on_main_thread(move || {
+        main_thread_app.state::<NowPlayingState>().clear();
+    })
+    .map_err(|error| format!("schedule macOS Now Playing clear: {error}"))
 }
