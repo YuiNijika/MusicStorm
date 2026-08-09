@@ -19,6 +19,10 @@ jobs:
     name: Apple Silicon build and test
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      # mediaplayer 的 Swift 桥接引用 macOS 16 MediaPlayer API；macos-15
+      # runner 默认 Xcode 16.4 SDK 不包含这些符号，但镜像已预装 Xcode 26。
+      DEVELOPER_DIR: /Applications/Xcode_26.0.app/Contents/Developer
 
     steps:
       - name: Check out repository
