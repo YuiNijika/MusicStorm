@@ -2,12 +2,16 @@
   "name": "music-storm",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "website:dev": "pnpm --filter website dev",
+    "website:build": "pnpm --filter website build",
+    "website:preview": "pnpm --filter website preview"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
