@@ -2,10 +2,18 @@ import { useEffect } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
 
+type PlayerCommandPayload =
+    | string
+    | {
+          action?: string
+          positionMs?: number | null
+      }
+
 function useTrayCommands() {
     const {
         currentTrack,
         durationMs,
+        isPlaying,
         positionMs,
         volume,
         togglePlay,
@@ -23,8 +31,26 @@ function useTrayCommands() {
             if (cancelled) {
                 return
             }
-            void listen<string>("musicstorm:player-command", (event) => {
-                switch (event.payload) {
+            void listen<PlayerCommandPayload>("musicstorm:player-command", (event) => {
+                const action =
+                    typeof event.payload === "string"
+                        ? event.payload
+                        : event.payload.action
+                const requestedPosition =
+                    typeof event.payload === "string"
+                        ? null
+                        : event.payload.positionMs
+                switch (action) {
+                    case "play":
+                        if (!isPlaying) {
+                            togglePlay()
+                        }
+                        break
+                    case "pause":
+                        if (isPlaying) {
+                            togglePlay()
+                        }
+                        break
                     case "toggle":
                         togglePlay()
                         break
@@ -35,14 +61,30 @@ function useTrayCommands() {
                         next()
                         break
                     case "seek-backward":
-                        seek(Math.max(0, positionMs - 5_000))
+                        seek(Math.max(0, positionMs - (requestedPosition ?? 5_000)))
                         break
                     case "seek-forward": {
                         const total =
                             durationMs > 0
                                 ? durationMs
                                 : (currentTrack?.durationMs ?? positionMs + 5_000)
-                        seek(Math.min(total, positionMs + 5_000))
+                        seek(
+                            Math.min(
+                                total,
+                                positionMs + (requestedPosition ?? 5_000),
+                            ),
+                        )
+                        break
+                    }
+                    case "seek-to": {
+                        if (typeof requestedPosition !== "number") {
+                            break
+                        }
+                        const total =
+                            durationMs > 0
+                                ? durationMs
+                                : (currentTrack?.durationMs ?? requestedPosition)
+                        seek(Math.min(total, Math.max(0, requestedPosition)))
                         break
                     }
                     case "volume-up":
@@ -71,6 +113,7 @@ function useTrayCommands() {
     }, [
         currentTrack,
         durationMs,
+        isPlaying,
         next,
         positionMs,
         previous,

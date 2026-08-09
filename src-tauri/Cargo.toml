@@ -56,3 +56,10 @@ rodio = { version = "0.20", default-features = false, features = [
     "symphonia-vorbis",
 ] }
 cpal = "0.15"
+
+# macOS 系统媒体中心：发布 Now Playing 信息并接收键盘、耳机和控制中心指令。
+[target.'cfg(target_os = "macos")'.dependencies]
+# mediaplayer 0.3.2 的 CGRect 构造匹配 0.7.x API；精确锁定避免宽松上游范围
+# 自动选择已变更结构的 apple-cf 0.8+。
+apple-cf = { version = "=0.7.1", default-features = false, features = ["cg"] }
+mediaplayer = "=0.3.2"

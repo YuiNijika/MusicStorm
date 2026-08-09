@@ -4,6 +4,8 @@ mod cover_cache;
 mod db;
 mod ffmpeg;
 mod local_meta;
+#[cfg(target_os = "macos")]
+mod macos_now_playing;
 mod netease_proxy;
 #[cfg(not(target_os = "android"))]
 mod tray;
@@ -764,6 +766,9 @@ pub fn run() {
             app.manage(AudioState::default());
 
             #[cfg(target_os = "macos")]
+            app.manage(macos_now_playing::setup(app.handle()));
+
+            #[cfg(target_os = "macos")]
             if let Err(error) = tray::setup_macos_menu(app.handle()) {
                 eprintln!("setup macOS menu failed: {error}");
             }
@@ -855,6 +860,10 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             audio_stop,
             netease_http_post,
+            #[cfg(target_os = "macos")]
+            macos_now_playing::macos_now_playing_update,
+            #[cfg(target_os = "macos")]
+            macos_now_playing::macos_now_playing_clear,
             #[cfg(not(target_os = "android"))]
             tray::update_global_shortcut,
         ])

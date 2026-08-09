@@ -82,6 +82,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "apple-cf"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67ba5e8f49a0239ddb14da08ad41bb28b46880252bf4831380de20709c996574"
+dependencies = [
+ "doom-fish-utils",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1021,6 +1030,12 @@ dependencies = [
  "selectors",
  "tendril",
 ]
+
+[[package]]
+name = "doom-fish-utils"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "075caf2993a45abe1c2e60d8d1514ce43f947fcbcd31de19db0075e80e20c6a7"
 
 [[package]]
 name = "downcast-rs"
@@ -2410,6 +2425,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mediaplayer"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dbd88a825fca8ed5f1ae3d59e7e08e82725d372bf88fd1ed6cb727facf634f9"
+dependencies = [
+ "apple-cf",
+ "libc",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2492,12 +2517,14 @@ dependencies = [
 name = "music-storm"
 version = "0.0.6"
 dependencies = [
+ "apple-cf",
  "base64 0.22.1",
  "cpal",
  "encoding_rs",
  "image",
  "lofty",
  "md-5",
+ "mediaplayer",
  "rayon",
  "reqwest 0.12.28",
  "rfd",
