@@ -30,5 +30,7 @@ src-tauri/resources/config/*.db
 src-tauri/target/
 
 .cursor
+.workbuddy
 CloudMusicAPI
 CloudMusicAPI_New
+docs
