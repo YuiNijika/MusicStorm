@@ -474,7 +474,14 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             paddingTop: "env(safe-area-inset-top)",
                         }}
                         onPointerDown={(event) => {
-                            if ((event.target as HTMLElement).closest("button")) return
+                            // 只让空白区参与拖拽/双击：按钮、Base UI 弹层部件
+                            // （data-slot）一律不穿透，避免菜单项点击误触最大化还原
+                            if (
+                                (event.target as HTMLElement).closest(
+                                    "button, [data-slot], [role='menuitem'], [role='menu']",
+                                )
+                            )
+                                return
                             if (event.pointerType !== "mouse") return
                             // 双击动作与主标题栏一致（最大化/还原）；
                             // 微抖穿透点击已由 hook 的移动阈值过滤

@@ -90,6 +90,12 @@ function DropdownMenuItem({
         className
       )}
       {...props}
+      onPointerDown={(event) => {
+        // 菜单项是非 button 的 div[role=menuitem]：不拦 pointerdown 会冒泡到
+        // 窗口拖拽区（全屏播放器头部等）的双击/拖拽检测，误触发最大化还原
+        event.stopPropagation()
+        props.onPointerDown?.(event)
+      }}
     />
   )
 }
