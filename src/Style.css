@@ -462,6 +462,31 @@
     }
 }
 
+[data-slot="toast"] {
+    animation: toast-in var(--duration-enter) var(--ease-enter) both;
+    transition:
+        opacity var(--duration-exit) var(--ease-exit),
+        transform var(--duration-exit) var(--ease-exit),
+        height var(--duration-exit) var(--ease-exit);
+}
+
+[data-slot="toast"][data-limited] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    pointer-events: none;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 /* reduced-motion 非"零反馈"——用短 cross-fade（150ms opacity）保留状态反馈，
  * 同时关闭移位/缩放/关键帧动画，避免前庭性触发器（Apple HIG） */
 @media (prefers-reduced-motion: reduce) {
@@ -501,7 +526,8 @@
     .material-panel,
     .material-field,
     .full-player-backdrop,
-    .full-player-backdrop-tint {
+    .full-player-backdrop-tint,
+    [data-slot="toast"] {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
