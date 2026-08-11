@@ -131,9 +131,12 @@ async function fetchExternal<T>(
         url.searchParams.set("cookie", cookie)
     }
 
+    // 登录凭证经 URL cookie 参数透传（auth-cookie 体系），不依赖浏览器 cookie；
+    // 必须 omit——credentials: include 会让 CORS 要求响应头返回具体 origin，
+    // 与官方源/第三方源的 `Access-Control-Allow-Origin: *` 冲突而被浏览器拦截
     const response = await fetch(url.toString(), {
         method,
-        credentials: "include",
+        credentials: "omit",
     })
 
     if (!response.ok) {
