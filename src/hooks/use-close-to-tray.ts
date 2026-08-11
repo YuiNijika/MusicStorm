@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 
 import { getCloseToTray } from "@/lib/app/close-to-tray-prefs"
+import { isWebMode } from "@/lib/web-mode"
 
 // 关闭窗口两条路：开「最小化到托盘」→ 隐藏继续播放；
 // 关闭该选项 → 走与托盘菜单「退出」一致的 exit_app 彻底退出。
@@ -10,6 +11,13 @@ function useCloseToTray() {
     useEffect(() => {
         let unlisten: (() => void) | null = null
         let cancelled = false
+
+        // 网页版无窗口关闭语义，跳过
+        if (isWebMode()) {
+            return () => {
+                cancelled = true
+            }
+        }
 
         void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
             if (cancelled) {

@@ -1,4 +1,5 @@
 import { GITHUB_REPO_URL } from "@/lib/open-external"
+import { isWebMode } from "@/lib/web-mode"
 
 const OWNER = "YuiNijika"
 const REPO = "MusicStorm"
@@ -187,6 +188,21 @@ function isCacheFresh(cache: CachePayload, now = Date.now()): boolean {
 }
 
 async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
+    // 网页版是线上最新代码，无本地版本可比较，也不做应用内更新
+    if (isWebMode()) {
+        return {
+            currentVersion: "0.0.0",
+            latestTag: "",
+            latestVersion: "",
+            releaseName: "",
+            releaseBody: "",
+            htmlUrl: "",
+            publishedAt: null,
+            hasUpdate: false,
+            fromCache: false,
+            checkedAt: Date.now(),
+        }
+    }
     const currentVersion = await readAppVersion()
     const cached = readCache()
     const now = Date.now()

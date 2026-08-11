@@ -8,6 +8,7 @@ import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
+import { isWebMode } from "@/lib/web-mode"
 import {
     PERFORMANCE_MODE_EVENT,
     applyPerformanceModeClass,
@@ -48,6 +49,7 @@ const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.Alb
 const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
 const LibraryPage = lazy(() => import("@/pages/library").then(m => ({ default: m.LibraryPage })))
 const LocalPage = lazy(() => import("@/pages/local").then(m => ({ default: m.LocalPage })))
+const LocalWebPage = lazy(() => import("@/pages/local-web").then(m => ({ default: m.LocalWebPage })))
 const MvPage = lazy(() => import("@/pages/mv").then(m => ({ default: m.MvPage })))
 const PlaylistPage = lazy(() => import("@/pages/playlist").then(m => ({ default: m.PlaylistPage })))
 const RadioPage = lazy(() => import("@/pages/radio").then(m => ({ default: m.RadioPage })))
@@ -113,6 +115,14 @@ function AppRoutes({
         )
     }
     if (route === "local") {
+        // 网页版无文件系统访问：轻量导入页（blob URL 播放，不落盘）
+        if (isWebMode()) {
+            return (
+                <Suspense fallback={<LocalPageSkeleton />}>
+                    <LocalWebPage />
+                </Suspense>
+            )
+        }
         return <Suspense fallback={<LocalPageSkeleton />}><LocalPage /></Suspense>
     }
     if (route === "library") {
@@ -142,7 +152,9 @@ function AppRoutes({
 }
 
 function App() {
-    const [route, setRoute] = useState<AppRoute>("home")
+    const [route, setRoute] = useState<AppRoute>(() =>
+        isWebMode() ? webHashToRoute(window.location.hash) : "home",
+    )
     const [titleBarStyle, setTitleBarStyle] = useState<TitleBarStyle>(() =>
         readTitleBarStyle(),
     )
@@ -219,8 +231,7 @@ function App() {
 
 /** 挂在 Toaster 内，保证失败 toast；同时静默迁移旧 base64 封面。
  *  冷启动优化：延迟非关键操作到首屏渲染完成后执行。 */
-function IntegratedApiBootEffect() {
-    useEffect(() => {
+function IntegratedApiBootEffect() {    useEffect(() => {
         // API 探测和旧数据迁移延迟到首帧之后，避免阻塞冷启动关键路径
         const timer = window.setTimeout(() => {
             void bootIntegratedApiProbe()
@@ -229,6 +240,30 @@ function IntegratedApiBootEffect() {
         return () => window.clearTimeout(timer)
     }, [])
     return null
+}
+
+// 网页版 hash 路由：/#/player 为默认播放页，其余路由与侧栏一致。
+// 未知或空 hash 回落到主页，避免链接拼错导致白屏。
+const WEB_HASH_ROUTES: Record<string, AppRoute> = {
+    player: "home",
+    local: "local",
+    library: "library",
+    radios: "radios",
+    search: "search",
+    stats: "stats",
+    settings: "settings",
+}
+
+function webHashToRoute(hash: string): AppRoute {
+    const key = hash.replace(/^#\/?/, "").split("?")[0].toLowerCase()
+    return WEB_HASH_ROUTES[key] ?? "home"
+}
+
+function webRouteToHash(route: AppRoute): string {
+    const key = Object.entries(WEB_HASH_ROUTES).find(
+        ([, value]) => value === route,
+    )?.[0]
+    return `#/${key ?? "player"}`
 }
 
 function AppWithNav({
@@ -265,6 +300,34 @@ function AppWithNav({
         setRoute("settings")
     }, [closeDetail, setRoute, setSettingsTab])
 
+    // 网页版与浏览器地址栏同步：/#/player 进入应用，#/local 等映射路由。
+    // 桌面版保持纯内存路由，不受 hash 影响。
+    useEffect(() => {
+        if (!isWebMode()) {
+            return
+        }
+        function sync() {
+            const next = webHashToRoute(window.location.hash)
+            setRoute(next)
+        }
+        window.addEventListener("hashchange", sync)
+        return () => window.removeEventListener("hashchange", sync)
+    }, [])
+
+    // 导航时同步 hash（网页版可分享/刷新保持页面；触发 hashchange 后 setRoute 幂等）
+    const handleNavigateWeb = useCallback(
+        (next: AppRoute) => {
+            if (isWebMode()) {
+                const target = webRouteToHash(next)
+                if (window.location.hash !== target) {
+                    window.location.hash = target
+                }
+            }
+            handleNavigate(next)
+        },
+        [handleNavigate],
+    )
+
     useEffect(() => {
         let unlisten: (() => void) | null = null
         let cancelled = false
@@ -291,7 +354,7 @@ function AppWithNav({
     return (
         <AppShell
             activeRoute={route}
-            onNavigate={handleNavigate}
+            onNavigate={handleNavigateWeb}
             titleBarStyle={titleBarStyle}
             onOpenUpdate={handleOpenUpdate}
         >

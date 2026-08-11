@@ -8,6 +8,9 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      - "player.html"
+      - "vite.player.config.ts"
+      - "src/**"
       - ".github/workflows/website-deploy.yml"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -50,11 +53,23 @@ jobs:
       - name: Build website
         run: pnpm --filter website build
 
+      - name: Build web player (player.html)
+        run: pnpm build:player
+
       - name: Stage build output into docs/
+        # 先组装到 docs.tmp/ 并校验关键产物，全部就绪后再原子替换 docs/：
+        # 任何一步失败都不会破坏已发布的 docs/
         run: |
+          rm -rf docs.tmp
+          mkdir -p docs.tmp
+          cp -r website/dist/. docs.tmp/
+          cp -r dist/player.html dist/icon.png dist/icon.svg dist/assets/player docs.tmp/
+          # 完整性校验：网页版入口与分包缺失即失败，避免"在线播放"入口丢失
+          test -f docs.tmp/player.html
+          test -d docs.tmp/assets/player
+          test "$(find docs.tmp/assets/player -name '*.js' | wc -l)" -gt 0
           rm -rf docs
-          mkdir -p docs
-          cp -r website/dist/. docs/
+          mv docs.tmp docs
 
       - name: Commit and push docs/
         run: |

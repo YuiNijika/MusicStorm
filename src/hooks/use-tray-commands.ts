@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
+import { isWebMode } from "@/lib/web-mode"
 
 type PlayerCommandPayload =
     | string
@@ -26,6 +27,13 @@ function useTrayCommands() {
     useEffect(() => {
         let unlisten: (() => void) | null = null
         let cancelled = false
+
+        // 网页版无托盘事件源
+        if (isWebMode()) {
+            return () => {
+                cancelled = true
+            }
+        }
 
         void import("@tauri-apps/api/event").then(({ listen }) => {
             if (cancelled) {

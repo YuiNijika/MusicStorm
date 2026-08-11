@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react"
 
+import { DownloadBanner } from "@/components/app/download-banner"
 import { TitleBar, type TitleBarStyle } from "@/components/app/title-bar"
 import { FullPlayer } from "@/components/layout/full-player"
 import { MobileNavBar } from "@/components/layout/mobile-nav-bar"
@@ -13,6 +14,7 @@ import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
 import { isNativeMacOS } from "@/lib/platform"
 import type { AppRoute } from "@/lib/routes"
+import { isWebMode } from "@/lib/web-mode"
 
 type AppShellProps = {
     activeRoute: AppRoute
@@ -32,6 +34,7 @@ function AppShell({
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     const { detail, back } = useMusicNavigation()
+    // 网页版无窗口/托盘/系统媒体集成；桌面 hooks 内部自带 web 守卫
     usePlayerHotkeys()
     useCloseToTray()
     useTrayCommands()
@@ -55,7 +58,10 @@ function AppShell({
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
-            {!nativeMacOS ? (
+            {/* 网页版下载提示条：正常文档流置顶，不遮挡内容；桌面版不渲染 */}
+            <DownloadBanner />
+
+            {!nativeMacOS && !isWebMode() ? (
                 <div className="hidden md:block">
                     <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
                 </div>

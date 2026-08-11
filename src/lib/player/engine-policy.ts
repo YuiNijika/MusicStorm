@@ -19,6 +19,10 @@ function getEnginePref(): EnginePref {
     if (typeof window === "undefined") {
         return "auto"
     }
+    // 网页版无原生音频后端，固定 H5
+    if (!isTauriRuntime()) {
+        return "html5"
+    }
     const raw = window.localStorage.getItem(ENGINE_PREF_KEY)
     if (raw === "wasapi") {
         window.localStorage.setItem(ENGINE_PREF_KEY, "native")

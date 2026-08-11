@@ -9,6 +9,7 @@ import {
 } from "@/lib/netease/song-privilege"
 import { fetchSongUrl } from "@/lib/netease/track"
 import type { Track } from "@/lib/types"
+import { isWebMode } from "@/lib/web-mode"
 
 export type ResolvePlayableResult =
     | { ok: true; url: string }
@@ -39,6 +40,10 @@ function normalizeNeteaseMediaUrl(url: string): string {
 // 本地直接 convertFileSrc；网易云始终重新取链，无 url / 无版权 / VIP 未购 → ok:false
 async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> {
     if (track.filePath && track.source === "local") {
+        // 网页版导入的本地歌 filePath 即 blob URL，可直接播放，无需 Tauri 转换
+        if (isWebMode()) {
+            return { ok: true, url: track.filePath }
+        }
         try {
             return { ok: true, url: convertFileSrc(track.filePath) }
         } catch {
@@ -86,6 +91,9 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
     }
 
     if (track.filePath) {
+        if (isWebMode()) {
+            return { ok: true, url: track.filePath }
+        }
         try {
             return { ok: true, url: convertFileSrc(track.filePath) }
         } catch {

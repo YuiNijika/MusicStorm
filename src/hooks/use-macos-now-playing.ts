@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
 import { getCoverOverride } from "@/lib/music/cover-overrides"
+import { isWebMode } from "@/lib/web-mode"
 import {
     ensureRemoteCoverCached,
     getCachedRemoteCover,
@@ -47,7 +48,8 @@ function useMacOSNowPlaying() {
     const lastIdentityRef = useRef("")
 
     useEffect(() => {
-        if (!isNativeMacOS() || !currentTrack) {
+        // 网页版无系统媒体集成
+        if (isWebMode() || !isNativeMacOS() || !currentTrack) {
             setCoverPath(null)
             return
         }
@@ -77,7 +79,7 @@ function useMacOSNowPlaying() {
     }, [currentTrack])
 
     useEffect(() => {
-        if (!isNativeMacOS()) {
+        if (isWebMode() || !isNativeMacOS()) {
             return
         }
         if (!currentTrack) {

@@ -152,6 +152,7 @@ import { loadLocalLibrary } from "@/lib/local/library-store"
 import { collectCoverRefHashes } from "@/lib/music/cover-overrides"
 import { isMacOS, isNativeMacOS } from "@/lib/platform"
 import { cn } from "@/lib/utils"
+import { isWebMode } from "@/lib/web-mode"
 import { readTitleBarStyle, TITLE_BAR_STORAGE_KEY, type SettingsTab } from "@/lib/app/title-bar-prefs"
 
 const TABS: { id: SettingsTab; label: string }[] = [
@@ -187,7 +188,11 @@ function SettingsPage({
     return (
         <div className="space-y-5">
             <SegmentedControl
-                items={TABS}
+                items={
+                    isWebMode()
+                        ? TABS.filter((item) => item.id !== "update")
+                        : TABS
+                }
                 value={tab}
                 onChange={(id) => setTab(id as SettingsTab)}
                 className="w-fit max-w-full"
@@ -208,7 +213,7 @@ function SettingsPage({
                         onTitleBarStyleChange={onTitleBarStyleChange}
                     />
                 ) : null}
-                {tab === "update" ? <UpdateTab /> : null}
+                {!isWebMode() && tab === "update" ? <UpdateTab /> : null}
                 {tab === "hotkeys" ? <HotkeysTab /> : null}
                 {tab === "other" ? <OtherTab /> : null}
             </div>
@@ -331,6 +336,24 @@ function SourceTab() {
     const sourceLabel =
         EXTERNAL_SOURCES.find((item) => item.id === settings.source)?.label ??
         "API 源"
+
+    // 网页版固定官方源，不提供切换
+    if (isWebMode()) {
+        return (
+            <Section title="音源" description="网页版固定使用官方源">
+                <div className="material-panel rounded-[20px] px-4 py-4">
+                    <p className="text-[14px] font-medium tracking-[-0.01em]">
+                        MusicStorm 官方源
+                    </p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                        网页版无本机加密链路，网易云 API 固定调用官方源
+                        （api.miomoe.cn），不支持切换或自定义。
+                        下载桌面端可在「音源」中配置内置集成或第三方 API 源。
+                    </p>
+                </div>
+            </Section>
+        )
+    }
 
     return (
         <Section title="音源" description="内置 API 或对接外部 NCM 源 · 音质">
@@ -666,34 +689,36 @@ function PlaybackTab() {
                     </div>
                 </div>
 
-                <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
-                    <div>
-                        <p className="text-[14px] font-medium tracking-[-0.01em]">播放引擎</p>
-                        <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            当前：{labelForEngineStatus(engineStatus, audioMode?.backend)}
-                            {audioMode?.note ? ` · ${audioMode.note}` : ""}
-                        </p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                            无损/高规格本地走{nativeBackendLabel}，在线与普通 mp3 走 H5
+                {!isWebMode() ? (
+                    <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
+                        <div>
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">播放引擎</p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                当前：{labelForEngineStatus(engineStatus, audioMode?.backend)}
+                                {audioMode?.note ? ` · ${audioMode.note}` : ""}
+                            </p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                无损/高规格本地走{nativeBackendLabel}，在线与普通 mp3 走 H5
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {ENGINE_PREF_OPTIONS.map((option) => (
+                                <ChoiceChip
+                                    key={option.id}
+                                    label={option.label}
+                                    active={enginePref === option.id}
+                                    onClick={() => {
+                                        setEnginePref(option.id)
+                                        setEnginePrefState(option.id)
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            切换后将在下次启动播放会话时生效
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {ENGINE_PREF_OPTIONS.map((option) => (
-                            <ChoiceChip
-                                key={option.id}
-                                label={option.label}
-                                active={enginePref === option.id}
-                                onClick={() => {
-                                    setEnginePref(option.id)
-                                    setEnginePrefState(option.id)
-                                }}
-                            />
-                        ))}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                        切换后将在下次启动播放会话时生效
-                    </p>
-                </div>
+                ) : null}
 
                 <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
                     <div className="flex items-center justify-between gap-3">
@@ -1797,11 +1822,12 @@ function OtherTab() {
 
     return (
         <div className="space-y-7">
-            <Section
-                title="窗口与托盘"
-                description="关闭窗口的行为与恢复方式"
-            >
-                <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
+            {!isWebMode() ? (
+                <Section
+                    title="窗口与托盘"
+                    description="关闭窗口的行为与恢复方式"
+                >
+                    <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
                     <div className="min-w-0">
                         <p className="text-[14px] font-medium tracking-[-0.01em]">
                             {isMacOS()
@@ -1822,7 +1848,8 @@ function OtherTab() {
                         }}
                     />
                 </div>
-            </Section>
+                </Section>
+            ) : null}
 
             <Section
                 title="性能模式"
@@ -1887,14 +1914,15 @@ function OtherTab() {
                 </div>
             </Section>
 
-            <Section
-                title="开发者工具"
-                description="调试界面布局与网络请求"
-            >
-                <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-4">
-                    <div className="min-w-0">
-                        <p className="text-[14px] font-medium tracking-[-0.01em]">
-                            启用 DevTools
+            {!isWebMode() ? (
+                <Section
+                    title="开发者工具"
+                    description="调试界面布局与网络请求"
+                >
+                    <div className="material-panel flex items-center justify-between gap-4 rounded-[20px] px-4 py-4">
+                        <div className="min-w-0">
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                启用 DevTools
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
                             启用后按 F12 打开开发者工具（仅开发构建生效）
@@ -1912,7 +1940,8 @@ function OtherTab() {
                         aria-label="启用 DevTools"
                     />
                 </div>
-            </Section>
+                </Section>
+            ) : null}
 
             <Section
                 title="缓存"

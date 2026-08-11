@@ -38,7 +38,10 @@ function MediaCard({
         >
             <div
                 className={cn(
-                    "apple-card-shadow relative overflow-hidden rounded-[14px] ring-1 ring-black/[0.06] dark:ring-white/[0.08]",
+                    "apple-card-shadow relative overflow-hidden rounded-[14px] ring-1 ring-black/[0.06]",
+                    "transition-shadow duration-200 ease-out",
+                    "group-hover:shadow-[0_14px_36px_rgba(15,23,42,0.14)] group-hover:ring-black/[0.14]",
+                    "dark:ring-white/[0.08] dark:group-hover:shadow-[0_14px_36px_rgba(0,0,0,0.4)] dark:group-hover:ring-white/[0.16]",
                     active && "ring-2 ring-primary/70",
                 )}
             >

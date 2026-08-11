@@ -1,5 +1,7 @@
 // 单一 localStorage 真相源
 
+import { isWebMode } from "@/lib/web-mode"
+
 const SETTINGS_KEY = "musicstorm-api-settings"
 const LEGACY_BASE_URL_KEY = "musicstorm-netease-base-url"
 const LEGACY_PRESET_KEY = "musicstorm-netease-base-preset"
@@ -99,6 +101,11 @@ function migrateLegacy(): ApiSettings | null {
 function readRaw(): ApiSettings {
     if (typeof window === "undefined") {
         return { ...DEFAULT_SETTINGS }
+    }
+
+    // 网页版没有本机加密链路，固定走官方外部源（与设置页只读展示一致）
+    if (isWebMode()) {
+        return { ...DEFAULT_SETTINGS, mode: "external" }
     }
 
     try {

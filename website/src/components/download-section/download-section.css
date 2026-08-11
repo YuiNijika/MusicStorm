@@ -90,3 +90,18 @@
     font-size: 14px;
     color: var(--color-text-secondary);
 }
+
+/* 在线体验（网页版入口）：a 标签形态，与按钮组一致 */
+a.download__button {
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+a.download__button:hover {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+a.download__button:active {
+    transform: scale(0.96);
+}

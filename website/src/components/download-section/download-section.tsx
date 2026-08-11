@@ -76,6 +76,17 @@ function DownloadSection() {
                             <span className="download__button-version">即将推出</span>
                         </span>
                     </span>
+                    <a
+                        className="download__button"
+                        href="player.html"
+                        title="浏览器直接体验（功能受限）"
+                    >
+                        <GlobeIcon />
+                        <span className="download__button-text">
+                            <span className="download__button-label">在线体验</span>
+                            <span className="download__button-version">网页版</span>
+                        </span>
+                    </a>
                 </div>
             </div>
         </section>
@@ -86,6 +97,15 @@ function WindowsIcon() {
     return (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm9 1.1L21 5.3v8.2h-9V6.6ZM3 12.9h7.5V20L3 18.9v-6Zm9 0h9v7.7l-9-1.3v-6.4Z" />
+        </svg>
+    )
+}
+
+function GlobeIcon() {
+    return (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3Z" />
         </svg>
     )
 }

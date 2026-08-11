@@ -40,6 +40,7 @@ import {
     writePlaybackSession,
 } from "@/lib/player/playback-session"
 import type { PlayerSnapshot, RepeatMode, Track } from "@/lib/types"
+import { isWebMode } from "@/lib/web-mode"
 
 type PlayerContextValue = PlayerSnapshot & {
     currentTrack: Track | null
@@ -129,10 +130,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [currentIndex, setCurrentIndex] = useState(
         () => restored?.currentIndex ?? -1,
     )
+    // 浏览器自动播放策略会拦截无用户交互的 play()：网页版恢复会话时保持暂停，
+    // 由用户首次点击播放（此后即可正常连播）。
     const [isPlaying, setIsPlaying] = useState(
         () =>
             Boolean(
-                playerPrefs.autoPlayOnStartup && restored?.queue.length,
+                !isWebMode() &&
+                    playerPrefs.autoPlayOnStartup &&
+                    restored?.queue.length,
             ),
     )
     const [positionMs, setPositionMs] = useState(
