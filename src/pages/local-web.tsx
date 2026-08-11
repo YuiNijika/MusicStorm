@@ -194,7 +194,7 @@ function LocalWebPage() {
                     <div className="flex items-center justify-between gap-3">
                         <p className="text-[12px] text-muted-foreground">
                             {tracks.length} 首 · 共 {formatDuration(totalMs)}
-                            {storageLabel}（IndexedDB 持久化）
+                            {storageLabel}
                         </p>
                         <button
                             type="button"
