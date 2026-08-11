@@ -12,7 +12,7 @@ function OpenSource() {
     const { data: contributors, loading } = useContributors()
 
     return (
-        <section className="open-source" id="open-source">
+        <section className="open-source">
             <div className="open-source__inner">
                 <BlurText
                     tag="h2"

@@ -12,7 +12,7 @@ function DownloadSection() {
     const windowsUrl = release?.url ?? RELEASES_URL
 
     return (
-        <section className="download" id="download">
+        <section className="download">
             <div className="download__inner reveal">
                 <h2 className="display-lg download__title">
                     <ShinyText

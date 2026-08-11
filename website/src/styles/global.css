@@ -37,26 +37,26 @@
     color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --color-bg: #000000;
-        --color-bg-elevated: #1c1c1e;
-        --color-bg-subtle: #161617;
-        --color-text: #f5f5f7;
-        --color-text-secondary: #a1a1a6;
-        --color-text-tertiary: #86868b;
-        --color-separator: rgba(255, 255, 255, 0.12);
-        --color-accent: #2997ff;
-        --color-accent-hover: #147ce5;
-        --color-accent-text: #ffffff;
-        --color-nav-bg: rgba(22, 22, 23, 0.72);
-        --color-card-shadow: rgba(0, 0, 0, 0.3);
-        --color-placeholder-from: #2c2c2e;
-        --color-placeholder-to: #1c1c1e;
-        --color-spotlight: rgba(41, 151, 255, 0.22);
+/* 暗色由 html[data-theme="dark"] 驱动（index.html 内联脚本按系统/手动偏好设置），
+   不用 media query 直接触发，避免与手动切换打架 */
+html[data-theme="dark"] {
+    --color-bg: #000000;
+    --color-bg-elevated: #1c1c1e;
+    --color-bg-subtle: #161617;
+    --color-text: #f5f5f7;
+    --color-text-secondary: #a1a1a6;
+    --color-text-tertiary: #86868b;
+    --color-separator: rgba(255, 255, 255, 0.12);
+    --color-accent: #2997ff;
+    --color-accent-hover: #147ce5;
+    --color-accent-text: #ffffff;
+    --color-nav-bg: rgba(22, 22, 23, 0.72);
+    --color-card-shadow: rgba(0, 0, 0, 0.3);
+    --color-placeholder-from: #2c2c2e;
+    --color-placeholder-to: #1c1c1e;
+    --color-spotlight: rgba(41, 151, 255, 0.22);
 
-        color-scheme: dark;
-    }
+    color-scheme: dark;
 }
 
 /* Base */

@@ -1,0 +1,20 @@
+/* 单钮主题切换：纯图标按钮，无背景无边框，仅 hover/按压变色反馈 */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color var(--duration-control) var(--ease-enter);
+}
+
+.theme-toggle:hover {
+    color: var(--color-text);
+}
+
+.theme-toggle:active {
+    opacity: 0.7;
+}

@@ -1,11 +1,12 @@
 import { GradientText } from "../gradient-text/gradient-text"
 import { ScrollExpand } from "../scroll-expand/scroll-expand"
+import { scrollToSection } from "../../lib/scroll-to"
 
 import "./hero.css"
 
 function Hero() {
     return (
-        <section className="hero" id="top">
+        <section className="hero">
             <ScrollExpand
                 src="/image/hero.webp"
                 alt="MusicStorm 应用主界面"
@@ -26,15 +27,20 @@ function Hero() {
                         为你重新设计的音乐体验。
                     </p>
                     <div className="hero__actions">
-                        <a
+                        <button
+                            type="button"
                             className="hero__button hero__button--primary"
-                            href="#download"
+                            onClick={() => scrollToSection("download")}
                         >
                             免费下载
-                        </a>
-                        <a className="hero__button hero__button--link" href="#features">
+                        </button>
+                        <button
+                            type="button"
+                            className="hero__button hero__button--link"
+                            onClick={() => scrollToSection("features")}
+                        >
                             了解更多
-                        </a>
+                        </button>
                     </div>
                 </div>
             </ScrollExpand>

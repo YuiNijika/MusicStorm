@@ -20,7 +20,6 @@ interface Contributor {
     profileUrl: string
 }
 
-/** SWR 结果：cached 同步可用（可能过期），refreshed 后台回源 */
 interface SwrResult<T> {
     cached: T | null
     refreshed: Promise<T | null>
@@ -68,7 +67,6 @@ async function fetchJson<T>(url: string): Promise<T | null> {
     }
 }
 
-/** 最新桌面版：Android 版本线走独立 -android 后缀 tag，官网下载按钮只认桌面版 */
 async function requestLatestRelease(): Promise<ReleaseInfo | null> {
     const releases = await fetchJson<{ tag_name: string; html_url: string }[]>(
         `${API_BASE}/releases?per_page=20`,

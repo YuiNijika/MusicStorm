@@ -19,7 +19,7 @@ function Screenshots() {
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
     return (
-        <section className="screenshots" id="screenshots">
+        <section className="screenshots">
             <div className="screenshots__inner">
                 <h2 className="display-lg screenshots__title reveal">眼见为实。</h2>
                 <div className="screenshots__gallery reveal">

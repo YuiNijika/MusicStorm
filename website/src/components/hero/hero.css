@@ -39,6 +39,13 @@
 }
 
 .hero__button {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
     transition:
         background-color var(--duration-control) var(--ease-enter),
         transform var(--duration-press) var(--ease-press);

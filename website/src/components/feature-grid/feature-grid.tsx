@@ -1,4 +1,12 @@
 import type { ReactNode } from "react"
+import {
+    AlignLeft,
+    Cloud,
+    Library,
+    Maximize,
+    MonitorSmartphone,
+    Palette,
+} from "lucide-react"
 
 import { SplitText } from "../split-text/split-text"
 import { SpotlightCard } from "../spotlight-card/spotlight-card"
@@ -46,7 +54,7 @@ const FEATURES: Feature[] = [
 
 function FeatureGrid() {
     return (
-        <section className="feature-grid" id="features">
+        <section className="feature-grid">
             <div className="feature-grid__inner">
                 {/* SplitText 渲染为 inline-block，外层 div 负责居中与间距 */}
                 <div className="feature-grid__title">
@@ -80,75 +88,31 @@ function FeatureGrid() {
     )
 }
 
+// lucide 图标统一 28px / 1.8 描边，保持原手绘图标的视觉重量
+const ICON_PROPS = { size: 28, strokeWidth: 1.8 } as const
+
 function LibraryIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="7" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="14" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="14" y="15" width="7" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        </svg>
-    )
+    return <Library {...ICON_PROPS} />
 }
 
 function CloudIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path
-                d="M7 18a4.5 4.5 0 1 1 .6-8.96A5.5 5.5 0 0 1 18.3 10.4 3.75 3.75 0 0 1 17.5 18H7Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
+    return <Cloud {...ICON_PROPS} />
 }
 
 function LyricsIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path d="M4 7h16M4 12h10M4 17h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-    )
+    return <AlignLeft {...ICON_PROPS} />
 }
 
 function PaletteIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path
-                d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-.8-.6-1.3-.6-2.1 0-.9.7-1.6 1.7-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.6-9-8.6Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-            />
-            <circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" />
-            <circle cx="11" cy="7.5" r="1.2" fill="currentColor" />
-            <circle cx="15" cy="8.5" r="1.2" fill="currentColor" />
-        </svg>
-    )
+    return <Palette {...ICON_PROPS} />
 }
 
 function ExpandIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path
-                d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
+    return <Maximize {...ICON_PROPS} />
 }
 
 function DevicesIcon() {
-    return (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <rect x="2.5" y="5" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="17.5" y="9" width="4" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M6 19h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-    )
+    return <MonitorSmartphone {...ICON_PROPS} />
 }
 
 export { FeatureGrid }

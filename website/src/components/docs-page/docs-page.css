@@ -1,0 +1,351 @@
+/* 文档页：侧栏目录 + 正文，排版遵循 Apple 规范
+   （大标题负字距、正文舒适行高、层级靠字重+尺寸+行距成组） */
+
+.docs {
+    padding: calc(var(--nav-height) + 48px) 24px 96px;
+}
+
+.docs__inner {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 64px;
+    align-items: start;
+}
+
+/* ---------- 侧栏目录 ---------- */
+
+.docs__sidebar {
+    position: sticky;
+    top: calc(var(--nav-height) + 40px);
+}
+
+.docs__sidebar-title {
+    margin: 0 0 12px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-text-tertiary);
+}
+
+.docs__nav {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.docs__nav a {
+    display: block;
+    padding: 7px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    transition:
+        color var(--duration-control) var(--ease-enter),
+        background-color var(--duration-control) var(--ease-enter);
+}
+
+.docs__nav a:hover {
+    color: var(--color-text);
+    background: var(--color-bg-subtle);
+}
+
+.docs__nav a[aria-current="page"] {
+    color: var(--color-accent);
+    background: var(--color-spotlight);
+    font-weight: 500;
+}
+
+/* ---------- 正文 ---------- */
+
+.docs__body {
+    min-width: 0;
+    max-width: 720px;
+}
+
+.docs__eyebrow {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-accent);
+}
+
+.docs__title {
+    margin: 0;
+    font-size: clamp(2rem, 4.5vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    color: var(--color-text);
+}
+
+.docs__lead {
+    margin: 14px 0 0;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+}
+
+/* ---------- 索引卡片 ---------- */
+
+.docs__cards {
+    margin-top: 40px;
+    display: grid;
+    gap: 12px;
+}
+
+.docs__card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 18px 20px;
+    border-radius: var(--radius-card);
+    background: var(--color-bg-elevated);
+    box-shadow: 0 1px 2px var(--color-card-shadow);
+    transition:
+        transform var(--duration-control) var(--ease-enter),
+        box-shadow var(--duration-hover) var(--ease-enter);
+}
+
+.docs__card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--color-card-shadow);
+}
+
+.docs__card:active {
+    transform: scale(0.99);
+    transition-duration: var(--duration-press);
+}
+
+.docs__card-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+}
+
+.docs__card-desc {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+}
+
+/* ---------- markdown 正文（prose） ---------- */
+
+.doc-content {
+    margin-top: 32px;
+    font-size: 15.5px;
+    line-height: 1.75;
+    color: var(--color-text);
+}
+
+.doc-content > *:first-child {
+    margin-top: 0;
+}
+
+.doc-content h2 {
+    margin: 48px 0 14px;
+    font-size: 24px;
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    scroll-margin-top: calc(var(--nav-height) + 24px);
+}
+
+.doc-content h3 {
+    margin: 32px 0 10px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.012em;
+    scroll-margin-top: calc(var(--nav-height) + 24px);
+}
+
+.doc-content p {
+    margin: 14px 0;
+}
+
+.doc-content a {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.doc-content a:hover {
+    text-decoration: underline;
+}
+
+.doc-content ul,
+.doc-content ol {
+    margin: 14px 0;
+    padding-left: 1.4em;
+}
+
+.doc-content li {
+    margin: 6px 0;
+}
+
+.doc-content li::marker {
+    color: var(--color-text-tertiary);
+}
+
+.doc-content strong {
+    font-weight: 600;
+}
+
+.doc-content code {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+        monospace;
+    font-size: 0.88em;
+}
+
+.doc-content pre {
+    margin: 18px 0;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: var(--color-bg-subtle);
+    overflow-x: auto;
+}
+
+.doc-content pre code {
+    padding: 0;
+    background: none;
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.doc-content blockquote {
+    margin: 18px 0;
+    padding: 2px 0 2px 16px;
+    border-left: 3px solid var(--color-accent);
+    color: var(--color-text-secondary);
+}
+
+.doc-content blockquote p {
+    margin: 6px 0;
+}
+
+.doc-content hr {
+    margin: 36px 0;
+    border: none;
+    border-top: 1px solid var(--color-separator);
+}
+
+.doc-content img {
+    max-width: 100%;
+    border-radius: var(--radius-card);
+}
+
+.doc-content table {
+    width: 100%;
+    margin: 18px 0;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.doc-content th,
+.doc-content td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-separator);
+}
+
+.doc-content th {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.doc-content td {
+    color: var(--color-text-secondary);
+}
+
+/* ---------- 上一篇 / 下一篇 ---------- */
+
+.docs__pager {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-separator);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.docs__pager a {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 18px;
+    border-radius: var(--radius-card);
+    transition: background-color var(--duration-control) var(--ease-enter);
+}
+
+.docs__pager a:hover {
+    background: var(--color-bg-subtle);
+}
+
+.docs__pager a[rel="next"] {
+    grid-column: 2;
+    text-align: right;
+}
+
+.docs__pager-hint {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.docs__pager-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-accent);
+}
+
+/* ---------- 移动端：侧栏变顶部横向滚动条 ---------- */
+
+@media (max-width: 800px) {
+    .docs {
+        padding-top: calc(var(--nav-height) + 28px);
+    }
+
+    .docs__inner {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+
+    .docs__sidebar {
+        position: static;
+    }
+
+    .docs__sidebar-title {
+        padding: 0;
+    }
+
+    .docs__nav {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 6px;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .docs__nav a {
+        white-space: nowrap;
+    }
+
+    .docs__pager {
+        grid-template-columns: 1fr;
+    }
+
+    .docs__pager a[rel="next"] {
+        grid-column: auto;
+        text-align: left;
+    }
+}

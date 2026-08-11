@@ -23,9 +23,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    border: 0;
+    padding: 0;
+    background: none;
+    font: inherit;
     font-weight: 600;
     font-size: 15px;
     color: var(--color-text);
+    cursor: pointer;
 }
 
 .site-header__brand:hover {
@@ -40,12 +45,19 @@
     list-style: none;
 }
 
+.site-header__links button,
 .site-header__links a {
+    border: 0;
+    padding: 0;
+    background: none;
+    font: inherit;
     font-size: 13px;
     color: var(--color-text-secondary);
+    cursor: pointer;
     transition: color var(--duration-hover) var(--ease-enter);
 }
 
+.site-header__links button:hover,
 .site-header__links a:hover {
     color: var(--color-text);
     text-decoration: none;
