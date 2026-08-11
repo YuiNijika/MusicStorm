@@ -6,7 +6,7 @@ order: 1
 
 ## 下载与安装
 
-前往首页的[下载区](#download)获取最新版本，或在 [GitHub Releases](https://github.com/YuiNijika/MusicStorm/releases) 中选择对应平台的安装包。
+前往[首页](#/)的**下载区**获取最新版本，或在 [GitHub Releases](https://github.com/YuiNijika/MusicStorm/releases) 中选择对应平台的安装包。
 
 | 平台 | 状态 |
 | --- | --- |

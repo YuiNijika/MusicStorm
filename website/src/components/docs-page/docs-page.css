@@ -39,6 +39,67 @@
     gap: 2px;
 }
 
+/* 组行：链接 + 折叠按钮并排 */
+.docs__nav-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.docs__nav-group > a {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 激活文档所在的组标题高亮（子文档激活时父组同样标亮） */
+.docs__nav-group > a.is-active {
+    color: var(--color-text);
+}
+
+/* 折叠按钮：纯图标，hover 圆底，chevron 旋转 180°（transform 符合动效规范） */
+.docs__nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    transition:
+        color var(--duration-control) var(--ease-enter),
+        background-color var(--duration-control) var(--ease-enter);
+}
+
+.docs__nav-toggle:hover {
+    color: var(--color-text);
+    background: var(--color-bg-subtle);
+}
+
+.docs__nav-toggle svg {
+    transition: transform var(--duration-control) var(--ease-enter);
+}
+
+.docs__nav-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+/* 折叠子项：缩进 + 左侧细分隔线，次级字号 */
+.docs__nav-children {
+    list-style: none;
+    margin: 2px 0 2px 14px;
+    padding: 0 0 0 10px;
+    border-left: 1px solid var(--color-separator);
+}
+
+.docs__nav-children a {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
 .docs__nav a {
     display: block;
     padding: 7px 12px;
@@ -96,9 +157,57 @@
 /* ---------- 索引卡片 ---------- */
 
 .docs__cards {
-    margin-top: 40px;
+    margin-top: 28px;
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+}
+
+/* 搜索框：图标 + 输入，聚焦高亮描边 */
+.docs__search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 28px;
+    padding: 0 14px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--color-bg-subtle);
+    border: 1px solid transparent;
+    transition:
+        border-color var(--duration-control) var(--ease-enter),
+        background-color var(--duration-control) var(--ease-enter);
+}
+
+.docs__search:focus-within {
+    border-color: var(--color-accent);
+    background: var(--color-bg-elevated);
+}
+
+.docs__search-icon {
+    flex-shrink: 0;
+    color: var(--color-text-tertiary);
+}
+
+.docs__search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: none;
+    font-size: 14px;
+    color: var(--color-text);
+}
+
+.docs__search input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+/* 空态：不匹配关键词时提示而非空白 */
+.docs__empty {
+    margin: 32px 0 0;
+    font-size: 14px;
+    color: var(--color-text-tertiary);
 }
 
 .docs__card {
@@ -223,6 +332,120 @@
     line-height: 1.65;
 }
 
+/* ---- 代码高亮 token（构建期 hljs 生成，纯静态配色） ---- */
+.doc-content .hljs-keyword,
+.doc-content .hljs-selector-tag,
+.doc-content .hljs-literal,
+.doc-content .hljs-type {
+    color: #cf222e;
+}
+
+.doc-content .hljs-string,
+.doc-content .hljs-regexp,
+.doc-content .hljs-addition {
+    color: #0a3069;
+}
+
+.doc-content .hljs-number,
+.doc-content .hljs-symbol,
+.doc-content .hljs-bullet {
+    color: #0550ae;
+}
+
+.doc-content .hljs-comment,
+.doc-content .hljs-quote {
+    color: #6e7781;
+    font-style: italic;
+}
+
+.doc-content .hljs-title,
+.doc-content .hljs-title.function_,
+.doc-content .hljs-section,
+.doc-content .hljs-name {
+    color: #8250df;
+}
+
+.doc-content .hljs-attr,
+.doc-content .hljs-attribute,
+.doc-content .hljs-variable.constant_ {
+    color: #116329;
+}
+
+.doc-content .hljs-variable,
+.doc-content .hljs-template-variable,
+.doc-content .hljs-selector-class {
+    color: #953800;
+}
+
+.doc-content .hljs-built_in,
+.doc-content .hljs-property {
+    color: #0550ae;
+}
+
+.doc-content .hljs-meta {
+    color: #6e7781;
+}
+
+.doc-content .hljs-emphasis {
+    font-style: italic;
+}
+
+.doc-content .hljs-strong {
+    font-weight: 600;
+}
+
+html[data-theme="dark"] .doc-content .hljs-keyword,
+html[data-theme="dark"] .doc-content .hljs-selector-tag,
+html[data-theme="dark"] .doc-content .hljs-literal,
+html[data-theme="dark"] .doc-content .hljs-type {
+    color: #ff7b72;
+}
+
+html[data-theme="dark"] .doc-content .hljs-string,
+html[data-theme="dark"] .doc-content .hljs-regexp,
+html[data-theme="dark"] .doc-content .hljs-addition {
+    color: #a5d6ff;
+}
+
+html[data-theme="dark"] .doc-content .hljs-number,
+html[data-theme="dark"] .doc-content .hljs-symbol,
+html[data-theme="dark"] .doc-content .hljs-bullet {
+    color: #79c0ff;
+}
+
+html[data-theme="dark"] .doc-content .hljs-comment,
+html[data-theme="dark"] .doc-content .hljs-quote {
+    color: #8b949e;
+}
+
+html[data-theme="dark"] .doc-content .hljs-title,
+html[data-theme="dark"] .doc-content .hljs-title.function_,
+html[data-theme="dark"] .doc-content .hljs-section,
+html[data-theme="dark"] .doc-content .hljs-name {
+    color: #d2a8ff;
+}
+
+html[data-theme="dark"] .doc-content .hljs-attr,
+html[data-theme="dark"] .doc-content .hljs-attribute,
+html[data-theme="dark"] .doc-content .hljs-variable.constant_ {
+    color: #7ee787;
+}
+
+html[data-theme="dark"] .doc-content .hljs-variable,
+html[data-theme="dark"] .doc-content .hljs-template-variable,
+html[data-theme="dark"] .doc-content .hljs-selector-class {
+    color: #ffa657;
+}
+
+html[data-theme="dark"] .doc-content .hljs-built_in,
+html[data-theme="dark"] .doc-content .hljs-property {
+    color: #79c0ff;
+}
+
+html[data-theme="dark"] .doc-content .hljs-meta {
+    color: #8b949e;
+}
+
 .doc-content blockquote {
     margin: 18px 0;
     padding: 2px 0 2px 16px;
@@ -313,6 +536,10 @@
 @media (max-width: 800px) {
     .docs {
         padding-top: calc(var(--nav-height) + 28px);
+    }
+
+    .docs__cards {
+        grid-template-columns: 1fr;
     }
 
     .docs__inner {

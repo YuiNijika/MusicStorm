@@ -1,29 +1,45 @@
+import type { SectionTarget } from "../../lib/scroll-to"
+import { ThemeToggle } from "../theme-toggle/theme-toggle"
+
 import "./site-header.css"
 
-const NAV_LINKS = [
-    { label: "功能", href: "#features" },
-    { label: "截图", href: "#screenshots" },
-    { label: "下载", href: "#download" },
-] as const
+const NAV_LINKS: { label: string; target: SectionTarget }[] = [
+    { label: "功能", target: "features" },
+    { label: "截图", target: "screenshots" },
+    { label: "下载", target: "download" },
+]
 
-function SiteHeader() {
+function SiteHeader({ onNavigate }: { onNavigate: (target: SectionTarget) => void }) {
     return (
         <header className="site-header">
             <nav className="site-header__inner" aria-label="主导航">
-                <a className="site-header__brand" href="#top">
+                <button
+                    type="button"
+                    className="site-header__brand"
+                    onClick={() => onNavigate("top")}
+                >
                     <StormIcon />
                     <span>MusicStorm</span>
-                </a>
+                </button>
                 <ul className="site-header__links">
                     {NAV_LINKS.map((link) => (
-                        <li key={link.href}>
-                            <a href={link.href}>{link.label}</a>
+                        <li key={link.target}>
+                            <button
+                                type="button"
+                                onClick={() => onNavigate(link.target)}
+                            >
+                                {link.label}
+                            </button>
                         </li>
                     ))}
+                    <li>
+                        <a href="#/docs">文档</a>
+                    </li>
                 </ul>
-                <a className="site-header__cta" href="https://space.bilibili.com/435502585" target="_blank" rel="noopener noreferrer">
-                    联系作者
-                </a>
+                <ThemeToggle />
+                {/* <a className="site-header__cta" href="https://github.com/YuiNijika/MusicStorm" target="_blank" rel="noopener noreferrer">
+                    GitHub
+                </a> */}
             </nav>
         </header>
     )
