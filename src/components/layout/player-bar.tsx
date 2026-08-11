@@ -250,7 +250,9 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                             disabled={!currentTrack}
                         />
                     </div>
-                    <div className="hidden w-full max-w-[420px] items-center gap-2 md:flex">
+                    {/* 中列是 md:flex-col items-center（子项收缩到内容宽），
+                        轨道必须 w-full 撑满，flex-1 + min-w-0 会塌缩成 0 宽 */}
+                    <div className="hidden w-full min-w-0 items-center gap-2 md:flex">
                         <SeekElasticSlider
                             positionMs={positionMs}
                             durationMs={totalMs}

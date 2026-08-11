@@ -6,13 +6,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State,
 };
+// 仅 macOS 应用菜单用到，其它平台不编译避免 unused import
+#[cfg(target_os = "macos")]
+use tauri::menu::{MenuItemKind, Submenu};
 
 /// 前端监听的事件名：payload 为 "toggle" | "previous" | "next" | "show"
 const PLAYER_COMMAND_EVENT: &str = "musicstorm:player-command";
+/// macOS 应用菜单「设置…」点击后广播，前端据此打开设置页
+#[cfg(target_os = "macos")]
 const OPEN_SETTINGS_EVENT: &str = "musicstorm:open-settings";
 /// 全局快捷键配置的 DB key：JSON { "toggle": "Ctrl+Alt+Space", ... }
 pub const SHORTCUT_SETTING_KEY: &str = "global_shortcuts";

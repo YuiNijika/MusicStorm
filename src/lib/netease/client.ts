@@ -110,7 +110,10 @@ async function fetchExternal<T>(
     cookie: string | null,
 ): Promise<T> {
     const base = getNeteaseBaseUrl()
-    const url = new URL(path, base.endsWith("/") ? base : `${base}/`)
+    const baseUrl = base.endsWith("/") ? base : `${base}/`
+    // path 以 / 开头会覆盖 base 的路径段（官方源带 /netease/music 子路径），
+    // 去掉前导斜杠让 base 路径段生效；对无子路径的第三方源结果不变
+    const url = new URL(path.replace(/^\/+/, ""), baseUrl)
 
     if (params) {
         for (const [key, value] of Object.entries(params)) {
@@ -147,7 +150,50 @@ async function fetchExternal<T>(
         throw new Error(`网易云接口失败: ${detail}`)
     }
 
-    return (await response.json()) as T
+    const json = (await response.json()) as T & {
+        success?: boolean
+        code?: number
+        message?: string
+        data?: unknown
+        cookie?: string
+    }
+
+    // 官方源（CloudMusicAPI_New）返回统一 envelope { success, code, message, data, cookie? }：
+    // - code 已是网易云业务码
+    // - data 保留（登录接口 auth 层读 data.unikey / data.cookie 这类包裹形状，去掉会读不到）
+    // - data 为对象时字段展平到顶层（lyric 读 lrc、likelist 读 ids 这类网易云原样形状）
+    // 第三方源仍透传原始 JSON
+    if (
+        isOfficialSource(base) &&
+        typeof json === "object" &&
+        json !== null &&
+        "success" in json
+    ) {
+        if (json.success !== true) {
+            throw new Error(`网易云接口失败: ${json.message ?? "请求失败"}`)
+        }
+        const data = json.data
+        const flattened: Record<string, unknown> = { code: json.code }
+        if (data !== null && typeof data === "object" && !Array.isArray(data)) {
+            Object.assign(flattened, data)
+            flattened.data = data
+        } else {
+            flattened.data = data
+        }
+        if (json.cookie != null) {
+            flattened.cookie = json.cookie
+        }
+        return flattened as T
+    }
+
+    return json as T
+}
+
+// 官方源判断：归一化去掉尾斜杠后与 DEFAULT_BASE_URL 比对
+function isOfficialSource(base: string): boolean {
+    return (
+        base.replace(/\/+$/, "") === DEFAULT_BASE_URL.replace(/\/+$/, "")
+    )
 }
 
 async function neteaseRequest<T>(options: RequestOptions): Promise<T> {

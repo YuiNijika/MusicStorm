@@ -15,24 +15,18 @@ import {
 } from "lucide-react"
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 
-import { useTheme } from "@/components/app/theme-provider"
 import { Cover } from "@/components/music/cover"
+import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
-import {
-    ACCENT_OPTIONS,
-    accentSwatch,
-    resolveAccentHue,
-} from "@/lib/appearance/appearance-prefs"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -116,7 +110,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
-    const { appearance, setAccent, setCustomHue } = useTheme()
     const isMobile = useIsMobile()
 
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
@@ -130,8 +123,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         : FULL_PLAYER_LAYOUTS
     const effectiveLayout: FullPlayerLayout =
         isMobile && layout === "classic" ? "cover" : layout
-    const customHue = resolveAccentHue(appearance)
-    const customActive = appearance.accent === "custom"
     // 移动端下滑收起手势：跟手位移（px）+ 起始 Y（区分水平滚动）
     const [dragDy, setDragDy] = useState(0)
     const dragStartRef = useRef<{ y: number; startDy: number } | null>(null)
@@ -221,6 +212,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         if (phase === "closed" || phase === "exiting") {
             return
         }
+        // 打开播放器即预热歌词 chunk：切到歌词布局时不再等懒加载白屏
+        void import("@/components/music/lyrics-view")
         // 关闭全屏快捷键可自定义（in-app-shortcut-prefs）
         const closeCombo =
             getInAppShortcuts().closeFullPlayer || "Esc"
@@ -483,6 +476,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         onPointerDown={(event) => {
                             if ((event.target as HTMLElement).closest("button")) return
                             if (event.pointerType !== "mouse") return
+                            // 双击动作与主标题栏一致（最大化/还原）；
+                            // 微抖穿透点击已由 hook 的移动阈值过滤
                             startDragging(event)
                         }}
                     >
@@ -517,73 +512,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 ?.label ?? "样式"}
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-60 p-3">
-                            <p className="mb-2 text-[12px] font-medium text-foreground">
-                                主题色
-                            </p>
-                            <div className="flex flex-wrap gap-2.5">
-                                {ACCENT_OPTIONS.map((option) => {
-                                    const active = appearance.accent === option.id
-                                    return (
-                                        <button
-                                            key={option.id}
-                                            type="button"
-                                            aria-label={option.label}
-                                            onClick={() => setAccent(option.id)}
-                                            className={cn(
-                                                "size-7 cursor-pointer rounded-full transition-transform duration-150",
-                                                "ring-offset-2 ring-offset-background active:scale-95",
-                                                active
-                                                    ? "ring-2 ring-foreground/80"
-                                                    : "ring-1 ring-black/10 dark:ring-white/15",
-                                            )}
-                                            style={{
-                                                background: accentSwatch(
-                                                    option.hue,
-                                                    option.id === "neutral",
-                                                ),
-                                            }}
-                                        />
-                                    )
-                                })}
-                                <button
-                                    type="button"
-                                    aria-label="自定义色相"
-                                    onClick={() => setCustomHue(customHue)}
-                                    className={cn(
-                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
-                                        "ring-offset-2 ring-offset-background active:scale-95",
-                                        customActive
-                                            ? "ring-2 ring-foreground/80"
-                                            : "ring-1 ring-black/10 dark:ring-white/15",
-                                    )}
-                                    style={{
-                                        background: `conic-gradient(
-                                            oklch(0.7 0.16 0),
-                                            oklch(0.7 0.16 60),
-                                            oklch(0.7 0.16 120),
-                                            oklch(0.7 0.16 180),
-                                            oklch(0.7 0.16 240),
-                                            oklch(0.7 0.16 300),
-                                            oklch(0.7 0.16 360)
-                                        )`,
-                                    }}
-                                />
-                            </div>
-                            {customActive ? (
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={359}
-                                    step={1}
-                                    value={customHue}
-                                    onChange={(event) =>
-                                        setCustomHue(Number(event.currentTarget.value))
-                                    }
-                                    className="progress-range mt-3 w-full"
-                                    aria-label="自定义色相"
-                                />
-                            ) : null}
-                            <DropdownMenuSeparator className="my-2.5" />
                             <div className="space-y-0.5">
                                 {availableLayouts.map((item) => (
                                     <DropdownMenuItem
@@ -628,7 +556,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             </div>
                         </div>
                         {lyricsActive ? (
-                            <Suspense fallback={null}>
+                            <Suspense fallback={<LyricsSkeleton />}>
                                 <LyricsView
                                     variant="full"
                                     active={lyricsActive}
@@ -662,7 +590,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 {effectiveLayout === "lyrics" ? (
                     <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
                         {lyricsActive ? (
-                            <Suspense fallback={null}>
+                            <Suspense fallback={<LyricsSkeleton />}>
                                 <LyricsView
                                     variant="full"
                                     active={lyricsActive}

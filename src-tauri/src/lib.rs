@@ -870,16 +870,17 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app_handle, event| {
+    // macOS 分支才用到闭包参数，其它平台以下划线前缀抑制未使用警告
+    app.run(|_app_handle, _event| {
         // macOS：窗口隐藏到托盘后，点击 Dock 图标会触发 Reopen。
         // Tauri 不会自动显示被 hide() 的窗口，需要应用主动恢复。
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen {
             has_visible_windows: false,
             ..
-        } = event
+        } = _event
         {
-            tray::show_main_window(app_handle);
+            tray::show_main_window(_app_handle);
         }
     });
 }

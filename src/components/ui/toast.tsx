@@ -48,7 +48,8 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
                 "rounded-2xl border border-black/[0.08] bg-popover text-popover-foreground shadow-lg outline-none",
                 "dark:border-white/[0.1] dark:bg-zinc-900/95",
                 "min-h-[3.25rem] backdrop-blur-xl",
-                "data-limited:opacity-0 data-limited:pointer-events-none",
+                // 入场/退场动画在 Style.css：[data-slot="toast"] 材质化入场，
+                // data-limited 走对称退场，由 Base UI 等 transition 结束再卸载
                 className,
             )}
             {...props}

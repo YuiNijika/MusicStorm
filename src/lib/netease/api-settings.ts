@@ -4,8 +4,8 @@ const SETTINGS_KEY = "musicstorm-api-settings"
 const LEGACY_BASE_URL_KEY = "musicstorm-netease-base-url"
 const LEGACY_PRESET_KEY = "musicstorm-netease-base-preset"
 
-// 自定义空值与集成降级回落
-const DEFAULT_BASE_URL = "https://cloud-music-api.miomoe.cn"
+// 自定义空值与集成降级回落；官方源 = 自建 CloudMusicAPI_New（统一 envelope 格式）
+const DEFAULT_BASE_URL = "https://api.miomoe.cn/netease/music"
 
 const EXTERNAL_SOURCES = [
     {

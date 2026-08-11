@@ -157,6 +157,30 @@ async function fetchArtistDetail(artistId: string): Promise<ArtistDetailResult> 
     return { profile, hotTracks, albums }
 }
 
+/** 专辑分页：艺人页下滑追加用；映射与 fetchArtistDetail 首屏保持一致 */
+async function fetchArtistAlbumsPage(
+    artistId: string,
+    offset: number,
+    limit = 50,
+): Promise<ArtistAlbumCard[]> {
+    const id = assertArtistId(artistId)
+    const data = await neteaseRequest<ArtistAlbumApiData>({
+        path: NETEASE_PATHS.artistAlbum,
+        params: { id, limit, offset },
+    })
+    return (data.hotAlbums ?? [])
+        .filter((item) => item.id != null && item.name)
+        .map((item) => ({
+            id: String(item.id),
+            title: item.name ?? "未知专辑",
+            coverUrl: item.picUrl ? `${item.picUrl}?param=400y400` : "",
+            trackCount: item.size,
+            year: item.publishTime
+                ? new Date(item.publishTime).getFullYear()
+                : undefined,
+        }))
+}
+
 async function fetchArtistMvs(artistId: string): Promise<ArtistMvCard[]> {
     const id = assertArtistId(artistId)
     const data = await neteaseRequest<ArtistMvApiData>({
@@ -216,6 +240,7 @@ async function fetchSimiArtists(artistId: string): Promise<SimiArtistCard[]> {
 }
 
 export {
+    fetchArtistAlbumsPage,
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,

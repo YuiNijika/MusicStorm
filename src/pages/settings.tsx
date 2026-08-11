@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useAppUpdate } from "@/hooks/use-app-update"
+import { useContributors } from "@/hooks/use-contributors"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
@@ -117,8 +118,17 @@ import {
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
 import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/notify"
-import { openExternalUrl } from "@/lib/open-external"
-import { getCloseToTray, setCloseToTray } from "@/lib/app/close-to-tray-prefs"
+import { openExternalUrl, GITHUB_REPO_URL } from "@/lib/open-external"
+import {
+    CLOSE_TO_TRAY_EVENT,
+    getCloseToTray,
+    setCloseToTray,
+} from "@/lib/app/close-to-tray-prefs"
+import {
+    TITLE_BAR_DOUBLE_CLICK_OPTIONS,
+    getTitleBarDoubleClickAction,
+    setTitleBarDoubleClickAction,
+} from "@/lib/app/title-bar-prefs"
 import {
     DEFAULT_SHORTCUTS,
     SHORTCUT_ACTIONS,
@@ -180,7 +190,7 @@ function SettingsPage({
                 items={TABS}
                 value={tab}
                 onChange={(id) => setTab(id as SettingsTab)}
-                className="md:max-w-md"
+                className="w-fit max-w-full"
             />
 
             <div
@@ -513,8 +523,8 @@ function PlaybackTab() {
     const [autoPlayOnStartup, setAutoPlayOnStartup] = useState(
         () => getPlayerPreferences().autoPlayOnStartup,
     )
-    const [closeToTray, setCloseToTrayState] = useState(() =>
-        getCloseToTray(),
+    const [titleBarDoubleClick, setTitleBarDoubleClickState] = useState(() =>
+        getTitleBarDoubleClickAction(),
     )
     const [devices, setDevices] = useState<AudioDeviceInfo[]>([])
     const [audioMode, setAudioMode] = useState<AudioOutputMode | null>(null)
@@ -632,26 +642,28 @@ function PlaybackTab() {
                     />
                 </div>
 
-                <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
-                    <div className="min-w-0">
+                <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
+                    <div>
                         <p className="text-[14px] font-medium tracking-[-0.01em]">
-                            {isMacOS()
-                                ? "关闭窗口后保留在菜单栏"
-                                : "关闭窗口时最小化到托盘"}
+                            双击标题栏
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {isMacOS()
-                                ? "关闭后音乐继续播放；点击 Dock 或菜单栏图标恢复，⌘Q 退出"
-                                : "关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单"}
+                            桌面端主标题栏与全屏播放器头部均生效
                         </p>
                     </div>
-                    <Switch
-                        checked={closeToTray}
-                        onCheckedChange={(checked) => {
-                            setCloseToTrayState(checked)
-                            void setCloseToTray(checked)
-                        }}
-                    />
+                    <div className="flex flex-wrap gap-2">
+                        {TITLE_BAR_DOUBLE_CLICK_OPTIONS.map((option) => (
+                            <ChoiceChip
+                                key={option.id}
+                                label={option.label}
+                                active={titleBarDoubleClick === option.id}
+                                onClick={() => {
+                                    setTitleBarDoubleClickState(option.id)
+                                    setTitleBarDoubleClickAction(option.id)
+                                }}
+                            />
+                        ))}
+                    </div>
                 </div>
 
                 <div className="material-panel space-y-3 rounded-[20px] px-4 py-3.5">
@@ -1589,8 +1601,70 @@ function UpdateTab() {
                         </p>
                     )}
                 </div>
+
+                <ContributorsPanel />
             </div>
         </Section>
+        </div>
+    )
+}
+
+// 开源共建者头像墙
+function ContributorsPanel() {
+    const { contributors, loading } = useContributors()
+
+    return (
+        <div className="material-panel space-y-3 rounded-[20px] px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[14px] font-medium tracking-[-0.01em]">
+                    贡献者
+                </p>
+                <button
+                    type="button"
+                    onClick={() => void openExternalUrl(GITHUB_REPO_URL)}
+                    className="cursor-pointer text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                    在 GitHub 上参与共建 →
+                </button>
+            </div>
+            {loading && contributors.length === 0 ? (
+                <div className="flex flex-wrap gap-3" aria-hidden="true">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <span
+                            key={i}
+                            className="size-10 animate-pulse rounded-full bg-black/[0.06] dark:bg-white/[0.08]"
+                        />
+                    ))}
+                </div>
+            ) : contributors.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                    {contributors.map((contributor) => (
+                        <button
+                            key={contributor.login}
+                            type="button"
+                            title={`${contributor.login} · ${contributor.contributions} 次提交`}
+                            onClick={() =>
+                                void openExternalUrl(contributor.htmlUrl)
+                            }
+                            className="group flex w-16 cursor-pointer flex-col items-center gap-1.5"
+                        >
+                            <img
+                                src={contributor.avatarUrl}
+                                alt={contributor.login}
+                                loading="lazy"
+                                className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform duration-150 group-hover:scale-105 dark:ring-white/[0.12]"
+                            />
+                            <span className="w-full truncate text-center text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
+                                {contributor.login}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-[12px] text-muted-foreground">
+                    暂时拉取不到贡献者列表，可稍后再试。
+                </p>
+            )}
         </div>
     )
 }
@@ -1604,6 +1678,9 @@ function OtherTab() {
     const [performanceMode, setPerformanceModeState] = useState(() =>
         getPerformanceMode(),
     )
+    const [closeToTray, setCloseToTrayState] = useState(() =>
+        getCloseToTray(),
+    )
     const [cacheTtl, setCacheTtl] = useState(() => getApiCacheTtlMs())
     const [autoPurge, setAutoPurge] = useState(() => getApiCacheAutoPurge())
     const [cacheHint, setCacheHint] = useState<string | null>(null)
@@ -1615,6 +1692,9 @@ function OtherTab() {
         function onDevtools() {
             setDevtoolsEnabledState(getDevToolsEnabled())
         }
+        function onCloseToTray() {
+            setCloseToTrayState(getCloseToTray())
+        }
         function onTtl() {
             setCacheTtl(getApiCacheTtlMs())
         }
@@ -1625,11 +1705,13 @@ function OtherTab() {
             setPerformanceModeState(getPerformanceMode())
         }
         window.addEventListener(DEVTOOLS_EVENT, onDevtools)
+        window.addEventListener(CLOSE_TO_TRAY_EVENT, onCloseToTray)
         window.addEventListener(TTL_EVENT, onTtl)
         window.addEventListener(AUTO_PURGE_EVENT, onAutoPurge)
         window.addEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
         return () => {
             window.removeEventListener(DEVTOOLS_EVENT, onDevtools)
+            window.removeEventListener(CLOSE_TO_TRAY_EVENT, onCloseToTray)
             window.removeEventListener(TTL_EVENT, onTtl)
             window.removeEventListener(AUTO_PURGE_EVENT, onAutoPurge)
             window.removeEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
@@ -1715,6 +1797,33 @@ function OtherTab() {
 
     return (
         <div className="space-y-7">
+            <Section
+                title="窗口与托盘"
+                description="关闭窗口的行为与恢复方式"
+            >
+                <div className="material-panel flex items-center justify-between gap-3 rounded-[20px] px-4 py-3.5">
+                    <div className="min-w-0">
+                        <p className="text-[14px] font-medium tracking-[-0.01em]">
+                            {isMacOS()
+                                ? "关闭窗口后保留在菜单栏"
+                                : "关闭窗口时最小化到托盘"}
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                            {isMacOS()
+                                ? "关闭后音乐继续播放；点击 Dock 或菜单栏图标恢复，⌘Q 退出"
+                                : "关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单"}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={closeToTray}
+                        onCheckedChange={(checked) => {
+                            setCloseToTrayState(checked)
+                            void setCloseToTray(checked)
+                        }}
+                    />
+                </div>
+            </Section>
+
             <Section
                 title="性能模式"
                 description="牺牲视觉效果换更低的内存与 GPU 占用"

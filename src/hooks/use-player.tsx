@@ -1009,20 +1009,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, [advance])
 
     const previous = useCallback(() => {
-        if (positionMs > 3000) {
-            // 走统一 seek，播放中带 resume，避免本地原生引擎停在 pause
-            const engine = activeRef.current
-            const resume = isPlayingRef.current && mediaReadyRef.current
-            setPositionMs(0)
-            lastTickPosRef.current = 0
-            seekGuardUntilRef.current = performance.now() + 800
-            if (engine) {
-                void Promise.resolve(engine.seek(0, { resume })).catch(() => {})
-            }
-            return
-        }
+        // 直接切上一首；不做「>3s 先重头播当前曲」的二次判定，
+        // 该行为会让按一次看似只是重置进度条、要再按才切歌
         advance(-1)
-    }, [advance, positionMs])
+    }, [advance])
 
     const seek = useCallback((nextPosition: number) => {
         if (!Number.isFinite(nextPosition)) {

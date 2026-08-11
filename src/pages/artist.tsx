@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
@@ -12,6 +12,7 @@ import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayer } from "@/hooks/use-player"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import {
+    fetchArtistAlbumsPage,
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,
@@ -69,6 +70,12 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
 
+    // 专辑无限滚动：偏移量、加载中、是否还有下一页
+    const [albumsOffset, setAlbumsOffset] = useState(0)
+    const [albumsLoading, setAlbumsLoading] = useState(false)
+    const [albumsHasMore, setAlbumsHasMore] = useState(true)
+    const albumsSentinelRef = useRef<HTMLDivElement>(null)
+
     const [mvs, setMvs] = useState<LazyState<ArtistMvCard[]>>(emptyLazy([]))
     const [desc, setDesc] = useState<LazyState<ArtistDescResult>>(
         emptyLazy({ brief: "", sections: [] }),
@@ -82,6 +89,9 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         setLoading(true)
         setError(null)
         setTab("songs")
+        setAlbumsOffset(0)
+        setAlbumsHasMore(true)
+        setAlbumsLoading(false)
         setMvs(emptyLazy([]))
         setDesc(emptyLazy({ brief: "", sections: [] }))
         setSimilar(emptyLazy([]))
@@ -94,6 +104,9 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 setProfile(result.profile)
                 setHotTracks(result.hotTracks)
                 setAlbums(result.albums)
+                // 首屏拿满一页（50 张）视为可能还有更多，靠下滑追加
+                setAlbumsOffset(result.albums.length)
+                setAlbumsHasMore(result.albums.length >= 50)
                 setLoading(false)
             })
             .catch((err: unknown) => {
@@ -103,6 +116,8 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 setProfile(null)
                 setHotTracks([])
                 setAlbums([])
+                setAlbumsOffset(0)
+                setAlbumsHasMore(false)
                 setLoading(false)
                 const message = formatError(err)
                 setError(message)
@@ -113,6 +128,47 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
             cancelled = true
         }
     }, [artistId, retry])
+
+    // 专辑无限滚动：下滑到哨兵进入视口时追加下一页，按 id 去重
+    const loadMoreAlbums = useCallback(async () => {
+        if (albumsLoading || !albumsHasMore) {
+            return
+        }
+        setAlbumsLoading(true)
+        try {
+            const next = await fetchArtistAlbumsPage(artistId, albumsOffset)
+            setAlbums((prev) => {
+                const seen = new Set(prev.map((album) => album.id))
+                return [...prev, ...next.filter((album) => !seen.has(album.id))]
+            })
+            setAlbumsOffset((offset) => offset + next.length)
+            if (next.length < 50) {
+                setAlbumsHasMore(false)
+            }
+        } catch (err) {
+            notifyFromError("加载更多专辑失败", err)
+        } finally {
+            setAlbumsLoading(false)
+        }
+    }, [artistId, albumsOffset, albumsLoading, albumsHasMore])
+
+    useEffect(() => {
+        const sentinel = albumsSentinelRef.current
+        if (tab !== "albums" || !albumsHasMore || !sentinel) {
+            return
+        }
+        // rootMargin 提前 300px 触发，滚动到底前就开始加载
+        const io = new IntersectionObserver(
+            (entries) => {
+                if (entries[0]?.isIntersecting) {
+                    void loadMoreAlbums()
+                }
+            },
+            { rootMargin: "300px" },
+        )
+        io.observe(sentinel)
+        return () => io.disconnect()
+    }, [tab, albumsHasMore, albumsLoading, loadMoreAlbums])
 
     // Tab 懒加载：勿把 status 放进 deps，否则 set loading 会 cleanup 取消请求导致永久卡 loading
     useEffect(() => {
@@ -333,27 +389,44 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             {albums.length === 0 ? (
                                 <StateHero variant="empty" title="暂无专辑" />
                             ) : (
-                                <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                    {albums.map((album) => (
-                                        <MediaCard
-                                            key={album.id}
-                                            coverUrl={album.coverUrl}
-                                            title={album.title}
-                                            subtitle={
-                                                [
-                                                    album.year,
-                                                    album.trackCount
-                                                        ? `${album.trackCount} 首`
-                                                        : null,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(" · ") || "专辑"
-                                            }
-                                            widthClassName="w-full"
-                                            onClick={() => openAlbum(album.id)}
-                                        />
-                                    ))}
-                                </div>
+                                <>
+                                    <div ref={gridRef} className={gridClass} style={gridStyle}>
+                                        {albums.map((album) => (
+                                            <MediaCard
+                                                key={album.id}
+                                                coverUrl={album.coverUrl}
+                                                title={album.title}
+                                                subtitle={
+                                                    [
+                                                        album.year,
+                                                        album.trackCount
+                                                            ? `${album.trackCount} 首`
+                                                            : null,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" · ") || "专辑"
+                                                }
+                                                widthClassName="w-full"
+                                                onClick={() => openAlbum(album.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                    {/* 下滑追加哨兵：进入视口触发下一页 */}
+                                    <div
+                                        ref={albumsSentinelRef}
+                                        className="h-1"
+                                        aria-hidden
+                                    />
+                                    {albumsLoading ? (
+                                        <p className="py-6 text-center text-[12px] text-muted-foreground">
+                                            加载中…
+                                        </p>
+                                    ) : !albumsHasMore ? (
+                                        <p className="py-6 text-center text-[12px] text-muted-foreground">
+                                            没有更多专辑了
+                                        </p>
+                                    ) : null}
+                                </>
                             )}
                         </TabsContent>
 
