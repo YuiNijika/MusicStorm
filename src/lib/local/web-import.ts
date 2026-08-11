@@ -7,7 +7,8 @@ import type { Track } from "@/lib/types"
  *
  * 桌面版走 Rust 扫描（路径 + 落盘缓存）；网页版没有文件系统访问，
  * 用浏览器 File API 选目录/文件，music-metadata 在内存解析标签，
- * 音频与封面均以 blob URL 播放（页面生命周期有效，刷新后需重新导入）。
+ * 音频与封面以 blob URL 播放；持久化由 web-library（IndexedDB）负责，
+ * 刷新后从库中恢复并重建 URL。
  */
 
 export type WebLocalTrack = Track & {

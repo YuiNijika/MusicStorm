@@ -343,7 +343,7 @@ def _print_web_storage() -> None:
     print("  仓库根 docs/，GitHub Pages 从 /docs 发布：")
     print(f"    在线体验 → {WEB_PLAYER_URL}")
     print()
-    print("  网页版能力受限：仅在线播放与本地导入（blob 临时播放，刷新需重导），")
+    print("  网页版能力受限：仅在线播放与本地导入，")
     print("  无本地高音质输出、系统托盘、全局快捷键与完整本地曲库。")
     print(f"  下载桌面端体验完整功能 → {WEB_DOWNLOAD_URL}")
     print("=" * 60)

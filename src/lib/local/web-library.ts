@@ -48,7 +48,7 @@ function openDb(): Promise<IDBDatabase> {
         request.onsuccess = () => resolve(request.result)
         request.onerror = () =>
             reject(request.error ?? new Error("打开 IndexedDB 失败"))
-        // 版本变更被外部关闭等场景：重置缓存，下次调用重开
+        // 多标签页下旧版本连接会阻塞升级；拒绝而非挂起，让调用方降级
         request.onblocked = () => reject(new Error("IndexedDB 被占用"))
     })
     return dbPromise
@@ -125,10 +125,9 @@ async function removeWebTrack(id: string): Promise<void> {
     })
 }
 
-/** 清空全部持久化曲目；返回被清条目供调用方 revoke 对应 blob URL。 */
-async function clearWebLibrary(): Promise<StoredWebTrack[]> {
+/** 清空全部持久化曲目；调用方需先 revoke 内存中的 blob URL。 */
+async function clearWebLibrary(): Promise<void> {
     const db = await openDb()
-    const all = await readAllTracks(db)
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite")
         tx.objectStore(STORE_NAME).clear()
@@ -136,7 +135,6 @@ async function clearWebLibrary(): Promise<StoredWebTrack[]> {
         tx.onerror = () => reject(tx.error ?? new Error("清空 IndexedDB 失败"))
         tx.onabort = () => reject(tx.error ?? new Error("清空 IndexedDB 中止"))
     })
-    return all
 }
 
 /** 浏览器存储占用（整个 origin，含 API 缓存等），不可用时返回 null。 */

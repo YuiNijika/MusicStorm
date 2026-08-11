@@ -20,9 +20,8 @@ import {
 /**
  * 网页版本地音乐页。
  *
- * 浏览器无文件系统权限：选目录/文件后在内存解析标签，音频本体存入
- * IndexedDB（刷新后自动恢复列表并重建 blob URL 继续播放），数据不落
- * 磁盘文件系统、仅占用浏览器配额。桌面版请下载客户端体验完整曲库。
+ * 浏览器无文件系统权限：导入的音频持久化在浏览器内（刷新不丢），
+ * 播放依赖每次会话重建的 blob URL。桌面版请下载客户端体验完整曲库。
  */
 
 function formatBytes(bytes: number): string {
@@ -45,7 +44,7 @@ function LocalWebPage() {
     const [storageLabel, setStorageLabel] = useState("")
     const { currentTrack, isPlaying, playTrack } = usePlayer()
 
-    // 挂载时从 IndexedDB 恢复上次导入的曲目
+    // 刷新后音乐不丢：挂载即从持久化库恢复上次导入
     useEffect(() => {
         let cancelled = false
         void loadWebLibrary()
@@ -55,7 +54,7 @@ function LocalWebPage() {
                 }
             })
             .catch(() => {
-                // IDB 不可用：静默降级为空列表，本次会话内存导入
+                // 隐私模式等场景持久化不可用：降级为空列表，本次会话内存导入
             })
             .finally(() => {
                 if (!cancelled) {
@@ -67,14 +66,13 @@ function LocalWebPage() {
         }
     }, [])
 
-    // 曲目变化后刷新浏览器存储占用显示
     useEffect(() => {
         let cancelled = false
         void estimateWebStorage().then((info) => {
             if (cancelled || !info) {
                 return
             }
-            setStorageLabel(` · 浏览器存储 ${formatBytes(info.usage)}`)
+            setStorageLabel(` · 已占用 ${formatBytes(info.usage)}`)
         })
         return () => {
             cancelled = true
@@ -158,9 +156,8 @@ function LocalWebPage() {
                         本地音乐
                     </h1>
                     <p className="mt-1 max-w-[46rem] text-[13px] leading-relaxed text-muted-foreground">
-                        网页版无文件系统权限：音乐在浏览器内解析并存入 IndexedDB
-                        （占用浏览器存储配额），刷新后可自动恢复继续播放；
-                        桌面版支持完整本地曲库管理。
+                        音乐保存在浏览器中，刷新页面后不会丢失；
+                        下载桌面端可体验完整本地曲库管理。
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -186,7 +183,7 @@ function LocalWebPage() {
             {restoring ? (
                 <div className="flex flex-col items-center gap-3 rounded-[20px] border border-dashed border-black/[0.12] px-6 py-14 text-center dark:border-white/[0.16]">
                     <p className="text-[14px] text-muted-foreground">
-                        正在从 IndexedDB 恢复本地音乐…
+                        正在恢复上次导入的音乐…
                     </p>
                 </div>
             ) : tracks.length > 0 ? (
@@ -280,7 +277,7 @@ function LocalWebPage() {
                     <p className="max-w-[28rem] text-[13px] leading-relaxed text-muted-foreground">
                         选择音乐文件夹或音频文件开始播放，支持 MP3 / FLAC / WAV /
                         M4A / OGG 等常见格式，标签（歌名、艺人、封面）自动解析。
-                        音乐将保存到浏览器 IndexedDB，刷新后不会丢失。
+                        音乐将保存在浏览器中，刷新后不会丢失。
                     </p>
                 </div>
             )}
