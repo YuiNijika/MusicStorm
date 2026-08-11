@@ -4,11 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 /**
- * 网页版独立构建（player.html）。
- *
- * 与 Tauri 主构建（index.html）分离：产物自包含，
- * player.html + assets/player/* 拷到 GitHub Pages（docs/）即可运行，
- * 不与主应用 / website 的资源混用。手动触发 CI 构建。
+ * 网页版独立构建
  */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
