@@ -1,0 +1,70 @@
+name: Deploy Website to GitHub Pages
+
+# website 子包有变更时自动构建，产物提交到仓库根 docs/ 目录，
+# 由 GitHub Pages 的 "Deploy from a branch → /docs" 发布。
+# 手动触发入口：Actions → Deploy Website to GitHub Pages → Run workflow。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/website-deploy.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+# 需要写权限把 docs/ 产物提交回仓库
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    name: Build website and publish into docs/
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WEBSITE_BASE: /
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        # lockfile 过期时移除 --frozen-lockfile 重试
+        run: pnpm install --frozen-lockfile
+
+      - name: Build website
+        run: pnpm --filter website build
+
+      - name: Stage build output into docs/
+        run: |
+          rm -rf docs
+          mkdir -p docs
+          cp -r website/dist/. docs/
+
+      - name: Commit and push docs/
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs
+          # 产物与上次一致时跳过提交，避免空 commit 死循环
+          if git diff --cached --quiet; then
+            echo "docs/ unchanged, skip commit"
+          else
+            git commit -m "chore(website): publish pages into docs/"
+            git push
+          fi
