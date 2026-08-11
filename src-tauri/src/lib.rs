@@ -1,5 +1,7 @@
 #[cfg(not(target_os = "android"))]
 mod audio;
+#[cfg(test)]
+mod bundle_config;
 mod cover_cache;
 mod db;
 mod ffmpeg;
