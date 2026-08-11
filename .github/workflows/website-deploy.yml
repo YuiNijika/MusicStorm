@@ -57,19 +57,22 @@ jobs:
         run: pnpm build:player
 
       - name: Stage build output into docs/
-        # 先组装到 docs.tmp/ 并校验关键产物，全部就绪后再原子替换 docs/：
-        # 任何一步失败都不会破坏已发布的 docs/
+        # 先组装到唯一临时目录并校验关键产物，全部就绪后再原子替换 docs/：
+        # 任何一步失败都不会破坏已发布的 docs/（线上网页版/官网保持旧版完整）
         run: |
-          rm -rf docs.tmp
-          mkdir -p docs.tmp
-          cp -r website/dist/. docs.tmp/
-          cp -r dist/player.html dist/icon.png dist/icon.svg dist/assets/player docs.tmp/
+          set -euxo pipefail
+          ls -la dist/
+          tmpdir="$(mktemp -d docs.tmp.XXXXXX)"
+          cp -r website/dist/. "$tmpdir/"
+          mkdir -p "$tmpdir/assets"
+          cp -r dist/player.html dist/icon.png dist/icon.svg "$tmpdir/"
+          cp -r dist/assets/player "$tmpdir/assets/"
           # 完整性校验：网页版入口与分包缺失即失败，避免"在线播放"入口丢失
-          test -f docs.tmp/player.html
-          test -d docs.tmp/assets/player
-          test "$(find docs.tmp/assets/player -name '*.js' | wc -l)" -gt 0
+          test -f "$tmpdir/player.html"
+          test -d "$tmpdir/assets/player"
+          test "$(find "$tmpdir/assets/player" -name '*.js' -print -quit)" != ""
           rm -rf docs
-          mv docs.tmp docs
+          mv "$tmpdir" docs
 
       - name: Commit and push docs/
         run: |
