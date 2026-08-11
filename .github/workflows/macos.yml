@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Apple Silicon build and test
+    name: Universal macOS build and test
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       # mediaplayer 的 Swift 桥接引用 macOS 16 MediaPlayer API；macos-15
       # runner 默认 Xcode 16.4 SDK 不包含这些符号，但镜像已预装 Xcode 26。
@@ -42,6 +42,9 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
+          # Universal binary：Apple Silicon + Intel
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -49,5 +52,5 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
-      - name: Build macOS app
-        run: pnpm tauri build --debug --bundles app
+      - name: Build universal macOS app and DMG
+        run: pnpm tauri build --debug --bundles app,dmg --target universal-apple-darwin

@@ -90,7 +90,7 @@ brew install node pnpm ffmpeg
 
 安装完成后可运行 `rustc --version`、`cargo --version`、`pnpm --version` 和 `ffmpeg -version` 检查环境。通过 Finder 启动时，MusicStorm 会额外探测 Apple Silicon Homebrew 的 `/opt/homebrew/bin/ffmpeg` 和 Intel Homebrew 的 `/usr/local/bin/ffmpeg`。
 
-当前 macOS 支持仍处于开发阶段，已验证 Apple Silicon 上的 `.app` 构建、CoreAudio 本地播放和 FFmpeg 自动发现；签名、公证、DMG 与最低系统版本仍待完善。
+当前 macOS 支持仍处于开发阶段，已验证 `.app` / `.dmg` 构建（含 **Universal** 双架构）、CoreAudio 本地播放、FFmpeg 自动发现，以及系统媒体键与控制中心集成。打包配置将最低系统版本设为 **macOS 13.0**（与当前 MediaPlayer 桥接依赖一致）。代码签名与公证仍待完善，未签名的 `.dmg` 适合本地或内测分发。
 
 macOS 的数据库与持久化配置位于 `~/Library/Application Support/com.yuinijika.musicstorm/`，缓存位于 `~/Library/Caches/com.yuinijika.musicstorm/`；应用不会向 `.app` 包内部写入用户数据。
 
@@ -115,13 +115,22 @@ pnpm build
 pnpm tauri build
 ```
 
-构建产物由 Tauri 写入 `src-tauri/target/release/bundle/`。
+构建产物由 Tauri 写入 `src-tauri/target/release/bundle/`（debug 构建则为 `src-tauri/target/debug/bundle/`）。
 
-macOS 仅构建 `.app`、跳过其他安装包格式时，可运行：
+macOS 可同时构建 `.app` 与 `.dmg`。默认命令只针对当前机器架构（本机为 Apple Silicon 时即 arm64）：
 
 ```bash
-pnpm tauri build --bundles app
+pnpm tauri build --bundles app,dmg
 ```
+
+构建 **Universal** 安装包（同时含 `aarch64` 与 `x86_64`，与 CI 一致）前，先安装双架构 Rust 目标：
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+pnpm tauri build --bundles app,dmg --target universal-apple-darwin
+```
+
+产物中的主二进制可用 `lipo -info` 确认是否为 `x86_64 arm64`。仅需要可运行的 `.app` 时，将 `--bundles app,dmg` 改为 `--bundles app` 即可。
 
 ## 技术栈
 
