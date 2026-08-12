@@ -5,148 +5,59 @@
 <h1 align="center">MusicStorm</h1>
 
 <p align="center">
-  一款基于 Tauri 2、React 与 Rust 构建的桌面音乐播放器。
+  基于 Tauri 2、React 与 Rust 的桌面音乐播放器，整合本地曲库与网易云音乐。
 </p>
 
 <p align="center">
   <a href="https://github.com/YuiNijika/MusicStorm/releases">下载应用</a>
   ·
+  <a href="https://music.miomoe.cn/">网页版</a>
+  ·
   <a href="https://github.com/YuiNijika/MusicStorm/issues">反馈问题</a>
 </p>
 
-## 关于 MusicStorm
+## 功能
 
-MusicStorm 将本地音乐管理与网易云音乐服务整合在同一个桌面应用中，提供接近 Apple Music 的界面、原生本地音频播放、歌词展示和可定制的外观体验。
+| 模块 | 能力 |
+|---|---|
+| 本地音乐 | 文件夹/文件导入，按专辑与艺人管理，标签、内嵌封面与歌词解析，网易云补全元数据 |
+| 网易云音乐 | 扫码/验证码登录，搜索、歌单、电台、MV，收藏与音质偏好 |
+| 播放 | 队列与循环模式，会话恢复，播放统计，macOS 系统媒体键与控制中心 |
+| 外观 | 亮/暗/跟随系统，可调主题色与毛玻璃，全屏播放器与同步歌词 |
 
-项目目前主要面向 Windows，macOS 支持正在开发和验证中。部分在线能力依赖网易云音乐接口和账号状态，可能因服务端策略调整而发生变化。
+## 安装
 
-## 功能特性
+前往 [Releases](https://github.com/YuiNijika/MusicStorm/releases) 下载。Windows 安装包免管理员权限，需 Microsoft Edge WebView2 Runtime（现代 Win10/11 自带）。
 
-### 本地音乐
+也可以直接打开 [网页版](https://music.miomoe.cn/player.html) 在线体验，支持在线播放与本地导入，功能少于桌面版。
 
-- 导入音乐文件夹或单独添加歌曲
-- 按歌曲、专辑管理本地曲库
-- 读取音频标签、内嵌封面、内嵌歌词和同目录歌词文件
-- 支持 UTF-8、UTF-16、GBK / GB18030 等常见歌词编码
-- 使用原生音频引擎播放本地音乐，并支持自动切换下一首
-- 支持编辑专辑信息、手动设置封面和重新扫描元数据
-- 可从网易云匹配并补全缺失的歌曲封面与歌词
+## 开发
 
-### 网易云音乐
-
-- 手机号与二维码登录
-- 搜索歌曲、专辑、歌手、歌单和 MV
-- 浏览推荐内容、个人歌单、收藏与电台
-- 播放在线歌曲、查看歌词和 MV
-- 支持歌曲收藏、歌单操作和音质偏好
-- 支持电台及节目浏览、排序和队列播放
-
-### 播放与曲库
-
-- 播放队列、顺序播放、单曲循环与随机播放
-- 音量、静音、播放进度和队列状态持久化
-- 本地曲库、歌单、收藏和电台列表排序
-- 支持列表与卡片视图，以及自定义拖拽排序
-- 播放统计页面可查看歌曲、歌手和收听趋势
-- 启动时恢复上次播放会话，可自行控制是否自动播放
-- macOS 支持系统媒体键、控制中心播放信息与进度控制
-
-### 外观与交互
-
-- Apple 风格的亮色、暗色和跟随系统主题
-- 可调整主题色、全局色调、玻璃透明度与模糊强度
-- 全屏播放器、动态封面背景和同步歌词
-- 自定义桌面标题栏、窗口控制与启动画面
-- 支持键盘播放快捷键和 GitHub Releases 更新检测
-
-## 下载与安装
-
-前往 [Releases](https://github.com/YuiNijika/MusicStorm/releases) 下载最新构建产物。
-
-Windows 安装包使用当前用户模式安装，不需要管理员权限。首次启动前请确保系统已安装 Microsoft Edge WebView2 Runtime；现代 Windows 10 / 11 通常已自带该组件。
-
-> 如果系统或安全软件阻止运行，请先核对下载来源与 Release 页面提供的信息，不建议关闭系统安全防护。
-
-## 本地开发
-
-### 环境要求
-
-- Node.js
-- [pnpm](https://pnpm.io/)
-- Rust stable 工具链
-- Tauri 2 对应平台所需的系统依赖
-
-具体系统依赖请参考 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)。
-
-#### macOS
-
-macOS 桌面开发需要 Xcode Command Line Tools。Rust 建议通过 rustup 安装，FFmpeg 为部分格式转码和探测能力所需：
-
-```bash
-xcode-select --install
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-brew install node pnpm ffmpeg
-```
-
-安装完成后可运行 `rustc --version`、`cargo --version`、`pnpm --version` 和 `ffmpeg -version` 检查环境。通过 Finder 启动时，MusicStorm 会额外探测 Apple Silicon Homebrew 的 `/opt/homebrew/bin/ffmpeg` 和 Intel Homebrew 的 `/usr/local/bin/ffmpeg`。
-
-当前 macOS 支持仍处于开发阶段，已验证 `.app` / `.dmg` 构建（含 **Universal** 双架构）、CoreAudio 本地播放、FFmpeg 自动发现，以及系统媒体键与控制中心集成。打包配置将最低系统版本设为 **macOS 13.0**（与当前 MediaPlayer 桥接依赖一致）。代码签名与公证仍待完善，未签名的 `.dmg` 适合本地或内测分发。
-
-macOS 的数据库与持久化配置位于 `~/Library/Application Support/com.yuinijika.musicstorm/`，缓存位于 `~/Library/Caches/com.yuinijika.musicstorm/`；应用不会向 `.app` 包内部写入用户数据。
-
-### 启动开发环境
+环境要求：Node.js、pnpm、Rust stable、Tauri 2 系统依赖（见 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)）。
 
 ```bash
 git clone https://github.com/YuiNijika/MusicStorm.git
 cd MusicStorm
 pnpm install
-pnpm tauri dev
+pnpm tauri dev        # 开发
 ```
 
-### 构建前端
+## 构建
 
 ```bash
-pnpm build
+# 产物在 src-tauri/target/release/bundle/
+pnpm tauri build          # 包管理器
+python scripts/build.py   # 构建脚本
 ```
-
-### 构建桌面应用
-
-```bash
-pnpm tauri build
-```
-
-构建产物由 Tauri 写入 `src-tauri/target/release/bundle/`（debug 构建则为 `src-tauri/target/debug/bundle/`）。
-
-macOS 可同时构建 `.app` 与 `.dmg`。默认命令只针对当前机器架构（本机为 Apple Silicon 时即 arm64）：
-
-```bash
-pnpm tauri build --bundles app,dmg
-```
-
-构建 **Universal** 安装包（同时含 `aarch64` 与 `x86_64`，与 CI 一致）前，先安装双架构 Rust 目标：
-
-```bash
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-pnpm tauri build --bundles app,dmg --target universal-apple-darwin
-```
-
-产物中的主二进制可用 `lipo -info` 确认是否为 `x86_64 arm64`。仅需要可运行的 `.app` 时，将 `--bundles app,dmg` 改为 `--bundles app` 即可。
-
-## 技术栈
-
-- **桌面框架**：Tauri 2
-- **前端**：React、TypeScript、Vite、Tailwind CSS
-- **原生层**：Rust、rodio、cpal、symphonia
-- **本地数据**：SQLite 与应用本地存储
-- **在线服务**：网易云音乐接口、GitHub Releases
+Android 开发需 Android Studio、Android SDK、Android NDK。  
+macOS 开发需 Xcode Command Line Tools；FFmpeg 用于部分格式转码与探测，应用会自动探测 Homebrew 安装路径。macOS 支持仍为开发阶段，最低系统 macOS 13.0。
 
 ## 项目说明
 
-- MusicStorm 与网易云音乐及其关联公司无隶属、授权或合作关系。
-- 在线音乐内容的版权归对应权利人所有，请遵守所在地区的法律法规及相关服务条款。
-- 请勿将本项目用于绕过付费、版权保护或其他访问限制。
-- 项目尚未提供许可证文件；在许可证明确前，默认保留所有权利。
+- 与网易云音乐及其关联公司无隶属、授权或合作关系
+- 在线音乐版权归对应权利人所有，请遵守当地法律与服务条款
+- 请勿将本项目用于绕过付费、版权保护或其他访问限制
 
 ## 反馈
 
-发现问题或希望提出改进建议，可前往 [Issues](https://github.com/YuiNijika/MusicStorm/issues) 提交。反馈时建议附上系统版本、复现步骤和相关日志，以便定位问题。
+前往 [Issues](https://github.com/YuiNijika/MusicStorm/issues)，附上系统版本、复现步骤与日志。
