@@ -20,6 +20,7 @@ type QrCheckData = {
     code?: number
     message?: string
     cookie?: string
+    data?: { cookie?: string }
 }
 
 type QrSession = {
@@ -81,12 +82,13 @@ async function checkQrLogin(key: string): Promise<QrCheckData> {
     })
 }
 
-// 803 时写入 cookie
+// 803 时写入 cookie；第三方源 cookie 可能包在 data 里，两层都取
 async function pollQrLogin(key: string): Promise<number> {
     const data = await checkQrLogin(key)
     const code = data.code ?? 0
-    if (code === 803 && data.cookie) {
-        setCookiesFromApi(data.cookie)
+    const cookie = data.cookie ?? data.data?.cookie
+    if (code === 803 && cookie) {
+        setCookiesFromApi(cookie)
     }
     return code
 }

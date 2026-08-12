@@ -44,15 +44,15 @@ function DownloadBanner() {
     return (
         <Alert
             role="note"
-            className="download-banner rounded-none border-0 px-4 py-2.5"
+            className="download-banner rounded-none border-0 px-4 py-0"
         >
-            <AlertDescription className="flex w-full max-w-[720px] items-center gap-2.5 justify-self-center py-0 text-[13px]">
-                <span className="min-w-0 flex-1 leading-6">
+            <AlertDescription className="flex w-full items-center justify-center gap-2.5 py-0 text-[13px] font-medium tracking-[0.01em] text-foreground">
+                <span className="min-w-0 leading-6 text-foreground/80">
                     网页版功能有限（仅在线播放与本地导入），下载桌面端可体验
                     本地高音质输出、系统托盘、全局快捷键等完整功能
                 </span>
                 <a
-                    className="shrink-0 font-semibold text-accent underline-offset-3 transition-colors hover:text-accent/80 hover:underline"
+                    className="shrink-0 font-semibold text-primary underline-offset-3 transition-colors hover:text-primary/75 hover:underline"
                     href="https://github.com/YuiNijika/MusicStorm/releases/latest"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -63,7 +63,7 @@ function DownloadBanner() {
                     type="button"
                     onClick={dismiss}
                     aria-label="关闭提示"
-                    className="grid size-6 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground active:scale-95 dark:hover:bg-white/[0.1]"
+                    className="grid size-6 shrink-0 place-items-center rounded-full text-foreground/60 transition-colors hover:bg-black/[0.08] hover:text-foreground active:scale-95 dark:hover:bg-white/[0.12]"
                 >
                     <svg
                         width="14"

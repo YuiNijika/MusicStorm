@@ -329,6 +329,10 @@ function AppWithNav({
     )
 
     useEffect(() => {
+        // 网页版没有 Tauri 运行时，listen 内部会访问 window.__TAURI_INTERNALS__ 崩溃
+        if (isWebMode()) {
+            return
+        }
         let unlisten: (() => void) | null = null
         let cancelled = false
         void import("@tauri-apps/api/event").then(({ listen }) => {

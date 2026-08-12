@@ -33,6 +33,7 @@ import {
     type FullPlayerLayout,
 } from "@/lib/player/full-player-prefs"
 import { cn } from "@/lib/utils"
+import { isWebMode } from "@/lib/web-mode"
 
 type TitleBarStyle = "mac" | "windows"
 
@@ -65,6 +66,8 @@ function TitleBar({
     const { status } = useAppUpdate()
     const showNew = Boolean(status?.hasUpdate)
     const isMacStyle = style === "mac"
+    // 网页版无桌面窗口：不渲染窗口控制按钮（红绿灯/最小化/关闭）
+    const web = isWebMode()
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
     const [fpLayout, setFpLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
@@ -116,13 +119,17 @@ function TitleBar({
             >
                 {isMacStyle ? (
                     <div className="relative z-10 flex items-center gap-2 pr-2">
-                        <TrafficLight tone="close" title="关闭" onClick={close} />
-                        <TrafficLight tone="minimize" title="最小化" onClick={minimize} />
-                        <TrafficLight
-                            tone="maximize"
-                            title={isMaximized ? "还原" : "最大化"}
-                            onClick={toggleMaximize}
-                        />
+                        {!web ? (
+                            <>
+                                <TrafficLight tone="close" title="关闭" onClick={close} />
+                                <TrafficLight tone="minimize" title="最小化" onClick={minimize} />
+                                <TrafficLight
+                                    tone="maximize"
+                                    title={isMaximized ? "还原" : "最大化"}
+                                    onClick={toggleMaximize}
+                                />
+                            </>
+                        ) : null}
                     </div>
                 ) : (
                     <div
@@ -443,7 +450,7 @@ function TitleBar({
                         <GitHubMark className="size-4" />
                     </button>
 
-                    {!isMacStyle ? (
+                    {!isMacStyle && !web ? (
                         <div className="ml-1 flex items-center">
                             <WindowAction title="最小化" onClick={minimize}>
                                 <span className="block h-px w-3 bg-current" />

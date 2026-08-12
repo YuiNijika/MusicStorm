@@ -14,7 +14,6 @@ import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
 import { isNativeMacOS } from "@/lib/platform"
 import type { AppRoute } from "@/lib/routes"
-import { isWebMode } from "@/lib/web-mode"
 
 type AppShellProps = {
     activeRoute: AppRoute
@@ -58,14 +57,14 @@ function AppShell({
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
-            {/* 网页版下载提示条：正常文档流置顶，不遮挡内容；桌面版不渲染 */}
-            <DownloadBanner />
-
-            {!nativeMacOS && !isWebMode() ? (
+            {!nativeMacOS ? (
                 <div className="hidden md:block">
                     <TitleBar style={titleBarStyle} onOpenUpdate={onOpenUpdate} />
                 </div>
             ) : null}
+
+            {/* 网页版下载提示条：navbar 下方、内容上方；桌面版不渲染 */}
+            <DownloadBanner />
 
             <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
 
