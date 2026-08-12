@@ -17,8 +17,8 @@ export type ResolvePlayableResult =
 
 /**
  * 网易云仍可能下发 HTTP CDN 地址。macOS WKWebView 会按 App Transport
- * Security 拒绝这类混合内容，而同一签名地址的 HTTPS 端点可直接使用。
- * 桌面版仅升级网易云域（126.net / 163.com，避免改写不确定支持 TLS 的第三方地址）；
+ * Security 拒绝这类混合内容，而同一地址的 HTTPS 端点可直接使用。
+ * 桌面版仅升级网易云域 126.net / 163.com，避免改写不确定支持 TLS 的第三方地址；
  * 网页版本身是 HTTPS 页面，任何 http 资源都会被浏览器拦截，一律升级尝试。
  */
 function normalizeNeteaseMediaUrl(url: string): string {
