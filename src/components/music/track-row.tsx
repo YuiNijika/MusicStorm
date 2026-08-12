@@ -67,6 +67,7 @@ import {
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { isWebMode } from "@/lib/web-mode"
 
 type TrackRowProps = {
     track: Track
@@ -501,7 +502,8 @@ function TrackRow({
                             <ListPlus />
                             加入队列
                         </DropdownMenuItem>
-                        {isLocal && track.filePath ? (
+                        {/* 网页版 filePath 是 blob URL，无文件管理器可打开 */}
+                        {isLocal && track.filePath && !isWebMode() ? (
                             <DropdownMenuItem
                                 onClick={() => void handleRevealInFolder()}
                             >
@@ -598,7 +600,7 @@ function TrackRow({
                         下载歌曲
                     </ContextMenuItem>
                 ) : null}
-                {isLocal && track.filePath ? (
+                {isLocal && track.filePath && !isWebMode() ? (
                     <ContextMenuItem onClick={() => void handleRevealInFolder()}>
                         <FolderOpen />
                         打开所在文件夹

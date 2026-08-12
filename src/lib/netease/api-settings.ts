@@ -103,19 +103,17 @@ function readRaw(): ApiSettings {
         return { ...DEFAULT_SETTINGS }
     }
 
-    // 网页版没有本机加密链路，固定走官方外部源（与设置页只读展示一致）
-    if (isWebMode()) {
-        return { ...DEFAULT_SETTINGS, mode: "external" }
-    }
-
     try {
         const raw = window.localStorage.getItem(SETTINGS_KEY)
         if (raw) {
             const data = JSON.parse(raw) as Partial<ApiSettings>
             return {
-                mode: isApiMode(String(data.mode ?? ""))
-                    ? (data.mode as ApiMode)
-                    : DEFAULT_SETTINGS.mode,
+                // 网页版无本机加密链路：mode 锁定 external，外部源与自定义 URL 可切换
+                mode: isWebMode()
+                    ? "external"
+                    : isApiMode(String(data.mode ?? ""))
+                      ? (data.mode as ApiMode)
+                      : DEFAULT_SETTINGS.mode,
                 source: isExternalSourceId(String(data.source ?? ""))
                     ? (data.source as ExternalSourceId)
                     : DEFAULT_SETTINGS.source,
@@ -133,13 +131,16 @@ function readRaw(): ApiSettings {
 
     const migrated = migrateLegacy()
     if (migrated) {
+        if (isWebMode()) {
+            migrated.mode = "external"
+        }
         writeSettings(migrated, false)
         window.localStorage.removeItem(LEGACY_BASE_URL_KEY)
         window.localStorage.removeItem(LEGACY_PRESET_KEY)
         return migrated
     }
 
-    return { ...DEFAULT_SETTINGS }
+    return { ...DEFAULT_SETTINGS, mode: isWebMode() ? "external" : DEFAULT_SETTINGS.mode }
 }
 
 function writeSettings(next: ApiSettings, emit = true): void {
@@ -159,7 +160,12 @@ function getApiSettings(): ApiSettings {
 function setApiSettings(patch: Partial<ApiSettings>): ApiSettings {
     const prev = readRaw()
     const next: ApiSettings = {
-        mode: patch.mode && isApiMode(patch.mode) ? patch.mode : prev.mode,
+        // 网页版无本机加密链路，mode 不可切
+        mode: isWebMode()
+            ? "external"
+            : patch.mode && isApiMode(patch.mode)
+              ? patch.mode
+              : prev.mode,
         source:
             patch.source && isExternalSourceId(patch.source)
                 ? patch.source

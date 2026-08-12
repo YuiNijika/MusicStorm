@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
+import { TrackRow } from "@/components/music/track-row"
 import { usePlayer } from "@/hooks/use-player"
 import { notifyWarning } from "@/lib/notify"
 import { formatDuration } from "@/lib/format"
 import {
+    authorizeWebTrack,
     clearWebLibrary,
     estimateWebStorage,
     loadWebLibrary,
@@ -18,10 +20,10 @@ import {
 } from "@/lib/local/web-import"
 
 /**
- * 网页版本地音乐页。
+ * 网页版本地音乐页
  *
- * 浏览器无文件系统权限：导入的音频持久化在浏览器内（刷新不丢），
- * 播放依赖每次会话重建的 blob URL。桌面版请下载客户端体验完整曲库。
+ * 浏览器无文件系统权限：Chromium 走 FSA 引用本地目录，其余浏览器存副本
+ * 到 IndexedDB；刷新后自动恢复列表，授权降级的条目点播时重新授权
  */
 
 function formatBytes(bytes: number): string {
@@ -42,7 +44,7 @@ function LocalWebPage() {
     const [restoring, setRestoring] = useState(true)
     const [importing, setImporting] = useState(false)
     const [storageLabel, setStorageLabel] = useState("")
-    const { currentTrack, isPlaying, playTrack } = usePlayer()
+    const { currentTrack, isPlaying, playOrToggle } = usePlayer()
 
     // 刷新后音乐不丢：挂载即从持久化库恢复上次导入
     useEffect(() => {
@@ -143,6 +145,31 @@ function LocalWebPage() {
         }
     }, [tracks])
 
+    // 点播：未授权条目先请求目录授权再播放；同曲再点切换播放/暂停
+    const handlePlay = useCallback(
+        async (track: WebLocalTrack, queue: WebLocalTrack[]) => {
+            if (track.needsAuth) {
+                try {
+                    const authorized = await authorizeWebTrack(track)
+                    setTracks((prev) =>
+                        prev.map((item) =>
+                            item.id === track.id ? authorized : item,
+                        ),
+                    )
+                    playOrToggle(authorized, queue)
+                } catch {
+                    notifyWarning("需要授权访问文件夹", {
+                        description: "点击播放时浏览器会弹出授权，允许后可继续",
+                        id: `web-auth-${track.id}`,
+                    })
+                }
+                return
+            }
+            playOrToggle(track, queue)
+        },
+        [playOrToggle],
+    )
+
     const totalMs = useMemo(
         () => tracks.reduce((sum, track) => sum + track.durationMs, 0),
         [tracks],
@@ -202,71 +229,49 @@ function LocalWebPage() {
                         </button>
                     </div>
                     <div className="space-y-0.5">
-                        {tracks.map((track) => {
-                            const active =
-                                currentTrack?.id === track.id && isPlaying
-                            return (
-                                <div
-                                    key={track.id}
-                                    className="group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                                    onClick={() =>
-                                        playTrack(track, tracks)
-                                    }
-                                >
-                                    <div className="size-10 shrink-0 overflow-hidden rounded-lg bg-black/[0.06] dark:bg-white/[0.08]">
-                                        {track.coverUrl ? (
-                                            <img
-                                                src={track.coverUrl}
-                                                alt=""
-                                                className="size-full object-cover"
-                                            />
-                                        ) : null}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className={
-                                                active
-                                                    ? "truncate text-[14px] font-medium text-accent"
-                                                    : "truncate text-[14px] font-medium text-foreground"
-                                            }
+                        {tracks.map((track) => (
+                            <TrackRow
+                                key={track.id}
+                                track={track}
+                                isActive={currentTrack?.id === track.id}
+                                isPlaying={
+                                    currentTrack?.id === track.id && isPlaying
+                                }
+                                showSource={false}
+                                showAlbumMeta={false}
+                                dense
+                                onPlay={(item) =>
+                                    void handlePlay(item as WebLocalTrack, tracks)
+                                }
+                                trailing={
+                                    track.needsAuth ? (
+                                        <span className="text-[12px] text-muted-foreground">
+                                            需授权
+                                        </span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            aria-label={`移除 ${track.title}`}
+                                            onClick={() => removeTrack(track)}
+                                            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
                                         >
-                                            {track.title}
-                                        </p>
-                                        <p className="truncate text-[12px] text-muted-foreground">
-                                            {track.artist}
-                                            {track.album
-                                                ? ` · ${track.album}`
-                                                : ""}
-                                        </p>
-                                    </div>
-                                    <span className="shrink-0 font-mono text-[12px] text-muted-foreground">
-                                        {formatDuration(track.durationMs)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        aria-label={`移除 ${track.title}`}
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            removeTrack(track)
-                                        }}
-                                        className="shrink-0 rounded-full p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-foreground group-hover:opacity-100 dark:hover:bg-white/[0.1]"
-                                    >
-                                        <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            aria-hidden="true"
-                                        >
-                                            <path d="M6 6l12 12M18 6L6 18" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            )
-                        })}
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M6 6l12 12M18 6L6 18" />
+                                            </svg>
+                                        </button>
+                                    )
+                                }
+                            />
+                        ))}
                     </div>
                 </div>
             ) : (

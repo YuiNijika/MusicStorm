@@ -11,6 +11,12 @@ declare global {
     }
     interface FileSystemDirectoryHandle {
         values(): AsyncIterableIterator<FileSystemHandle>
+        queryPermission(options?: {
+            mode?: "read" | "readwrite"
+        }): Promise<PermissionState>
+        requestPermission(options?: {
+            mode?: "read" | "readwrite"
+        }): Promise<PermissionState>
     }
 }
 
@@ -22,10 +28,12 @@ declare global {
  */
 
 export type WebLocalTrack = Track & {
-    file: File
+    file?: File
     /** FSA 目录句柄：存引用不复制音频，恢复时实时读本地文件 */
     directoryHandle?: FileSystemDirectoryHandle
     relativePath?: string
+    /** 恢复时目录授权未授予：点击播放需先 requestPermission */
+    needsAuth?: boolean
 }
 
 const AUDIO_EXT = /\.(mp3|flac|wav|m4a|aac|ogg|opus|wma|ape|dsf|dff)$/i

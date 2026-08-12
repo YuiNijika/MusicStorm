@@ -337,121 +337,175 @@ function SourceTab() {
         EXTERNAL_SOURCES.find((item) => item.id === settings.source)?.label ??
         "API 源"
 
-    // 网页版固定官方源，不提供切换
-    if (isWebMode()) {
-        return (
-            <Section title="音源" description="网页版固定使用官方源">
-                <div className="material-panel rounded-[20px] px-4 py-4">
-                    <p className="text-[14px] font-medium tracking-[-0.01em]">
-                        MusicStorm 官方源
-                    </p>
-                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                        网页版无本机加密链路，网易云 API 固定调用官方源
-                        （api.miomoe.cn），不支持切换或自定义。
-                        下载桌面端可在「音源」中配置内置集成或第三方 API 源。
-                    </p>
-                </div>
-            </Section>
-        )
-    }
-
     return (
-        <Section title="音源" description="内置 API 或对接外部 NCM 源 · 音质">
+        <Section
+            title="音源"
+            description={
+                isWebMode() ? "对接外部 NCM 源 · 音质" : "内置 API 或对接外部 NCM 源 · 音质"
+            }
+        >
             <div className="space-y-3">
-                <div className="material-panel space-y-4 rounded-[20px] px-4 py-3.5">
-                    <div className="space-y-3">
-                        <div>
-                            <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                API 模式
-                            </p>
-                            <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                默认应用内置（TS 加密直连网易云）；也可对接远程 API
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <ChoiceChip
-                                label="应用内置"
-                                active={settings.mode === "integrated"}
-                                onClick={() => handleMode("integrated")}
-                            />
-                            <ChoiceChip
-                                label="对接 API"
-                                active={settings.mode === "external"}
-                                onClick={() => handleMode("external")}
-                            />
-                        </div>
-                        {settings.mode === "integrated" ? (
-                            <p className="text-[12px] text-muted-foreground">
-                                {nativeHint ??
-                                    "内置运行时：加密在应用内完成，桌面代理发请求"}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    {settings.mode === "external" ? (
-                        <div className="space-y-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                {!isWebMode() ? (
+                    <div className="material-panel space-y-4 rounded-[20px] px-4 py-3.5">
+                        <div className="space-y-3">
                             <div>
-                                <p className="text-[13px] font-medium">外部 API 源</p>
+                                <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                    API 模式
+                                </p>
                                 <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                    官方 / 社区预设，或自定义 Base URL
+                                    默认应用内置（TS 加密直连网易云）；也可对接远程 API
                                 </p>
                             </div>
-                            <Select
-                                value={settings.source}
-                                onValueChange={(value) =>
-                                    handleSource(value as ExternalSourceId | null)
-                                }
-                            >
-                                <SelectTrigger className="h-9 w-full min-w-[240px] max-w-md rounded-xl">
-                                    <SelectValue placeholder={sourceLabel}>
-                                        {sourceLabel}
-                                    </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {EXTERNAL_SOURCES.map((preset) => (
-                                        <SelectItem
-                                            key={preset.id}
-                                            value={preset.id}
-                                        >
-                                            {preset.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {settings.source === "custom" ? (
-                                <div className="space-y-2">
-                                    <p className="text-[12px] font-medium text-muted-foreground">
-                                        自定义 URL
-                                    </p>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                        <input
-                                            value={customDraft}
-                                            onChange={(event) =>
-                                                setCustomDraft(
-                                                    event.currentTarget.value,
-                                                )
-                                            }
-                                            placeholder={DEFAULT_BASE_URL}
-                                            className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveCustom}
-                                            className="h-9 shrink-0 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
-                                        >
-                                            保存
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="truncate text-[12px] text-muted-foreground">
-                                    {getNeteaseBaseUrl()}
+                            <div className="flex flex-wrap gap-2">
+                                <ChoiceChip
+                                    label="应用内置"
+                                    active={settings.mode === "integrated"}
+                                    onClick={() => handleMode("integrated")}
+                                />
+                                <ChoiceChip
+                                    label="对接 API"
+                                    active={settings.mode === "external"}
+                                    onClick={() => handleMode("external")}
+                                />
+                            </div>
+                            {settings.mode === "integrated" ? (
+                                <p className="text-[12px] text-muted-foreground">
+                                    {nativeHint ??
+                                        "内置运行时：加密在应用内完成，桌面代理发请求"}
                                 </p>
-                            )}
+                            ) : null}
                         </div>
-                    ) : null}
 
-                    <div className="flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                        {settings.mode === "external" ? (
+                            <div className="space-y-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                                <div>
+                                    <p className="text-[13px] font-medium">外部 API 源</p>
+                                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                        官方 / 社区预设，或自定义 Base URL
+                                    </p>
+                                </div>
+                                <Select
+                                    value={settings.source}
+                                    onValueChange={(value) =>
+                                        handleSource(value as ExternalSourceId | null)
+                                    }
+                                >
+                                    <SelectTrigger className="h-9 w-full min-w-[240px] max-w-md rounded-xl">
+                                        <SelectValue placeholder={sourceLabel}>
+                                            {sourceLabel}
+                                        </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EXTERNAL_SOURCES.map((preset) => (
+                                            <SelectItem
+                                                key={preset.id}
+                                                value={preset.id}
+                                            >
+                                                {preset.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {settings.source === "custom" ? (
+                                    <div className="space-y-2">
+                                        <p className="text-[12px] font-medium text-muted-foreground">
+                                            自定义 URL
+                                        </p>
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                            <input
+                                                value={customDraft}
+                                                onChange={(event) =>
+                                                    setCustomDraft(
+                                                        event.currentTarget.value,
+                                                    )
+                                                }
+                                                placeholder={DEFAULT_BASE_URL}
+                                                className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleSaveCustom}
+                                                className="h-9 shrink-0 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
+                                            >
+                                                保存
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="truncate text-[12px] text-muted-foreground">
+                                        {getNeteaseBaseUrl()}
+                                    </p>
+                                )}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : (
+                    <div className="material-panel space-y-4 rounded-[20px] px-4 py-3.5">
+                        <div>
+                            <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                外部 API 源
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                官方 / 社区预设，或自定义 Base URL
+                            </p>
+                        </div>
+                        <Select
+                            value={settings.source}
+                            onValueChange={(value) =>
+                                handleSource(value as ExternalSourceId | null)
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-full min-w-[240px] max-w-md rounded-xl">
+                                <SelectValue placeholder={sourceLabel}>
+                                    {sourceLabel}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {EXTERNAL_SOURCES.map((preset) => (
+                                    <SelectItem
+                                        key={preset.id}
+                                        value={preset.id}
+                                    >
+                                        {preset.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {settings.source === "custom" ? (
+                            <div className="space-y-2">
+                                <p className="text-[12px] font-medium text-muted-foreground">
+                                    自定义 URL
+                                </p>
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <input
+                                        value={customDraft}
+                                        onChange={(event) =>
+                                            setCustomDraft(
+                                                event.currentTarget.value,
+                                            )
+                                        }
+                                        placeholder={DEFAULT_BASE_URL}
+                                        className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveCustom}
+                                        className="h-9 shrink-0 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
+                                    >
+                                        保存
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="truncate text-[12px] text-muted-foreground">
+                                {getNeteaseBaseUrl()}
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                <div className="material-panel rounded-[20px] px-4 py-3.5">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
                             disabled={speedLoading}

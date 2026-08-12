@@ -136,7 +136,19 @@ async function loadWebLibrary(): Promise<WebLocalTrack[]> {
                 }
                 if (item.directoryHandle && item.relativePath) {
                     try {
-                        // 浏览器重启后授权可能失效：失败即跳过，重新导入即可恢复
+                        // 浏览器重启后授权可能降级：未授予的条目保留待授权标记，
+                        // 由用户点击播放时 requestPermission 恢复，不静默丢失
+                        const granted = await item.directoryHandle.queryPermission({
+                            mode: "read",
+                        })
+                        if (granted !== "granted") {
+                            return {
+                                ...base,
+                                directoryHandle: item.directoryHandle,
+                                relativePath: item.relativePath,
+                                needsAuth: true,
+                            }
+                        }
                         const file = await getFileFromDirectory(
                             item.directoryHandle,
                             item.relativePath,
@@ -163,6 +175,34 @@ async function loadWebLibrary(): Promise<WebLocalTrack[]> {
             }),
     )
     return restored.filter((track): track is WebLocalTrack => track != null)
+}
+
+/**
+ * 授权并读取本地文件，返回可播放的曲目。
+ * 必须在用户手势内调用（点击播放），否则浏览器拒绝弹授权框。
+ */
+async function authorizeWebTrack(
+    track: WebLocalTrack,
+): Promise<WebLocalTrack> {
+    if (!track.directoryHandle || !track.relativePath) {
+        return track
+    }
+    const granted = await track.directoryHandle.requestPermission({
+        mode: "read",
+    })
+    if (granted !== "granted") {
+        throw new Error("未授权访问本地文件夹")
+    }
+    const file = await getFileFromDirectory(
+        track.directoryHandle,
+        track.relativePath,
+    )
+    return {
+        ...track,
+        file,
+        filePath: URL.createObjectURL(file),
+        needsAuth: false,
+    }
 }
 
 async function removeWebTrack(id: string): Promise<void> {
@@ -207,6 +247,7 @@ async function estimateWebStorage(): Promise<{
 }
 
 export {
+    authorizeWebTrack,
     clearWebLibrary,
     estimateWebStorage,
     loadWebLibrary,
