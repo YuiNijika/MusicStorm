@@ -3,6 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core"
 
+import { upgradeNeteaseUrls } from "@/lib/music/upgrade-url"
 import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
 import {
     buildAnonymousUsername,
@@ -298,7 +299,8 @@ function parseProxyBody<T>(path: string, response: ProxyResponse): T {
 
     let parsed: unknown
     try {
-        parsed = JSON.parse(response.body || "{}")
+        // 网易云封面仍是 http 地址，macOS WKWebView 会按 ATS 拒绝，统一升级后再透传
+        parsed = upgradeNeteaseUrls(JSON.parse(response.body || "{}"))
     } catch {
         const snippet = response.body.slice(0, 80)
         throw new Error(

@@ -9,6 +9,7 @@ import { getApiCacheTtlMs } from "@/lib/netease/cache-prefs"
 import { resolveRealIp } from "@/lib/netease/native/real-ip"
 import { nativeNeteaseRequest } from "@/lib/netease/native/request"
 import { NETEASE_PATHS } from "@/lib/netease/paths"
+import { upgradeNeteaseUrls } from "@/lib/music/upgrade-url"
 
 // 网易云请求入口：integrated = TS 直连 music.163.com，external = 对接第三方 NCM API
 
@@ -153,7 +154,8 @@ async function fetchExternal<T>(
         throw new Error(`网易云接口失败: ${detail}`)
     }
 
-    const json = (await response.json()) as T & {
+    // 网易云封面仍是 http 地址，HTTPS 页面会按混合内容拒绝，这里统一升级后交给后续解包
+    const json = upgradeNeteaseUrls(await response.json()) as T & {
         success?: boolean
         code?: number
         message?: string
@@ -219,7 +221,8 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
             const hit = await apiCacheGet(cacheKey)
             if (hit) {
                 try {
-                    const cached = JSON.parse(hit) as T
+                    // 旧缓存里可能还是 http 封面，命中时同样升级
+                    const cached = upgradeNeteaseUrls(JSON.parse(hit)) as T
                     if (checkCode) {
                         assertNeteasePayload(options.path, cached)
                     }
