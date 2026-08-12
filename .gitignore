@@ -33,4 +33,6 @@ src-tauri/target/
 .workbuddy
 CloudMusicAPI
 CloudMusicAPI_New
+CloudMusicAPI_PHP
+CloudMusicAPI_Node
 docs
