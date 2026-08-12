@@ -78,7 +78,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs
+          # -f：docs/ 在 .gitignore 中（Pages 产物目录），新文件须强制纳入
+          git add -f docs
           # 产物与上次一致时跳过提交，避免空 commit 死循环
           if git diff --cached --quiet; then
             echo "docs/ unchanged, skip commit"
