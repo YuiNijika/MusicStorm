@@ -106,15 +106,34 @@ function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     }
 }
 
-function getNeteaseCookieParam(): string | undefined {
-    const musicU = getCookie("MUSIC_U")
-    if (!musicU) {
-        return undefined
+function getNeteaseDeviceId(): string {
+    const KEY = "musicstorm-netease-device-id"
+    try {
+        const cached = window.localStorage.getItem(KEY)
+        if (cached) {
+            return cached
+        }
+        const id = crypto.randomUUID()
+        window.localStorage.setItem(KEY, id)
+        return id
+    } catch {
+        // 存储不可用每次新值，扫码登录可能不绑定
+        return crypto.randomUUID()
     }
-    const csrf = getCookie("__csrf")
-    return csrf
-        ? `MUSIC_U=${musicU}; __csrf=${csrf};`
-        : `MUSIC_U=${musicU};`
+}
+
+function getNeteaseCookieParam(): string {
+    // deviceId 恒带：扫码登录前就要与后端对齐设备标识，登录态才绑定
+    const parts = [`deviceId=${getNeteaseDeviceId()}`]
+    const musicU = getCookie("MUSIC_U")
+    if (musicU) {
+        const csrf = getCookie("__csrf")
+        parts.push(`MUSIC_U=${musicU}`)
+        if (csrf) {
+            parts.push(`__csrf=${csrf}`)
+        }
+    }
+    return `${parts.join("; ")};`
 }
 
 export {
@@ -122,6 +141,7 @@ export {
     clearNeteaseSession,
     getCookie,
     getNeteaseCookieParam,
+    getNeteaseDeviceId,
     isNeteaseLoggedIn,
     removeCookie,
     setCookiesFromApi,
