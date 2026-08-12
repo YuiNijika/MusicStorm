@@ -57,7 +57,7 @@ function StateHero({
                     "flex size-14 items-center justify-center rounded-full",
                     isError
                         ? "bg-destructive/10 text-destructive"
-                        : "bg-black/[0.05] text-muted-foreground dark:bg-white/[0.08]",
+                        : "bg-[var(--surface-fill)] text-muted-foreground",
                 )}
             >
                 <Icon className="size-6" strokeWidth={1.75} />
@@ -89,7 +89,7 @@ function HeroRetryButton({
             type="button"
             onClick={onClick}
             className={cn(
-                "h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform active:scale-[0.98]",
+                "h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]",
             )}
         >
             {children}

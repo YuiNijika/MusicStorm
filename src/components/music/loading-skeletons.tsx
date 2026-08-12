@@ -30,7 +30,7 @@ function PlaylistGridSkeleton({
             {Array.from({ length: count }, (_, index) => (
                 <div
                     key={index}
-                    className="flex flex-col gap-3 rounded-[22px] bg-black/[0.03] p-3 dark:bg-white/[0.04]"
+                    className="flex flex-col gap-3 rounded-[22px] bg-[var(--surface-fill)] p-3"
                 >
                     <Skeleton className="aspect-square w-full rounded-2xl" />
                     <div className="space-y-2 px-0.5">
@@ -144,7 +144,7 @@ function DailyColumnsSkeleton({ columns = 3 }: { columns?: number }) {
             {Array.from({ length: columns }).map((_, index) => (
                 <div
                     key={index}
-                    className="rounded-[22px] border border-black/[0.05] bg-black/[0.02] p-2 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                    className="apple-list-surface p-2"
                 >
                     <TrackListSkeleton count={8} />
                 </div>

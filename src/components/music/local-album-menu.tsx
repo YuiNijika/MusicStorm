@@ -43,10 +43,10 @@ function LocalAlbumMenu({
                 aria-label={`${album.title} 更多操作`}
                 onClick={(event) => event.stopPropagation()}
                 className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors active:scale-[0.95]",
+                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform,opacity] active:scale-[0.95] active:duration-[var(--duration-press)]",
                     overlay
                         ? "bg-black/55 text-white opacity-100 backdrop-blur-md sm:opacity-0 sm:group-hover:opacity-100 data-popup-open:opacity-100"
-                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.1] dark:hover:bg-white/[0.14]",
+                        : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                 )}
             >
                 <MoreHorizontal className="size-4" />
@@ -109,10 +109,10 @@ function LocalArtistMenu({
                 aria-label={`${artist.name} 更多操作`}
                 onClick={(event) => event.stopPropagation()}
                 className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors active:scale-[0.95]",
+                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform,opacity] active:scale-[0.95] active:duration-[var(--duration-press)]",
                     overlay
                         ? "bg-black/55 text-white opacity-100 backdrop-blur-md sm:opacity-0 sm:group-hover:opacity-100 data-popup-open:opacity-100"
-                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.1] dark:hover:bg-white/[0.14]",
+                        : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                 )}
             >
                 <MoreHorizontal className="size-4" />

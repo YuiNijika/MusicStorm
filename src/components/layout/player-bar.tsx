@@ -92,8 +92,8 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                 aria-label="打开全屏播放"
                                 className={cn(
                                     "group shrink-0 cursor-pointer rounded-xl",
-                                    "transition-transform duration-150 ease-out",
-                                    "hover:scale-[1.03] active:scale-[0.97]",
+                                    "transition-transform duration-[var(--duration-hover)]",
+                                    "hover:scale-[1.03] active:scale-[0.97] active:duration-[var(--duration-press)]",
                                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                                 )}
                             >
@@ -302,9 +302,8 @@ function ControlButton({
             disabled={disabled}
             onClick={onClick}
             className={cn(
-                "flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors duration-100",
-                "text-muted-foreground hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
-                "dark:hover:bg-white/[0.08]",
+                "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
+                "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                 "disabled:pointer-events-none disabled:opacity-40",
                 active && "text-rose-600 dark:text-rose-300",
                 className,

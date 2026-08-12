@@ -161,7 +161,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                     <button
                                         type="button"
                                         onClick={() => playTrack(queue[0], queue)}
-                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                                     >
                                         播放最新
                                     </button>
@@ -176,10 +176,10 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                                 )
                                             }}
                                             className={cn(
-                                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium active:scale-[0.97]",
+                                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
                                                 subscribed
                                                     ? "glass-chip text-rose-600 dark:text-rose-300"
-                                                    : "bg-black/[0.05] text-foreground dark:bg-white/[0.08]",
+                                                    : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                             )}
                                         >
                                             <Heart
@@ -204,10 +204,10 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                             )
                                         }}
                                         className={cn(
-                                            "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium active:scale-[0.97]",
+                                            "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
                                             subscribed
                                                 ? "glass-chip text-rose-600 dark:text-rose-300"
-                                                : "bg-black/[0.05] text-foreground dark:bg-white/[0.08]",
+                                                : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                         )}
                                     >
                                         <Heart
@@ -336,8 +336,8 @@ function ProgramRow({
             className={cn(
                 "group flex w-full min-w-0 items-center gap-1 rounded-2xl transition-colors",
                 isActive
-                    ? "bg-black/[0.05] dark:bg-white/[0.08]"
-                    : "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]",
+                    ? "bg-[var(--surface-fill-hover)]"
+                    : "hover:bg-[var(--surface-fill)]",
             )}
         >
             {leading ? <div className="ml-1 shrink-0">{leading}</div> : null}
@@ -345,7 +345,7 @@ function ProgramRow({
             <button
                 type="button"
                 onClick={onPlay}
-                className="relative shrink-0 cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className="relative shrink-0 cursor-pointer rounded-lg"
                 title={isPlaying ? "暂停" : "播放"}
             >
                 <Cover
@@ -358,7 +358,7 @@ function ProgramRow({
             <button
                 type="button"
                 onClick={onOpen}
-                className="min-w-0 cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className="min-w-0 cursor-pointer rounded-lg text-left"
             >
                 <div className="flex min-w-0 items-center gap-2">
                     <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted-foreground">

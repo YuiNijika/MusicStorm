@@ -71,11 +71,10 @@ function RailControls({
                 onClick={() => api?.scrollPrev()}
                 className={cn(
                     "flex size-8 cursor-pointer items-center justify-center rounded-full",
-                    "border border-black/[0.06] bg-black/[0.04] text-foreground",
-                    "transition-[background-color,opacity,transform] duration-150",
-                    "hover:bg-black/[0.08] active:scale-[0.96]",
+                    "bg-[var(--surface-fill)] text-foreground",
+                    "transition-[background-color,opacity,transform] active:duration-[var(--duration-press)]",
+                    "hover:bg-[var(--surface-fill-hover)] active:scale-[0.96]",
                     "disabled:cursor-default disabled:opacity-30",
-                    "dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]",
                 )}
             >
                 <ChevronLeft className="size-4" />
@@ -87,11 +86,10 @@ function RailControls({
                 onClick={() => api?.scrollNext()}
                 className={cn(
                     "flex size-8 cursor-pointer items-center justify-center rounded-full",
-                    "border border-black/[0.06] bg-black/[0.04] text-foreground",
-                    "transition-[background-color,opacity,transform] duration-150",
-                    "hover:bg-black/[0.08] active:scale-[0.96]",
+                    "bg-[var(--surface-fill)] text-foreground",
+                    "transition-[background-color,opacity,transform] active:duration-[var(--duration-press)]",
+                    "hover:bg-[var(--surface-fill-hover)] active:scale-[0.96]",
                     "disabled:cursor-default disabled:opacity-30",
-                    "dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]",
                 )}
             >
                 <ChevronRight className="size-4" />

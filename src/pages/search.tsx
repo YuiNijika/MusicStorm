@@ -298,7 +298,7 @@ function SearchPage() {
                         }
                         className={cn(
                             "h-11 shrink-0 cursor-pointer rounded-2xl bg-foreground px-4 text-[13px] font-medium text-background",
-                            "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
+                            "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
                         )}
                     >
                         {mode === "netease" && isLoading ? "搜索中…" : "搜索"}
@@ -306,7 +306,7 @@ function SearchPage() {
                 </div>
 
                 {inputFocused && !query.trim() && history.length > 0 ? (
-                    <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.16)] ring-1 ring-foreground/10 backdrop-blur-2xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-200 ease-out">
+                    <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.16)] ring-1 ring-foreground/10 backdrop-blur-2xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-[var(--duration-enter)] ease-[var(--ease-enter)]">
                         <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                             最近搜索
                         </p>
@@ -315,7 +315,7 @@ function SearchPage() {
                                 key={item}
                                 type="button"
                                 onClick={() => runHistorySearch(item)}
-                                className="group flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                                className="group flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-fill)]"
                             >
                                 <HistoryIcon className="size-4 shrink-0 text-muted-foreground/50" />
                                 <span className="min-w-0 flex-1 truncate text-[13px]">
@@ -330,7 +330,7 @@ function SearchPage() {
                                         event.stopPropagation()
                                         removeSearchHistory(item)
                                     }}
-                                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-opacity hover:bg-black/10 hover:opacity-100 group-hover:opacity-100 dark:hover:bg-white/15"
+                                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-[opacity,background-color] hover:bg-[var(--surface-fill-hover)] hover:opacity-100 group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </span>
@@ -633,10 +633,10 @@ function ModeChip({
             type="button"
             onClick={onClick}
             className={cn(
-                "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors duration-100 active:scale-[0.97]",
+                "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)]",
                 active
                     ? "bg-foreground text-background"
-                    : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]",
+                    : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
             )}
         >
             {label}

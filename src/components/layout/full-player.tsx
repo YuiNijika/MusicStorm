@@ -495,8 +495,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         className={cn(
                             "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
                             "text-[13px] font-medium text-foreground/70",
-                            "transition-colors duration-100 hover:bg-black/[0.06] hover:text-foreground",
-                            "active:scale-[0.97] dark:hover:bg-white/[0.1]",
+                            "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                            "active:scale-[0.97] active:duration-[var(--duration-press)]",
                         )}
                     >
                         <ChevronDown className="size-4" />
@@ -509,8 +509,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             className={cn(
                                 "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
                                 "text-[12px] font-medium text-foreground/70 outline-none",
-                                "transition-colors duration-100 hover:bg-black/[0.06] hover:text-foreground",
-                                "active:scale-[0.97] dark:hover:bg-white/[0.1]",
+                                "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                "active:scale-[0.97] active:duration-[var(--duration-press)]",
                             )}
                             title="播放样式"
                         >
@@ -733,9 +733,9 @@ function TransportBar({
                     <PopoverTrigger
                         className={cn(
                             "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                            "text-muted-foreground transition-colors duration-100",
-                            "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
-                            "dark:hover:bg-white/[0.08]",
+                            "text-muted-foreground transition-[color,background-color,transform]",
+                            "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                            "active:duration-[var(--duration-press)]",
                         )}
                         title="音量"
                         aria-label="音量"
@@ -764,9 +764,9 @@ function TransportBar({
                         <PopoverTrigger
                             className={cn(
                                 "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                                "text-muted-foreground transition-colors duration-100",
-                                "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
-                                "dark:hover:bg-white/[0.08]",
+                                "text-muted-foreground transition-[color,background-color,transform]",
+                                "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                "active:duration-[var(--duration-press)]",
                             )}
                             title={`音质 · ${labelForQualityBr(qualityBr)}`}
                             aria-label={`音质 · ${labelForQualityBr(qualityBr)}`}
@@ -783,7 +783,7 @@ function TransportBar({
                                         "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
                                         qualityBr === option.br
                                             ? "bg-foreground text-background"
-                                            : "text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]",
+                                            : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
                                     )}
                                 >
                                     {option.label}
@@ -816,9 +816,9 @@ function IconBtn({
             onClick={onClick}
             className={cn(
                 "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                "text-muted-foreground transition-colors duration-100",
-                "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
-                "dark:hover:bg-white/[0.08]",
+                "text-muted-foreground transition-[color,background-color,transform]",
+                "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                "active:duration-[var(--duration-press)]",
                 active && "text-rose-600 dark:text-rose-300",
             )}
         >

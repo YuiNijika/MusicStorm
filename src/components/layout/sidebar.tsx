@@ -66,7 +66,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                             type="button"
                             onClick={() => onNavigate(item.id)}
                             className={cn(
-                                "group flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-colors duration-150 ease-out active:scale-[0.99]",
+                                "group flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-[color,background-color,transform] active:scale-[0.99] active:duration-[var(--duration-press)]",
                                 isActive
                                     ? "bg-sidebar-accent text-foreground"
                                     : "text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
@@ -74,7 +74,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                         >
                             <Icon
                                 className={cn(
-                                    "size-[18px] shrink-0 transition-opacity duration-150",
+                                    "size-[18px] shrink-0 transition-opacity",
                                     isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100",
                                 )}
                                 strokeWidth={isActive ? 2.2 : 1.9}
@@ -97,12 +97,11 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                     <DropdownMenuTrigger
                         className={cn(
                             "flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left",
-                            "transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
-                            "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                            "transition-colors hover:bg-[var(--surface-fill)]",
                         )}
                     >
                         {!ready ? (
-                            <div className="size-8 animate-pulse rounded-full bg-black/[0.06] dark:bg-white/[0.1]" />
+                            <div className="size-8 animate-pulse rounded-full bg-[var(--surface-fill)]" />
                         ) : loggedIn && profile?.avatarUrl ? (
                             <img
                                 src={profile.avatarUrl}
@@ -110,7 +109,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                                 className="size-8 rounded-full object-cover"
                             />
                         ) : (
-                            <div className="flex size-8 items-center justify-center rounded-full bg-black/[0.06] dark:bg-white/[0.1]">
+                            <div className="flex size-8 items-center justify-center rounded-full bg-[var(--surface-fill)]">
                                 {loggedIn && profile ? (
                                     <span className="text-[12px] font-medium">
                                         {profile.nickname.slice(0, 1)}

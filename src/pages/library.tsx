@@ -118,11 +118,11 @@ function LibraryPage() {
                             gridRef={gridRef}
                         />
                     ) : (
-                        <div className="space-y-1 rounded-[22px] bg-black/[0.02] p-1.5 dark:bg-white/[0.03]">
+                        <div className="apple-list-surface space-y-1 p-1.5">
                             {Array.from({ length: 6 }).map((_, index) => (
                                 <div
                                     key={index}
-                                    className="h-14 animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.06]"
+                                    className="h-14 animate-pulse rounded-xl bg-[var(--surface-fill)]"
                                 />
                             ))}
                         </div>
@@ -160,7 +160,7 @@ function LibraryPage() {
                                     onClick={() => openPlaylist(playlist.id)}
                                     className={cn(
                                         "flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors",
-                                        "hover:bg-black/[0.05] active:scale-[0.995] dark:hover:bg-white/[0.07]",
+                                        "hover:bg-[var(--surface-fill)] active:scale-[0.995]",
                                         isLikedFolder &&
                                             "bg-primary/[0.06] ring-1 ring-primary/20 dark:bg-primary/[0.12]",
                                     )}
@@ -199,9 +199,8 @@ function LibraryPage() {
                                     onClick={() => openPlaylist(playlist.id)}
                                     className={cn(
                                         "group flex cursor-pointer flex-col gap-3 rounded-[22px] p-3 text-left",
-                                        "bg-black/[0.03] transition-[background-color,transform] duration-150",
-                                        "hover:bg-black/[0.05] active:scale-[0.98]",
-                                        "dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
+                                        "bg-[var(--surface-fill)] transition-[background-color,transform]",
+                                        "hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]",
                                         isLikedFolder &&
                                             "ring-1 ring-primary/25 bg-primary/[0.06] dark:bg-primary/[0.12]",
                                     )}
@@ -210,7 +209,7 @@ function LibraryPage() {
                                         src={playlist.coverUrl}
                                         alt={playlist.title}
                                         size="xl"
-                                        className="transition-transform duration-200 ease-out group-hover:scale-[1.02] group-active:scale-[0.98]"
+                                        className="transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.02] group-active:scale-[0.98] group-active:duration-[var(--duration-press)]"
                                     />
                                     <div className="min-w-0 px-0.5">
                                         <p className="truncate text-[14px] font-semibold tracking-[-0.02em]">

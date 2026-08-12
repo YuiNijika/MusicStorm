@@ -90,9 +90,8 @@ function TitleBar({
 
     const chromeIconBtn = cn(
         "flex size-8 cursor-pointer items-center justify-center rounded-full",
-        "text-foreground/70 outline-none transition-colors",
-        "hover:bg-black/[0.05] hover:text-foreground active:scale-[0.97]",
-        "dark:hover:bg-white/[0.08]",
+        "text-foreground/70 outline-none transition-[color,background-color,transform]",
+        "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]",
     )
 
     function handleDragStart(event: PointerEvent<HTMLElement>) {
@@ -233,7 +232,7 @@ function TitleBar({
                                                 title={option.label}
                                                 onClick={() => setAccent(option.id)}
                                                 className={cn(
-                                                    "size-6 cursor-pointer rounded-full transition-transform duration-150",
+                                                    "size-6 cursor-pointer rounded-full transition-transform",
                                                     "ring-offset-2 ring-offset-popover active:scale-95",
                                                     selected
                                                         ? "ring-2 ring-foreground/80"
@@ -253,7 +252,7 @@ function TitleBar({
                                         title="自定义"
                                         onClick={() => setCustomHue(appearance.customHue)}
                                         className={cn(
-                                            "relative size-6 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
+                                            "relative size-6 cursor-pointer overflow-hidden rounded-full transition-transform",
                                             "ring-offset-2 ring-offset-popover active:scale-95",
                                             customActive
                                                 ? "ring-2 ring-foreground/80"
@@ -391,7 +390,7 @@ function TitleBar({
                                                     "h-7 cursor-pointer rounded-full px-2.5 text-[11px] font-medium transition-colors",
                                                     active
                                                         ? "bg-foreground text-background"
-                                                        : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08]",
+                                                        : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                                 )}
                                             >
                                                 {item.label}
@@ -426,7 +425,7 @@ function TitleBar({
                                                             "h-7 cursor-pointer rounded-full px-2.5 text-[11px] font-medium transition-colors",
                                                             active
                                                                 ? "bg-foreground text-background"
-                                                                : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08]",
+                                                                : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                                         )}
                                                     >
                                                         {item.label}
@@ -546,7 +545,7 @@ function TitleText({
                         className={cn(
                             "shrink-0 cursor-pointer rounded-full px-1.5 py-px",
                             "bg-rose-500/90 text-[10px] font-semibold uppercase tracking-[0.04em] text-white",
-                            "shadow-sm transition-transform duration-100 active:scale-[0.96]",
+                            "shadow-sm transition-transform duration-[var(--duration-press)] active:scale-[0.96]",
                             "hover:bg-rose-500",
                         )}
                     >
@@ -584,7 +583,7 @@ function TrafficLight({
             aria-label={title}
             onClick={onClick}
             className={cn(
-                "size-3 cursor-pointer rounded-full ring-1 transition-transform duration-100 ease-out active:scale-95",
+                "size-3 cursor-pointer rounded-full ring-1 transition-transform duration-[var(--duration-press)] active:scale-95",
                 toneClassName,
             )}
         />
@@ -609,7 +608,7 @@ function WindowAction({
             aria-label={title}
             onClick={onClick}
             className={cn(
-                "flex h-8 w-11 cursor-pointer items-center justify-center text-foreground/70 transition-colors duration-100",
+                "flex h-8 w-11 cursor-pointer items-center justify-center text-foreground/70 transition-colors",
                 "hover:bg-black/[0.06] active:bg-black/[0.1] dark:hover:bg-white/[0.08] dark:active:bg-white/[0.12]",
                 danger &&
                     "hover:bg-[#e81123] hover:text-white active:bg-[#c50f1f] dark:hover:bg-[#e81123]",

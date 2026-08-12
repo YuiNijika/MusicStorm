@@ -340,7 +340,7 @@ function StatsPage() {
                             <button
                                 {...props}
                                 type="button"
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium tabular-nums transition-colors hover:bg-black/[0.08] active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium tabular-nums transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                             >
                                 <CalendarDays className="size-4 text-muted-foreground" />
                                 {fromDate} ~ {toDate}
@@ -497,10 +497,9 @@ function StatsPage() {
                                     }
                                     placeholder="搜索歌曲或艺人"
                                     className={cn(
-                                        "h-10 rounded-full border-0 bg-black/[0.05] pl-10 text-[14px]",
+                                        "h-10 rounded-full border-0 bg-[var(--surface-fill)] pl-10 text-[14px]",
                                         "shadow-none placeholder:text-muted-foreground/55",
-                                        "focus-visible:bg-black/[0.06] focus-visible:ring-1 focus-visible:ring-black/8",
-                                        "dark:bg-white/[0.08] dark:focus-visible:bg-white/[0.1] dark:focus-visible:ring-white/12",
+                                        "focus-visible:bg-[var(--surface-fill-hover)] focus-visible:ring-1 focus-visible:ring-ring/30",
                                     )}
                                 />
                             </div>
@@ -576,7 +575,7 @@ function StatsPage() {
                                         >
                                             <ChevronDown
                                                 className={cn(
-                                                    "size-4 transition-transform duration-200 ease-out",
+                                                    "size-4 transition-transform duration-[var(--duration-hover)]",
                                                     !open && "-rotate-90",
                                                 )}
                                             />
@@ -616,7 +615,7 @@ function StatsPage() {
                                                 }
                                             />
                                             {open && canExpand ? (
-                                                <div className="border-t border-black/[0.04] bg-black/[0.02] dark:border-white/[0.05] dark:bg-white/[0.02] ml-3 rounded-b-xl">
+                                                <div className="ml-3 rounded-b-xl border-t border-[var(--separator)] bg-[var(--surface-fill)]">
                                                     {cluster.members.map(
                                                         (member) => (
                                                             <div
@@ -735,7 +734,7 @@ function Segmented<T extends string>({
         <div
             role="tablist"
             aria-label="统计时段"
-            className="inline-flex rounded-full bg-black/[0.06] p-[3px] dark:bg-white/[0.1]"
+            className="inline-flex rounded-full bg-[var(--surface-fill)] p-[3px]"
         >
             {items.map((item) => {
                 const active = value === item.id
@@ -748,8 +747,8 @@ function Segmented<T extends string>({
                         onClick={() => onChange(item.id)}
                         className={cn(
                             "min-w-[3.25rem] rounded-full px-3.5 py-[6px] text-[13px] font-medium tracking-[-0.01em]",
-                            "transition-[color,background-color,box-shadow,transform] duration-150",
-                            "active:scale-[0.97]",
+                            "transition-[color,background-color,box-shadow,transform]",
+                            "active:scale-[0.97] active:duration-[var(--duration-press)]",
                             active
                                 ? cn(
                                       "bg-background text-foreground",

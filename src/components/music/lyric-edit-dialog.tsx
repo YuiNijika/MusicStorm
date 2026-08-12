@@ -118,7 +118,7 @@ function LyricEditDialog({ track, open, onOpenChange }: LyricEditDialogProps) {
                             ? "正在加载歌词…"
                             : "[00:12.00] 歌词时间轴格式\n[00:15.50] 每行一个时间点"
                     }
-                    className="h-64 w-full resize-none rounded-2xl bg-black/[0.03] p-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none ring-1 ring-black/[0.06] placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 disabled:opacity-50 dark:bg-white/[0.05] dark:ring-white/[0.08]"
+                    className="h-64 w-full resize-none rounded-2xl bg-[var(--surface-fill)] p-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none ring-1 ring-black/[0.06] placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 disabled:opacity-50 dark:ring-white/[0.08]"
                 />
 
                 <p className="-mt-2 text-[11px] text-muted-foreground">

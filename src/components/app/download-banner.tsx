@@ -63,7 +63,7 @@ function DownloadBanner() {
                     type="button"
                     onClick={dismiss}
                     aria-label="关闭提示"
-                    className="grid size-6 shrink-0 place-items-center rounded-full text-foreground/60 transition-colors hover:bg-black/[0.08] hover:text-foreground active:scale-95 dark:hover:bg-white/[0.12]"
+                    className="grid size-6 shrink-0 place-items-center rounded-full text-foreground/60 transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-95 active:duration-[var(--duration-press)]"
                 >
                     <svg
                         width="14"

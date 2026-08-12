@@ -200,7 +200,7 @@ function SettingsPage({
 
             <div
                 key={tab}
-                className="animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-out"
+                className="animate-in fade-in-0 slide-in-from-top-1 duration-[var(--duration-enter)] ease-[var(--ease-enter)]"
             >
                 {tab === "source" ? <SourceTab /> : null}
                 {tab === "playback" ? <PlaybackTab /> : null}
@@ -510,7 +510,7 @@ function SourceTab() {
                             type="button"
                             disabled={speedLoading}
                             onClick={() => void handleSpeedTest()}
-                            className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] disabled:opacity-50 dark:bg-white/[0.08]"
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {speedLoading
                                 ? "检测中"
@@ -829,13 +829,13 @@ function PlaybackTab() {
                                 "rounded-full px-2.5 py-1 text-[11px] font-medium",
                                 ffmpegStatus?.available
                                     ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                                    : "bg-black/[0.05] text-muted-foreground dark:bg-white/[0.08]",
+                                    : "bg-[var(--surface-fill)] text-muted-foreground",
                             )}
                         >
                             {ffmpegStatus?.available ? "可用" : "未配置"}
                         </span>
                     </div>
-                    <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
+                    <div className="space-y-1 rounded-xl bg-[var(--surface-fill)] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
                         {ffmpegStatus?.path ? (
                             <p className="break-all font-mono" title={ffmpegStatus.path}>
                                 {ffmpegStatus.path}
@@ -861,7 +861,7 @@ function PlaybackTab() {
                             type="button"
                             disabled={ffmpegBusy}
                             onClick={() => void refreshFfmpeg()}
-                            className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] disabled:opacity-45 dark:bg-white/[0.08]"
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-45"
                         >
                             自动检测
                         </button>
@@ -878,7 +878,7 @@ function PlaybackTab() {
                                 type="button"
                                 disabled={ffmpegBusy}
                                 onClick={() => void clearFfmpeg()}
-                                className="h-9 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.06]"
+                                className="h-9 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] disabled:opacity-45"
                             >
                                 清除
                             </button>
@@ -985,7 +985,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
             <div className="space-y-3">
                 <div className="material-panel space-y-4 rounded-[20px] px-4 py-4">
                     {!ready ? (
-                        <div className="h-12 animate-pulse rounded-xl bg-black/[0.04] dark:bg-white/[0.06]" />
+                        <div className="h-12 animate-pulse rounded-xl bg-[var(--surface-fill)]" />
                     ) : loggedIn && profile ? (
                         <div className="flex flex-wrap items-center gap-3">
                             {profile.avatarUrl ? (
@@ -995,7 +995,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                     className="size-12 rounded-full object-cover"
                                 />
                             ) : (
-                                <div className="flex size-12 items-center justify-center rounded-full bg-black/[0.06] text-[14px] font-medium dark:bg-white/[0.1]">
+                                <div className="flex size-12 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[14px] font-medium">
                                     {profile.nickname.slice(0, 1)}
                                 </div>
                             )}
@@ -1010,7 +1010,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                             <button
                                 type="button"
                                 onClick={logout}
-                                className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                                className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                             >
                                 退出当前
                             </button>
@@ -1032,7 +1032,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                         <button
                             type="button"
                             onClick={() => void openNeteaseRegister()}
-                            className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             注册（官网）
                         </button>
@@ -1066,7 +1066,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                                 className="size-9 rounded-full object-cover"
                                             />
                                         ) : (
-                                            <div className="flex size-9 items-center justify-center rounded-full bg-black/[0.06] text-[12px] font-medium dark:bg-white/[0.1]">
+                                            <div className="flex size-9 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[12px] font-medium">
                                                 {account.nickname.slice(0, 1)}
                                             </div>
                                         )}
@@ -1090,7 +1090,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                                 onClick={() =>
                                                     void handleSwitch(account.userId)
                                                 }
-                                                className="h-8 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[11px] font-medium disabled:cursor-default disabled:opacity-40 active:scale-[0.97] dark:bg-white/[0.08]"
+                                                className="h-8 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[11px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] disabled:cursor-default disabled:opacity-40 active:scale-[0.97] active:duration-[var(--duration-press)]"
                                             >
                                                 {busy && !isActive
                                                     ? "切换中"
@@ -1256,7 +1256,7 @@ function AppearanceTab({
                                     title={option.label}
                                     onClick={() => setAccent(option.id)}
                                     className={cn(
-                                        "size-8 cursor-pointer rounded-full transition-transform duration-150",
+                                        "size-8 cursor-pointer rounded-full transition-transform",
                                         "ring-offset-2 ring-offset-background active:scale-95",
                                         active
                                             ? "ring-2 ring-foreground/80"
@@ -1276,7 +1276,7 @@ function AppearanceTab({
                             title="自定义"
                             onClick={() => setCustomHue(appearance.customHue)}
                             className={cn(
-                                "relative size-8 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
+                                "relative size-8 cursor-pointer overflow-hidden rounded-full transition-transform",
                                 "ring-offset-2 ring-offset-background active:scale-95",
                                 customActive
                                     ? "ring-2 ring-foreground/80"
@@ -1570,7 +1570,7 @@ function UpdateTab() {
                 <div className="space-y-3">
                     <div className="material-panel space-y-4 rounded-[20px] px-4 py-4">
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.04]">
+                        <div className="rounded-2xl bg-[var(--surface-fill)] px-3.5 py-3">
                             <p className="text-[11px] font-medium text-muted-foreground">
                                 当前版本
                             </p>
@@ -1578,7 +1578,7 @@ function UpdateTab() {
                                 {current}
                             </p>
                         </div>
-                        <div className="rounded-2xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.04]">
+                        <div className="rounded-2xl bg-[var(--surface-fill)] px-3.5 py-3">
                             <p className="text-[11px] font-medium text-muted-foreground">
                                 最新版本
                             </p>
@@ -1591,7 +1591,7 @@ function UpdateTab() {
                                         new
                                     </span>
                                 ) : status?.latestVersion ? (
-                                    <span className="rounded-full bg-black/[0.06] px-1.5 py-px text-[10px] font-medium text-muted-foreground dark:bg-white/[0.08]">
+                                    <span className="rounded-full bg-[var(--surface-fill)] px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                                         最新
                                     </span>
                                 ) : null}
@@ -1638,9 +1638,8 @@ function UpdateTab() {
                             onClick={() => void handleRefresh()}
                             disabled={checking}
                             className={cn(
-                                "h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium",
-                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45",
-                                "dark:bg-white/[0.08]",
+                                "h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium",
+                                "transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-45",
                             )}
                         >
                             {checking ? "检测中…" : "刷新检测"}
@@ -1650,7 +1649,7 @@ function UpdateTab() {
                             onClick={() => void handleOpenRelease()}
                             className={cn(
                                 "h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background",
-                                "active:scale-[0.97]",
+                                "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)]",
                             )}
                         >
                             前往更新
@@ -1670,7 +1669,7 @@ function UpdateTab() {
                         ) : null}
                     </div>
                     {body ? (
-                        <pre className="max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/[0.03] px-3.5 py-3 text-[12.5px] leading-relaxed text-foreground/90 dark:bg-white/[0.04]">
+                        <pre className="max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-[var(--surface-fill)] px-3.5 py-3 text-[12.5px] leading-relaxed text-foreground/90">
                             {body}
                         </pre>
                     ) : (
@@ -1711,7 +1710,7 @@ function ContributorsPanel() {
                     {Array.from({ length: 4 }, (_, i) => (
                         <span
                             key={i}
-                            className="size-10 animate-pulse rounded-full bg-black/[0.06] dark:bg-white/[0.08]"
+                            className="size-10 animate-pulse rounded-full bg-[var(--surface-fill)]"
                         />
                     ))}
                 </div>
@@ -1731,7 +1730,7 @@ function ContributorsPanel() {
                                 src={contributor.avatarUrl}
                                 alt={contributor.login}
                                 loading="lazy"
-                                className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform duration-150 group-hover:scale-105 dark:ring-white/[0.12]"
+                                className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform group-hover:scale-105 dark:ring-white/[0.12]"
                             />
                             <span className="w-full truncate text-center text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
                                 {contributor.login}
@@ -2018,7 +2017,7 @@ function OtherTab() {
                             <button
                                 type="button"
                                 onClick={() => void handleClearApiCache()}
-                                className="h-8 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                                className="h-8 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                             >
                                 清空缓存
                             </button>
@@ -2036,7 +2035,7 @@ function OtherTab() {
                                 />
                             ))}
                         </div>
-                        <div className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.05]">
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-fill)] px-3 py-2.5">
                             <div className="min-w-0">
                                 <p className="text-[13px] font-medium">
                                     自动清理过期缓存
@@ -2060,7 +2059,7 @@ function OtherTab() {
                             </p>
                         ) : null}
                         {storagePaths ? (
-                            <div className="space-y-1 rounded-xl bg-black/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground dark:bg-white/[0.05]">
+                            <div className="space-y-1 rounded-xl bg-[var(--surface-fill)] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
                                 <p className="truncate" title={storagePaths.appDir}>
                                     {nativeMacOS ? "应用数据" : "运行目录"} ·{" "}
                                     {storagePaths.appDir}
@@ -2091,7 +2090,7 @@ function OtherTab() {
                         <button
                             type="button"
                             onClick={() => void handleClearCoverCache()}
-                            className="h-8 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                            className="h-8 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             清空封面缓存
                         </button>
@@ -2300,7 +2299,7 @@ function ShortcutRow({
         <div
             className={cn(
                 "flex items-center justify-between gap-3 px-4 py-2.5",
-                active && "bg-black/[0.03] dark:bg-white/[0.05]",
+                active && "bg-[var(--surface-fill)]",
             )}
         >
             <span className="text-[13px] text-foreground/90">{label}</span>
@@ -2312,7 +2311,7 @@ function ShortcutRow({
                 <button
                     type="button"
                     onClick={onStart}
-                    className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                    className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-[var(--surface-fill)]"
                     title="点击修改"
                 >
                     {value ? (
@@ -2365,11 +2364,11 @@ function ChoiceChip({
             type="button"
             onClick={onClick}
             className={cn(
-                "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors duration-100",
-                "active:scale-[0.97]",
+                "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-[color,background-color,transform]",
+                "active:scale-[0.97] active:duration-[var(--duration-press)]",
                 active
                     ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]",
+                    : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
             )}
         >
             {label}

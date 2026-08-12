@@ -94,8 +94,8 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                             aria-label="主题色"
                             className={cn(
                                 "flex size-9 cursor-pointer items-center justify-center rounded-full",
-                                "text-foreground/60 transition-colors duration-100 active:scale-[0.95]",
-                                "hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]",
+                                "text-foreground/60 transition-[color,background-color,transform] active:scale-[0.95] active:duration-[var(--duration-press)]",
+                                "hover:bg-[var(--surface-fill)] hover:text-foreground",
                             )}
                         >
                             <Palette className="size-4" strokeWidth={1.9} />
@@ -118,7 +118,7 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                                             aria-label={option.label}
                                             onClick={() => setAccent(option.id)}
                                             className={cn(
-                                                "size-7 cursor-pointer rounded-full transition-transform duration-150",
+                                                "size-7 cursor-pointer rounded-full transition-transform",
                                                 "ring-offset-2 ring-offset-background active:scale-95",
                                                 active
                                                     ? "ring-2 ring-foreground/80"
@@ -138,7 +138,7 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                                     aria-label="自定义色相"
                                     onClick={() => setCustomHue(customHue)}
                                     className={cn(
-                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform duration-150",
+                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform",
                                         "ring-offset-2 ring-offset-background active:scale-95",
                                         customActive
                                             ? "ring-2 ring-foreground/80"
@@ -179,12 +179,12 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                     <DropdownMenuTrigger
                         className={cn(
                             "ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full",
-                            "transition-colors duration-100 active:scale-[0.95]",
-                            "hover:bg-black/[0.05] dark:hover:bg-white/[0.08]",
+                            "transition-[color,background-color,transform] active:scale-[0.95] active:duration-[var(--duration-press)]",
+                            "hover:bg-[var(--surface-fill)]",
                         )}
                     >
                         {!ready ? (
-                            <div className="size-6 animate-pulse rounded-full bg-black/[0.06] dark:bg-white/[0.1]" />
+                            <div className="size-6 animate-pulse rounded-full bg-[var(--surface-fill)]" />
                         ) : loggedIn && profile?.avatarUrl ? (
                             <img
                                 src={profile.avatarUrl}

@@ -126,7 +126,7 @@ function NeteaseAlbumPickerDialog({
                                     onClick={() => onPick(album)}
                                     className={cn(
                                         "flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2 py-2 text-left",
-                                        "hover:bg-black/[0.04] active:scale-[0.995] dark:hover:bg-white/[0.06]",
+                                        "transition-[background-color,transform] hover:bg-[var(--surface-fill)] active:scale-[0.995]",
                                     )}
                                 >
                                     <Cover

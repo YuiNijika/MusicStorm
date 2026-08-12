@@ -164,7 +164,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                     {playlist.trackCount ?? sortedTracks.length} 首
                                 </span>
                             </div>
-                            <h1 className="text-[28px] font-semibold tracking-[-0.04em]">
+                            <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.04em]">
                                 {playlist.title}
                             </h1>
                             {playlist.description ? (
@@ -182,7 +182,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 playTrack(first, sortedTracks)
                                             }
                                         }}
-                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                                     >
                                         播放全部
                                     </button>
@@ -193,10 +193,10 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                         disabled={subBusy}
                                         onClick={() => void handleToggleSubscribe()}
                                         className={cn(
-                                            "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors active:scale-[0.97] disabled:opacity-50",
+                                            "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
                                             subscribed
                                                 ? "bg-primary/15 text-primary"
-                                                : "bg-black/[0.05] text-foreground hover:bg-black/[0.08] dark:bg-white/[0.08]",
+                                                : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                         )}
                                     >
                                         <Heart

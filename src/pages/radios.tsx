@@ -68,7 +68,7 @@ function RadioList({
             }
             className="apple-list-surface space-y-0.5 p-1.5"
             renderItem={(radio, _index, handle) => (
-                <div className="group flex items-center gap-1 rounded-2xl transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.07]">
+                <div className="group flex items-center gap-1 rounded-2xl transition-colors hover:bg-[var(--surface-fill)]">
                     {handle ? <div className="ml-1 shrink-0">{handle}</div> : null}
                     <button
                         type="button"
@@ -84,7 +84,7 @@ function RadioList({
                             />
                             <span
                                 className={cn(
-                                    "pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/35 text-white opacity-0 transition-opacity duration-150",
+                                    "pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/35 text-white opacity-0 transition-opacity",
                                     "group-hover:opacity-100 group-focus-visible:opacity-100",
                                 )}
                             >
@@ -104,7 +104,7 @@ function RadioList({
                         type="button"
                         onClick={() => onPlay(radio)}
                         title="播放"
-                        className="mr-2.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.05] text-foreground/80 transition-colors hover:bg-black/[0.1] active:scale-95 dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
+                        className="mr-2.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--surface-fill)] text-foreground/80 transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-95 active:duration-[var(--duration-press)]"
                     >
                         <Play className="size-3.5 fill-current" />
                     </button>
@@ -272,7 +272,7 @@ function RadiosPage() {
                 onClick={() => setRetry((n) => n + 1)}
                 className={cn(
                     "glass-chip inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3",
-                    "text-[13px] font-medium active:scale-[0.97]",
+                    "text-[13px] font-medium transition-transform active:scale-[0.97] active:duration-[var(--duration-press)]",
                 )}
                 title="刷新"
             >

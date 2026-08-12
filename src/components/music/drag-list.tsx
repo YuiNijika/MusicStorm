@@ -96,7 +96,7 @@ function DragList<T extends { id: string }>({
                         className={cn(
                             "flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg",
                             "text-muted-foreground touch-none active:cursor-grabbing",
-                            "hover:bg-black/[0.05] dark:hover:bg-white/[0.08]",
+                            "transition-colors hover:bg-[var(--surface-fill)]",
                             dragId === item.id && "cursor-grabbing text-foreground",
                         )}
                         onPointerDown={(e) => onHandlePointerDown(e, item.id)}

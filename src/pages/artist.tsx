@@ -294,7 +294,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人
                             </p>
-                            <h1 className="text-[24px] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[24px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
                                 {profile.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -313,7 +313,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                 <button
                                     type="button"
                                     onClick={() => playTrack(hotTracks[0], hotTracks)}
-                                    className="mt-1 h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
+                                    className="mt-1 h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                                 >
                                     播放热门
                                 </button>
@@ -465,7 +465,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                             onClick={() => openMv(mv.id)}
                                             className={cn(
                                                 "group flex cursor-pointer flex-col gap-2 text-left",
-                                                "transition-transform active:scale-[0.98]",
+                                                "transition-transform active:scale-[0.98] active:duration-[var(--duration-press)]",
                                             )}
                                         >
                                             <div className="relative overflow-hidden rounded-[14px] ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
@@ -473,7 +473,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                                     src={mv.coverUrl}
                                                     alt={mv.title}
                                                     size="xl"
-                                                    className="aspect-video w-full rounded-[14px] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                                    className="aspect-video w-full rounded-[14px] object-cover transition-transform duration-[var(--duration-enter)] ease-[var(--ease-enter)] group-hover:scale-[1.03]"
                                                 />
                                                 {mv.playCount != null ? (
                                                     <span className="absolute right-2 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm">
@@ -567,15 +567,14 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                             onClick={() => openArtist(artist.id)}
                                             className={cn(
                                                 "group flex cursor-pointer flex-col items-center gap-2.5 rounded-[20px] p-3 text-center",
-                                                "bg-black/[0.03] transition-colors hover:bg-black/[0.05] active:scale-[0.98]",
-                                                "dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
+                                                "bg-[var(--surface-fill)] transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]",
                                             )}
                                         >
                                             <Cover
                                                 src={artist.coverUrl}
                                                 alt={artist.name}
                                                 size="xl"
-                                                className="rounded-full transition-transform duration-200 group-hover:scale-[1.03]"
+                                                className="rounded-full transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.03]"
                                             />
                                             <div className="min-w-0 w-full px-0.5">
                                                 <p className="truncate text-[13px] font-semibold tracking-[-0.01em]">

@@ -146,7 +146,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                 MV
                                 {data?.br ? ` · ${data.br}p` : ""}
                             </p>
-                            <h1 className="line-clamp-2 text-[22px] font-semibold tracking-[-0.03em]">
+                            <h1 className="line-clamp-2 text-[22px] leading-[1.2] font-semibold tracking-[-0.03em]">
                                 {profile.title}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -186,8 +186,8 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                 onClick={() => void handleDownload()}
                                 className={cn(
                                     "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium",
-                                    "bg-black/[0.05] text-foreground transition-colors hover:bg-black/[0.08]",
-                                    "active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]",
+                                    "bg-[var(--surface-fill)] text-foreground transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)]",
+                                    "active:scale-[0.97] active:duration-[var(--duration-press)]",
                                 )}
                                 title={
                                     isHlsStream(data.url)

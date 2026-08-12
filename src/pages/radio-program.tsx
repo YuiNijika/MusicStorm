@@ -122,7 +122,7 @@ function RadioProgramPage({
                                 onClick={() =>
                                     playOrToggle(program.track, [program.track])
                                 }
-                                className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
+                                className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                             >
                                 {active && isPlaying ? "暂停" : "播放"}
                             </button>
@@ -131,7 +131,7 @@ function RadioProgramPage({
                                 onClick={() =>
                                     playTrack(program.track, [program.track])
                                 }
-                                className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[13px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                                className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                             >
                                 从头播放
                             </button>

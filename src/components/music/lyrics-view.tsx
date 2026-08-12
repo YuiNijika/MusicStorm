@@ -240,7 +240,7 @@ function LyricsView({
                                         }
                                     }}
                                     className={cn(
-                                        "block w-full transition-colors duration-150",
+                                        "block w-full transition-colors",
                                         textAlignClass,
                                         timedLyrics
                                             ? "cursor-pointer"

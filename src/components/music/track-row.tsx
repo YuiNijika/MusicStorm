@@ -283,7 +283,7 @@ function TrackRow({
             onKeyDown={handleRowKey}
             className={cn(
                 props.className,
-                "group grid w-full min-w-0 cursor-pointer items-center text-left transition-colors duration-150",
+                "group grid w-full min-w-0 cursor-pointer items-center text-left transition-colors",
                 dense
                     ? "gap-1.5 rounded-xl px-1.5 py-1.5 sm:gap-2"
                     : "gap-2 rounded-2xl px-2.5 py-2 sm:gap-3 sm:px-3",
@@ -304,10 +304,11 @@ function TrackRow({
                         : actions
                           ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
                           : "grid-cols-[auto_minmax(0,1fr)_auto]",
-                "active:scale-[0.995] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                // outline 交给全局 focus-visible 环，行内不再叠第二层 ring
+                "active:scale-[0.995]",
                 isActive
-                    ? "bg-black/[0.05] dark:bg-white/[0.08]"
-                    : "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]",
+                    ? "bg-[var(--surface-fill-hover)]"
+                    : "hover:bg-[var(--surface-fill)]",
             )}
         >
             {leading ? (
@@ -324,7 +325,7 @@ function TrackRow({
                 <Cover src={coverUrl} alt={track.title} size="sm" />
                 <span
                     className={cn(
-                        "pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-black/35 text-white opacity-0 transition-opacity duration-150",
+                        "pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-black/35 text-white opacity-0 transition-opacity",
                         "group-hover:opacity-100 group-focus-visible:opacity-100",
                         isActive && "opacity-100",
                     )}
@@ -470,8 +471,8 @@ function TrackRow({
                         onClick={(event) => event.stopPropagation()}
                         className={cn(
                             "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full",
-                            "text-muted-foreground opacity-60 hover:bg-black/[0.05] hover:opacity-100",
-                            "group-hover:opacity-100 dark:hover:bg-white/[0.08]",
+                            "text-muted-foreground opacity-60 transition-colors hover:bg-[var(--surface-fill)] hover:opacity-100",
+                            "group-hover:opacity-100",
                         )}
                         aria-label="更多操作"
                     >

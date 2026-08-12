@@ -53,9 +53,8 @@ function QueuePanel() {
                 title="播放队列"
                 aria-label="播放队列"
                 className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors duration-100",
-                    "text-muted-foreground hover:bg-black/[0.05] hover:text-foreground active:scale-[0.96]",
-                    "dark:hover:bg-white/[0.08]",
+                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
+                    "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                     "disabled:pointer-events-none disabled:opacity-40",
                 )}
             >
@@ -80,7 +79,7 @@ function QueuePanel() {
                         <button
                             type="button"
                             onClick={clearQueue}
-                            className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-destructive dark:hover:bg-white/[0.08]"
+                            className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-destructive"
                         >
                             <Trash2 className="size-3" />
                             清空
@@ -90,7 +89,7 @@ function QueuePanel() {
 
                 {count === 0 ? (
                     <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-                        <div className="flex size-10 items-center justify-center rounded-full bg-black/[0.04] dark:bg-white/[0.06]">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-[var(--surface-fill)]">
                             <ListMusic className="size-4 text-muted-foreground" />
                         </div>
                         <p className="text-[12px] text-muted-foreground">
@@ -110,8 +109,8 @@ function QueuePanel() {
                                         className={cn(
                                             "group flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5",
                                             active
-                                                ? "bg-black/[0.05] dark:bg-white/[0.08]"
-                                                : "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]",
+                                                ? "bg-[var(--surface-fill-hover)]"
+                                                : "hover:bg-[var(--surface-fill)]",
                                         )}
                                     >
                                         {count > 1 ? (
@@ -181,7 +180,7 @@ function QueuePanel() {
                                                 }
                                                 title="从队列移除"
                                                 aria-label={`移除 ${track.title}`}
-                                                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-destructive group-hover:opacity-100 dark:hover:bg-white/[0.1]"
+                                                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
                                             >
                                                 <X className="size-3.5" />
                                             </button>

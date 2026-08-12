@@ -134,7 +134,7 @@ function LocalAlbumDrawer({
 
                     <div className="max-h-[min(58vh,520px)] space-y-5 overflow-y-auto px-4 pb-4">
                         {folderPath ? (
-                            <div className="rounded-2xl bg-black/[0.04] px-3.5 py-2.5 dark:bg-white/[0.05]">
+                            <div className="rounded-2xl bg-[var(--surface-fill)] px-3.5 py-2.5">
                                 <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                                     关联文件夹
                                 </p>
@@ -158,8 +158,8 @@ function LocalAlbumDrawer({
                                         onClick={() => void handlePickCover()}
                                         className={cn(
                                             "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl",
-                                            "bg-black/[0.05] text-[12px] font-medium active:scale-[0.98]",
-                                            "disabled:opacity-50 dark:bg-white/[0.08]",
+                                            "bg-[var(--surface-fill)] text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]",
+                                            "disabled:opacity-50",
                                         )}
                                     >
                                         {coverBusy ? (
@@ -174,7 +174,7 @@ function LocalAlbumDrawer({
                                             type="button"
                                             disabled={coverBusy}
                                             onClick={() => setCoverDataUrl("")}
-                                            className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-black/[0.05] text-[12px] font-medium active:scale-[0.98] dark:bg-white/[0.08]"
+                                            className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-fill)] text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]"
                                         >
                                             <RotateCcw className="size-3.5" />
                                             清除封面
@@ -231,7 +231,7 @@ function LocalAlbumDrawer({
                                     className={cn(
                                         "flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl",
                                         "bg-foreground text-[13px] font-medium text-background",
-                                        "active:scale-[0.98] disabled:opacity-50",
+                                        "transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50",
                                     )}
                                 >
                                     <Search className="size-4" />
@@ -247,7 +247,7 @@ function LocalAlbumDrawer({
                                 type="button"
                                 disabled={submitting}
                                 onClick={() => onOpenChange(false)}
-                                className="h-10 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[13px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                                className="h-10 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                             >
                                 取消
                             </button>

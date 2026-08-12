@@ -52,7 +52,7 @@ function MobileTabBar({ activeRoute, onNavigate }: MobileTabBarProps) {
                             onClick={() => onNavigate(id)}
                             className={cn(
                                 "flex min-h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl",
-                                "transition-colors duration-150 active:scale-[0.97]",
+                                "transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)]",
                                 isActive
                                     ? "text-foreground"
                                     : "text-muted-foreground hover:text-foreground",

@@ -395,7 +395,7 @@ function LocalPage() {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人 / 合集
                             </p>
-                            <h1 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
                                 {artist.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -411,7 +411,7 @@ function LocalPage() {
                                 onClick={() =>
                                     void enrichTracksFromNetease(artistTrackList)
                                 }
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-40"
                             >
                                 {metadataBusy ? (
                                     <Loader2 className="size-3.5 animate-spin" />
@@ -424,7 +424,7 @@ function LocalPage() {
                         <button
                             type="button"
                             onClick={() => openArtistEditDrawer(artist)}
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             <Pencil className="size-3.5" />
                             编辑
@@ -437,10 +437,10 @@ function LocalPage() {
                                     : setSelectionMode("album")
                             }
                             className={cn(
-                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium active:scale-[0.97]",
+                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)]",
                                 selectionMode === "album"
                                     ? "bg-primary text-primary-foreground"
-                                    : "bg-black/[0.05] dark:bg-white/[0.08]",
+                                    : "bg-[var(--surface-fill)] hover:bg-[var(--surface-fill-hover)]",
                             )}
                         >
                             <SquareCheck className="size-3.5" />
@@ -457,7 +457,7 @@ function LocalPage() {
                                     ).length,
                                 })
                             }
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 text-[13px] font-medium text-muted-foreground hover:text-foreground active:scale-[0.97] dark:bg-white/[0.08]"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             <Trash2 className="size-3.5" />
                             删除分组
@@ -589,7 +589,7 @@ function LocalPage() {
 
                 <header className="flex flex-wrap items-end justify-between gap-3 px-0.5">
                     <div className="min-w-0">
-                        <h1 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px] md:text-[28px]">
+                        <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[26px] md:text-[28px]">
                             {title}
                         </h1>
                         <p className="mt-0.5 text-[12px] text-muted-foreground sm:text-[13px]">
@@ -614,7 +614,7 @@ function LocalPage() {
                                         playOrToggle(first, sortedTracks)
                                     }
                                 }}
-                                className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium active:scale-[0.98]"
+                                className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                             >
                                 播放
                             </button>
@@ -626,7 +626,7 @@ function LocalPage() {
                                 onClick={() =>
                                     void enrichTracksFromNetease(sortedTracks)
                                 }
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-40"
                             >
                                 {metadataBusy ? (
                                     <Loader2 className="size-3.5 animate-spin" />
@@ -641,7 +641,7 @@ function LocalPage() {
                                 type="button"
                                 disabled={!lib.desktop || lib.submitting}
                                 onClick={() => void lib.importTracks(null)}
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-40"
+                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-40"
                             >
                                 <FilePlus2 className="size-3.5" />
                                 添加单曲
@@ -686,7 +686,7 @@ function LocalPage() {
                                                 : null,
                                         )
                                     }
-                                    className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background active:scale-[0.97] disabled:opacity-40"
+                                    className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-40"
                                 >
                                     <FilePlus2 className="size-3.5" />
                                     {lib.nav.kind === "all"
@@ -697,7 +697,7 @@ function LocalPage() {
                         }
                     />
                 ) : (
-                    <div className="overflow-hidden rounded-[16px] bg-black/[0.02] dark:bg-white/[0.03]">
+                    <div className="apple-list-surface p-1.5">
                         {dragEnabled ? (
                             <DragList
                                 items={sortedTracks}
@@ -781,8 +781,8 @@ function LocalPage() {
                                 disabled={lib.submitting}
                                 className={cn(
                                     "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full",
-                                    "bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground",
-                                    "outline-none active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60",
+                                    "apple-primary-action px-3.5 text-[13px] font-semibold",
+                                    "transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60",
                                 )}
                             >
                                 {lib.submitting ? (
@@ -854,7 +854,7 @@ function LocalPage() {
                             <button
                                 type="button"
                                 onClick={exitSelectionMode}
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground active:scale-[0.97]"
+                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97]"
                             >
                                 <SquareCheck className="size-3.5" />
                                 完成
@@ -868,8 +868,8 @@ function LocalPage() {
                                     aria-label="资料库更多操作"
                                     className={cn(
                                         "inline-flex size-9 cursor-pointer items-center justify-center rounded-full",
-                                        "bg-black/[0.05] text-foreground transition-colors hover:bg-black/[0.08]",
-                                        "outline-none active:scale-[0.97] dark:bg-white/[0.08] dark:hover:bg-white/[0.14]",
+                                        "bg-[var(--surface-fill)] text-foreground transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)]",
+                                        "active:scale-[0.97] active:duration-[var(--duration-press)]",
                                     )}
                                 >
                                     <MoreHorizontal className="size-4" />
@@ -1024,7 +1024,7 @@ function LocalPage() {
                                 <button
                                     type="button"
                                     onClick={lib.openAllSongs}
-                                    className="flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.05] active:scale-[0.995] dark:hover:bg-white/[0.07]"
+                                    className="flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-fill)] active:scale-[0.995]"
                                 >
                                     <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/90 to-violet-600/90">
                                         <Disc3 className="size-6 text-white/90" />
@@ -1051,7 +1051,7 @@ function LocalPage() {
                                             "group flex items-center gap-1 rounded-2xl transition-colors",
                                             selectionMode === "album" && selected
                                                 ? "bg-primary/[0.08] ring-1 ring-primary/25"
-                                                : "hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
+                                                : "hover:bg-[var(--surface-fill)]",
                                         )}
                                     >
                                         <button
@@ -1291,7 +1291,7 @@ function ConfirmDialog({
                 </AlertDialogHeader>
 
                 {isRemoveArtist ? (
-                    <label className="flex cursor-pointer items-center gap-2.5 rounded-xl bg-black/[0.03] px-3.5 py-3 dark:bg-white/[0.05]">
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-xl bg-[var(--surface-fill)] px-3.5 py-3 transition-colors hover:bg-[var(--surface-fill-hover)]">
                         <input
                             type="checkbox"
                             checked={includeAlbums}
@@ -1370,7 +1370,7 @@ function BulkActionBar({
         <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
             <div className="material-panel pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-full px-2 py-2 text-[13px] shadow-lg">
                 {canSwitch ? (
-                    <div className="flex items-center gap-0.5 rounded-full bg-black/[0.05] p-0.5 dark:bg-white/[0.08]">
+                    <div className="flex items-center gap-0.5 rounded-full bg-[var(--surface-fill)] p-0.5">
                         <button
                             type="button"
                             onClick={() => onSwitchMode("album")}
@@ -1401,7 +1401,7 @@ function BulkActionBar({
                 <button
                     type="button"
                     onClick={onSelectAll}
-                    className="h-8 cursor-pointer rounded-full px-3 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                    className="h-8 cursor-pointer rounded-full px-3 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-[var(--surface-fill)]"
                 >
                     全选
                 </button>
@@ -1417,7 +1417,7 @@ function BulkActionBar({
                 <button
                     type="button"
                     onClick={onDone}
-                    className="h-8 cursor-pointer rounded-full bg-foreground px-3.5 text-[12px] font-medium text-background active:scale-[0.97]"
+                    className="h-8 cursor-pointer rounded-full bg-foreground px-3.5 text-[12px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)]"
                 >
                     完成
                 </button>

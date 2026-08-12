@@ -192,7 +192,7 @@ function LocalWebPage() {
                         type="button"
                         onClick={() => void importDirectory()}
                         disabled={importing || restoring}
-                        className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-transform duration-100 active:scale-[0.97] disabled:opacity-50"
+                        className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                     >
                         {importing ? "解析中…" : "选择文件夹"}
                     </button>
@@ -200,7 +200,7 @@ function LocalWebPage() {
                         type="button"
                         onClick={() => void importFiles()}
                         disabled={importing || restoring}
-                        className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-black/[0.06] px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-black/[0.1] active:scale-[0.97] disabled:opacity-50 dark:bg-white/[0.08] dark:hover:bg-white/[0.14]"
+                        className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium text-foreground transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                     >
                         选择音频文件
                     </button>
@@ -223,12 +223,12 @@ function LocalWebPage() {
                         <button
                             type="button"
                             onClick={() => void clearLibrary()}
-                            className="shrink-0 rounded-full px-3 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
+                            className="shrink-0 rounded-full px-3 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
                         >
                             清空存储
                         </button>
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="apple-list-surface space-y-0.5 p-1.5">
                         {tracks.map((track) => (
                             <TrackRow
                                 key={track.id}
@@ -253,7 +253,7 @@ function LocalWebPage() {
                                             type="button"
                                             aria-label={`移除 ${track.title}`}
                                             onClick={() => removeTrack(track)}
-                                            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
+                                            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
                                         >
                                             <svg
                                                 width="14"

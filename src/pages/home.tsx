@@ -224,12 +224,12 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                     onClick={() => onOpenPlaylist(featured.id)}
                     className={cn(
                         "group relative flex w-full cursor-pointer flex-row overflow-hidden rounded-[22px] text-left",
-                        "bg-black/[0.03] ring-1 ring-black/[0.04]",
-                        "transition-[background-color,box-shadow,transform] duration-200 ease-out",
-                        "hover:bg-black/[0.06] hover:shadow-[0_12px_40px_rgba(15,23,42,0.1)] hover:ring-black/[0.08]",
+                        "bg-[var(--surface-fill)] ring-1 ring-black/[0.04]",
+                        "transition-[background-color,box-shadow,transform] duration-[var(--duration-hover)] active:duration-[var(--duration-press)]",
+                        "hover:bg-[var(--surface-fill-hover)] hover:shadow-[0_12px_40px_rgba(15,23,42,0.1)] hover:ring-black/[0.08]",
                         "active:scale-[0.99]",
-                        "dark:bg-white/[0.04] dark:ring-white/[0.06]",
-                        "dark:hover:bg-white/[0.08] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)] dark:hover:ring-white/[0.12]",
+                        "dark:ring-white/[0.06]",
+                        "dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)] dark:hover:ring-white/[0.12]",
                     )}
                 >
                     <div className="relative aspect-square w-28 shrink-0 sm:w-[168px] md:w-[200px]">
@@ -237,7 +237,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                             src={featured.coverUrl}
                             alt={featured.title}
                             size="xl"
-                            className="size-full rounded-none transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                            className="size-full rounded-none transition-transform duration-[var(--duration-enter)] ease-[var(--ease-enter)] group-hover:scale-[1.03]"
                         />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-4 sm:gap-2 sm:p-6">
@@ -340,7 +340,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                         {dailyColumns.map((column, colIndex) => (
                             <div
                                 key={colIndex}
-                                className="min-w-0 overflow-hidden rounded-[16px] border border-black/[0.05] bg-black/[0.02] p-1 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                                className="apple-list-surface min-w-0 p-1"
                             >
                                 {column.map((track, index) => {
                                     const globalIndex =

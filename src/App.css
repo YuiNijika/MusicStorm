@@ -46,6 +46,10 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* Tailwind transition-* 默认时长/缓动改挂 motion token，组件不再各自写死 150ms/ease-out */
+    --default-transition-duration: var(--duration-control);
+    --default-transition-timing-function: var(--ease-press);
 }
 
 :root {

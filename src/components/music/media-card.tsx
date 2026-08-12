@@ -31,7 +31,8 @@ function MediaCard({
             onClick={onClick}
             className={cn(
                 "group relative flex shrink-0 cursor-pointer flex-col gap-2.5 text-left outline-none",
-                "transition-transform duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.98]",
+                // 悬停上浮走 hover 时长，按下瞬间缩短到 press 时长——按压反馈必须先到位
+                "transition-transform duration-[var(--duration-hover)] hover:-translate-y-0.5 active:scale-[0.98] active:duration-[var(--duration-press)]",
                 widthClassName,
                 className,
             )}
@@ -39,7 +40,7 @@ function MediaCard({
             <div
                 className={cn(
                     "apple-card-shadow relative overflow-hidden rounded-[14px] ring-1 ring-black/[0.06]",
-                    "transition-shadow duration-200 ease-out",
+                    "transition-shadow duration-[var(--duration-hover)]",
                     "group-hover:shadow-[0_14px_36px_rgba(15,23,42,0.14)] group-hover:ring-black/[0.14]",
                     "dark:ring-white/[0.08] dark:group-hover:shadow-[0_14px_36px_rgba(0,0,0,0.4)] dark:group-hover:ring-white/[0.16]",
                     active && "ring-2 ring-primary/70",
@@ -49,7 +50,7 @@ function MediaCard({
                     src={coverUrl}
                     alt={title}
                     size="xl"
-                    className="rounded-[14px] shadow-none transition-transform duration-300 ease-out group-hover:scale-[1.02]"
+                    className="rounded-[14px] shadow-none transition-transform duration-[var(--duration-enter)] ease-[var(--ease-enter)] group-hover:scale-[1.02]"
                 />
                 {overlay}
             </div>

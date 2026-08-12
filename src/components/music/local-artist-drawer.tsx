@@ -102,8 +102,8 @@ function LocalArtistDrawer({
                                     onClick={() => void handlePickCover()}
                                     className={cn(
                                         "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl",
-                                        "bg-black/[0.05] text-[12px] font-medium active:scale-[0.98]",
-                                        "disabled:opacity-50 dark:bg-white/[0.08]",
+                                        "bg-[var(--surface-fill)] text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]",
+                                        "disabled:opacity-50",
                                     )}
                                 >
                                     {coverBusy ? (
@@ -118,7 +118,7 @@ function LocalArtistDrawer({
                                         type="button"
                                         disabled={coverBusy}
                                         onClick={() => setCoverDataUrl("")}
-                                        className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-black/[0.05] text-[12px] font-medium active:scale-[0.98] dark:bg-white/[0.08]"
+                                        className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-fill)] text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.98] active:duration-[var(--duration-press)]"
                                     >
                                         <RotateCcw className="size-3.5" />
                                         清除封面
@@ -154,7 +154,7 @@ function LocalArtistDrawer({
                             type="button"
                             disabled={submitting}
                             onClick={() => onOpenChange(false)}
-                            className="h-10 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[13px] font-medium active:scale-[0.97] dark:bg-white/[0.08]"
+                            className="h-10 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             取消
                         </button>
@@ -164,7 +164,7 @@ function LocalArtistDrawer({
                             onClick={handleSubmit}
                             className={cn(
                                 "flex h-10 cursor-pointer items-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background",
-                                "active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
+                                "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
                             )}
                         >
                             {submitting ? (

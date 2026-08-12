@@ -147,7 +147,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex gap-1 rounded-full bg-black/[0.04] p-1 dark:bg-white/[0.06]">
+                <div className="flex gap-1 rounded-full bg-[var(--surface-fill)] p-1">
                     {TAB_ORDER.map(([id, label]) => (
                         <button
                             key={id}
@@ -189,7 +189,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                                 type="button"
                                 disabled={sending || cooldown > 0}
                                 onClick={() => void handleSendCaptcha()}
-                                className="h-10 shrink-0 cursor-pointer rounded-full bg-black/[0.05] px-3 text-[12px] font-medium disabled:opacity-50 dark:bg-white/[0.08]"
+                                className="h-10 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                             >
                                 {cooldown > 0 ? `${cooldown}s` : sending ? "发送中" : "获取验证码"}
                             </button>
@@ -198,7 +198,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             type="button"
                             disabled={loggingIn}
                             onClick={() => void handleLogin()}
-                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background disabled:opacity-50 active:scale-[0.98]"
+                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {loggingIn ? "登录中…" : "登录"}
                         </button>
@@ -232,7 +232,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                         <button
                             type="button"
                             onClick={() => void startQrLogin()}
-                            className="h-9 cursor-pointer rounded-full bg-black/[0.05] px-4 text-[12px] font-medium dark:bg-white/[0.08]"
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             刷新二维码
                         </button>
