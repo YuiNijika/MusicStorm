@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { isWebMode } from "@/lib/web-mode"
 
 const BANNER_DISMISS_KEY = "musicstorm-web-download-banner-dismissed"
@@ -41,14 +42,17 @@ function DownloadBanner() {
     }
 
     return (
-        <div className="download-banner" role="note">
-            <div className="download-banner__inner">
-                <span className="download-banner__text">
+        <Alert
+            role="note"
+            className="download-banner rounded-none border-0 px-4 py-2.5"
+        >
+            <AlertDescription className="flex w-full max-w-[720px] items-center gap-2.5 justify-self-center py-0 text-[13px]">
+                <span className="min-w-0 flex-1 leading-6">
                     网页版功能有限（仅在线播放与本地导入），下载桌面端可体验
                     本地高音质输出、系统托盘、全局快捷键等完整功能
                 </span>
                 <a
-                    className="download-banner__link"
+                    className="shrink-0 font-semibold text-accent underline-offset-3 transition-colors hover:text-accent/80 hover:underline"
                     href="https://github.com/YuiNijika/MusicStorm/releases/latest"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -57,9 +61,9 @@ function DownloadBanner() {
                 </a>
                 <button
                     type="button"
-                    className="download-banner__close"
                     onClick={dismiss}
                     aria-label="关闭提示"
+                    className="grid size-6 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground active:scale-95 dark:hover:bg-white/[0.1]"
                 >
                     <svg
                         width="14"
@@ -74,8 +78,8 @@ function DownloadBanner() {
                         <path d="M6 6l12 12M18 6L6 18" />
                     </svg>
                 </button>
-            </div>
-        </div>
+            </AlertDescription>
+        </Alert>
     )
 }
 

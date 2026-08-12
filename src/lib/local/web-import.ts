@@ -2,24 +2,96 @@ import { parseBlob } from "music-metadata"
 
 import type { Track } from "@/lib/types"
 
+// lib.dom 缺 File System Access API 的部分方法，补齐类型
+declare global {
+    interface Window {
+        showDirectoryPicker(options?: {
+            mode?: "read" | "readwrite"
+        }): Promise<FileSystemDirectoryHandle>
+    }
+    interface FileSystemDirectoryHandle {
+        values(): AsyncIterableIterator<FileSystemHandle>
+    }
+}
+
 /**
- * 网页版本地音乐导入。
+ * 网页版本地音乐导入
  *
- * 桌面版走 Rust 扫描（路径 + 落盘缓存）；网页版没有文件系统访问，
- * 用浏览器 File API 选目录/文件，music-metadata 在内存解析标签，
- * 音频与封面以 blob URL 播放；持久化由 web-library（IndexedDB）负责，
- * 刷新后从库中恢复并重建 URL。
+ * Chromium 系走 File System Access API 引用本地目录，不复制音频；
+ * 其余浏览器降级 input 选择器，存 File 副本
  */
 
 export type WebLocalTrack = Track & {
-    /** 原始 File 引用，保留以便删除时 revoke blob URL */
     file: File
+    /** FSA 目录句柄：存引用不复制音频，恢复时实时读本地文件 */
+    directoryHandle?: FileSystemDirectoryHandle
+    relativePath?: string
 }
 
 const AUDIO_EXT = /\.(mp3|flac|wav|m4a|aac|ogg|opus|wma|ape|dsf|dff)$/i
+const MAX_SCAN_DEPTH = 6
+const MAX_SCAN_FILES = 2000
 
-/** 文件对话框：选择整个目录（webkitdirectory，Chromium 系浏览器可用） */
-function pickDirectory(): Promise<File[]> {
+// ---------- File System Access API：直接引用本地目录 ----------
+
+function hasDirectoryPicker(): boolean {
+    return (
+        typeof window !== "undefined" &&
+        typeof window.showDirectoryPicker === "function"
+    )
+}
+
+async function pickDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+    // mode read：只读授权，浏览器持久记住；用户可随时在站点设置里撤销
+    return window.showDirectoryPicker({ mode: "read" })
+}
+
+type DirectoryEntry = {
+    directoryHandle: FileSystemDirectoryHandle
+    relativePath: string
+    file: File
+}
+
+async function collectAudioEntries(
+    root: FileSystemDirectoryHandle,
+    dir: FileSystemDirectoryHandle,
+    relativeDir: string,
+    depth: number,
+    out: DirectoryEntry[],
+): Promise<void> {
+    if (depth > MAX_SCAN_DEPTH || out.length >= MAX_SCAN_FILES) {
+        return
+    }
+    for await (const entry of dir.values()) {
+        if (out.length >= MAX_SCAN_FILES) {
+            return
+        }
+        if (entry.kind === "directory") {
+            await collectAudioEntries(
+                root,
+                entry as FileSystemDirectoryHandle,
+                `${relativeDir}/${entry.name}`,
+                depth + 1,
+                out,
+            )
+        } else if (entry.kind === "file" && AUDIO_EXT.test(entry.name)) {
+            try {
+                const file = await (entry as FileSystemFileHandle).getFile()
+                out.push({
+                    directoryHandle: root,
+                    relativePath: `${relativeDir}/${entry.name}`,
+                    file,
+                })
+            } catch {
+                // 个别文件读取失败不影响整体导入
+            }
+        }
+    }
+}
+
+// input 文件选择器
+
+function pickDirectoryInput(): Promise<File[]> {
     return new Promise((resolve, reject) => {
         const input = document.createElement("input")
         input.type = "file"
@@ -36,7 +108,6 @@ function pickDirectory(): Promise<File[]> {
     })
 }
 
-/** 文件对话框：多选音频文件 */
 function pickFiles(): Promise<File[]> {
     return new Promise((resolve, reject) => {
         const input = document.createElement("input")
@@ -56,7 +127,7 @@ function pickFiles(): Promise<File[]> {
 function isAudioFile(file: File): boolean {
     return (
         file.type.startsWith("audio/") ||
-        file.name.startsWith(".") === false && AUDIO_EXT.test(file.name)
+        (file.name.startsWith(".") === false && AUDIO_EXT.test(file.name))
     )
 }
 
@@ -122,8 +193,31 @@ async function webImportFiles(files: File[]): Promise<WebLocalTrack[]> {
     return tracks
 }
 
+/** 选目录导入：无 FSA 环境降级 input 选择器 */
 async function webImportDirectory(): Promise<WebLocalTrack[]> {
-    const files = await pickDirectory()
+    if (hasDirectoryPicker()) {
+        try {
+            const root = await pickDirectoryHandle()
+            const entries: DirectoryEntry[] = []
+            await collectAudioEntries(root, root, "", 0, entries)
+            const tracks: WebLocalTrack[] = []
+            for (let i = 0; i < entries.length; i += 1) {
+                const entry = entries[i]
+                const track = await parseWebTrack(entry.file, i)
+                track.directoryHandle = entry.directoryHandle
+                track.relativePath = entry.relativePath
+                tracks.push(track)
+            }
+            return tracks
+        } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") {
+                return []
+            }
+            // FSA 不可用/授权失败：降级 input 选择器
+            console.warn("[web-local] directory picker failed, fallback input", error)
+        }
+    }
+    const files = await pickDirectoryInput()
     return webImportFiles(files)
 }
 
@@ -139,6 +233,8 @@ function revokeWebTrack(track: WebLocalTrack): void {
 }
 
 export {
+    MAX_SCAN_DEPTH,
+    MAX_SCAN_FILES,
     revokeWebTrack,
     webImportAudioFiles,
     webImportDirectory,

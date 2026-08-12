@@ -1,16 +1,14 @@
 import type { WebLocalTrack } from "@/lib/local/web-import"
 
 /**
- * 网页版本地音乐持久化（IndexedDB）。
+ * 网页版本地音乐持久化到 IndexedDB。
  *
- * 浏览器无文件系统权限：导入的音频以 File 对象结构化克隆进 IndexedDB，
- * 刷新后从库中恢复并重建 blob URL 继续播放。数据不落磁盘文件系统，
- * 仅占用浏览器配额（navigator.storage.estimate 可查）。
- * IndexedDB 不可用（隐私模式/被禁用）时写入失败降级为纯内存会话。
+ * FSA 目录导入存句柄引用，几乎零占用；其余存 File 副本。
+ * 刷新后恢复列表；隐私模式等场景写入失败降级为内存会话。
  */
 
 const DB_NAME = "musicstorm-web-library"
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = "tracks"
 
 export type StoredWebTrack = {
@@ -18,12 +16,14 @@ export type StoredWebTrack = {
     title: string
     artist: string
     album: string
-    /** base64 dataURL，可能为空串 */
     coverUrl: string
     durationMs: number
     fileName: string
-    /** 音频本体（File 保留 type/name，可再次 createObjectURL） */
-    file: File
+    /** 仅非 FSA 导入时存音频副本 */
+    file?: File
+    /** FSA 目录句柄：存引用不复制音频 */
+    directoryHandle?: FileSystemDirectoryHandle
+    relativePath?: string
     importedAt: number
 }
 
@@ -64,7 +64,23 @@ function readAllTracks(db: IDBDatabase): Promise<StoredWebTrack[]> {
     })
 }
 
-/** 将内存导入的曲目持久化到 IndexedDB；配额耗尽等失败时抛错由调用方降级。 */
+async function getFileFromDirectory(
+    root: FileSystemDirectoryHandle,
+    relativePath: string,
+): Promise<File> {
+    const parts = relativePath.split("/").filter(Boolean)
+    if (parts.length === 0) {
+        throw new Error("空相对路径")
+    }
+    let dir = root
+    for (let i = 0; i < parts.length - 1; i += 1) {
+        dir = await dir.getDirectoryHandle(parts[i])
+    }
+    const fileHandle = await dir.getFileHandle(parts[parts.length - 1])
+    return fileHandle.getFile()
+}
+
+/** 将内存导入的曲目持久化；配额耗尽等失败时抛错由调用方降级。 */
 async function saveWebTracks(tracks: WebLocalTrack[]): Promise<void> {
     if (tracks.length === 0) {
         return
@@ -75,6 +91,7 @@ async function saveWebTracks(tracks: WebLocalTrack[]): Promise<void> {
         const tx = db.transaction(STORE_NAME, "readwrite")
         const store = tx.objectStore(STORE_NAME)
         for (const track of tracks) {
+            // FSA 引用型：存句柄 + 相对路径，不复制音频；input 型存 File 副本
             const stored: StoredWebTrack = {
                 id: track.id,
                 title: track.title,
@@ -83,7 +100,12 @@ async function saveWebTracks(tracks: WebLocalTrack[]): Promise<void> {
                 coverUrl: track.coverUrl ?? "",
                 durationMs: track.durationMs,
                 fileName: track.fileName ?? track.title,
-                file: track.file,
+                ...(track.directoryHandle && track.relativePath
+                    ? {
+                          directoryHandle: track.directoryHandle,
+                          relativePath: track.relativePath,
+                      }
+                    : { file: track.file }),
                 importedAt: now,
             }
             store.put(stored)
@@ -94,24 +116,53 @@ async function saveWebTracks(tracks: WebLocalTrack[]): Promise<void> {
     })
 }
 
-/** 从 IndexedDB 恢复全部曲目，并为每首重建 blob URL 供播放。 */
+/** 从 IndexedDB 恢复全部曲目；FSA 型实时读本地文件，授权失效的条目跳过。 */
 async function loadWebLibrary(): Promise<WebLocalTrack[]> {
     const db = await openDb()
     const all = await readAllTracks(db)
-    return all
-        .sort((a, b) => a.importedAt - b.importedAt)
-        .map((item) => ({
-            id: item.id,
-            title: item.title,
-            artist: item.artist,
-            album: item.album,
-            coverUrl: item.coverUrl,
-            durationMs: item.durationMs,
-            source: "local" as const,
-            filePath: URL.createObjectURL(item.file),
-            fileName: item.fileName,
-            file: item.file,
-        }))
+    const restored = await Promise.all(
+        all
+            .sort((a, b) => a.importedAt - b.importedAt)
+            .map(async (item): Promise<WebLocalTrack | null> => {
+                const base = {
+                    id: item.id,
+                    title: item.title,
+                    artist: item.artist,
+                    album: item.album,
+                    coverUrl: item.coverUrl,
+                    durationMs: item.durationMs,
+                    source: "local" as const,
+                    fileName: item.fileName,
+                }
+                if (item.directoryHandle && item.relativePath) {
+                    try {
+                        // 浏览器重启后授权可能失效：失败即跳过，重新导入即可恢复
+                        const file = await getFileFromDirectory(
+                            item.directoryHandle,
+                            item.relativePath,
+                        )
+                        return {
+                            ...base,
+                            file,
+                            filePath: URL.createObjectURL(file),
+                            directoryHandle: item.directoryHandle,
+                            relativePath: item.relativePath,
+                        }
+                    } catch {
+                        return null
+                    }
+                }
+                if (item.file) {
+                    return {
+                        ...base,
+                        file: item.file,
+                        filePath: URL.createObjectURL(item.file),
+                    }
+                }
+                return null
+            }),
+    )
+    return restored.filter((track): track is WebLocalTrack => track != null)
 }
 
 async function removeWebTrack(id: string): Promise<void> {

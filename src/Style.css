@@ -621,65 +621,8 @@ html.performance-mode [class*="animate-out"] {
 }
 
 .download-banner {
-    display: flex;
-    justify-content: center;
     flex-shrink: 0;
-    padding: 10px 16px;
-    background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg) 88%);
-    border-bottom: 1px solid var(--color-separator);
     animation: download-banner-in var(--duration-enter) var(--ease-enter) both;
-}
-
-.download-banner__inner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 720px;
-    width: 100%;
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-.download-banner__text {
-    flex: 1;
-    min-width: 0;
-    line-height: 1.5;
-}
-
-.download-banner__link {
-    flex-shrink: 0;
-    font-weight: 600;
-    color: var(--color-accent);
-    text-decoration: none;
-    transition: color var(--duration-control) var(--ease-enter);
-}
-
-.download-banner__link:hover {
-    text-decoration: underline;
-}
-
-.download-banner__close {
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
-    color: var(--color-text-tertiary);
-    cursor: pointer;
-    transition:
-        color var(--duration-control) var(--ease-enter),
-        background-color var(--duration-control) var(--ease-enter),
-        transform var(--duration-press) var(--ease-press);
-}
-
-.download-banner__close:hover {
-    color: var(--color-text);
-    background: color-mix(in srgb, currentColor 10%, transparent);
-}
-
-.download-banner__close:active {
-    transform: scale(0.92);
 }
 
 @keyframes download-banner-in {
