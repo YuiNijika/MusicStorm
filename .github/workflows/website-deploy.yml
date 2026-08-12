@@ -1,8 +1,8 @@
-name: Deploy Website to GitHub Pages
+name: Deploy Website to website branch
 
-# website 子包有变更时自动构建，产物提交到仓库根 docs/ 目录，
-# 由 GitHub Pages 的 "Deploy from a branch → /docs" 发布。
-# 手动触发入口：Actions → Deploy Website to GitHub Pages → Run workflow。
+# website 子包有变更时自动构建，产物推送到独立 website 分支（GitHub Pages
+# 从该分支发布），main 分支不再维护 docs/ 部署目录。
+# 手动触发：Actions → Deploy Website to website branch → Run workflow。
 on:
   push:
     branches: [main]
@@ -16,7 +16,7 @@ on:
       - "pnpm-lock.yaml"
   workflow_dispatch:
 
-# 需要写权限把 docs/ 产物提交回仓库
+# 需要写权限推送 website 分支
 permissions:
   contents: write
 
@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   build-and-publish:
-    name: Build website and publish into docs/
+    name: Build and publish to website branch
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -56,36 +56,29 @@ jobs:
       - name: Build web player (player.html)
         run: pnpm build:player
 
-      - name: Stage build output into docs/
-        # 先组装到唯一临时目录并校验关键产物，全部就绪后再原子替换 docs/：
-        # 任何一步失败都不会破坏已发布的 docs/（线上网页版/官网保持旧版完整）
+      - name: Stage site into temp dir
+        # 先组装到临时目录并校验关键产物，全部就绪后再发布：
+        # 任何一步失败都不会污染已发布的 website 分支
         run: |
-          set -euxo pipefail
-          ls -la dist/
-          tmpdir="$(mktemp -d docs.tmp.XXXXXX)"
-          cp -r website/dist/. "$tmpdir/"
-          mkdir -p "$tmpdir/assets"
-          cp -r dist/player.html dist/icon.png dist/icon.svg "$tmpdir/"
-          cp -r dist/assets/player "$tmpdir/assets/"
+          rm -rf /tmp/ms-site
+          mkdir -p /tmp/ms-site/assets
+          cp -r website/dist/. /tmp/ms-site/
+          cp -r dist/player.html dist/icon.png dist/icon.svg /tmp/ms-site/
+          cp -r dist/assets/player /tmp/ms-site/assets/
           # 完整性校验：网页版入口与分包缺失即失败，避免"在线播放"入口丢失
-          test -f "$tmpdir/player.html"
-          test -d "$tmpdir/assets/player"
-          test "$(find "$tmpdir/assets/player" -name '*.js' -print -quit)" != ""
-          # 自定义域名：整目录重建前保留 CNAME（website/public 也带一份，这里兜底）
-          test -f docs/CNAME && cp docs/CNAME "$tmpdir/" || true
-          rm -rf docs
-          mv "$tmpdir" docs
+          test -f /tmp/ms-site/player.html
+          test -d /tmp/ms-site/assets/player
+          test "$(find /tmp/ms-site/assets/player -name '*.js' -print -quit)" != ""
+          test -f /tmp/ms-site/CNAME
 
-      - name: Commit and push docs/
+      - name: Publish to website branch
+        # orphan 分支整树替换 + force push：website 分支只保留当前产物，无历史包袱
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # -f：docs/ 在 .gitignore 中（Pages 产物目录），新文件须强制纳入
-          git add -f docs
-          # 产物与上次一致时跳过提交，避免空 commit 死循环
-          if git diff --cached --quiet; then
-            echo "docs/ unchanged, skip commit"
-          else
-            git commit -m "chore(website): publish pages into docs/"
-            git push
-          fi
+          git checkout --orphan website-publish
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -r /tmp/ms-site/. .
+          git add -A
+          git commit -m "chore(website): publish pages"
+          git push origin HEAD:website --force
