@@ -71,6 +71,8 @@ jobs:
           test -f "$tmpdir/player.html"
           test -d "$tmpdir/assets/player"
           test "$(find "$tmpdir/assets/player" -name '*.js' -print -quit)" != ""
+          # 自定义域名：整目录重建前保留 CNAME（website/public 也带一份，这里兜底）
+          test -f docs/CNAME && cp docs/CNAME "$tmpdir/" || true
           rm -rf docs
           mv "$tmpdir" docs
 
