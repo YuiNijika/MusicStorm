@@ -1,0 +1,1 @@
+import{j as t}from"./player-Cq47SnhA.js";import{de as o,a as s}from"./App-4qh9JM19.js";function i({onClick:e,label:r="返回"}){return t.jsxs("button",{type:"button",onClick:e,className:s("apple-control inline-flex h-9 cursor-pointer items-center gap-0.5 px-2.5","text-[13px] font-medium text-primary"),children:[t.jsx(o,{className:"size-4",strokeWidth:2.25}),r]})}export{i as B};

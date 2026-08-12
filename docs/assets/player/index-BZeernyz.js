@@ -1,1 +1,0 @@
-import{p as i}from"./App-C-Kd7GGM.js";import"./player-NtPq1Bq-.js";async function p(n,e){await i("plugin:opener|open_url",{url:n,with:e})}async function r(n,e){await i("plugin:opener|open_path",{path:n,with:e})}async function a(n){return i("plugin:opener|reveal_item_in_dir",{paths:typeof n=="string"?[n]:n})}export{r as openPath,p as openUrl,a as revealItemInDir};
