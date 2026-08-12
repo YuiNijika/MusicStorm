@@ -27,7 +27,7 @@ import {
     fetchUserAccount,
     type NeteaseProfile,
 } from "@/lib/netease/user"
-import { notifyError, notifySuccess, notifyWarning } from "@/lib/notify"
+import { notifyError, notifySuccess } from "@/lib/notify"
 
 type SessionState = {
     ready: boolean
@@ -113,12 +113,22 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
             const profile = await fetchUserAccount()
             if (!profile) {
                 // 请求成功但拿不到资料（网易云风控/新接口行为/外部源格式差异）：
+                // 先用 vault 缓存资料兜底显示，45s 后自动重试补拉；
                 // cookie 还在就不杀登录态，避免误判导致喜欢列表等本地数据被清空
+                const cached = activeUserId != null
+                    ? listNeteaseAccounts().find((a) => a.userId === activeUserId)
+                    : null
                 commit({
                     ready: true,
                     loggedIn: isNeteaseLoggedIn(),
-                    profile: stateRef.current.profile,
-                    error: "账号资料暂不可用",
+                    profile: cached
+                        ? {
+                              userId: cached.userId,
+                              nickname: cached.nickname,
+                              avatarUrl: cached.avatarUrl,
+                          }
+                        : stateRef.current.profile,
+                    error: cached ? "资料未刷新，稍后自动重试" : "账号资料暂不可用",
                     accounts,
                     activeUserId,
                 })
@@ -153,7 +163,21 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
             commit({
                 ready: true,
                 loggedIn: isNeteaseLoggedIn(),
-                profile: stateRef.current.profile,
+                profile: (() => {
+                    const cached =
+                        activeUserId != null
+                            ? listNeteaseAccounts().find(
+                                  (a) => a.userId === activeUserId,
+                              )
+                            : null
+                    return cached
+                        ? {
+                              userId: cached.userId,
+                              nickname: cached.nickname,
+                              avatarUrl: cached.avatarUrl,
+                          }
+                        : stateRef.current.profile
+                })(),
                 error: "无法获取账号信息",
                 accounts: listNeteaseAccounts(),
                 activeUserId: getActiveUserId(),
@@ -205,11 +229,12 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                 return true
             }
 
-            // 凭证已写入，但资料拉取失败：仍算切换成功，提示可重试
+            // 凭证已写入，但资料拉取失败：先按切换成功提示（vault 缓存资料已在
+            // refresh 中兜底显示），45s 后自动重试补拉，不误报失败
             if (isNeteaseLoggedIn()) {
-                notifyWarning("已切换账号", {
+                notifySuccess("已切换账号", {
                     id: "netease-switch-account",
-                    description: `${label} · 资料暂未刷新`,
+                    description: label,
                 })
                 return true
             }
