@@ -65,6 +65,8 @@ jobs:
           cp -r website/dist/. /tmp/ms-site/
           cp -r dist/player.html dist/icon.png dist/icon.svg /tmp/ms-site/
           cp -r dist/assets/player /tmp/ms-site/assets/
+          # 纯静态产物，禁用 Pages 的 jekyll 构建
+          touch /tmp/ms-site/.nojekyll
           # 完整性校验：网页版入口与分包缺失即失败，避免"在线播放"入口丢失
           test -f /tmp/ms-site/player.html
           test -d /tmp/ms-site/assets/player
