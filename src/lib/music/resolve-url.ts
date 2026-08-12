@@ -18,16 +18,21 @@ export type ResolvePlayableResult =
 /**
  * 网易云仍可能下发 HTTP CDN 地址。macOS WKWebView 会按 App Transport
  * Security 拒绝这类混合内容，而同一签名地址的 HTTPS 端点可直接使用。
- * 仅升级网易云媒体域，避免擅自改写不确定是否支持 TLS 的第三方地址。
+ * 桌面版仅升级网易云域（126.net / 163.com，避免改写不确定支持 TLS 的第三方地址）；
+ * 网页版本身是 HTTPS 页面，任何 http 资源都会被浏览器拦截，一律升级尝试。
  */
 function normalizeNeteaseMediaUrl(url: string): string {
     try {
         const parsed = new URL(url)
-        if (
-            parsed.protocol === "http:" &&
-            (parsed.hostname === "music.126.net" ||
-                parsed.hostname.endsWith(".music.126.net"))
-        ) {
+        if (parsed.protocol !== "http:") {
+            return url
+        }
+        const isNeteaseDomain =
+            parsed.hostname === "126.net" ||
+            parsed.hostname.endsWith(".126.net") ||
+            parsed.hostname === "163.com" ||
+            parsed.hostname.endsWith(".163.com")
+        if (isNeteaseDomain || isWebMode()) {
             parsed.protocol = "https:"
             return parsed.toString()
         }
@@ -87,7 +92,7 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
     }
 
     if (track.url) {
-        return { ok: true, url: track.url }
+        return { ok: true, url: normalizeNeteaseMediaUrl(track.url) }
     }
 
     if (track.filePath) {
