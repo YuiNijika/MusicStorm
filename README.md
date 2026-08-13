@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="/public/icon.webp" width="128" alt="MusicStorm 图标" />
 </p>
@@ -27,7 +29,7 @@
 
 ## 安装
 
-前往 [Releases](https://github.com/YuiNijika/MusicStorm/releases) 下载。Windows 安装包免管理员权限，需 Microsoft Edge WebView2 Runtime（现代 Win10/11 自带）。
+前往 [Releases](https://github.com/YuiNijika/MusicStorm/releases) 下载。Windows 安装包免管理员权限，需 Microsoft Edge WebView2 Runtime（现代 Win10/11 自带）；macOS / Linux 用户请选择对应平台的安装包。
 
 也可以直接打开 [网页版](https://music.miomoe.cn/player.html) 在线体验，支持在线播放与本地导入，功能少于桌面版。
 
