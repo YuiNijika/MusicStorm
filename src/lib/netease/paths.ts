@@ -5,6 +5,8 @@ export const NETEASE_PATHS = {
     search: "/cloudsearch",
     playlistDetail: "/playlist/detail",
     playlistSubscribe: "/playlist/subscribe",
+    playlistCreate: "/playlist/create",
+    playlistUpdateName: "/playlist/update/name",
     personalized: "/personalized",
     recommendSongs: "/recommend/songs",
     loginQrKey: "/login/qr/key",

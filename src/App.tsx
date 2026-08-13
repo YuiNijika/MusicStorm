@@ -115,7 +115,7 @@ function AppRoutes({
         )
     }
     if (route === "local") {
-        // 网页版无文件系统访问：轻量导入页（blob URL 播放，不落盘）
+        // 网页版走浏览器本地导入（FSA 目录引用 + IndexedDB），艺人/专辑分组对齐桌面版
         if (isWebMode()) {
             return (
                 <Suspense fallback={<LocalPageSkeleton />}>

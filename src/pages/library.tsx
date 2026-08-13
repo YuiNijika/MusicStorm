@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
@@ -6,6 +7,15 @@ import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
@@ -19,8 +29,9 @@ import {
     PLAYLIST_SORT_OPTIONS,
     sortPlaylists,
 } from "@/lib/library/sort"
+import { createPlaylist } from "@/lib/netease/playlist"
 import { fetchUserPlaylists } from "@/lib/netease/user"
-import { notifyError } from "@/lib/notify"
+import { notifyError, notifyFromError, notifySuccess } from "@/lib/notify"
 import type { Playlist } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -37,6 +48,32 @@ function LibraryPage() {
         "idle",
     )
     const [retry, setRetry] = useState(0)
+    const [createOpen, setCreateOpen] = useState(false)
+    const [createName, setCreateName] = useState("")
+    const [createBusy, setCreateBusy] = useState(false)
+
+    async function handleCreatePlaylist() {
+        const name = createName.trim()
+        if (!name || createBusy || !profile) {
+            return
+        }
+        setCreateBusy(true)
+        try {
+            const id = await createPlaylist(name)
+            notifySuccess("歌单已创建", { description: name })
+            setCreateOpen(false)
+            setCreateName("")
+            // 刷新列表并跳转到新歌单
+            const items = await fetchUserPlaylists(profile.userId)
+            setPlaylists(items)
+            setStatus("ready")
+            openPlaylist(id)
+        } catch (error) {
+            notifyFromError("创建歌单失败", error)
+        } finally {
+            setCreateBusy(false)
+        }
+    }
 
     const sortedPlaylists = useMemo(
         () => sortPlaylists(playlists, playlistSort),
@@ -96,6 +133,17 @@ function LibraryPage() {
                 }
                 action={
                     <div className="flex flex-wrap items-center gap-2">
+                        {loggedIn ? (
+                            <button
+                                type="button"
+                                disabled={createBusy}
+                                onClick={() => setCreateOpen(true)}
+                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-60"
+                            >
+                                <Plus className="size-3.5" strokeWidth={2.4} />
+                                新建歌单
+                            </button>
+                        ) : null}
                         <SortSelect
                             value={playlistSort}
                             options={PLAYLIST_SORT_OPTIONS}
@@ -229,6 +277,42 @@ function LibraryPage() {
                     </div>
                 )}
             </Section>
+
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>新建歌单</DialogTitle>
+                        <DialogDescription>输入歌单名称</DialogDescription>
+                    </DialogHeader>
+                    <div className="px-1 py-2">
+                        <Input
+                            value={createName}
+                            onChange={(event) =>
+                                setCreateName(event.currentTarget.value)
+                            }
+                            placeholder="歌单名称"
+                            className="h-10 rounded-xl"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setCreateOpen(false)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            disabled={createBusy}
+                            onClick={() => void handleCreatePlaylist()}
+                            className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {createBusy ? "创建中…" : "创建"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

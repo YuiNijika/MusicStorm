@@ -100,6 +100,25 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 crypto: "eapi",
             }
         }
+        case NETEASE_PATHS.playlistCreate:
+            return {
+                uri: "/api/playlist/create",
+                data: {
+                    name: q(query, "name"),
+                    privacy: q(query, "privacy", "0"),
+                    type: q(query, "type", "NORMAL"),
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.playlistUpdateName:
+            return {
+                uri: "/api/playlist/update/name",
+                data: {
+                    id: q(query, "id"),
+                    name: q(query, "name"),
+                },
+                crypto: "weapi",
+            }
         case NETEASE_PATHS.personalized:
             return {
                 uri: "/api/personalized/playlist",

@@ -27,6 +27,10 @@ type PlaylistDetailData = {
         trackCount?: number
         tracks?: NeteaseSong[]
         trackIds?: Array<{ id: number }>
+        creator?: {
+            userId?: number
+            nickname?: string
+        }
     }
     privileges?: unknown[]
     code?: number
@@ -86,6 +90,13 @@ async function fetchPlaylistDetail(id: string): Promise<{
         source: "netease",
         description: raw.description ?? undefined,
         trackCount: raw.trackCount ?? tracks.length,
+        creator:
+            raw.creator?.userId != null
+                ? {
+                      id: String(raw.creator.userId),
+                      name: raw.creator.nickname ?? "",
+                  }
+                : undefined,
     }
 
     return { playlist, tracks }
@@ -107,4 +118,41 @@ async function subscribePlaylist(id: string, subscribe: boolean): Promise<void> 
     }
 }
 
-export { fetchPlaylistDetail, fetchRecommendPlaylists, subscribePlaylist }
+async function createPlaylist(name: string): Promise<string> {
+    const data = await neteaseRequest<{
+        code?: number
+        id?: number
+        playlist?: { id?: number }
+    }>({
+        path: NETEASE_PATHS.playlistCreate,
+        method: "POST",
+        params: { name, timestamp: Date.now() },
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(`创建歌单失败: ${data.code}`)
+    }
+    const id = data.id ?? data.playlist?.id
+    if (!id) {
+        throw new Error("创建歌单失败：未返回歌单 id")
+    }
+    return String(id)
+}
+
+async function updatePlaylistName(id: string, name: string): Promise<void> {
+    const data = await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.playlistUpdateName,
+        method: "POST",
+        params: { id, name, timestamp: Date.now() },
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(`歌单改名失败: ${data.code}`)
+    }
+}
+
+export {
+    createPlaylist,
+    fetchPlaylistDetail,
+    fetchRecommendPlaylists,
+    subscribePlaylist,
+    updatePlaylistName,
+}

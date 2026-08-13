@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
+import { resolveVipTier } from "@/lib/netease/user"
 import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
@@ -124,7 +125,11 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                                 {loggedIn && profile ? profile.nickname : "未登录"}
                             </span>
                             <span className="block truncate text-[11px] text-muted-foreground">
-                                {loggedIn ? "账号" : "登录 / 注册"}
+                                {loggedIn
+                                    ? profile
+                                        ? `账号 · ${resolveVipTier(profile.vipType)}`
+                                        : "账号"
+                                    : "登录 / 注册"}
                             </span>
                         </span>
                     </DropdownMenuTrigger>

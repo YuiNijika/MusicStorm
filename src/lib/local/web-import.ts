@@ -34,6 +34,8 @@ export type WebLocalTrack = Track & {
     relativePath?: string
     /** 恢复时目录授权未授予：点击播放需先 requestPermission */
     needsAuth?: boolean
+    /** 归属本地专辑分组 id；null/undefined = 未归类，仅进「全部歌曲」 */
+    localAlbumId?: string | null
 }
 
 const AUDIO_EXT = /\.(mp3|flac|wav|m4a|aac|ogg|opus|wma|ape|dsf|dff)$/i

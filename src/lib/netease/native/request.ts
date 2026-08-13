@@ -31,9 +31,11 @@ const DOMAIN = "https://music.163.com"
 // CloudMusicAPI APP_CONF.eapiDomain — PC 客户端 eapi，扫码 unikey 必须走这域
 const EAPI_DOMAIN = "https://interfacepc.music.163.com"
 
-// 统一 UA：NeteaseMusicDesktop 桌面客户端形态，与 eapi pc 设备头一致；
-// weapi/eapi 同一 UA，避免多 UA 混用触发网易云风控
+// eapi 桌面设备头 UA：NeteaseMusicDesktop 形态，与 eapi pc 设备头一致
 const UA_PC = `Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/${DESKTOP_UA_APPVER}`
+
+// weapi 是网页端接口，对齐 Node 版 request.js 的 chooseUserAgent('weapi')：浏览器 UA
+const UA_WEB = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0`
 
 type Query = Record<string, string | number | boolean | undefined>
 
@@ -230,9 +232,9 @@ async function nativeNeteaseRequest<T>(
             url: `${DOMAIN}/weapi/${spec.uri.replace(/^\/api\//, "")}`,
             body: formBody(encrypted),
             cookie: cookieHeader(jar),
-            userAgent: UA_PC,
+            userAgent: UA_WEB,
             referer: DOMAIN,
-            origin: DOMAIN,
+            origin: null,
             realIp,
         })
         return parseProxyBody<T>(path, response)

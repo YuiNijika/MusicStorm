@@ -19,6 +19,8 @@ export type StoredWebTrack = {
     coverUrl: string
     durationMs: number
     fileName: string
+    /** 归属本地专辑分组 id */
+    albumId: string | null
     /** 仅非 FSA 导入时存音频副本 */
     file?: File
     /** FSA 目录句柄：存引用不复制音频 */
@@ -100,6 +102,7 @@ async function saveWebTracks(tracks: WebLocalTrack[]): Promise<void> {
                 coverUrl: track.coverUrl ?? "",
                 durationMs: track.durationMs,
                 fileName: track.fileName ?? track.title,
+                albumId: track.localAlbumId ?? null,
                 ...(track.directoryHandle && track.relativePath
                     ? {
                           directoryHandle: track.directoryHandle,
@@ -133,6 +136,7 @@ async function loadWebLibrary(): Promise<WebLocalTrack[]> {
                     durationMs: item.durationMs,
                     source: "local" as const,
                     fileName: item.fileName,
+                    localAlbumId: item.albumId,
                 }
                 if (item.directoryHandle && item.relativePath) {
                     try {

@@ -5,6 +5,8 @@ type NeteaseProfile = {
     userId: number
     nickname: string
     avatarUrl: string
+    /** 网易云 vipType：0=无，10=音乐包，11=黑胶 VIP */
+    vipType: number
 }
 
 type AccountData = {
@@ -14,7 +16,23 @@ type AccountData = {
         userId?: number
         nickname?: string
         avatarUrl?: string
+        vipType?: number
     } | null
+}
+
+// 会员档位：free=未开通，vip=音乐包/黑胶，svip=黑胶 SVIP（预留）
+type VipTier = "free" | "vip" | "svip"
+
+/**
+ * vipType → 档位标签。
+ * 网易云网页端 profile 只有 vipType：0=无、10=音乐包、11=黑胶（SVIP 与黑胶同为 11，
+ * 网页端暂不返回 SVIP 区分字段），故 svip 仅作预留、当前恒不会命中。
+ */
+function resolveVipTier(vipType: number | null | undefined): VipTier {
+    if (vipType === 10 || vipType === 11) {
+        return "vip"
+    }
+    return "free"
 }
 
 type UserPlaylistItem = {
@@ -55,6 +73,7 @@ async function fetchUserAccount(): Promise<NeteaseProfile | null> {
         userId: profile.userId,
         nickname: profile.nickname ?? "网易云用户",
         avatarUrl: profile.avatarUrl ?? "",
+        vipType: profile.vipType ?? 0,
     }
 }
 
@@ -99,5 +118,5 @@ async function fetchUserPlaylistsDetailed(uid: number): Promise<UserPlaylistsRes
     }
 }
 
-export { fetchUserAccount, fetchUserPlaylists, fetchUserPlaylistsDetailed }
-export type { NeteaseProfile, UserPlaylistsResult }
+export { fetchUserAccount, fetchUserPlaylists, fetchUserPlaylistsDetailed, resolveVipTier }
+export type { NeteaseProfile, UserPlaylistsResult, VipTier }

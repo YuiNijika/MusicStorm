@@ -19,6 +19,7 @@ import { useAppUpdate } from "@/hooks/use-app-update"
 import { useContributors } from "@/hooks/use-contributors"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
+import { resolveVipTier } from "@/lib/netease/user"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
 import {
     DEVTOOLS_EVENT,
@@ -1004,7 +1005,8 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                     {profile.nickname}
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">
-                                    当前使用 · uid {profile.userId}
+                                    当前使用 · {resolveVipTier(profile.vipType)} · uid{" "}
+                                    {profile.userId}
                                 </p>
                             </div>
                             <button

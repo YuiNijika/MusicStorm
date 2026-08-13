@@ -41,6 +41,8 @@ export type Playlist = {
     source: MusicSource
     description?: string
     trackCount?: number
+    /** 创建者；id 与当前登录账号一致时判定为自己的歌单 */
+    creator?: { id: string; name: string }
 }
 
 export type Radio = {

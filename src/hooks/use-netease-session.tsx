@@ -126,6 +126,7 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                               userId: cached.userId,
                               nickname: cached.nickname,
                               avatarUrl: cached.avatarUrl,
+                              vipType: stateRef.current.profile?.vipType ?? 0,
                           }
                         : stateRef.current.profile,
                     error: cached ? "资料未刷新，稍后自动重试" : "账号资料暂不可用",
@@ -175,6 +176,7 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                               userId: cached.userId,
                               nickname: cached.nickname,
                               avatarUrl: cached.avatarUrl,
+                              vipType: stateRef.current.profile?.vipType ?? 0,
                           }
                         : stateRef.current.profile
                 })(),
