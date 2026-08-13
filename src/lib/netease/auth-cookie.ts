@@ -106,19 +106,34 @@ function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     }
 }
 
+// 对齐 CloudMusicAPI generateDeviceId：52 位大写 hex，UUID 会被网易云判设备异常
+function generateDeviceId(): string {
+    const chars = "0123456789ABCDEF"
+    let out = ""
+    for (let i = 0; i < 52; i += 1) {
+        out += chars[Math.floor(Math.random() * chars.length)]
+    }
+    return out
+}
+
+function isCanonicalDeviceId(value: string | null): boolean {
+    return Boolean(value && /^[0-9A-Fa-f]{52}$/.test(value))
+}
+
 function getNeteaseDeviceId(): string {
     const KEY = "musicstorm-netease-device-id"
     try {
         const cached = window.localStorage.getItem(KEY)
-        if (cached) {
-            return cached
+        if (isCanonicalDeviceId(cached)) {
+            return cached as string
         }
-        const id = crypto.randomUUID()
+        // 旧版 UUID 与 MUSIC_A 错位触发风控，重新生成覆盖
+        const id = generateDeviceId()
         window.localStorage.setItem(KEY, id)
         return id
     } catch {
         // 存储不可用每次新值，扫码登录可能不绑定
-        return crypto.randomUUID()
+        return generateDeviceId()
     }
 }
 

@@ -1,4 +1,5 @@
 import { listLocalPlayableTracks, loadLocalLibrary } from "@/lib/local/library-store"
+import { upgradeNeteaseUrl } from "@/lib/music/upgrade-url"
 import type { RepeatMode, Track } from "@/lib/types"
 import { isWebMode } from "@/lib/web-mode"
 
@@ -68,9 +69,13 @@ function readPlaybackSession(): PlaybackSession | null {
         if (!Array.isArray(data.queue) || data.queue.length === 0) {
             return null
         }
+        // 旧会话里可能存了网易云升级 https 前的 http 封面，恢复时统一升级
         const queue = hydrateLocalTracks(
             data.queue.filter(isTrack).filter(isTrackRestorable),
-        )
+        ).map((track) => ({
+            ...track,
+            coverUrl: upgradeNeteaseUrl(track.coverUrl),
+        }))
         if (queue.length === 0) {
             return null
         }

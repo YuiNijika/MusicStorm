@@ -16,6 +16,9 @@ function useQrLogin(onSuccess: () => void | Promise<void>) {
     const timerRef = useRef<number | null>(null)
     const startRef = useRef<() => Promise<void>>(async () => {})
     const onSuccessRef = useRef(onSuccess)
+    // 登录成功（803）到弹窗关闭之间 kind 被重置为 idle，会再次触发 startQrLogin
+    // 重新轮询；用标志阻断，否则弹窗关闭后后台仍在请求 login/qr/check
+    const succeededRef = useRef(false)
     onSuccessRef.current = onSuccess
 
     const stopPolling = useCallback(() => {
@@ -27,6 +30,9 @@ function useQrLogin(onSuccess: () => void | Promise<void>) {
     }, [])
 
     const startQrLogin = useCallback(async () => {
+        if (succeededRef.current) {
+            return
+        }
         stopPolling()
         setQrState({ kind: "loading" })
         try {
@@ -46,6 +52,7 @@ function useQrLogin(onSuccess: () => void | Promise<void>) {
                 try {
                     const code = await pollQrLogin(key)
                     if (code === 803) {
+                        succeededRef.current = true
                         stopPolling()
                         setQrState({ kind: "idle" })
                         await onSuccessRef.current()
@@ -84,6 +91,7 @@ function useQrLogin(onSuccess: () => void | Promise<void>) {
     useEffect(() => () => stopPolling(), [stopPolling])
 
     const reset = useCallback(() => {
+        succeededRef.current = false
         stopPolling()
         setQrState({ kind: "idle" })
     }, [stopPolling])
