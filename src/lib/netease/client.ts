@@ -1,4 +1,9 @@
-import { apiCacheGet, apiCacheSet, withInflight } from "@/lib/netease/api-cache"
+import {
+    apiCacheClear,
+    apiCacheGet,
+    apiCacheSet,
+    withInflight,
+} from "@/lib/netease/api-cache"
 import {
     DEFAULT_BASE_URL,
     getApiSettings,
@@ -24,6 +29,23 @@ const NO_CACHE_PATHS = new Set<string>([
     NETEASE_PATHS.like,
     NETEASE_PATHS.playlistSubscribe,
     NETEASE_PATHS.playlistTracks,
+])
+
+// 写操作：成功后失效磁盘缓存，避免 playlistDetail / userPlaylist / sublist 等读接口命中旧数据
+const WRITE_PATHS = new Set<string>([
+    NETEASE_PATHS.like,
+    NETEASE_PATHS.playlistSubscribe,
+    NETEASE_PATHS.playlistCreate,
+    NETEASE_PATHS.playlistUpdateName,
+    NETEASE_PATHS.playlistDescUpdate,
+    NETEASE_PATHS.playlistDelete,
+    NETEASE_PATHS.playlistTracks,
+    NETEASE_PATHS.albumSub,
+    NETEASE_PATHS.artistSub,
+    NETEASE_PATHS.mvSub,
+    NETEASE_PATHS.djSub,
+    NETEASE_PATHS.userCloudDel,
+    NETEASE_PATHS.fmTrash,
 ])
 
 type RequestOptions = {
@@ -252,6 +274,12 @@ async function neteaseRequest<T>(options: RequestOptions): Promise<T> {
         if (cacheable) {
             const ttl = getApiCacheTtlMs()
             void apiCacheSet(cacheKey, JSON.stringify(data), ttl)
+        }
+
+        // 写操作成功后失效缓存：这些请求本身不落缓存，但会改变 playlistDetail /
+        // userPlaylist / sublist 等读接口的结果，立即清掉避免旧数据一直命中
+        if (WRITE_PATHS.has(options.path)) {
+            void apiCacheClear()
         }
 
         return data

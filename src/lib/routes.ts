@@ -1,5 +1,6 @@
 export type AppRoute =
     | "home"
+    | "discover"
     | "local"
     | "library"
     | "radios"
@@ -16,6 +17,7 @@ export type NavItem = {
 // 侧栏顺序：本地在资料库上；资料库 = 网易云
 export const NAV_ITEMS: NavItem[] = [
     { id: "home", label: "现在就听", description: "推荐与精选" },
+    { id: "discover", label: "发现", description: "榜单与新碟" },
     { id: "local", label: "本地", description: "本机资料库" },
     { id: "library", label: "资料库", description: "网易云歌单" },
     { id: "radios", label: "电台", description: "订阅与发现" },

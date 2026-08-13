@@ -121,13 +121,24 @@ function isCanonicalDeviceId(value: string | null): boolean {
 }
 
 function getNeteaseDeviceId(): string {
-    const KEY = "musicstorm-netease-device-id"
+    // 必须与 native 游客注册（device-cookie getOrCreateDeviceId）共用同一枚 deviceId：
+    // 扫码登录请求带游客 MUSIC_A，而 MUSIC_A 绑定了游客注册时的 deviceId，
+    // 若登录请求的 deviceId 与它不一致，网易云按「设备不匹配」风控，签发出的
+    // MUSIC_U 在隐私类接口（收藏歌手/MV/云盘）被判 301
+    const KEY = "netease-device-id"
+    const LEGACY = "musicstorm-netease-device-id"
     try {
         const cached = window.localStorage.getItem(KEY)
         if (isCanonicalDeviceId(cached)) {
             return cached as string
         }
-        // 旧版 UUID 与 MUSIC_A 错位触发风控，重新生成覆盖
+        // 旧 key 迁移：登录态曾绑定的 deviceId 迁到统一 key，避免登录态凭空失效
+        const legacy = window.localStorage.getItem(LEGACY)
+        if (isCanonicalDeviceId(legacy)) {
+            window.localStorage.setItem(KEY, legacy as string)
+            window.localStorage.removeItem(LEGACY)
+            return legacy as string
+        }
         const id = generateDeviceId()
         window.localStorage.setItem(KEY, id)
         return id

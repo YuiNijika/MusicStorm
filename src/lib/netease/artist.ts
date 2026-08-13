@@ -239,10 +239,50 @@ async function fetchSimiArtists(artistId: string): Promise<SimiArtistCard[]> {
         })
 }
 
+type ArtistSublistApiData = {
+    code?: number
+    data?:
+        | Array<{ id?: number; name?: string; picUrl?: string; albumSize?: number }>
+        | { artists?: Array<{ id?: number; name?: string; picUrl?: string; albumSize?: number }> }
+}
+
+// 关注歌手列表（需要登录）
+async function fetchArtistSublist(limit = 50): Promise<SimiArtistCard[]> {
+    const data = await neteaseRequest<ArtistSublistApiData>({
+        path: NETEASE_PATHS.artistSublist,
+        params: { limit, offset: 0 },
+        skipCache: true,
+    })
+    const raw = data.data
+    const list = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object" && Array.isArray(raw.artists)
+          ? raw.artists
+          : []
+    return list
+        .filter((item) => item.id != null)
+        .map((item) => ({
+            id: String(item.id),
+            name: item.name?.trim() || "未知歌手",
+            coverUrl: item.picUrl ? `${item.picUrl}?param=400y400` : "",
+            albumCount: item.albumSize,
+        }))
+}
+
+async function subscribeArtist(artistId: string, subscribe: boolean): Promise<void> {
+    await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.artistSub,
+        params: { id: artistId, t: subscribe ? 1 : 0 },
+        skipCache: true,
+    })
+}
+
 export {
     fetchArtistAlbumsPage,
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,
+    fetchArtistSublist,
     fetchSimiArtists,
+    subscribeArtist,
 }

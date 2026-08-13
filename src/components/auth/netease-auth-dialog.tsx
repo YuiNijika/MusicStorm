@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { useQrLogin } from "@/hooks/use-qr-login"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { loginWithEmail } from "@/lib/netease/auth-email"
 import { loginWithCellphone, sendCaptcha } from "@/lib/netease/auth-phone"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import { formatError, notifyError, notifySuccess } from "@/lib/notify"
@@ -22,12 +23,12 @@ function isMobile(): boolean {
     }
 }
 
-type AuthTab = "phone" | "qr"
+type AuthTab = "phone" | "qr" | "email"
 
 const DEFAULT_TAB: AuthTab = isMobile() ? "phone" : "qr"
 const TAB_ORDER: [AuthTab, string][] = isMobile()
-    ? [["phone", "手机号"], ["qr", "扫码"]]
-    : [["qr", "扫码"], ["phone", "手机号"]]
+    ? [["phone", "手机号"], ["qr", "扫码"], ["email", "邮箱"]]
+    : [["qr", "扫码"], ["phone", "手机号"], ["email", "邮箱"]]
 
 type NeteaseAuthDialogProps = {
     open: boolean
@@ -39,6 +40,8 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
     const [tab, setTab] = useState<AuthTab>(DEFAULT_TAB)
     const [phone, setPhone] = useState("")
     const [captcha, setCaptcha] = useState("")
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
     const [sending, setSending] = useState(false)
     const [loggingIn, setLoggingIn] = useState(false)
     const [cooldown, setCooldown] = useState(0)
@@ -137,6 +140,38 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
         }
     }
 
+    async function handleEmailLogin() {
+        if (loggingInRef.current) {
+            return
+        }
+        setError(null)
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            const message = "请输入正确的邮箱"
+            setError(message)
+            notifyError("登录失败", { description: message })
+            return
+        }
+        if (!password) {
+            const message = "请输入密码"
+            setError(message)
+            notifyError("登录失败", { description: message })
+            return
+        }
+        loggingInRef.current = true
+        setLoggingIn(true)
+        try {
+            await loginWithEmail({ email, password })
+            await handleSuccess()
+        } catch (err) {
+            const message = formatError(err) || "登录失败"
+            setError(message)
+            notifyError("登录失败", { description: message })
+        } finally {
+            loggingInRef.current = false
+            setLoggingIn(false)
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md" showCloseButton>
@@ -198,6 +233,33 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             type="button"
                             disabled={loggingIn}
                             onClick={() => void handleLogin()}
+                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {loggingIn ? "登录中…" : "登录"}
+                        </button>
+                    </div>
+                ) : tab === "email" ? (
+                    <div className="space-y-3">
+                        <input
+                            value={email}
+                            onChange={(event) => setEmail(event.currentTarget.value)}
+                            placeholder="邮箱"
+                            inputMode="email"
+                            autoComplete="email"
+                            className="material-field h-10 w-full rounded-xl px-3 text-[13px] outline-none"
+                        />
+                        <input
+                            value={password}
+                            onChange={(event) => setPassword(event.currentTarget.value)}
+                            placeholder="密码"
+                            type="password"
+                            autoComplete="current-password"
+                            className="material-field h-10 w-full rounded-xl px-3 text-[13px] outline-none"
+                        />
+                        <button
+                            type="button"
+                            disabled={loggingIn}
+                            onClick={() => void handleEmailLogin()}
                             className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {loggingIn ? "登录中…" : "登录"}

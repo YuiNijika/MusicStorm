@@ -14,6 +14,7 @@ import {
     Pause,
     Pencil,
     Play,
+    Trash2,
 } from "lucide-react"
 import {
     useEffect,
@@ -85,6 +86,8 @@ type TrackRowProps = {
     /** 传入时可从歌单移除 */
     playlistId?: string
     onRemoved?: (trackId: string) => void
+    /** 传入时在更多菜单显示「从云盘删除」 */
+    onCloudDelete?: () => void
     trailing?: ReactNode
     onPlay: (track: Track) => void
 }
@@ -102,6 +105,7 @@ function TrackRow({
     dense = false,
     playlistId,
     onRemoved,
+    onCloudDelete,
     onPlay,
     trailing,
 }: TrackRowProps) {
@@ -289,21 +293,35 @@ function TrackRow({
                     : "gap-2 rounded-2xl px-2.5 py-2 sm:gap-3 sm:px-3",
                 leading
                     ? albumCol && actions
-                        ? "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto]"
+                        ? hasTrailing
+                            ? "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto_auto]"
+                            : "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto]"
                         : albumCol
-                          ? "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
+                          ? hasTrailing
+                            ? "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                            : "grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                           : actions
-                            ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]"
+                            ? hasTrailing
+                                ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto_auto]"
+                                : "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]"
                             : hasTrailing
                               ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]"
                               : "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
                     : albumCol && actions
-                      ? "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto]"
+                      ? hasTrailing
+                        ? "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto_auto]"
+                        : "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto]"
                       : albumCol
-                        ? "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
+                        ? hasTrailing
+                          ? "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                          : "grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                         : actions
-                          ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
-                          : "grid-cols-[auto_minmax(0,1fr)_auto]",
+                          ? hasTrailing
+                            ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto_auto]"
+                            : "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
+                          : hasTrailing
+                            ? "grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+                            : "grid-cols-[auto_minmax(0,1fr)_auto]",
                 // outline 交给全局 focus-visible 环，行内不再叠第二层 ring
                 "active:scale-[0.995]",
                 isActive
@@ -503,6 +521,18 @@ function TrackRow({
                             <ListPlus />
                             加入队列
                         </DropdownMenuItem>
+                        {onCloudDelete ? (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => onCloudDelete()}
+                                >
+                                    <Trash2 />
+                                    从云盘删除
+                                </DropdownMenuItem>
+                            </>
+                        ) : null}
                         {/* 网页版 filePath 是 blob URL，无文件管理器可打开 */}
                         {isLocal && track.filePath && !isWebMode() ? (
                             <DropdownMenuItem

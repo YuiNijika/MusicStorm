@@ -26,6 +26,15 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
 import { usePlayer } from "@/hooks/use-player"
 import { formatDuration } from "@/lib/format"
 import type {
@@ -114,6 +123,14 @@ function LocalWebPage() {
         folderPath: null,
         artistId: null,
     })
+    // 移除/清空确认对话框
+    const [removeArtistTarget, setRemoveArtistTarget] =
+        useState<LocalArtist | null>(null)
+    const [removeArtistIncludeAlbums, setRemoveArtistIncludeAlbums] =
+        useState(false)
+    const [removeAlbumTarget, setRemoveAlbumTarget] =
+        useState<LocalAlbum | null>(null)
+    const [clearOpen, setClearOpen] = useState(false)
 
     // 刷新后恢复：曲目从 IndexedDB，艺人/专辑从 localStorage
     useEffect(() => {
@@ -239,39 +256,36 @@ function LocalWebPage() {
         [artistEditId, state, persistMeta],
     )
 
-    const confirmRemoveArtist = useCallback(
-        (artist: LocalArtist) => {
-            if (!window.confirm(`移除艺人分组「${artist.name}」？`)) {
-                return
-            }
-            const albumCount = listAlbumsByArtist(state, artist.id).length
-            const includeAlbums =
-                albumCount > 0
-                    ? window.confirm(
-                          `同时移除其下 ${albumCount} 张专辑？\n「确定」= 连同专辑移除，「取消」= 专辑保留`,
-                      )
-                    : false
-            const prevTracks = state.tracks
-            const next = removeArtist(state, artist.id, includeAlbums)
-            setState(next)
-            persistMeta(next)
-            const changed = next.tracks.filter(
-                (track) =>
-                    track.localAlbumId == null &&
-                    prevTracks.some(
-                        (prev) => prev.id === track.id && prev.localAlbumId != null,
-                    ),
-            )
-            if (changed.length > 0) {
-                void saveWebTracks(changed)
-            }
-            if (nav.kind === "artist" && nav.artistId === artist.id) {
-                setNav({ kind: "root" })
-            }
-            notifySuccess("已移除艺人", { description: artist.name })
-        },
-        [state, nav, persistMeta],
-    )
+    const openRemoveArtist = useCallback((artist: LocalArtist) => {
+        setRemoveArtistTarget(artist)
+        setRemoveArtistIncludeAlbums(false)
+    }, [])
+
+    const executeRemoveArtist = useCallback(() => {
+        const artist = removeArtistTarget
+        if (!artist) {
+            return
+        }
+        const prevTracks = state.tracks
+        const next = removeArtist(state, artist.id, removeArtistIncludeAlbums)
+        setState(next)
+        persistMeta(next)
+        const changed = next.tracks.filter(
+            (track) =>
+                track.localAlbumId == null &&
+                prevTracks.some(
+                    (prev) => prev.id === track.id && prev.localAlbumId != null,
+                ),
+        )
+        if (changed.length > 0) {
+            void saveWebTracks(changed)
+        }
+        if (nav.kind === "artist" && nav.artistId === artist.id) {
+            setNav({ kind: "root" })
+        }
+        notifySuccess("已移除艺人", { description: artist.name })
+        setRemoveArtistTarget(null)
+    }, [removeArtistTarget, removeArtistIncludeAlbums, state, nav, persistMeta])
 
     // —— 专辑操作 ——
 
@@ -318,39 +332,43 @@ function LocalWebPage() {
         [albumEditId, state, persistMeta],
     )
 
-    const confirmRemoveAlbum = useCallback(
-        (album: LocalAlbum) => {
-            if (!window.confirm(`移除专辑「${album.title}」？其下曲目将解除归属（文件保留）。`)) {
-                return
-            }
-            const prevTracks = state.tracks
-            const next = removeAlbum(state, album.id)
-            setState(next)
-            persistMeta(next)
-            const changed = next.tracks.filter(
-                (track) =>
-                    track.localAlbumId == null &&
-                    prevTracks.some(
-                        (prev) => prev.id === track.id && prev.localAlbumId === album.id,
-                    ),
-            )
-            if (changed.length > 0) {
-                void saveWebTracks(changed)
-            }
-            if (nav.kind === "album" && nav.albumId === album.id) {
-                setNav({ kind: "root" })
-            }
-            notifySuccess("已移除专辑", { description: album.title })
-        },
-        [state, nav, persistMeta],
-    )
+    const openRemoveAlbum = useCallback((album: LocalAlbum) => {
+        setRemoveAlbumTarget(album)
+    }, [])
+
+    const executeRemoveAlbum = useCallback(() => {
+        const album = removeAlbumTarget
+        if (!album) {
+            return
+        }
+        const prevTracks = state.tracks
+        const next = removeAlbum(state, album.id)
+        setState(next)
+        persistMeta(next)
+        const changed = next.tracks.filter(
+            (track) =>
+                track.localAlbumId == null &&
+                prevTracks.some(
+                    (prev) => prev.id === track.id && prev.localAlbumId === album.id,
+                ),
+        )
+        if (changed.length > 0) {
+            void saveWebTracks(changed)
+        }
+        if (nav.kind === "album" && nav.albumId === album.id) {
+            setNav({ kind: "root" })
+        }
+        notifySuccess("已移除专辑", { description: album.title })
+        setRemoveAlbumTarget(null)
+    }, [removeAlbumTarget, state, nav, persistMeta])
 
     // —— 清空 ——
 
-    const confirmClear = useCallback(() => {
-        if (!window.confirm("清空浏览器中保存的全部本地音乐与分组？")) {
-            return
-        }
+    const openClear = useCallback(() => {
+        setClearOpen(true)
+    }, [])
+
+    const executeClear = useCallback(() => {
         state.tracks.forEach(revokeWebTrack)
         setState(EMPTY_STATE)
         persistMeta(EMPTY_STATE)
@@ -358,6 +376,7 @@ function LocalWebPage() {
         void clearWebLibrary().catch((error) =>
             console.warn("[web-local] clear IndexedDB failed", error),
         )
+        setClearOpen(false)
     }, [state.tracks, persistMeta])
 
     // —— 播放 ——
@@ -448,6 +467,120 @@ function LocalWebPage() {
 
     const subtitle = `${state.artists.length} 位艺人 · ${state.albums.length} 张专辑 · ${state.tracks.length} 首`
 
+    // 移除/清空的确认对话框：各视图提前 return，这里抽成共享 JSX 逐个挂载
+    const removeArtistAlbumCount = removeArtistTarget
+        ? listAlbumsByArtist(state, removeArtistTarget.id).length
+        : 0
+    const confirmDialogs = (
+        <>
+            <Dialog
+                open={removeArtistTarget != null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setRemoveArtistTarget(null)
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>移除艺人分组</DialogTitle>
+                        <DialogDescription>
+                            将移除「{removeArtistTarget?.name}」及其分组
+                        </DialogDescription>
+                    </DialogHeader>
+                    {removeArtistAlbumCount > 0 ? (
+                        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-[var(--surface-fill)] px-3 py-2.5">
+                            <span className="text-[13px] font-medium">
+                                同时移除其下 {removeArtistAlbumCount} 张专辑
+                            </span>
+                            <Switch
+                                checked={removeArtistIncludeAlbums}
+                                onCheckedChange={setRemoveArtistIncludeAlbums}
+                            />
+                        </label>
+                    ) : null}
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setRemoveArtistTarget(null)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void executeRemoveArtist()}
+                            className="h-9 cursor-pointer rounded-full bg-destructive/10 px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-destructive/20 active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            移除
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={removeAlbumTarget != null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setRemoveAlbumTarget(null)
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>移除专辑</DialogTitle>
+                        <DialogDescription>
+                            将移除「{removeAlbumTarget?.title}」，其下曲目解除归属（文件保留）
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setRemoveAlbumTarget(null)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void executeRemoveAlbum()}
+                            className="h-9 cursor-pointer rounded-full bg-destructive/10 px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-destructive/20 active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            移除
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>清空本地音乐</DialogTitle>
+                        <DialogDescription>
+                            清空浏览器中保存的全部本地音乐与分组，此操作不可撤销
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setClearOpen(false)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void executeClear()}
+                            className="h-9 cursor-pointer rounded-full bg-destructive/10 px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-destructive/20 active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            清空
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    )
+
     // —— 视图渲染 ——
 
     if (restoring) {
@@ -504,7 +637,7 @@ function LocalWebPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => confirmRemoveArtist(artist)}
+                            onClick={() => openRemoveArtist(artist)}
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             删除分组
@@ -542,7 +675,7 @@ function LocalWebPage() {
                                             overlay
                                             onEdit={openEditAlbum}
                                             onRescan={() => {}}
-                                            onDelete={confirmRemoveAlbum}
+                                            onDelete={openRemoveAlbum}
                                         />
                                     </div>
                                 </div>
@@ -550,6 +683,7 @@ function LocalWebPage() {
                         </div>
                     </Section>
                 )}
+            {confirmDialogs}
             </div>
         )
     }
@@ -590,7 +724,7 @@ function LocalWebPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => confirmRemoveAlbum(album)}
+                            onClick={() => openRemoveAlbum(album)}
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
                         >
                             删除专辑
@@ -650,6 +784,7 @@ function LocalWebPage() {
                         ))}
                     </div>
                 )}
+            {confirmDialogs}
             </div>
         )
     }
@@ -668,7 +803,7 @@ function LocalWebPage() {
                     trailing={
                         <button
                             type="button"
-                            onClick={confirmClear}
+                            onClick={openClear}
                             className="apple-control inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
                         >
                             清空存储
@@ -728,6 +863,7 @@ function LocalWebPage() {
                         ))}
                     </div>
                 )}
+            {confirmDialogs}
             </div>
         )
     }
@@ -852,7 +988,7 @@ function LocalWebPage() {
                                                     artist={artist}
                                                     overlay
                                                     onEdit={openEditArtist}
-                                                    onDelete={confirmRemoveArtist}
+                                                    onDelete={openRemoveArtist}
                                                 />
                                             </div>
                                         </div>
@@ -897,7 +1033,7 @@ function LocalWebPage() {
                                                 overlay
                                                 onEdit={openEditAlbum}
                                                 onRescan={() => {}}
-                                                onDelete={confirmRemoveAlbum}
+                                                onDelete={openRemoveAlbum}
                                             />
                                         </div>
                                     </div>
@@ -930,6 +1066,7 @@ function LocalWebPage() {
                 onOpenChange={setAlbumDrawerOpen}
                 onSubmit={submitAlbum}
             />
+            {confirmDialogs}
         </div>
     )
 }

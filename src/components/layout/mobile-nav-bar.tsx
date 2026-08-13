@@ -1,5 +1,6 @@
 import {
     BarChart3,
+    Compass,
     FolderOpen,
     Home,
     Library,
@@ -46,6 +47,7 @@ const MOBILE_TABS: AppRoute[] = [
 
 const ICONS: Record<AppRoute, LucideIcon> = {
     home: Home,
+    discover: Compass,
     library: Library,
     radios: Podcast,
     search: Search,

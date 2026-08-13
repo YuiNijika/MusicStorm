@@ -53,8 +53,9 @@ await neteaseRequest({
 
 内建行为契约：
 
-- **磁盘缓存**：默认读缓存写缓存，TTL 由偏好 `musicstorm-api-cache-ttl` 控制
+- **磁盘缓存**：默认读缓存写缓存，TTL 由偏好 `musicstorm-api-cache-ttl` 控制（仅 Tauri 桌面端，浏览器无缓存）
 - **不落缓存的路径**：登录、写操作、时效 URL（`src/lib/netease/client.ts` 的 `NO_CACHE_PATHS`）
+- **写操作失效缓存**：`WRITE_PATHS` 里的写操作（改名 / 删除 / 收藏 / 红心等）成功后自动 `apiCacheClear`，避免 `playlistDetail` / `userPlaylist` / `sublist` 等读接口命中旧数据
 - **in-flight 去重**：同 key 并发请求只发一次，其余共享结果
 - **错误断言**：响应 `code !== 200` 直接抛错（`loginQrCheck` 除外，其 code 是轮询状态码）
 
@@ -74,22 +75,30 @@ netease_http_post (Rust)  绕过 CORS 的无状态 POST 代理
 
 **禁止静态 import `native/crypto.ts`**，否则加密库会进启动包；只能经 `native/request.ts` 的 `loadCrypto()` 动态加载。
 
+新增接口的加密模式（weapi/eapi）与 `data` 字段，一律对照官方 Node 版 `CloudMusicAPI_Node/module/*.js` 的 `createOption` 与 `data` 构造；不要凭 URL 前缀（如 `/api/v1/`）猜加密模式。
+
 ## 模块清单与调用示例
 
 | 模块 | 主要导出 | 用途 |
 |---|---|---|
 | `auth.ts` | `createQrSession`、`fetchQrKey`、`pollQrLogin`、`checkQrLogin` | 扫码登录 |
-| `auth-phone.ts` | 手机号 / 验证码登录 | 手机号登录 |
+| `auth-phone.ts` | `loginWithCellphone`、`sendCaptcha` | 手机号 / 验证码登录 |
+| `auth-email.ts` | `loginWithEmail` | 邮箱登录 |
 | `track.ts` | `fetchSongDetail`、`fetchSongUrl` | 歌曲详情、播放 URL |
-| `playlist.ts` | `fetchPlaylistDetail`、`fetchRecommendPlaylists`、`subscribePlaylist` | 歌单 |
+| `playlist.ts` | `fetchPlaylistDetail`、`fetchRecommendPlaylists`、`fetchTopPlaylists`、`subscribePlaylist`、`createPlaylist`、`updatePlaylistName`、`updatePlaylistDesc`、`deletePlaylist` | 歌单：详情 / 推荐 / 分类 / 收藏 / 创建 / 改名 / 介绍 / 删除 |
 | `search.ts` | `searchNeteaseTracks` / `Albums` / `Artists` / `Playlists` / `Radios` / `All` | 全局搜索 |
 | `album.ts` | `fetchAlbumDetail`、`fetchAlbumSublist`、`subscribeAlbum` | 专辑与收藏 |
-| `artist.ts` | `fetchArtistDetail`、`fetchArtistDesc`、`fetchArtistMvs`、`fetchSimiArtists` | 艺人页 |
-| `user.ts` | `fetchUserAccount`、`fetchUserPlaylists`、`fetchUserPlaylistsDetailed` | 账号与歌单 |
+| `artist.ts` | `fetchArtistDetail`、`fetchArtistDesc`、`fetchArtistMvs`、`fetchSimiArtists`、`fetchArtistSublist`、`subscribeArtist` | 艺人页与收藏 |
+| `user.ts` | `fetchUserAccount`、`fetchUserPlaylists`、`fetchUserPlaylistsDetailed`、`resolveVipTier`、`dailySignin` | 账号、歌单、VIP 等级、签到 |
 | `like.ts` | `fetchLikelist`、`setTrackLiked` | 红心 |
 | `recommend.ts` | `fetchDailyRecommendSongs` | 每日推荐 |
-| `dj.ts` | 电台详情 / 节目 / 订阅 | 电台 |
-| `mv.ts` | `fetchMvDetail`、`fetchMvPlayable`、`fetchMvUrl` | MV |
+| `toplist.ts` | `fetchToplists` | 官方排行榜 |
+| `discover.ts` | `fetchNewAlbums`、`fetchTopSongs` | 新碟上架、新歌速递 |
+| `fm.ts` | `fetchPersonalFm`、`fmTrash`、`fetchIntelligencePlaylist` | 私人 FM、心动模式 |
+| `cloud.ts` | `fetchCloudTracks`、`deleteCloudTrack` | 云盘列表与删除 |
+| `record.ts` | `fetchUserRecord` | 最近播放（听歌排行） |
+| `dj.ts` | `fetchDjDetail`、`fetchDjPrograms`、`fetchDjSublist`、`subscribeDjRadio`、`fetchHomeRadios` 等 | 电台 |
+| `mv.ts` | `fetchMvDetail`、`fetchMvPlayable`、`fetchMvUrl`、`fetchMvSublist`、`subscribeMv`、`fetchSimiMvs` | MV 与收藏 |
 | `lyric.ts` | `fetchLyricLines`、`fetchLyricText` | 歌词 |
 | `quality.ts` | `getNeteaseQualityBr`、`setNeteaseQualityBr`、`QUALITY_OPTIONS` | 音质偏好（标准 128k / 较高 192k / 极高 320k / 无损优先） |
 | `song-privilege.ts` | `isSongUrlPlayable`、`pickRicherSongUrlEntry`、`describeSongUrlFailure` | 播放 URL 校验与降级 |
@@ -142,6 +151,46 @@ const current = getNeteaseQualityBr()   // 如 320_000
 setNeteaseQualityBr(999_000)            // 无损优先；变更会持久化并广播
 ```
 
+### 歌单创建 / 编辑 / 删除
+
+```ts
+import {
+    createPlaylist,
+    deletePlaylist,
+    updatePlaylistDesc,
+    updatePlaylistName,
+} from "@/lib/netease/playlist"
+
+// 创建（介绍可选）：create 接口只收 name，介绍会在创建后单独写
+const id = await createPlaylist("我的歌单", "周末循环的轻音乐")
+
+// 改名 / 改介绍：各自独立，值变了才调用
+await updatePlaylistName(id, "新的名字")
+await updatePlaylistDesc(id, "新的介绍")
+
+// 删除（自己的歌单）
+await deletePlaylist(id)
+```
+
+### 发现页 / 私人 FM / 云盘 / 最近播放
+
+```ts
+import { fetchToplists } from "@/lib/netease/toplist"
+import { fetchNewAlbums, fetchTopSongs } from "@/lib/netease/discover"
+import { fetchPersonalFm, fetchIntelligencePlaylist } from "@/lib/netease/fm"
+import { fetchCloudTracks, deleteCloudTrack } from "@/lib/netease/cloud"
+import { fetchUserRecord } from "@/lib/netease/record"
+
+const toplists = await fetchToplists()                 // ToplistItem[] → 官方榜单
+const albums = await fetchNewAlbums("ALL", 30)         // 新碟，地区 ALL/ZH/EA/KR/JP
+const songs = await fetchTopSongs(0)                   // 新歌，type 0 全部
+const next = await fetchPersonalFm()                   // 私人 FM 下一首
+const smart = await fetchIntelligencePlaylist(seedId, playlistId) // 心动模式队列
+const cloud = await fetchCloudTracks()                 // 云盘歌曲
+await deleteCloudTrack(trackId)                        // 云盘删除
+const recent = await fetchUserRecord(uid, 1)           // 最近播放（一周听歌排行）
+```
+
 ## 常见错误
 
 | 现象 | 原因与处理 |
@@ -150,6 +199,7 @@ setNeteaseQualityBr(999_000)            // 无损优先；变更会持久化并�
 | 接口返回 code 非 200 | `neteaseRequest` 已抛错；查看 `msg` 字段定位（未登录 / 参数错） |
 | 播放 URL 拿不到 / 全不可播 | 走 `song-privilege` 的 `describeSongUrlFailure` 区分版权 / 登录 / 音质原因 |
 | 登录后接口仍报未登录 | 确认走 `neteaseRequest`（它负责携带 cookie），且 deviceId 与登录时一致 |
+| 登录后收藏歌手 / MV / 云盘返回 301 / 未登录 / 系统错误 | 多为登录态与 deviceId 不一致：`auth-cookie.ts` 与 `native/device-cookie.ts` 必须共用同一枚 deviceId，否则旧凭证绑定旧 deviceId 被判风险；退出重新扫码登录即可 |
 
 ## 排查路径
 

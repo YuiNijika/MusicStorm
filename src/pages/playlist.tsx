@@ -1,4 +1,4 @@
-import { Heart, Pencil } from "lucide-react"
+import { Heart, Pencil, Sparkles, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
@@ -22,6 +22,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
@@ -38,7 +39,13 @@ import {
     setPlaylistTrackOrder,
 } from "@/lib/library/track-order"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
-import { fetchPlaylistDetail, updatePlaylistName } from "@/lib/netease/playlist"
+import { fetchIntelligencePlaylist } from "@/lib/netease/fm"
+import {
+    deletePlaylist,
+    fetchPlaylistDetail,
+    updatePlaylistDesc,
+    updatePlaylistName,
+} from "@/lib/netease/playlist"
 import { formatError, notifyFromError, notifySuccess } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -67,7 +74,11 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const [orderTick, setOrderTick] = useState(0)
     const [editOpen, setEditOpen] = useState(false)
     const [editName, setEditName] = useState("")
+    const [editDesc, setEditDesc] = useState("")
     const [editBusy, setEditBusy] = useState(false)
+    const [intelBusy, setIntelBusy] = useState(false)
+    const [deleteBusy, setDeleteBusy] = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
 
     const isOwnLiked = playlistId === likedSongPlaylistId
     const isOwnPlaylist =
@@ -142,25 +153,92 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         }
     }
 
+    // 心动模式：随机取一首做种子，生成智能推荐队列并接管播放
+    async function handleIntelligence() {
+        if (sortedTracks.length === 0 || intelBusy) {
+            return
+        }
+        setIntelBusy(true)
+        try {
+            const seed =
+                sortedTracks[Math.floor(Math.random() * sortedTracks.length)]
+            if (!seed) {
+                return
+            }
+            const tracks = await fetchIntelligencePlaylist(seed.id, playlistId)
+            if (tracks.length === 0) {
+                notifySuccess("心动模式暂无可播歌曲", {
+                    description: "稍后再试试",
+                })
+                return
+            }
+            playTrack(tracks[0]!, tracks)
+        } catch (error) {
+            notifyFromError("心动模式失败", error)
+        } finally {
+            setIntelBusy(false)
+        }
+    }
+
     function openEditDialog() {
         setEditName(playlist?.title ?? "")
+        setEditDesc(playlist?.description ?? "")
         setEditOpen(true)
     }
 
-    async function handleSubmitRename() {
+    async function handleDelete() {
+        if (deleteBusy || !playlist) {
+            return
+        }
+        setDeleteBusy(true)
+        try {
+            await deletePlaylist(playlistId)
+            notifySuccess("歌单已删除")
+            onBack()
+        } catch (error) {
+            notifyFromError("删除歌单失败", error)
+        } finally {
+            setDeleteBusy(false)
+        }
+    }
+
+    async function handleSubmitEdit() {
+        if (editBusy || !playlist) {
+            return
+        }
         const name = editName.trim()
-        if (!name || name === playlist?.title || editBusy) {
+        const desc = editDesc.trim()
+        if (!name) {
+            setEditOpen(false)
+            return
+        }
+        const nameChanged = name !== playlist.title
+        const descChanged = desc !== (playlist.description ?? "")
+        if (!nameChanged && !descChanged) {
             setEditOpen(false)
             return
         }
         setEditBusy(true)
         try {
-            await updatePlaylistName(playlistId, name)
-            setPlaylist((prev) => (prev ? { ...prev, title: name } : prev))
-            notifySuccess("歌单已重命名", { description: name })
+            if (nameChanged) {
+                await updatePlaylistName(playlistId, name)
+            }
+            if (descChanged) {
+                await updatePlaylistDesc(playlistId, desc)
+            }
+            setPlaylist((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          title: nameChanged ? name : prev.title,
+                          description: descChanged ? desc : prev.description,
+                      }
+                    : prev,
+            )
+            notifySuccess("歌单已保存", { description: name })
             setEditOpen(false)
         } catch (error) {
-            notifyFromError("重命名失败", error)
+            notifyFromError("保存失败", error)
         } finally {
             setEditBusy(false)
         }
@@ -232,15 +310,37 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                         播放全部
                                     </button>
                                 ) : null}
-                                {isOwnPlaylist ? (
+                                {sortedTracks.length > 0 ? (
                                     <button
                                         type="button"
-                                        onClick={openEditDialog}
-                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                        disabled={intelBusy}
+                                        onClick={() => void handleIntelligence()}
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                                     >
-                                        <Pencil className="size-3.5" />
-                                        编辑
+                                        <Sparkles className="size-3.5" />
+                                        心动模式
                                     </button>
+                                ) : null}
+                                {isOwnPlaylist ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={openEditDialog}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                        >
+                                            <Pencil className="size-3.5" />
+                                            编辑
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={deleteBusy}
+                                            onClick={() => setDeleteOpen(true)}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium text-destructive transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                            删除
+                                        </button>
+                                    </>
                                 ) : loggedIn && !isOwnLiked ? (
                                     <button
                                         type="button"
@@ -383,10 +483,10 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>重命名歌单</DialogTitle>
-                        <DialogDescription>修改歌单名称</DialogDescription>
+                        <DialogTitle>编辑歌单</DialogTitle>
+                        <DialogDescription>修改歌单名称与介绍</DialogDescription>
                     </DialogHeader>
-                    <div className="px-1 py-2">
+                    <div className="space-y-3 px-1 py-2">
                         <Input
                             value={editName}
                             onChange={(event) =>
@@ -394,6 +494,15 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                             }
                             placeholder="歌单名称"
                             className="h-10 rounded-xl"
+                        />
+                        <Textarea
+                            value={editDesc}
+                            onChange={(event) =>
+                                setEditDesc(event.currentTarget.value)
+                            }
+                            placeholder="歌单介绍"
+                            rows={3}
+                            className="rounded-xl resize-none"
                         />
                     </div>
                     <DialogFooter>
@@ -407,10 +516,38 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                         <button
                             type="button"
                             disabled={editBusy}
-                            onClick={() => void handleSubmitRename()}
+                            onClick={() => void handleSubmitEdit()}
                             className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {editBusy ? "保存中…" : "保存"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>删除歌单</DialogTitle>
+                        <DialogDescription>
+                            将删除「{playlist?.title}」，此操作不可撤销
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setDeleteOpen(false)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            disabled={deleteBusy}
+                            onClick={() => void handleDelete()}
+                            className="h-9 cursor-pointer rounded-full bg-destructive/10 px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-destructive/20 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {deleteBusy ? "删除中…" : "删除"}
                         </button>
                     </DialogFooter>
                 </DialogContent>

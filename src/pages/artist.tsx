@@ -9,6 +9,7 @@ import { TrackRow } from "@/components/music/track-row"
 import { VirtualList } from "@/components/music/virtual-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import {
@@ -16,14 +17,16 @@ import {
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,
+    fetchArtistSublist,
     fetchSimiArtists,
+    subscribeArtist,
     type ArtistAlbumCard,
     type ArtistDescResult,
     type ArtistMvCard,
     type ArtistProfile,
     type SimiArtistCard,
 } from "@/lib/netease/artist"
-import { formatError, notifyFromError } from "@/lib/notify"
+import { formatError, notifyFromError, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -59,8 +62,12 @@ function formatPlayCount(count?: number): string {
 
 function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
+    const { loggedIn } = useNeteaseSession()
     const { openAlbum, openArtist, openMv } = useMusicNavigation()
     const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+
+    const [subscribed, setSubscribed] = useState(false)
+    const [subBusy, setSubBusy] = useState(false)
 
     const [tab, setTab] = useState<ArtistTab>("songs")
     const [profile, setProfile] = useState<ArtistProfile | null>(null)
@@ -75,6 +82,46 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const [albumsLoading, setAlbumsLoading] = useState(false)
     const [albumsHasMore, setAlbumsHasMore] = useState(true)
     const albumsSentinelRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (!loggedIn) {
+            setSubscribed(false)
+            return
+        }
+        let cancelled = false
+        void fetchArtistSublist()
+            .then((list) => {
+                if (cancelled) {
+                    return
+                }
+                setSubscribed(list.some((item) => item.id === artistId))
+            })
+            .catch(() => {
+                // 订阅状态查询失败不阻塞，按钮按未收藏展示
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [loggedIn, artistId])
+
+    async function handleToggleSub() {
+        if (!loggedIn || subBusy) {
+            return
+        }
+        setSubBusy(true)
+        const next = !subscribed
+        try {
+            await subscribeArtist(artistId, next)
+            setSubscribed(next)
+            notifySuccess(next ? "已收藏歌手" : "已取消收藏", {
+                description: profile?.name,
+            })
+        } catch (error) {
+            notifyFromError("收藏歌手失败", error)
+        } finally {
+            setSubBusy(false)
+        }
+    }
 
     const [mvs, setMvs] = useState<LazyState<ArtistMvCard[]>>(emptyLazy([]))
     const [desc, setDesc] = useState<LazyState<ArtistDescResult>>(
@@ -310,13 +357,32 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                     .join(" · ") || "网易云艺人"}
                             </p>
                             {hotTracks[0] ? (
-                                <button
-                                    type="button"
-                                    onClick={() => playTrack(hotTracks[0], hotTracks)}
-                                    className="mt-1 h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
-                                >
-                                    播放热门
-                                </button>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            playTrack(hotTracks[0], hotTracks)
+                                        }
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
+                                    >
+                                        播放热门
+                                    </button>
+                                    {loggedIn ? (
+                                        <button
+                                            type="button"
+                                            disabled={subBusy}
+                                            onClick={() => void handleToggleSub()}
+                                            className={cn(
+                                                "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
+                                                subscribed
+                                                    ? "bg-primary/15 text-primary"
+                                                    : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
+                                            )}
+                                        >
+                                            {subscribed ? "已收藏" : "收藏"}
+                                        </button>
+                                    ) : null}
+                                </div>
                             ) : null}
                         </div>
                     </header>

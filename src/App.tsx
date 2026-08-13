@@ -46,6 +46,7 @@ import {
 
 const SettingsPage = lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage })))
 const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
+const DiscoverPage = lazy(() => import("@/pages/discover").then(m => ({ default: m.DiscoverPage })))
 const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
 const LibraryPage = lazy(() => import("@/pages/library").then(m => ({ default: m.LibraryPage })))
 const LocalPage = lazy(() => import("@/pages/local").then(m => ({ default: m.LocalPage })))
@@ -72,7 +73,7 @@ function AppRoutes({
     onTitleBarStyleChange: (style: TitleBarStyle) => void
     settingsTab?: SettingsTab
 }) {
-    const { detail, openPlaylist, openRadio, back } = useMusicNavigation()
+    const { detail, openPlaylist, openAlbum, openRadio, back } = useMusicNavigation()
 
     const playlistFallback = <PlaylistDetailSkeleton />
     const albumFallback = <AlbumDetailSkeleton />
@@ -112,6 +113,16 @@ function AppRoutes({
     if (route === "home") {
         return (
             <HomePage onOpenPlaylist={openPlaylist} onOpenRadio={openRadio} />
+        )
+    }
+    if (route === "discover") {
+        return (
+            <Suspense fallback={gridFallback}>
+                <DiscoverPage
+                    onOpenPlaylist={openPlaylist}
+                    onOpenAlbum={openAlbum}
+                />
+            </Suspense>
         )
     }
     if (route === "local") {
@@ -246,6 +257,7 @@ function IntegratedApiBootEffect() {    useEffect(() => {
 // 未知或空 hash 回落到主页，避免链接拼错导致白屏。
 const WEB_HASH_ROUTES: Record<string, AppRoute> = {
     player: "home",
+    discover: "discover",
     local: "local",
     library: "library",
     radios: "radios",

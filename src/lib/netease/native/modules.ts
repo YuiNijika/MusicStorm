@@ -119,6 +119,15 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 },
                 crypto: "weapi",
             }
+        case NETEASE_PATHS.playlistDescUpdate:
+            return {
+                uri: "/api/playlist/desc/update",
+                data: {
+                    id: q(query, "id"),
+                    desc: q(query, "desc"),
+                },
+                crypto: "weapi",
+            }
         case NETEASE_PATHS.personalized:
             return {
                 uri: "/api/personalized/playlist",
@@ -204,8 +213,10 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
             }
         }
         case NETEASE_PATHS.userAccount:
+            // 对齐 Node 版 login_status.js：带 w/ 的网页端接口才会下发 __csrf，
+            // 供创建歌单等需要 csrf_token 的 weapi 写接口使用
             return {
-                uri: "/api/nuser/account/get",
+                uri: "/api/w/nuser/account/get",
                 data: {},
                 crypto: "weapi",
             }
@@ -391,6 +402,180 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 data: { id: q(query, "mvid") || q(query, "id") },
                 crypto: "weapi",
             }
+        case NETEASE_PATHS.toplist:
+            return {
+                uri: "/api/toplist",
+                data: {},
+                crypto: "eapi",
+            }
+        case NETEASE_PATHS.albumNew:
+            return {
+                uri: "/api/album/new",
+                data: {
+                    limit: qNum(query, "limit", 30),
+                    offset: qNum(query, "offset", 0),
+                    total: true,
+                    area: q(query, "area", "ALL"),
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.topSong:
+            return {
+                uri: "/api/v1/discovery/new/songs",
+                data: {
+                    areaId: qNum(query, "type", 0),
+                    total: true,
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.personalFm:
+            return {
+                uri: "/api/v1/radio/get",
+                data: {},
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.fmTrash:
+            return {
+                uri: "/api/radio/trash/add",
+                data: {
+                    songId: q(query, "id"),
+                    alg: "RT",
+                    time: qNum(query, "time", 25),
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.playmodeIntelligenceList: {
+            const songId = q(query, "id")
+            return {
+                uri: "/api/playmode/intelligence/list",
+                data: {
+                    songId,
+                    type: "fromPlayOne",
+                    playlistId: q(query, "pid"),
+                    startMusicId: q(query, "sid") || songId,
+                    count: qNum(query, "count", 1),
+                },
+                crypto: "eapi",
+            }
+        }
+        case NETEASE_PATHS.userCloud:
+            return {
+                uri: "/api/v1/cloud/get",
+                data: {
+                    limit: qNum(query, "limit", 50),
+                    offset: qNum(query, "offset", 0),
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.userCloudDel:
+            return {
+                uri: "/api/cloud/del",
+                data: { songIds: [q(query, "id")] },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.artistSublist:
+            return {
+                uri: "/api/artist/sublist",
+                data: {
+                    limit: qNum(query, "limit", 50),
+                    offset: qNum(query, "offset", 0),
+                    total: true,
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.artistSub: {
+            const sub = qNum(query, "t", 1) === 1 ? "sub" : "unsub"
+            return {
+                uri: `/api/artist/${sub}`,
+                data: {
+                    artistId: q(query, "id"),
+                    artistIds: `[${q(query, "id")}]`,
+                },
+                crypto: "weapi",
+            }
+        }
+        case NETEASE_PATHS.mvSublist:
+            return {
+                uri: "/api/cloudvideo/allvideo/sublist",
+                data: {
+                    limit: qNum(query, "limit", 50),
+                    offset: qNum(query, "offset", 0),
+                    total: true,
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.mvSub: {
+            const sub = qNum(query, "t", 1) === 1 ? "sub" : "unsub"
+            const mvid = q(query, "mvid") || q(query, "id")
+            return {
+                uri: `/api/mv/${sub}`,
+                data: {
+                    mvId: mvid,
+                    mvIds: `["${mvid}"]`,
+                },
+                crypto: "weapi",
+            }
+        }
+        case NETEASE_PATHS.userRecord:
+            return {
+                uri: "/api/v1/play/record",
+                data: {
+                    uid: q(query, "uid"),
+                    type: qNum(query, "type", 0),
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.topPlaylist:
+            return {
+                uri: "/api/playlist/list",
+                data: {
+                    cat: q(query, "cat", "全部"),
+                    order: q(query, "order", "hot"),
+                    limit: qNum(query, "limit", 50),
+                    offset: qNum(query, "offset", 0),
+                    total: true,
+                },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.playlistHighqualityTags:
+            return {
+                uri: "/api/playlist/highquality/tags",
+                data: {},
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.simiMv:
+            return {
+                uri: "/api/discovery/simiMV",
+                data: { mvid: q(query, "mvid") || q(query, "id") },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.playlistDelete:
+            return {
+                uri: "/api/playlist/remove",
+                data: { ids: `[${q(query, "id")}]` },
+                crypto: "weapi",
+            }
+        case NETEASE_PATHS.dailySignin:
+            return {
+                uri: "/api/point/dailyTask",
+                data: { type: qNum(query, "type", 0) },
+                crypto: "eapi",
+            }
+        case NETEASE_PATHS.loginEmail: {
+            const md5Password = q(query, "md5_password")
+            const password = q(query, "password")
+            return {
+                uri: "/api/w/login",
+                data: {
+                    type: "0",
+                    https: "true",
+                    username: q(query, "email"),
+                    password: md5Password || md5Hex(password),
+                    rememberLogin: "true",
+                },
+                crypto: "eapi",
+            }
+        }
         default:
             throw new Error(`内置 API 未实现路径: ${path}`)
     }

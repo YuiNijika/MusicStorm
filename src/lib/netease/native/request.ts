@@ -15,6 +15,7 @@ import {
     getOrCreateDeviceId,
     getStoredMusicA,
     PC_APPVER,
+    storeCsrf,
     storeMusicA,
 } from "@/lib/netease/native/device-cookie"
 import { resolveNativeModule } from "@/lib/netease/native/modules"
@@ -83,6 +84,18 @@ function extractMusicA(cookies: string[], bodyText?: string): string | null {
         }
     } catch {
         // cookie 解析失败时按无 cookie 处理，后续请求仍会带自己的凭证
+    }
+    return null
+}
+
+// 扫码登录（eapi）不下发 __csrf，但后续 weapi 网页端接口（nuser/account/get 等）
+// 会在 Set-Cookie 里回传 __csrf，供创建歌单等需要 csrf_token 的 weapi 接口使用
+function extractCsrf(cookies: string[]): string | null {
+    for (const c of cookies) {
+        const m = /^__csrf=(.*)$/i.exec(c.trim())
+        if (m?.[1]) {
+            return m[1]
+        }
     }
     return null
 }
@@ -325,6 +338,11 @@ function parseProxyBody<T>(path: string, response: ProxyResponse): T {
         const musicA = extractMusicA(response.cookies)
         if (musicA) {
             storeMusicA(musicA)
+        }
+        // 登录态 weapi 响应会回传 __csrf，捕获供 playlist/create 等写接口用
+        const csrf = extractCsrf(response.cookies)
+        if (csrf) {
+            storeCsrf(csrf)
         }
     }
 

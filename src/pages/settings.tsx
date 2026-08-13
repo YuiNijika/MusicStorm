@@ -19,7 +19,7 @@ import { useAppUpdate } from "@/hooks/use-app-update"
 import { useContributors } from "@/hooks/use-contributors"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
-import { resolveVipTier } from "@/lib/netease/user"
+import { dailySignin, resolveVipTier } from "@/lib/netease/user"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
 import {
     DEVTOOLS_EVENT,
@@ -118,7 +118,7 @@ import {
     type AudioDeviceInfo,
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
-import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/notify"
+import { notifyError, notifyFromError, notifyInfo, notifySuccess, notifyWarning } from "@/lib/notify"
 import { openExternalUrl, GITHUB_REPO_URL } from "@/lib/open-external"
 import {
     CLOSE_TO_TRAY_EVENT,
@@ -951,6 +951,33 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
         removeAccount,
     } = useNeteaseSession()
     const [busyId, setBusyId] = useState<number | null>(null)
+    const [signinBusy, setSigninBusy] = useState(false)
+
+    async function handleSignin() {
+        if (signinBusy) {
+            return
+        }
+        setSigninBusy(true)
+        try {
+            const [android, web] = await Promise.all([
+                dailySignin(0),
+                dailySignin(1),
+            ])
+            if (android.ok || web.ok) {
+                notifySuccess("签到成功", {
+                    description: [android.message, web.message]
+                        .filter(Boolean)
+                        .join(" · "),
+                })
+            } else {
+                notifyInfo("签到", { description: web.message || android.message })
+            }
+        } catch (err) {
+            notifyFromError("签到失败", err)
+        } finally {
+            setSigninBusy(false)
+        }
+    }
 
     async function handleSwitch(userId: number) {
         if (userId === activeUserId && loggedIn) {
@@ -1009,6 +1036,14 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                     {profile.userId}
                                 </p>
                             </div>
+                            <button
+                                type="button"
+                                disabled={signinBusy}
+                                onClick={() => void handleSignin()}
+                                className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                            >
+                                {signinBusy ? "签到中…" : "每日签到"}
+                            </button>
                             <button
                                 type="button"
                                 onClick={logout}

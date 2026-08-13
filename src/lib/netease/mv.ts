@@ -126,4 +126,104 @@ async function fetchMvPlayable(mvId: string): Promise<MvPlayable> {
     }
 }
 
-export { fetchMvDetail, fetchMvPlayable, fetchMvUrl }
+export type MvCard = {
+    id: string
+    title: string
+    coverUrl: string
+    artistName?: string
+}
+
+type MvSublistItem = {
+    id?: number | string
+    vid?: number | string
+    imgurl16v9?: string
+    cover?: string
+    coverUrl?: string
+    title?: string
+    name?: string
+    artistName?: string
+    artistId?: number
+    creator?: Array<{ userName?: string; userId?: number }>
+}
+
+type MvSublistData = {
+    code?: number
+    data?: MvSublistItem[] | { data?: MvSublistItem[] }
+}
+
+// 已收藏 MV 列表（需要登录）
+async function fetchMvSublist(limit = 50): Promise<MvCard[]> {
+    const data = await neteaseRequest<MvSublistData>({
+        path: NETEASE_PATHS.mvSublist,
+        params: { limit, offset: 0 },
+        skipCache: true,
+    })
+    const raw = data.data
+    const list = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object" && Array.isArray(raw.data)
+          ? raw.data
+          : []
+    return list
+        .filter((item) => (item.id ?? item.vid) != null)
+        .map((item) => {
+            const id = item.id ?? item.vid
+            const cover = item.imgurl16v9 || item.cover || item.coverUrl || ""
+            const artistName =
+                item.artistName ||
+                item.creator?.map((c) => c.userName).filter(Boolean).join(" / ") ||
+                undefined
+            return {
+                id: String(id),
+                title: (item.name ?? item.title)?.trim() || "未知 MV",
+                coverUrl: cover ? `${cover}?param=720y405` : "",
+                artistName,
+            }
+        })
+}
+
+async function subscribeMv(mvid: string, subscribe: boolean): Promise<void> {
+    await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.mvSub,
+        params: { mvid, id: mvid, t: subscribe ? 1 : 0 },
+        skipCache: true,
+    })
+}
+
+type SimiMvData = {
+    code?: number
+    mvs?: MvSublistItem[]
+}
+
+// 相似 MV 推荐
+async function fetchSimiMvs(mvid: string): Promise<MvCard[]> {
+    const data = await neteaseRequest<SimiMvData>({
+        path: NETEASE_PATHS.simiMv,
+        params: { mvid },
+    })
+    return (data.mvs ?? [])
+        .filter((item) => (item.id ?? item.vid) != null)
+        .map((item) => {
+            const id = item.id ?? item.vid
+            const cover = item.imgurl16v9 || item.cover || item.coverUrl || ""
+            const artistName =
+                item.artistName ||
+                item.creator?.map((c) => c.userName).filter(Boolean).join(" / ") ||
+                undefined
+            return {
+                id: String(id),
+                title: (item.name ?? item.title)?.trim() || "未知 MV",
+                coverUrl: cover ? `${cover}?param=720y405` : "",
+                artistName,
+            }
+        })
+}
+
+export {
+    fetchMvDetail,
+    fetchMvPlayable,
+    fetchMvSublist,
+    fetchMvUrl,
+    fetchSimiMvs,
+    subscribeMv,
+}

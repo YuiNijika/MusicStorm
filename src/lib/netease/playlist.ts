@@ -118,7 +118,7 @@ async function subscribePlaylist(id: string, subscribe: boolean): Promise<void> 
     }
 }
 
-async function createPlaylist(name: string): Promise<string> {
+async function createPlaylist(name: string, description?: string): Promise<string> {
     const data = await neteaseRequest<{
         code?: number
         id?: number
@@ -135,6 +135,11 @@ async function createPlaylist(name: string): Promise<string> {
     if (!id) {
         throw new Error("创建歌单失败：未返回歌单 id")
     }
+    // 创建接口只接受名称，介绍需在创建后单独更新
+    const desc = description?.trim()
+    if (desc) {
+        await updatePlaylistDesc(String(id), desc)
+    }
     return String(id)
 }
 
@@ -149,10 +154,69 @@ async function updatePlaylistName(id: string, name: string): Promise<void> {
     }
 }
 
+async function updatePlaylistDesc(id: string, desc: string): Promise<void> {
+    const data = await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.playlistDescUpdate,
+        method: "POST",
+        params: { id, desc, timestamp: Date.now() },
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(`歌单介绍更新失败: ${data.code}`)
+    }
+}
+
+type TopPlaylistItem = {
+    id?: number
+    name?: string
+    coverImgUrl?: string
+    trackCount?: number
+    playCount?: number
+}
+
+// 分类歌单（网友精选碟）：cat 见 TOP_PLAYLIST_CATS，order hot/new
+async function fetchTopPlaylists(
+    cat = "全部",
+    order: "hot" | "new" = "hot",
+    limit = 50,
+    offset = 0,
+): Promise<Playlist[]> {
+    const data = await neteaseRequest<{
+        code?: number
+        playlists?: TopPlaylistItem[]
+    }>({
+        path: NETEASE_PATHS.topPlaylist,
+        params: { cat, order, limit, offset },
+    })
+    return (data.playlists ?? [])
+        .filter((item) => item.id != null)
+        .map((item) => ({
+            id: String(item.id),
+            title: item.name ?? "未知歌单",
+            coverUrl: item.coverImgUrl ?? "",
+            trackIds: [],
+            source: "netease" as const,
+            trackCount: item.trackCount,
+        }))
+}
+
+async function deletePlaylist(id: string): Promise<void> {
+    const data = await neteaseRequest<{ code?: number }>({
+        path: NETEASE_PATHS.playlistDelete,
+        method: "POST",
+        params: { id, timestamp: Date.now() },
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(`删除歌单失败: ${data.code}`)
+    }
+}
+
 export {
     createPlaylist,
+    deletePlaylist,
     fetchPlaylistDetail,
     fetchRecommendPlaylists,
+    fetchTopPlaylists,
     subscribePlaylist,
+    updatePlaylistDesc,
     updatePlaylistName,
 }

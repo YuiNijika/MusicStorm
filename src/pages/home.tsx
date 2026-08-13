@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+
+import { Radio as RadioIcon } from "lucide-react"
 
 import { Cover } from "@/components/music/cover"
 import {
@@ -23,6 +25,7 @@ import {
     usePlaylistGrid,
 } from "@/hooks/use-playlist-grid"
 import { fetchHomeRadios } from "@/lib/netease/dj"
+import { fetchPersonalFm, fmTrash } from "@/lib/netease/fm"
 import { fetchRecommendPlaylists } from "@/lib/netease/playlist"
 import { fetchDailyRecommendSongs } from "@/lib/netease/recommend"
 import { notifyError } from "@/lib/notify"
@@ -49,7 +52,7 @@ function splitIntoColumns<T>(items: T[], columns: number): T[][] {
 }
 
 function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
-    const { playOrToggle, currentTrack, isPlaying } = usePlayer()
+    const { playOrToggle, playTrack, currentTrack, isPlaying } = usePlayer()
     const { ready, loggedIn, profile } = useNeteaseSession()
     const {
         cols,
@@ -78,6 +81,49 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
         "loading" | "ready" | "error"
     >("loading")
     const [radioRetry, setRadioRetry] = useState(0)
+
+    const [fmTracks, setFmTracks] = useState<Track[]>([])
+    const [fmStatus, setFmStatus] = useState<
+        "idle" | "loading" | "ready" | "error"
+    >("idle")
+    const [fmActive, setFmActive] = useState(false)
+
+    const startFm = useCallback(async () => {
+        setFmStatus("loading")
+        try {
+            const tracks = await fetchPersonalFm()
+            setFmTracks(tracks)
+            setFmStatus("ready")
+            if (tracks.length > 0) {
+                setFmActive(true)
+                playTrack(tracks[0]!, tracks)
+            }
+        } catch (error) {
+            setFmTracks([])
+            setFmStatus("error")
+            notifyError("私人 FM 加载失败", {
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "请检查网络或 API 设置",
+            })
+        }
+    }, [playTrack])
+
+    const trashCurrentFm = useCallback(async () => {
+        if (currentTrack) {
+            void fmTrash(currentTrack.id).catch(() => {
+                // 垃圾桶失败不打断切换，静默忽略
+            })
+        }
+        const index = fmTracks.findIndex((item) => item.id === currentTrack?.id)
+        const next = fmTracks[index + 1]
+        if (next) {
+            playTrack(next, fmTracks)
+        } else {
+            await startFm()
+        }
+    }, [currentTrack, fmTracks, playTrack, startFm])
 
     const dailyColumns = useMemo(() => splitIntoColumns(daily, 3), [daily])
 
@@ -260,6 +306,79 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                     />
                 </button>
             ) : null}
+
+            <Section
+                title="私人 FM"
+                description="红心电台 · 猜你喜欢"
+                variant="listen"
+            >
+                {!loggedIn ? (
+                    <StateHero
+                        variant="auth"
+                        title="登录后开启私人 FM"
+                        description="基于你的红心歌曲智能推荐"
+                    />
+                ) : fmStatus === "loading" ? (
+                    <div className="apple-list-surface flex h-20 items-center gap-3 p-3">
+                        <div className="size-12 animate-pulse rounded-xl bg-[var(--surface-fill)]" />
+                        <div className="flex-1 space-y-2">
+                            <div className="h-3 w-24 animate-pulse rounded bg-[var(--surface-fill)]" />
+                            <div className="h-3 w-40 animate-pulse rounded bg-[var(--surface-fill)]" />
+                        </div>
+                    </div>
+                ) : fmStatus === "error" ? (
+                    <StateHero
+                        variant="error"
+                        title="私人 FM 加载失败"
+                        description="请检查网络或 API 设置后重试"
+                        action={
+                            <HeroRetryButton onClick={() => void startFm()} />
+                        }
+                    />
+                ) : !fmActive ? (
+                    <button
+                        type="button"
+                        onClick={() => void startFm()}
+                        className="apple-list-surface flex w-full cursor-pointer items-center gap-4 p-3 text-left transition-[background-color,transform] duration-[var(--duration-hover)] hover:bg-[var(--surface-fill-hover)] active:scale-[0.995]"
+                    >
+                        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <RadioIcon className="size-6" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold tracking-[-0.01em]">
+                                开启私人 FM
+                            </p>
+                            <p className="mt-0.5 text-[13px] text-muted-foreground">
+                                连续播放你可能会喜欢的歌
+                            </p>
+                        </div>
+                    </button>
+                ) : (
+                    <div className="apple-list-surface flex items-center gap-4 p-3">
+                        <Cover
+                            src={currentTrack?.coverUrl ?? ""}
+                            alt={currentTrack?.title ?? "私人 FM"}
+                            size="md"
+                            className="size-14 shrink-0 rounded-xl"
+                        />
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[15px] font-semibold tracking-[-0.01em]">
+                                {currentTrack?.title ?? "私人 FM"}
+                            </p>
+                            <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                                {currentTrack?.artist ?? "未知艺人"}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => void trashCurrentFm()}
+                            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            下一首
+                        </button>
+                    </div>
+                )}
+            </Section>
 
             <Section
                 title="为你推荐"

@@ -1,3 +1,4 @@
+import { setCookiesFromApi } from "@/lib/netease/auth-cookie"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
 import type { Playlist } from "@/lib/types"
 
@@ -11,6 +12,7 @@ type NeteaseProfile = {
 
 type AccountData = {
     code?: number
+    cookie?: string
     account?: { id?: number } | null
     profile?: {
         userId?: number
@@ -63,6 +65,12 @@ async function fetchUserAccount(): Promise<NeteaseProfile | null> {
         path: NETEASE_PATHS.userAccount,
         params: { timestamp: Date.now() },
     })
+
+    // 扫码登录（eapi）不下发 __csrf，登录态 weapi 响应（nuser/account/get）会回传，
+    // 捕获持久化，供创建歌单/改名等需要 csrf_token 的 weapi 写接口使用
+    if (data.cookie) {
+        setCookiesFromApi(data.cookie)
+    }
 
     const profile = data.profile
     if (!profile?.userId) {
@@ -118,5 +126,34 @@ async function fetchUserPlaylistsDetailed(uid: number): Promise<UserPlaylistsRes
     }
 }
 
-export { fetchUserAccount, fetchUserPlaylists, fetchUserPlaylistsDetailed, resolveVipTier }
-export type { NeteaseProfile, UserPlaylistsResult, VipTier }
+type SigninResult = {
+    ok: boolean
+    message: string
+}
+
+// 每日签到：type=0 安卓端（3 经验），type=1 网页端（2 经验）
+async function dailySignin(type: 0 | 1 = 0): Promise<SigninResult> {
+    const data = await neteaseRequest<{
+        code?: number
+        point?: number
+        msg?: string
+    }>({
+        path: NETEASE_PATHS.dailySignin,
+        method: "POST",
+        params: { type, timestamp: Date.now() },
+        skipCache: true,
+    })
+    if (data.code === 200) {
+        return { ok: true, message: `签到成功，+${data.point ?? 0} 经验` }
+    }
+    return { ok: false, message: data.msg ?? "签到失败" }
+}
+
+export {
+    dailySignin,
+    fetchUserAccount,
+    fetchUserPlaylists,
+    fetchUserPlaylistsDetailed,
+    resolveVipTier,
+}
+export type { NeteaseProfile, SigninResult, UserPlaylistsResult, VipTier }

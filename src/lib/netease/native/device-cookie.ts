@@ -12,6 +12,7 @@ const NMTID_KEY = "netease-nmtid"
 const WNMCID_KEY = "netease-wnmcid"
 const NTES_NUID_KEY = "netease-ntes-nuid"
 const MUSIC_A_KEY = "cookie-MUSIC_A"
+const CSRF_KEY = "cookie-__csrf"
 
 const ID_XOR_KEY = "3go8&$8*3*3h0k(2)2"
 
@@ -130,6 +131,15 @@ function storeMusicA(token: string): void {
     writeLocal(MUSIC_A_KEY, token)
 }
 
+// 扫码登录（eapi）不下发 __csrf，创建歌单等 weapi 接口需要它；
+// 在 weapi 响应 Set-Cookie 里捕获并持久化，key 与 auth-cookie getCookie 一致
+function storeCsrf(token: string): void {
+    if (!token) {
+        return
+    }
+    writeLocal(CSRF_KEY, token)
+}
+
 function clearAnonymousSession(): void {
     removeLocal(MUSIC_A_KEY)
 }
@@ -209,7 +219,7 @@ function cookieToRecord(cookie: string | null | undefined): Record<string, strin
 
 function cookieHeader(jar: Record<string, string>): string {
     return Object.entries(jar)
-        .map(([k, v]) => `${k}=${v}`)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join("; ")
 }
 
@@ -233,5 +243,6 @@ export {
     getOrCreateDeviceId,
     getStoredMusicA,
     PC_APPVER,
+    storeCsrf,
     storeMusicA,
 }

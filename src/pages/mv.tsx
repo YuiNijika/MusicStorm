@@ -5,11 +5,22 @@ import { Download } from "lucide-react"
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { MvDetailSkeleton } from "@/components/music/loading-skeletons"
+import { MediaCard } from "@/components/music/media-card"
 import { MvPlayer } from "@/components/music/mv-player"
+import { Section } from "@/components/music/section"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import { formatDuration } from "@/lib/format"
-import { fetchMvPlayable, type MvPlayable } from "@/lib/netease/mv"
+import {
+    fetchMvPlayable,
+    fetchMvSublist,
+    fetchSimiMvs,
+    subscribeMv,
+    type MvCard,
+    type MvPlayable,
+} from "@/lib/netease/mv"
 import { formatError, notifyFromError, notifyInfo, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
@@ -19,11 +30,82 @@ type MvPageProps = {
 }
 
 function MvPage({ mvId, onBack }: MvPageProps) {
-    const { openArtist } = useMusicNavigation()
+    const { openArtist, openMv } = useMusicNavigation()
+    const { loggedIn } = useNeteaseSession()
+    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
     const [data, setData] = useState<MvPlayable | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
+
+    const [subscribed, setSubscribed] = useState(false)
+    const [subBusy, setSubBusy] = useState(false)
+
+    const [simiMvs, setSimiMvs] = useState<MvCard[]>([])
+    const [simiStatus, setSimiStatus] = useState<
+        "idle" | "loading" | "ready" | "error"
+    >("idle")
+
+    useEffect(() => {
+        let cancelled = false
+        setSimiStatus("loading")
+        void fetchSimiMvs(mvId)
+            .then((items) => {
+                if (cancelled) {
+                    return
+                }
+                setSimiMvs(items)
+                setSimiStatus("ready")
+            })
+            .catch(() => {
+                if (cancelled) {
+                    return
+                }
+                setSimiMvs([])
+                setSimiStatus("error")
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [mvId])
+
+    useEffect(() => {
+        if (!loggedIn) {
+            setSubscribed(false)
+            return
+        }
+        let cancelled = false
+        void fetchMvSublist()
+            .then((list) => {
+                if (cancelled) {
+                    return
+                }
+                setSubscribed(list.some((item) => item.id === mvId))
+            })
+            .catch(() => {
+                // 订阅状态查询失败不阻塞，按钮按未收藏展示
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [loggedIn, mvId])
+
+    async function handleToggleSub() {
+        if (!loggedIn || subBusy) {
+            return
+        }
+        setSubBusy(true)
+        const next = !subscribed
+        try {
+            await subscribeMv(mvId, next)
+            setSubscribed(next)
+            notifySuccess(next ? "已收藏 MV" : "已取消收藏")
+        } catch (err) {
+            notifyFromError("收藏 MV 失败", err)
+        } finally {
+            setSubBusy(false)
+        }
+    }
 
     useEffect(() => {
         let cancelled = false
@@ -199,7 +281,40 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                 下载
                             </button>
                         ) : null}
+                        {loggedIn ? (
+                            <button
+                                type="button"
+                                disabled={subBusy}
+                                onClick={() => void handleToggleSub()}
+                                className={cn(
+                                    "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
+                                    subscribed
+                                        ? "bg-primary/15 text-primary"
+                                        : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
+                                )}
+                            >
+                                {subscribed ? "已收藏" : "收藏"}
+                            </button>
+                        ) : null}
                     </header>
+
+                    {simiStatus === "ready" && simiMvs.length > 0 ? (
+                        <Section title="相似 MV" variant="listen">
+                            <div ref={gridRef} className={gridClass} style={gridStyle}>
+                                {simiMvs.map((mv) => (
+                                    <MediaCard
+                                        key={mv.id}
+                                        coverUrl={mv.coverUrl}
+                                        title={mv.title}
+                                        subtitle={mv.artistName || "MV"}
+                                        onClick={() => openMv(mv.id)}
+                                        widthClassName="w-full"
+                                        className="w-full"
+                                    />
+                                ))}
+                            </div>
+                        </Section>
+                    ) : null}
                 </>
             ) : null}
         </div>
