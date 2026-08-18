@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core"
 
+import { pickSafFiles, pickSafFolder } from "@/lib/android/native-bridge"
 import { upsertLibraryFolder, upsertLibraryTracks } from "@/lib/db/play-stats"
 import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
+import { isAndroid } from "@/lib/platform"
 import {
     CURRENT_METADATA_VERSION,
     createEmptyAlbum,
@@ -23,6 +25,10 @@ function isTauriRuntime(): boolean {
 }
 
 async function pickMusicFolder(): Promise<string | null> {
+    if (isAndroid()) {
+        // SAF 复制进应用私有目录后返回本地路径，复用桌面扫描链路
+        return pickSafFolder()
+    }
     if (!isTauriRuntime()) {
         throw new Error("DESKTOP_ONLY")
     }
@@ -30,6 +36,9 @@ async function pickMusicFolder(): Promise<string | null> {
 }
 
 async function pickMusicFiles(): Promise<string[] | null> {
+    if (isAndroid()) {
+        return pickSafFiles()
+    }
     if (!isTauriRuntime()) {
         throw new Error("DESKTOP_ONLY")
     }

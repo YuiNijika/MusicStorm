@@ -12,6 +12,8 @@ import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import { downloadViaBridge } from "@/lib/android/native-bridge"
+import { isAndroid } from "@/lib/platform"
 import { formatDuration } from "@/lib/format"
 import {
     fetchMvPlayable,
@@ -154,6 +156,15 @@ function MvPage({ mvId, onBack }: MvPageProps) {
         }
         const title = profile?.title || "MV"
         const name = `${title}.mp4`
+        if (isAndroid()) {
+            // Android 无桌面另存对话框，交给系统 DownloadManager
+            if (!downloadViaBridge(url, name)) {
+                notifyFromError("下载失败", new Error("下载不可用"))
+                return
+            }
+            notifyInfo("已开始下载", { description: "可在系统通知栏查看进度" })
+            return
+        }
         try {
             const saved = await invoke<string | null>("save_url_to_file", {
                 url,

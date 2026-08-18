@@ -6,6 +6,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 
 class MainActivity : TauriActivity() {
+  // launcher 属性初始化注册（早于 STARTED），webView 创建后再 attach
+  private val bridge = MusicStormBridge(this)
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -28,6 +31,9 @@ class MainActivity : TauriActivity() {
         }
       }
     )
+    // launcher 注册须早于 STARTED（属性初始化时已完成），webView 引用只在此回调可得
+    bridge.attach(webView)
+    webView.addJavascriptInterface(bridge, "musicStormNative")
     super.onWebViewCreate(webView)
   }
 }

@@ -1,5 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core"
 
+import { isAndroid } from "@/lib/platform"
+
 type CachedCover = {
     originalPath: string
     thumbnailPath: string
@@ -24,9 +26,9 @@ function coverPathToUrl(path: string | null | undefined): string {
     }
 }
 
-// 桌面端直接缓存原图和缩略图；浏览器预览仅返回临时 data URL
+// Android 无桌面选图命令，退回 WebView 文件选择器（浏览器预览同理）
 async function pickCoverImage(): Promise<CachedCover | null> {
-    if (isTauriRuntime()) {
+    if (isTauriRuntime() && !isAndroid()) {
         return invoke<CachedCover | null>("pick_cover_image")
     }
     const dataUrl = await pickImageViaFileInput()

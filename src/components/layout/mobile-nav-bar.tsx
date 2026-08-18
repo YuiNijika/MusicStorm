@@ -38,10 +38,12 @@ import { cn } from "@/lib/utils"
 // 仅 <md 显示的核心 tab；≥md 侧边栏接管
 const MOBILE_TABS: AppRoute[] = [
     "home",
+    "discover",
     "local",
     "library",
     "radios",
     "search",
+    "stats",
     "settings",
 ]
 

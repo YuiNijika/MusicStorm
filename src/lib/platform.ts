@@ -13,4 +13,12 @@ function isNativeMacOS(): boolean {
     return isTauriRuntime() && isMacOS()
 }
 
-export { isMacOS, isNativeMacOS, isTauriRuntime }
+// Android WebView 的 UA 带 Android，区别于桌面浏览器/网页版
+function isAndroid(): boolean {
+    if (typeof navigator === "undefined") {
+        return false
+    }
+    return /Android/i.test(navigator.userAgent)
+}
+
+export { isAndroid, isMacOS, isNativeMacOS, isTauriRuntime }

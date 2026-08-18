@@ -31,6 +31,8 @@ import {
     type LocalLibraryState,
 } from "@/lib/local/library-store"
 import { notifyError, notifySuccess } from "@/lib/notify"
+import { isAndroid } from "@/lib/platform"
+import type { SafProgressPayload } from "@/lib/android/native-bridge"
 import type { Track } from "@/lib/types"
 
 // 根页 = 艺人/专辑；artist = 艺人下专辑；album = 某专辑曲目；all = 全部歌曲
@@ -208,6 +210,22 @@ function useLocalLibrary() {
             unlisten?.()
         }
     }, [desktop])
+
+    // Android SAF 复制进度 → 状态栏（复制在 JS 拾取完成前，Rust 扫描事件还没开始）
+    useEffect(() => {
+        if (!isAndroid()) {
+            return
+        }
+        function onProgress(event: Event) {
+            const detail = (event as CustomEvent<SafProgressPayload>).detail
+            if (detail && detail.total > 0) {
+                setStatusText(`正在复制音乐… ${detail.done}/${detail.total}`)
+            }
+        }
+        window.addEventListener("musicstorm:saf-progress", onProgress)
+        return () =>
+            window.removeEventListener("musicstorm:saf-progress", onProgress)
+    }, [])
 
     const goRoot = useCallback(() => setNav({ kind: "root" }), [])
     const openAlbum = useCallback((albumId: string) => {

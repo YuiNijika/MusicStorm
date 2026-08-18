@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core"
 
+import { downloadViaBridge } from "@/lib/android/native-bridge"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
 import { setLyricOverride } from "@/lib/lyric/overrides"
+import { isAndroid } from "@/lib/platform"
 import { notifyInfo, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 
@@ -86,6 +88,14 @@ async function downloadNeteaseTrack(track: Track): Promise<void> {
 
     const ext = guessExtFromUrl(resolved.url)
     const base = `${track.artist || "未知"} - ${track.title || track.id}`.slice(0, 80)
+    if (isAndroid()) {
+        // Android 无桌面另存对话框，交给系统 DownloadManager
+        if (!downloadViaBridge(resolved.url, `${base}.${ext}`)) {
+            throw new Error("下载不可用")
+        }
+        notifyInfo("已开始下载", { description: "可在系统通知栏查看进度" })
+        return
+    }
     const saved = await invoke<string | null>("save_url_to_file", {
         url: resolved.url,
         defaultName: `${base}.${ext}`,
