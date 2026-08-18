@@ -2,3 +2,5 @@ packages:
   - website
 allowBuilds:
   esbuild: false
+minimumReleaseAgeExclude:
+  - input-otp@1.5.0

@@ -17,9 +17,9 @@
     "website:preview": "pnpm --filter website preview"
   },
   "dependencies": {
-    "@base-ui/react": "^1.6.0",
+    "@base-ui/react": "^1.7.0",
     "@fontsource-variable/geist": "^5.3.0",
-    "@shadcn/react": "^0.2.1",
+    "@shadcn/react": "^0.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
@@ -30,17 +30,17 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
-    "hls.js": "^1.6.17",
-    "input-otp": "^1.4.2",
-    "lucide-react": "^1.26.0",
+    "hls.js": "^1.7.0",
+    "input-otp": "^1.5.0",
+    "lucide-react": "^1.31.0",
     "music-metadata": "^11.14.0",
-    "node-forge": "^1.3.1",
+    "node-forge": "^1.4.0",
     "react": "^19.2.8",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.8",
-    "react-resizable-panels": "^4.12.2",
-    "recharts": "3.8.0",
-    "shadcn": "^4.14.0",
+    "react-resizable-panels": "^4.12.3",
+    "recharts": "3.10.1",
+    "shadcn": "^4.18.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "tw-animate-css": "^1.4.0"
@@ -48,13 +48,13 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
     "@types/crypto-js": "^4.2.2",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "@types/node-forge": "^1.3.14",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "shadcn-ui": "^0.9.5",
-    "typescript": "~5.8.3",
-    "vite": "^7.3.6"
+    "typescript": "~7.0.2",
+    "vite": "^8.2.1"
   }
 }
