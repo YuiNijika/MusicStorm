@@ -497,9 +497,9 @@ function StatsPage() {
                                     }
                                     placeholder="搜索歌曲或艺人"
                                     className={cn(
-                                        "h-10 rounded-full border-0 bg-[var(--surface-fill)] pl-10 text-[14px]",
+                                        "material-field h-10 rounded-full border-0 pl-10 text-[14px]",
                                         "shadow-none placeholder:text-muted-foreground/55",
-                                        "focus-visible:bg-[var(--surface-fill-hover)] focus-visible:ring-1 focus-visible:ring-ring/30",
+                                        "focus-visible:ring-1 focus-visible:ring-ring/30",
                                     )}
                                 />
                             </div>
@@ -602,6 +602,7 @@ function StatsPage() {
                                                 showSource
                                                 showAlbumMeta={false}
                                                 showActions={false}
+                                                showAddToPlaylist
                                                 onPlay={() =>
                                                     onPlayCluster(cluster)
                                                 }
@@ -734,7 +735,7 @@ function Segmented<T extends string>({
         <div
             role="tablist"
             aria-label="统计时段"
-            className="inline-flex rounded-full bg-[var(--surface-fill)] p-[3px]"
+            className="material-segmented inline-flex rounded-full p-[3px]"
         >
             {items.map((item) => {
                 const active = value === item.id

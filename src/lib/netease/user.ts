@@ -6,7 +6,7 @@ type NeteaseProfile = {
     userId: number
     nickname: string
     avatarUrl: string
-    /** 网易云 vipType：0=无，10=音乐包，11=黑胶 VIP */
+    /** 网易云 vipType：0=无，1~10=音乐包（按等级），11=黑胶 VIP，110=黑胶 SVIP */
     vipType: number
 }
 
@@ -22,16 +22,22 @@ type AccountData = {
     } | null
 }
 
-// 会员档位：free=未开通，vip=音乐包/黑胶，svip=黑胶 SVIP（预留）
+// 会员档位：free=未开通，vip=音乐包/黑胶，svip=黑胶 SVIP
 type VipTier = "free" | "vip" | "svip"
 
 /**
- * vipType → 档位标签。
- * 网易云网页端 profile 只有 vipType：0=无、10=音乐包、11=黑胶（SVIP 与黑胶同为 11，
- * 网页端暂不返回 SVIP 区分字段），故 svip 仅作预留、当前恒不会命中。
+ * profile → 档位标签。
+ * 网易云网页端 profile 的 vipType：0=无，1~10=音乐包（按等级），11=黑胶 VIP，
+ * 110=黑胶 SVIP（实测 SVIP 账号返回 110，非 11；网页端 profile 不返回 vipRights）。
  */
-function resolveVipTier(vipType: number | null | undefined): VipTier {
-    if (vipType === 10 || vipType === 11) {
+function resolveVipTier(profile: NeteaseProfile | null | undefined): VipTier {
+    if (!profile) {
+        return "free"
+    }
+    if (profile.vipType === 110) {
+        return "svip"
+    }
+    if (profile.vipType > 0) {
         return "vip"
     }
     return "free"

@@ -34,6 +34,9 @@ type ThemeContextValue = {
     setGlassOpacity: (value: number) => void
     setGlassBlur: (value: number) => void
     setMaterialGlass: (enabled: boolean) => void
+    setBackgroundUrl: (url: string) => void
+    setBackgroundOpacity: (value: number) => void
+    setBackgroundBlur: (value: number) => void
 }
 
 const STORAGE_KEY = "musicstorm-theme"
@@ -167,6 +170,36 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const setBackgroundUrl = useCallback((url: string) => {
+        setAppearance((prev) => {
+            const next = { ...prev, backgroundUrl: url }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
+    const setBackgroundOpacity = useCallback((value: number) => {
+        setAppearance((prev) => {
+            const next = {
+                ...prev,
+                backgroundOpacity: Math.min(1, Math.max(0, value)),
+            }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
+    const setBackgroundBlur = useCallback((value: number) => {
+        setAppearance((prev) => {
+            const next = {
+                ...prev,
+                backgroundBlur: Math.min(40, Math.max(0, value)),
+            }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
     const value = useMemo(
         () => ({
             theme,
@@ -180,6 +213,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setGlassOpacity,
             setGlassBlur,
             setMaterialGlass,
+            setBackgroundUrl,
+            setBackgroundOpacity,
+            setBackgroundBlur,
         }),
         [
             theme,
@@ -193,6 +229,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setGlassOpacity,
             setGlassBlur,
             setMaterialGlass,
+            setBackgroundUrl,
+            setBackgroundOpacity,
+            setBackgroundBlur,
         ],
     )
 

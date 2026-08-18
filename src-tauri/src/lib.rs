@@ -15,10 +15,12 @@ mod tray;
 #[cfg(not(target_os = "android"))]
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
-    audio_seek, audio_set_device, audio_set_exclusive, audio_set_volume, audio_stop, AudioState,
+    audio_seek, audio_set_device, audio_set_eq, audio_set_exclusive, audio_set_volume, audio_stop,
+    AudioState,
 };
 use cover_cache::{
     cache_cover_data_url, cache_cover_url, clear_cover_cache, purge_cover_cache,
+    purge_cover_cache_cmd, DEFAULT_COVER_CACHE_LIMIT,
 };
 #[cfg(not(target_os = "android"))]
 use cover_cache::pick_cover_image;
@@ -782,7 +784,7 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 let _ = purge_webview_caches_on_upgrade(&app_handle);
                 let _ = purge_expired_api_cache_in_background(&app_handle);
-                let _ = purge_cover_cache(&app_handle);
+                let _ = purge_cover_cache(&app_handle, DEFAULT_COVER_CACHE_LIMIT);
             });
 
             // 系统托盘 + 全局媒体快捷键（桌面专属，失败不阻断启动）
@@ -811,6 +813,7 @@ pub fn run() {
             cache_cover_url,
             cache_cover_data_url,
             clear_cover_cache,
+            purge_cover_cache_cmd,
             #[cfg(not(target_os = "android"))]
             pick_text_file,
             #[cfg(not(target_os = "android"))]
@@ -847,6 +850,8 @@ pub fn run() {
             audio_set_device,
             #[cfg(not(target_os = "android"))]
             audio_set_exclusive,
+            #[cfg(not(target_os = "android"))]
+            audio_set_eq,
             #[cfg(not(target_os = "android"))]
             audio_probe,
             #[cfg(not(target_os = "android"))]

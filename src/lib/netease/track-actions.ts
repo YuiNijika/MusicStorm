@@ -34,6 +34,30 @@ async function removeTracksFromPlaylist(
     }
 }
 
+async function addTrackToPlaylist(
+    playlistId: string,
+    trackIds: string[],
+): Promise<void> {
+    const ids = trackIds.filter((id) => /^\d+$/.test(id))
+    if (!ids.length) {
+        throw new Error("无效歌曲 id")
+    }
+    const data = await neteaseRequest<{ code?: number; message?: string }>({
+        path: NETEASE_PATHS.playlistTracks,
+        method: "POST",
+        params: {
+            op: "add",
+            pid: playlistId,
+            tracks: ids.join(","),
+            timestamp: Date.now(),
+        },
+        skipCache: true,
+    })
+    if (data.code != null && data.code !== 200) {
+        throw new Error(data.message || `添加失败 code=${data.code}`)
+    }
+}
+
 function guessExtFromUrl(url: string): string {
     try {
         const path = new URL(url).pathname
@@ -90,6 +114,7 @@ async function overrideTrackLyric(track: Track): Promise<void> {
 }
 
 export {
+    addTrackToPlaylist,
     downloadNeteaseTrack,
     overrideTrackLyric,
     removeTracksFromPlaylist,

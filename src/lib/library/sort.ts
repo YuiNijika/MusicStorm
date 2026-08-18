@@ -9,7 +9,7 @@ type TrackSortKey =
     | "duration"
     | "custom"
 
-type CollectionSortKey = "default" | "title" | "count" | "updated"
+type CollectionSortKey = "default" | "custom" | "title" | "count" | "updated"
 type RadioSortKey = "default" | "custom" | "title" | "count"
 type ProgramSortKey = "latest" | "earliest" | "custom"
 
@@ -24,6 +24,7 @@ const TRACK_SORT_OPTIONS: Array<{ value: TrackSortKey; label: string }> = [
 
 const PLAYLIST_SORT_OPTIONS: Array<{ value: CollectionSortKey; label: string }> = [
     { value: "default", label: "默认" },
+    { value: "custom", label: "自定义" },
     { value: "title", label: "名称" },
     { value: "count", label: "曲目数" },
 ]
@@ -52,6 +53,7 @@ const LOCAL_ALBUM_SORT_OPTIONS: Array<{
     label: string
 }> = [
     { value: "default", label: "默认" },
+    { value: "custom", label: "自定义" },
     { value: "title", label: "名称" },
     { value: "count", label: "曲目数" },
     { value: "updated", label: "最近更新" },
@@ -118,6 +120,7 @@ function isProgramSortKey(value: unknown): value is ProgramSortKey {
 function isCollectionSortKey(value: unknown): value is CollectionSortKey {
     return (
         value === "default" ||
+        value === "custom" ||
         value === "title" ||
         value === "count" ||
         value === "updated"
@@ -169,10 +172,14 @@ function playlistCount(item: SortablePlaylist): number {
     return item.trackIds?.length ?? 0
 }
 
-function sortPlaylists<T extends SortablePlaylist>(
+function sortPlaylists<T extends SortablePlaylist & { id: string }>(
     items: readonly T[],
     key: CollectionSortKey,
+    customOrder?: readonly string[],
 ): T[] {
+    if (key === "custom") {
+        return applyIdOrder(items, customOrder ?? [])
+    }
     if (key === "default" || key === "updated" || items.length <= 1) {
         return items.slice()
     }
@@ -235,11 +242,15 @@ function sortPrograms<T extends SortableProgram>(
     return indexed.map((row) => row.item)
 }
 
-function sortLocalAlbums<T extends SortableLocalAlbum>(
+function sortLocalAlbums<T extends SortableLocalAlbum & { id: string }>(
     items: readonly T[],
     key: CollectionSortKey,
     countOf: (item: T) => number,
+    customOrder?: readonly string[],
 ): T[] {
+    if (key === "custom") {
+        return applyIdOrder(items, customOrder ?? [])
+    }
     if (key === "default" || items.length <= 1) {
         return items.slice()
     }

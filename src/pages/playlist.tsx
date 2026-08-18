@@ -1,7 +1,8 @@
-import { Heart, Pencil, Sparkles, Trash2 } from "lucide-react"
+import { Heart, Library, Pencil, Sparkles, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
+import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
@@ -79,6 +80,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const [intelBusy, setIntelBusy] = useState(false)
     const [deleteBusy, setDeleteBusy] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
+    const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
+        null,
+    )
 
     const isOwnLiked = playlistId === likedSongPlaylistId
     const isOwnPlaylist =
@@ -405,6 +409,23 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                         onClick={() =>
                                             playOrToggle(track, sortedTracks)
                                         }
+                                        overlay={
+                                            track.source === "netease" ? (
+                                                <div
+                                                    role="button"
+                                                    title="添加到歌单"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        setAddToPlaylistTrack(
+                                                            track,
+                                                        )
+                                                    }}
+                                                    className="absolute bottom-2 right-2 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/60 group-hover:opacity-100"
+                                                >
+                                                    <Library className="size-4" />
+                                                </div>
+                                            ) : null
+                                        }
                                     />
                                 ))}
                             </div>
@@ -552,6 +573,16 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AddToPlaylistDialog
+                track={addToPlaylistTrack}
+                open={addToPlaylistTrack !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setAddToPlaylistTrack(null)
+                    }
+                }}
+            />
         </div>
     )
 }

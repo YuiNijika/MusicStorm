@@ -7,9 +7,11 @@ import {
     Heart,
     ImageOff,
     ImagePlus,
+    Library,
     ListMinus,
     ListPlus,
     ListStart,
+    MessageCircle,
     MoreHorizontal,
     Pause,
     Pencil,
@@ -25,6 +27,8 @@ import {
 } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
+import { CommentSheet } from "@/components/music/comment-sheet"
 import { LyricEditDialog } from "@/components/music/lyric-edit-dialog"
 import { SourceBadge } from "@/components/music/source-badge"
 import {
@@ -88,6 +92,8 @@ type TrackRowProps = {
     onRemoved?: (trackId: string) => void
     /** 传入时在更多菜单显示「从云盘删除」 */
     onCloudDelete?: () => void
+    /** showActions=false 的精简列表独立开启「添加到歌单」入口（时长列内按钮） */
+    showAddToPlaylist?: boolean
     trailing?: ReactNode
     onPlay: (track: Track) => void
 }
@@ -106,6 +112,7 @@ function TrackRow({
     playlistId,
     onRemoved,
     onCloudDelete,
+    showAddToPlaylist = false,
     onPlay,
     trailing,
 }: TrackRowProps) {
@@ -115,6 +122,8 @@ function TrackRow({
     const { playNext, addToQueue } = usePlayer()
     const [, setOverrideTick] = useState(0)
     const [lyricEditOpen, setLyricEditOpen] = useState(false)
+    const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false)
+    const [commentOpen, setCommentOpen] = useState(false)
 
     const isNetease = track.source === "netease"
     const isLocal = track.source === "local"
@@ -479,9 +488,25 @@ function TrackRow({
                 </div>
             ) : null}
 
-            <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                {formatDuration(track.durationMs)}
-            </span>
+            <div className="flex shrink-0 items-center gap-1.5">
+                <span className="text-[12px] tabular-nums text-muted-foreground">
+                    {formatDuration(track.durationMs)}
+                </span>
+                {showAddToPlaylist && isNetease ? (
+                    <button
+                        type="button"
+                        title="添加到歌单"
+                        aria-label="添加到歌单"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            setAddToPlaylistOpen(true)
+                        }}
+                        className="flex size-6 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-[var(--surface-fill)] hover:text-foreground group-hover:opacity-100"
+                    >
+                        <Library className="size-3.5" />
+                    </button>
+                ) : null}
+            </div>
 
             {actions ? (
                 <DropdownMenu>
@@ -521,6 +546,22 @@ function TrackRow({
                             <ListPlus />
                             加入队列
                         </DropdownMenuItem>
+                        {isNetease ? (
+                            <DropdownMenuItem
+                                onClick={() => setAddToPlaylistOpen(true)}
+                            >
+                                <Library />
+                                添加到歌单
+                            </DropdownMenuItem>
+                        ) : null}
+                        {isNetease ? (
+                            <DropdownMenuItem
+                                onClick={() => setCommentOpen(true)}
+                            >
+                                <MessageCircle />
+                                查看评论
+                            </DropdownMenuItem>
+                        ) : null}
                         {onCloudDelete ? (
                             <>
                                 <DropdownMenuSeparator />
@@ -616,6 +657,18 @@ function TrackRow({
                         {liked ? "取消喜欢" : "喜欢"}
                     </ContextMenuItem>
                 ) : null}
+                {isNetease ? (
+                    <ContextMenuItem onClick={() => setAddToPlaylistOpen(true)}>
+                        <Library />
+                        添加到歌单
+                    </ContextMenuItem>
+                ) : null}
+                {isNetease ? (
+                    <ContextMenuItem onClick={() => setCommentOpen(true)}>
+                        <MessageCircle />
+                        查看评论
+                    </ContextMenuItem>
+                ) : null}
                 {playlistId ? (
                     <>
                         <ContextMenuSeparator />
@@ -682,6 +735,18 @@ function TrackRow({
             track={track}
             open={lyricEditOpen}
             onOpenChange={setLyricEditOpen}
+        />
+
+        <AddToPlaylistDialog
+            track={track}
+            open={addToPlaylistOpen}
+            onOpenChange={setAddToPlaylistOpen}
+        />
+
+        <CommentSheet
+            track={track}
+            open={commentOpen}
+            onOpenChange={setCommentOpen}
         />
         </>
     )

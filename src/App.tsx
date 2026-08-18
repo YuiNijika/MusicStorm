@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react"
+import { invoke } from "@tauri-apps/api/core"
 
 import { AppShell } from "@/components/app/app-shell"
 import { ThemeProvider } from "@/components/app/theme-provider"
@@ -8,6 +9,10 @@ import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
+import {
+    DEFAULT_LIMIT_BYTES,
+    getCoverCacheLimitBytes,
+} from "@/lib/music/cover-cache-prefs"
 import { isWebMode } from "@/lib/web-mode"
 import {
     PERFORMANCE_MODE_EVENT,
@@ -173,6 +178,19 @@ function App() {
 
     useApiCacheAutoPurge()
     useDevtoolsShortcut()
+
+    useEffect(() => {
+        // 桌面端按用户设置的封面缓存阈值清理一次，覆盖 Rust 侧默认值
+        if (isWebMode()) {
+            return
+        }
+        const limit = getCoverCacheLimitBytes()
+        if (limit !== DEFAULT_LIMIT_BYTES) {
+            void invoke("purge_cover_cache_cmd", { maxBytes: limit }).catch(
+                () => {},
+            )
+        }
+    }, [])
 
     useEffect(() => {
         document.getElementById("boot-loading")?.remove()

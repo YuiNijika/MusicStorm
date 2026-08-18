@@ -270,12 +270,11 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                     onClick={() => onOpenPlaylist(featured.id)}
                     className={cn(
                         "group relative flex w-full cursor-pointer flex-row overflow-hidden rounded-[22px] text-left",
-                        "bg-[var(--surface-fill)] ring-1 ring-black/[0.04]",
+                        "material-surface",
                         "transition-[background-color,box-shadow,transform] duration-[var(--duration-hover)] active:duration-[var(--duration-press)]",
-                        "hover:bg-[var(--surface-fill-hover)] hover:shadow-[0_12px_40px_rgba(15,23,42,0.1)] hover:ring-black/[0.08]",
+                        "hover:shadow-[0_12px_40px_rgba(15,23,42,0.1)]",
                         "active:scale-[0.99]",
-                        "dark:ring-white/[0.06]",
-                        "dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)] dark:hover:ring-white/[0.12]",
+                        "dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
                     )}
                 >
                     <div className="relative aspect-square w-28 shrink-0 sm:w-[168px] md:w-[200px]">
@@ -480,6 +479,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                                             showAlbumColumn={false}
                                             showAlbumMeta={false}
                                             showActions={false}
+                                            showAddToPlaylist
                                             dense
                                             onPlay={(item) => playOrToggle(item, daily)}
                                         />

@@ -1,6 +1,8 @@
-import { ListMusic, Pause, Play, Trash2, X } from "lucide-react"
+import { Library, ListMusic, Pause, Play, Trash2, X } from "lucide-react"
+import { useState } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
 import { DragList } from "@/components/music/drag-list"
 import {
     Popover,
@@ -22,6 +24,10 @@ function QueuePanel() {
         clearQueue,
         reorderQueue,
     } = usePlayer()
+
+    const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
+        null,
+    )
 
     const count = queue.length
 
@@ -48,6 +54,7 @@ function QueuePanel() {
     }
 
     return (
+        <>
         <Popover>
             <PopoverTrigger
                 title="播放队列"
@@ -168,23 +175,40 @@ function QueuePanel() {
                                                 {track.artist}
                                             </p>
                                         </div>
-                                        {active ? (
-                                            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                                                播放中
-                                            </span>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    removeFromQueue(index)
-                                                }
-                                                title="从队列移除"
-                                                aria-label={`移除 ${track.title}`}
-                                                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
-                                            >
-                                                <X className="size-3.5" />
-                                            </button>
-                                        )}
+                                        <div className="flex shrink-0 items-center gap-0.5">
+                                            {track.source === "netease" ? (
+                                                <button
+                                                    type="button"
+                                                    title="添加到歌单"
+                                                    aria-label={`将 ${track.title} 添加到歌单`}
+                                                    onClick={() =>
+                                                        setAddToPlaylistTrack(
+                                                            track,
+                                                        )
+                                                    }
+                                                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground group-hover:opacity-100"
+                                                >
+                                                    <Library className="size-3.5" />
+                                                </button>
+                                            ) : null}
+                                            {active ? (
+                                                <span className="text-[11px] font-medium text-muted-foreground">
+                                                    播放中
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeFromQueue(index)
+                                                    }
+                                                    title="从队列移除"
+                                                    aria-label={`移除 ${track.title}`}
+                                                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
+                                                >
+                                                    <X className="size-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 )
                             }}
@@ -193,6 +217,17 @@ function QueuePanel() {
                 )}
             </PopoverContent>
         </Popover>
+
+        <AddToPlaylistDialog
+            track={addToPlaylistTrack}
+            open={addToPlaylistTrack !== null}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setAddToPlaylistTrack(null)
+                }
+            }}
+        />
+        </>
     )
 }
 

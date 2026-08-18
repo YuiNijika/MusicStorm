@@ -129,7 +129,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
                             <span className="block truncate text-[11px] text-muted-foreground">
                                 {loggedIn
                                     ? profile
-                                        ? `账号 · ${resolveVipTier(profile.vipType)}`
+                                        ? `账号 · ${resolveVipTier(profile)}`
                                         : "账号"
                                     : "登录 / 注册"}
                             </span>

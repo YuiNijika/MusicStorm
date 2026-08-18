@@ -17,6 +17,9 @@
     --scrollbar-thumb: rgb(60 60 67 / 24%);
     --scrollbar-thumb-hover: rgb(60 60 67 / 40%);
 
+    /* 毛玻璃卡片材质：比 surface-raised 更透，backdrop blur 才透得出背景 */
+    --glass-surface: oklch(1 0 0 / 68%);
+
     /* enter/exit 互为镜像（inverse cubic-bezier），保证可逆过渡路径对称 */
     --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
     --ease-exit: cubic-bezier(1, 0, 0.68, 0.28);
@@ -41,6 +44,7 @@
     --glass-border: rgb(255 255 255 / 10%);
     --glass-highlight: rgb(255 255 255 / 9%);
     --glass-shadow: 0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset;
+    --glass-surface: oklch(0.235 0.005 260 / 72%);
     --scrollbar-thumb: rgb(235 235 245 / 24%);
     --scrollbar-thumb-hover: rgb(235 235 245 / 40%);
 }
@@ -60,12 +64,24 @@
         color: var(--foreground);
         overflow: hidden;
         user-select: none;
-        background: var(--background);
+        /* 底层柔光渐变：给毛玻璃 backdrop-filter 提供可模糊的色彩层次，
+         * 纯色背景上 blur + saturate 无内容可模糊，卡片会退化成纯白 */
+        background:
+            radial-gradient(130% 95% at 6% -10%, oklch(0.85 0.075 290 / 70%), transparent 54%),
+            radial-gradient(120% 90% at 100% 110%, oklch(0.86 0.085 245 / 62%), transparent 56%),
+            var(--background);
         font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
         text-rendering: optimizeLegibility;
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
         overscroll-behavior: none;
+    }
+
+    .dark body {
+        background:
+            radial-gradient(130% 95% at 6% -10%, oklch(0.32 0.07 290 / 48%), transparent 54%),
+            radial-gradient(120% 90% at 100% 110%, oklch(0.29 0.075 245 / 42%), transparent 56%),
+            var(--background);
     }
 
     /* 触屏设备走原生 pan，防止全屏播放器下滑手势与滚动冲突 */
@@ -131,6 +147,7 @@
 @layer components {
     .app-root {
         position: relative;
+        isolation: isolate;
         background:
             radial-gradient(
                 900px 480px at 12% -12%,
@@ -150,6 +167,22 @@
             ),
             linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 26%),
             var(--background);
+    }
+
+    /* 自定义背景：fixed 层叠加在渐变底之上、内容之下；z-index -1 依赖 app-root 的 isolate 层叠上下文 */
+    .app-root::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background-image: var(--app-bg-image, none);
+        background-size: cover;
+        background-position: center;
+        opacity: var(--app-bg-opacity, 0.5);
+        filter: blur(var(--app-bg-blur, 0px));
+        /* 补偿模糊边缘露白 */
+        transform: scale(1.08);
     }
 
     .apple-scroll {
@@ -206,8 +239,11 @@
     .apple-list-surface {
         overflow: hidden;
         border-radius: 14px;
-        background: var(--surface-fill);
-        box-shadow: inset 0 0 0 0.5px var(--separator);
+        background: var(--glass-surface);
+        box-shadow:
+            inset 0 1px 0 var(--glass-highlight),
+            inset 0 0 0 0.5px var(--separator),
+            0 1px 2px rgb(0 0 0 / 4%);
     }
 
     .apple-card-shadow {
@@ -287,7 +323,10 @@
 .material-sidebar,
 .material-player,
 .material-panel,
-.material-field {
+.material-field,
+.material-surface,
+.material-segmented,
+.apple-list-surface {
     backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
 }
@@ -420,11 +459,19 @@
 }
 
 .material-panel,
-.material-field {
-    background: var(--surface-raised);
+.material-field,
+.material-surface {
+    background: var(--glass-surface);
     box-shadow:
+        inset 0 1px 0 var(--glass-highlight),
         inset 0 0 0 0.5px var(--separator),
         0 1px 2px rgb(0 0 0 / 4%);
+}
+
+/* 分段控制器容器：比 material-surface 更浅的毛玻璃胶囊，指示器用实心胶囊形成对比 */
+.material-segmented {
+    background: color-mix(in oklab, var(--glass-surface) 46%, transparent);
+    box-shadow: inset 0 0 0 0.5px var(--separator);
 }
 
 @keyframes cover-breathe {
@@ -525,6 +572,9 @@
     .material-player,
     .material-panel,
     .material-field,
+    .material-surface,
+    .material-segmented,
+    .apple-list-surface,
     .full-player-backdrop,
     .full-player-backdrop-tint,
     [data-slot="toast"] {
@@ -545,6 +595,17 @@
         background: var(--background);
     }
 
+    /* 透明降级：毛玻璃卡片回退实心，保持卡片层级不塌 */
+    .material-panel,
+    .material-field,
+    .material-surface,
+    .apple-list-surface {
+        background: var(--surface-raised);
+    }
+    .material-segmented {
+        background: var(--surface-fill);
+    }
+
     .app-root,
     .dark .app-root {
         background: var(--background);
@@ -559,6 +620,9 @@ html.glass-disabled .material-sidebar,
 html.glass-disabled .material-player,
 html.glass-disabled .material-panel,
 html.glass-disabled .material-field,
+html.glass-disabled .material-surface,
+html.glass-disabled .material-segmented,
+html.glass-disabled .apple-list-surface,
 html.glass-disabled .full-player-backdrop,
 html.glass-disabled .full-player-backdrop-tint {
     backdrop-filter: none !important;
@@ -570,6 +634,15 @@ html.glass-disabled .material-sidebar {
 html.glass-disabled .material-player,
 html.glass-disabled .full-player-backdrop-tint {
     background: var(--background, #f5f5f7) !important;
+}
+html.glass-disabled .material-panel,
+html.glass-disabled .material-field,
+html.glass-disabled .material-surface,
+html.glass-disabled .apple-list-surface {
+    background: var(--surface-raised, #ffffff) !important;
+}
+html.glass-disabled .material-segmented {
+    background: var(--surface-fill, rgba(0, 0, 0, 0.05)) !important;
 }
 
 html.performance-mode *,

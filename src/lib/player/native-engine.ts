@@ -123,6 +123,10 @@ function createNativeEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
             muted = next
             applyVolume()
         },
+        setEq(gains, enabled) {
+            // native 引擎（rodio）已集成 biquad EQ：实时下发增益，Rust 侧逐样本过滤
+            void invoke("audio_set_eq", { gains, enabled }).catch(() => {})
+        },
         getPositionMs: () => positionMs,
         getDurationMs: () => durationMs,
         destroy() {

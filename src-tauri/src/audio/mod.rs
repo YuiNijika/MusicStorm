@@ -1,3 +1,4 @@
+mod eq;
 mod player;
 
 use crate::db::DbState;
@@ -281,6 +282,23 @@ pub fn audio_set_volume(state: State<'_, AudioState>, volume: f32) -> Result<(),
     };
     if let Some(player) = player {
         player.set_volume(volume);
+    }
+    Ok(())
+}
+
+/// 设置 10 段均衡器增益；enabled 关闭时等效平直
+#[tauri::command]
+pub fn audio_set_eq(
+    state: State<'_, AudioState>,
+    gains: Vec<f32>,
+    enabled: bool,
+) -> Result<(), String> {
+    let player = {
+        let guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
+        guard.as_ref().cloned()
+    };
+    if let Some(player) = player {
+        player.set_eq(&gains, enabled);
     }
     Ok(())
 }

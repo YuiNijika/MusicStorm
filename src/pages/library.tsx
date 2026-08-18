@@ -2,6 +2,7 @@ import { Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { DragList } from "@/components/music/drag-list"
 import { PlaylistGridSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { PageTitle } from "@/components/music/page-title"
@@ -34,6 +35,11 @@ import {
     PLAYLIST_SORT_OPTIONS,
     sortPlaylists,
 } from "@/lib/library/sort"
+import {
+    ORDER_EVENT,
+    getPlaylistListOrder,
+    setPlaylistListOrder,
+} from "@/lib/library/track-order"
 import {
     fetchArtistSublist,
     type SimiArtistCard,
@@ -133,9 +139,19 @@ function LibraryPage() {
         }
     }
 
+    const [orderTick, setOrderTick] = useState(0)
+
+    useEffect(() => {
+        function onOrder() {
+            setOrderTick((n) => n + 1)
+        }
+        window.addEventListener(ORDER_EVENT, onOrder)
+        return () => window.removeEventListener(ORDER_EVENT, onOrder)
+    }, [])
+
     const sortedPlaylists = useMemo(
-        () => sortPlaylists(playlists, playlistSort),
-        [playlists, playlistSort],
+        () => sortPlaylists(playlists, playlistSort, getPlaylistListOrder()),
+        [playlists, playlistSort, orderTick],
     )
 
     useEffect(() => {
@@ -388,13 +404,18 @@ function LibraryPage() {
                         description="在网易云创建或收藏歌单后会出现在这里"
                     />
                 ) : playlistView === "list" ? (
-                    <div className="apple-list-surface space-y-0.5 p-1.5">
-                        {sortedPlaylists.map((playlist) => {
+                    <DragList
+                        items={sortedPlaylists}
+                        enabled={playlistSort === "custom"}
+                        className="apple-list-surface space-y-0.5 p-1.5"
+                        onReorder={(next) =>
+                            setPlaylistListOrder(next.map((item) => item.id))
+                        }
+                        renderItem={(playlist, _index, handle) => {
                             const isLikedFolder =
                                 playlist.id === likedSongPlaylistId
                             return (
                                 <button
-                                    key={playlist.id}
                                     type="button"
                                     onClick={() => openPlaylist(playlist.id)}
                                     className={cn(
@@ -404,6 +425,7 @@ function LibraryPage() {
                                             "bg-primary/[0.06] ring-1 ring-primary/20 dark:bg-primary/[0.12]",
                                     )}
                                 >
+                                    {handle}
                                     <Cover
                                         src={playlist.coverUrl}
                                         alt={playlist.title}
@@ -424,8 +446,8 @@ function LibraryPage() {
                                     </div>
                                 </button>
                             )
-                        })}
-                    </div>
+                        }}
+                    />
                 ) : (
                     <div ref={gridRef} className={gridClass} style={gridStyle}>
                         {sortedPlaylists.map((playlist) => {

@@ -134,7 +134,7 @@ function LocalAlbumDrawer({
 
                     <div className="max-h-[min(58vh,520px)] space-y-5 overflow-y-auto px-4 pb-4">
                         {folderPath ? (
-                            <div className="rounded-2xl bg-[var(--surface-fill)] px-3.5 py-2.5">
+                            <div className="material-surface rounded-2xl px-3.5 py-2.5">
                                 <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                                     关联文件夹
                                 </p>

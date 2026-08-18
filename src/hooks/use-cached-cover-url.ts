@@ -8,7 +8,16 @@ import {
 } from "@/lib/music/remote-cover-cache"
 
 function isRemoteUrl(url: string): boolean {
-    return /^https?:\/\//i.test(url)
+    if (!/^https?:\/\//i.test(url)) {
+        return false
+    }
+    // Windows 上 convertFileSrc 产出 http://asset.localhost，是本地 asset 虚拟协议，
+    // 不是可下载的远程封面；误判会触发无意义的下载并可能污染缓存索引
+    try {
+        return new URL(url).hostname !== "asset.localhost"
+    } catch {
+        return false
+    }
 }
 
 // 远程封面 → 本地缓存 URL 的透明升级：远程且已缓存立即用本地 asset（离线可用），未缓存先用远程渲染后台下载后切换

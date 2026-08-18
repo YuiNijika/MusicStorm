@@ -15,6 +15,8 @@ type NeteaseAccountRecord = {
     userId: number
     nickname: string
     avatarUrl: string
+    /** 网易云 vipType：0=无，1~10=音乐包（按等级），11=黑胶，110=黑胶 SVIP，用于离线兜底显示会员状态 */
+    vipType: number
     credentials: NeteaseCredentials
     updatedAt: number
 }
@@ -53,6 +55,8 @@ function readVault(): AccountVault {
                 userId: item.userId,
                 nickname: item.nickname || "网易云用户",
                 avatarUrl: item.avatarUrl || "",
+                vipType:
+                    typeof item.vipType === "number" ? item.vipType : 0,
                 credentials: {
                     musicU: item.credentials.musicU,
                     csrf: item.credentials.csrf ?? null,
@@ -108,6 +112,7 @@ function upsertActiveAccount(profile: NeteaseProfile): void {
         userId: profile.userId,
         nickname: profile.nickname,
         avatarUrl: profile.avatarUrl,
+        vipType: profile.vipType,
         credentials,
         updatedAt: Date.now(),
     }

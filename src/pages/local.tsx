@@ -65,7 +65,9 @@ import {
 } from "@/lib/library/sort"
 import {
     ORDER_EVENT,
+    getLocalAlbumListOrder,
     getLocalOrderIds,
+    setLocalAlbumListOrder,
     setLocalAlbumOrder,
     setLocalAllOrder,
 } from "@/lib/library/track-order"
@@ -140,8 +142,9 @@ function LocalPage() {
                 (album) =>
                     lib.library.tracks.filter((track) => track.albumId === album.id)
                         .length,
+                getLocalAlbumListOrder(),
             ),
-        [lib.library.albums, lib.library.tracks, localAlbumSort],
+        [lib.library.albums, lib.library.tracks, localAlbumSort, orderTick],
     )
 
     const sortedArtists = useMemo(
@@ -1039,68 +1042,80 @@ function LocalPage() {
                                     </div>
                                 </button>
                             ) : null}
-                            {sortedAlbums.map((album) => {
-                                const count = lib.library.tracks.filter(
-                                    (track) => track.albumId === album.id,
-                                ).length
-                                const selected = selection.has(album.id)
-                                return (
-                                    <div
-                                        key={album.id}
-                                        className={cn(
-                                            "group flex items-center gap-1 rounded-2xl transition-colors",
-                                            selectionMode === "album" && selected
-                                                ? "bg-primary/[0.08] ring-1 ring-primary/25"
-                                                : "hover:bg-[var(--surface-fill)]",
-                                        )}
-                                    >
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                selectionMode === "album"
-                                                    ? toggleSelection(album.id)
-                                                    : lib.openAlbum(album.id)
-                                            }
-                                            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
-                                        >
-                                            <Cover
-                                                src={lib.albumCoverThumb(album)}
-                                                alt={album.title}
-                                                size="sm"
-                                                className="size-12 rounded-xl"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
-                                                    {album.title}
-                                                </p>
-                                                <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                                                    {album.artist || "未知艺人"} · {count} 首
-                                                </p>
-                                            </div>
-                                        </button>
-                                        <div className="mr-2 shrink-0">
-                                            {selectionMode === "album" ? (
-                                                <SelectionBadge selected={selected} />
-                                            ) : (
-                                                <LocalAlbumMenu
-                                                    album={album}
-                                                    busy={lib.submitting}
-                                                    onEdit={openEditDrawer}
-                                                    onRescan={(item) =>
-                                                        void lib.rescanAlbum(item)
-                                                    }
-                                                    onDelete={(item) =>
-                                                        setConfirm({
-                                                            kind: "remove",
-                                                            album: item,
-                                                        })
-                                                    }
-                                                />
+                            <DragList
+                                items={sortedAlbums}
+                                enabled={
+                                    selectionMode === null &&
+                                    localAlbumSort === "custom"
+                                }
+                                onReorder={(next) =>
+                                    setLocalAlbumListOrder(
+                                        next.map((album) => album.id),
+                                    )
+                                }
+                                renderItem={(album, _index, handle) => {
+                                    const count = lib.library.tracks.filter(
+                                        (track) => track.albumId === album.id,
+                                    ).length
+                                    const selected = selection.has(album.id)
+                                    return (
+                                        <div
+                                            className={cn(
+                                                "group flex items-center gap-1 rounded-2xl transition-colors",
+                                                selectionMode === "album" && selected
+                                                    ? "bg-primary/[0.08] ring-1 ring-primary/25"
+                                                    : "hover:bg-[var(--surface-fill)]",
                                             )}
+                                        >
+                                            {handle}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    selectionMode === "album"
+                                                        ? toggleSelection(album.id)
+                                                        : lib.openAlbum(album.id)
+                                                }
+                                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2.5 py-2 text-left active:scale-[0.995]"
+                                            >
+                                                <Cover
+                                                    src={lib.albumCoverThumb(album)}
+                                                    alt={album.title}
+                                                    size="sm"
+                                                    className="size-12 rounded-xl"
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
+                                                        {album.title}
+                                                    </p>
+                                                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                                                        {album.artist || "未知艺人"} · {count} 首
+                                                    </p>
+                                                </div>
+                                            </button>
+                                            <div className="mr-2 shrink-0">
+                                                {selectionMode === "album" ? (
+                                                    <SelectionBadge selected={selected} />
+                                                ) : (
+                                                    <LocalAlbumMenu
+                                                        album={album}
+                                                        busy={lib.submitting}
+                                                        onEdit={openEditDrawer}
+                                                        onRescan={(item) =>
+                                                            void lib.rescanAlbum(item)
+                                                        }
+                                                        onDelete={(item) =>
+                                                            setConfirm({
+                                                                kind: "remove",
+                                                                album: item,
+                                                            })
+                                                        }
+                                                    />
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                }}
+                            />
                         </div>
                     ) : (
                         <div ref={gridRef} className={gridClass} style={gridStyle}>

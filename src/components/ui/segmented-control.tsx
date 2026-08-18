@@ -75,7 +75,7 @@ function SegmentedControl({
             ref={containerRef}
             onScroll={sync}
             className={cn(
-                "relative flex flex-nowrap gap-1 overflow-x-auto rounded-full bg-foreground/[0.06] p-1",
+                "material-segmented relative flex flex-nowrap gap-1 overflow-x-auto rounded-full p-1",
                 // 隐藏滚动条：横向 tab 滚动不应暴露系统滚动条
                 "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                 className,

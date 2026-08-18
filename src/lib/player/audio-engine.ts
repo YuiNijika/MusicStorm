@@ -15,10 +15,15 @@ type AudioEngine = {
     seek: (positionMs: number, opts?: { resume?: boolean }) => void | Promise<void>
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
+    /** 10 段均衡器：gains 为各频段增益 dB，enabled 关闭时等效平直 */
+    setEq: (gains: number[], enabled: boolean) => void
     getPositionMs: () => number
     getDurationMs: () => number
     destroy: () => void
 }
+
+// 10 段均衡器中心频率，与 eq-prefs.ts 的 EQ_BAND_FREQUENCIES 对齐
+const EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
 function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     const MEDIA_READY_TIMEOUT_MS = 15_000
@@ -27,10 +32,55 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     audio.setAttribute("playsinline", "")
     // 移动端（Android WebView / iOS WKWebView）需要允许内联播放，
     // 否则 play() 会被系统拦截仅允许全屏
+    // 均衡器经 createMediaElementSource 接管输出，需 CORS 干净的媒体源，
+    // 否则跨域音频被 Web Audio 判为污染而静音；本地 asset/blob 同源不受影响
+    audio.crossOrigin = "anonymous"
 
     // 加载完成后 resolve 的 Promise；切曲时取消等待避免卡死
     let readyPromise: Promise<void> | null = null
     let readyCancel = false
+    // Web Audio 均衡器：惰性创建，仅启用 EQ 时才接管音频输出
+    let eqContext: AudioContext | null = null
+    let eqFilters: BiquadFilterNode[] = []
+
+    function ensureEqGraph(): void {
+        if (eqContext) {
+            return
+        }
+        const Ctor =
+            window.AudioContext ??
+            (
+                window as unknown as {
+                    webkitAudioContext?: typeof AudioContext
+                }
+            ).webkitAudioContext
+        if (!Ctor) {
+            return
+        }
+        const context = new Ctor()
+        // createMediaElementSource 对同一元素只能调用一次，之后音频统一经 graph 输出
+        const source = context.createMediaElementSource(audio)
+        const filters = EQ_FREQUENCIES.map((freq, index) => {
+            const filter = context.createBiquadFilter()
+            filter.frequency.value = freq
+            filter.type =
+                index === 0
+                    ? "lowshelf"
+                    : index === EQ_FREQUENCIES.length - 1
+                      ? "highshelf"
+                      : "peaking"
+            filter.Q.value = 1.0
+            filter.gain.value = 0
+            return filter
+        })
+        source.connect(filters[0]!)
+        for (let i = 0; i < filters.length - 1; i += 1) {
+            filters[i]!.connect(filters[i + 1]!)
+        }
+        filters[filters.length - 1]!.connect(context.destination)
+        eqContext = context
+        eqFilters = filters
+    }
 
     const onCanPlay = () => {
         readyPromise = null
@@ -132,6 +182,19 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
         setMuted(muted) {
             audio.muted = muted
         },
+        setEq(gains, enabled) {
+            if (!enabled) {
+                // 旁路：graph 已建时增益归零等效平直；未建则 audio 直接输出，无需处理
+                for (const filter of eqFilters) {
+                    filter.gain.value = 0
+                }
+                return
+            }
+            ensureEqGraph()
+            for (let i = 0; i < eqFilters.length; i += 1) {
+                eqFilters[i]!.gain.value = gains[i] ?? 0
+            }
+        },
         getPositionMs() {
             return audio.currentTime * 1000
         },
@@ -148,6 +211,9 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             audio.removeEventListener("error", onError)
             audio.removeAttribute("src")
             audio.load()
+            void eqContext?.close()
+            eqContext = null
+            eqFilters = []
         },
     }
 }

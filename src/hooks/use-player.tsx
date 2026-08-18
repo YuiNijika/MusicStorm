@@ -39,6 +39,21 @@ import {
     readPlaybackSession,
     writePlaybackSession,
 } from "@/lib/player/playback-session"
+import {
+    applyGainToPreset,
+    clearPerTrackOverride,
+    deleteCustomPreset,
+    readEqPrefs,
+    renameCustomPreset,
+    resolveEqGains,
+    resolveEqGainsForTrack,
+    resolveEqPresetIdForTrack,
+    saveCustomPreset,
+    setPerTrackEnabled,
+    setPerTrackOverride,
+    writeEqPrefs,
+    type EqPrefs,
+} from "@/lib/player/eq-prefs"
 import type { PlayerSnapshot, RepeatMode, Track } from "@/lib/types"
 import { isWebMode } from "@/lib/web-mode"
 
@@ -67,6 +82,24 @@ type PlayerContextValue = PlayerSnapshot & {
     toggleMute: () => void
     toggleShuffle: () => void
     cycleRepeat: () => void
+    eq: EqPrefs
+    setEqEnabled: (enabled: boolean) => void
+    applyEqPreset: (presetId: string) => void
+    /**
+     * 拖动频段增益。perTrack 模式下传入 trackId 作用于该歌的覆盖预设，
+     * 否则作用于全局预设；内置预设拖动会克隆为新自定义再改。
+     */
+    setEqBandGain: (index: number, gainDb: number, trackId?: string | null) => void
+    /** 保存当前全局曲线为新自定义预设并切换选中 */
+    saveEqPreset: (name: string) => void
+    /** 按歌曲保存当前曲线为新自定义并设为该歌覆盖 */
+    saveEqPresetForTrack: (trackId: string, name: string) => void
+    /** 重命名/删除当前作用目标（全局 presetId 或某歌覆盖）的预设 */
+    renameEqPreset: (id: string, name: string) => void
+    deleteEqPreset: (id: string) => void
+    setPerTrackEqEnabled: (enabled: boolean) => void
+    setTrackEqPreset: (trackId: string, presetId: string) => void
+    clearTrackEqPreset: (trackId: string) => void
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null)
@@ -160,6 +193,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [enginesReadyToken, setEnginesReadyToken] = useState(0)
     /** load 就绪后递增，驱动 pause/resume effect 统一 play */
     const [readyEpoch, setReadyEpoch] = useState(0)
+    const [eq, setEq] = useState<EqPrefs>(() => readEqPrefs())
+    const eqRef = useRef(eq)
 
     const html5Ref = useRef<AudioEngine | null>(null)
     const nativeRef = useRef<AudioEngine | null>(null)
@@ -291,6 +326,121 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const linear = mutedRef.current ? 0 : volumeRef.current
         const perceptual = linear * linear
         engine.setVolume(perceptual * gain)
+    }, [])
+
+    const setEqEnabled = useCallback((enabled: boolean) => {
+        setEq((prev) => {
+            const next = { ...prev, enabled }
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const applyEqPreset = useCallback((presetId: string) => {
+        setEq((prev) => {
+            const next = { ...prev, presetId }
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    /**
+     * 拖动频段增益：perTrack 且有 trackId 时作用于该歌覆盖预设（懒克隆内置），
+     * 否则作用于全局预设。applyGainToPreset 统一处理「内置克隆/自定义就地改」。
+     * 返回后写回 localStorage。
+     */
+    const setEqBandGain = useCallback(
+        (index: number, gainDb: number, trackId?: string | null) => {
+            setEq((prev) => {
+                if (prev.perTrackEnabled && trackId) {
+                    // 该歌当前生效预设：有覆盖用覆盖，否则跟随全局
+                    const presetId = resolveEqPresetIdForTrack(prev, trackId)
+                    const { prefs, presetId: targetId } = applyGainToPreset(
+                        prev,
+                        presetId,
+                        index,
+                        gainDb,
+                    )
+                    // 始终把该歌覆盖指向作用后的预设（含内置懒克隆出的新自定义）
+                    const next = setPerTrackOverride(prefs, trackId, targetId)
+                    writeEqPrefs(next)
+                    return next
+                }
+                const { prefs, presetId } = applyGainToPreset(
+                    prev,
+                    prev.presetId,
+                    index,
+                    gainDb,
+                )
+                const next = { ...prefs, presetId }
+                writeEqPrefs(next)
+                return next
+            })
+        },
+        [],
+    )
+
+    const saveEqPreset = useCallback((name: string) => {
+        setEq((prev) => {
+            const next = saveCustomPreset(prev, name, resolveEqGains(prev))
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const saveEqPresetForTrack = useCallback((trackId: string, name: string) => {
+        setEq((prev) => {
+            // 以该歌当前生效曲线为准，存为新自定义并设为该歌覆盖（保存后返回 prefs 已带新 presetId）
+            const gains = resolveEqGainsForTrack(prev, trackId)
+            const withPreset = saveCustomPreset(prev, name, gains)
+            const next = setPerTrackOverride(
+                withPreset,
+                trackId,
+                withPreset.presetId,
+            )
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const renameEqPreset = useCallback((id: string, name: string) => {
+        setEq((prev) => {
+            const next = renameCustomPreset(prev, id, name)
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const deleteEqPreset = useCallback((id: string) => {
+        setEq((prev) => {
+            const next = deleteCustomPreset(prev, id)
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const setPerTrackEqEnabled = useCallback((enabled: boolean) => {
+        setEq((prev) => {
+            const next = setPerTrackEnabled(prev, enabled)
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const setTrackEqPreset = useCallback((trackId: string, presetId: string) => {
+        setEq((prev) => {
+            const next = setPerTrackOverride(prev, trackId, presetId)
+            writeEqPrefs(next)
+            return next
+        })
+    }, [])
+
+    const clearTrackEqPreset = useCallback((trackId: string) => {
+        setEq((prev) => {
+            const next = clearPerTrackOverride(prev, trackId)
+            writeEqPrefs(next)
+            return next
+        })
     }, [])
 
     /** 双引擎都 pause，不改 fade / pauseGen；切 H5↔原生引擎时用 */
@@ -510,6 +660,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const html5 = createHtml5Engine(handlers)
             html5Ref.current = html5
             activeRef.current = html5
+            html5.setEq(resolveEqGains(eqRef.current), eqRef.current.enabled)
             nativeAvailableRef.current = false
             nativeRef.current = null
 
@@ -518,6 +669,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 try {
                     nativeRef.current = createNativeEngine(handlers)
                     nativeAvailableRef.current = true
+                    // native 引擎已集成 biquad EQ，挂载时同步当前增益
+                    nativeRef.current.setEq(
+                        resolveEqGains(eqRef.current),
+                        eqRef.current.enabled,
+                    )
                     setEngineStatus(choice.status)
                     engineStatusRef.current = choice.status
                 } catch {
@@ -559,6 +715,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const currentTrack = currentIndex >= 0 ? (queue[currentIndex] ?? null) : null
     const currentTrackId = currentTrack?.id ?? null
+
+    // EQ 按当前歌曲解析后实时作用到 H5 与 native 引擎（切歌/改 EQ 都重新应用）；
+    // native 引擎（rodio）已集成 biquad EQ，随增益实时刷新
+    useEffect(() => {
+        eqRef.current = eq
+        const gains = resolveEqGainsForTrack(eq, currentTrackId)
+        html5Ref.current?.setEq(gains, eq.enabled)
+        nativeRef.current?.setEq(gains, eq.enabled)
+    }, [eq, currentTrackId])
 
     // load + seek；play 交给 pause/resume effect
     useEffect(() => {
@@ -1254,6 +1419,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             toggleMute,
             toggleShuffle,
             cycleRepeat,
+            eq,
+            setEqEnabled,
+            applyEqPreset,
+            setEqBandGain,
+            saveEqPreset,
+            saveEqPresetForTrack,
+            renameEqPreset,
+            deleteEqPreset,
+            setPerTrackEqEnabled,
+            setTrackEqPreset,
+            clearTrackEqPreset,
         }),
         [
             queue,
@@ -1284,6 +1460,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             toggleMute,
             toggleShuffle,
             cycleRepeat,
+            eq,
+            setEqEnabled,
+            applyEqPreset,
+            setEqBandGain,
+            saveEqPreset,
+            saveEqPresetForTrack,
+            renameEqPreset,
+            deleteEqPreset,
+            setPerTrackEqEnabled,
+            setTrackEqPreset,
+            clearTrackEqPreset,
         ],
     )
 

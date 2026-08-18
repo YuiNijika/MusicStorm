@@ -56,6 +56,13 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 crypto: "eapi",
             }
         }
+        case NETEASE_PATHS.songDetailV1:
+            // 旧版 v1 接口才有 starredNum（红心量），v3 不返回；纯 POST 明文即可
+            return {
+                uri: "/api/song/detail",
+                data: { ids: `[${q(query, "id")}]` },
+                crypto: "api",
+            }
         case NETEASE_PATHS.lyric:
             return {
                 uri: "/api/song/lyric",
@@ -252,6 +259,17 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 crypto: "weapi",
             }
         }
+        case NETEASE_PATHS.commentMusic:
+            return {
+                uri: `/api/v1/resource/comments/R_SO_4_${q(query, "id")}`,
+                data: {
+                    rid: q(query, "id"),
+                    limit: qNum(query, "limit", 20),
+                    offset: qNum(query, "offset", 0),
+                    beforeTime: qNum(query, "before", 0),
+                },
+                crypto: "weapi",
+            }
         case NETEASE_PATHS.artists:
             return {
                 uri: `/api/v1/artist/${q(query, "id")}`,

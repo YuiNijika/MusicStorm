@@ -182,7 +182,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex gap-1 rounded-full bg-[var(--surface-fill)] p-1">
+                <div className="material-segmented flex gap-1 rounded-full p-1">
                     {TAB_ORDER.map(([id, label]) => (
                         <button
                             key={id}

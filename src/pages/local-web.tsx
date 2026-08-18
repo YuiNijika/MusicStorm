@@ -131,6 +131,11 @@ function LocalWebPage() {
     const [removeAlbumTarget, setRemoveAlbumTarget] =
         useState<LocalAlbum | null>(null)
     const [clearOpen, setClearOpen] = useState(false)
+    // 目录导入分组方式选择
+    const [importGroupOpen, setImportGroupOpen] = useState(false)
+    const [pendingImportTracks, setPendingImportTracks] = useState<
+        WebLocalTrack[]
+    >([])
 
     // 刷新后恢复：曲目从 IndexedDB，艺人/专辑从 localStorage
     useEffect(() => {
@@ -176,6 +181,20 @@ function LocalWebPage() {
 
     // —— 导入 ——
 
+    const finishImport = useCallback(
+        async (list: WebLocalTrack[], groupByFolder: boolean) => {
+            const next = groupImportedTracks(state, list, "", groupByFolder)
+            setState(next)
+            persistMeta(next)
+            const importedIds = new Set(list.map((item) => item.id))
+            await saveWebTracks(
+                next.tracks.filter((item) => importedIds.has(item.id)),
+            )
+            notifySuccess("导入完成", { description: `已导入 ${list.length} 首` })
+        },
+        [state, persistMeta],
+    )
+
     const importDirectory = useCallback(async () => {
         setImporting(true)
         try {
@@ -183,18 +202,34 @@ function LocalWebPage() {
             if (list.length === 0) {
                 return
             }
-            const next = groupImportedTracks(state, list)
-            setState(next)
-            persistMeta(next)
-            const importedIds = new Set(list.map((item) => item.id))
-            await saveWebTracks(next.tracks.filter((item) => importedIds.has(item.id)))
-            notifySuccess("导入完成", { description: `已导入 ${list.length} 首` })
+            // 多文件夹结构（艺人/专辑/歌曲）时，让用户选择用文件夹名分组还是合并成一个专辑
+            const hasNestedDirs = list.some((item) => {
+                const parts = (item.relativePath ?? "")
+                    .split("/")
+                    .filter(Boolean)
+                return parts.length >= 2
+            })
+            if (hasNestedDirs) {
+                setPendingImportTracks(list)
+                setImportGroupOpen(true)
+                return
+            }
+            await finishImport(list, true)
         } catch (error) {
             console.warn("[web-local] import directory failed", error)
         } finally {
             setImporting(false)
         }
-    }, [state, persistMeta])
+    }, [finishImport])
+
+    function confirmImportGroup(groupByFolder: boolean) {
+        const list = pendingImportTracks
+        setImportGroupOpen(false)
+        setPendingImportTracks([])
+        if (list.length > 0) {
+            void finishImport(list, groupByFolder)
+        }
+    }
 
     const importFiles = useCallback(async () => {
         setImporting(true)
@@ -576,6 +611,51 @@ function LocalWebPage() {
                             清空
                         </button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={importGroupOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setImportGroupOpen(false)
+                        setPendingImportTracks([])
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>导入分组方式</DialogTitle>
+                        <DialogDescription>
+                            检测到多级文件夹，选择如何归组
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 px-1 py-2">
+                        <button
+                            type="button"
+                            onClick={() => confirmImportGroup(true)}
+                            className="flex w-full cursor-pointer flex-col gap-0.5 rounded-xl bg-[var(--surface-fill)] px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--surface-fill-hover)]"
+                        >
+                            <span className="text-[13px] font-medium">
+                                按文件夹分组
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                                每个子文件夹作为一张专辑，专辑名取文件夹名
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => confirmImportGroup(false)}
+                            className="flex w-full cursor-pointer flex-col gap-0.5 rounded-xl bg-[var(--surface-fill)] px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--surface-fill-hover)]"
+                        >
+                            <span className="text-[13px] font-medium">
+                                合并为一个专辑
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                                忽略文件夹层级，按标签或「精选」归组
+                            </span>
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>

@@ -30,7 +30,7 @@ function PlaylistGridSkeleton({
             {Array.from({ length: count }, (_, index) => (
                 <div
                     key={index}
-                    className="flex flex-col gap-3 rounded-[22px] bg-[var(--surface-fill)] p-3"
+                    className="material-surface flex flex-col gap-3 rounded-[22px] p-3"
                 >
                     <Skeleton className="aspect-square w-full rounded-2xl" />
                     <div className="space-y-2 px-0.5">

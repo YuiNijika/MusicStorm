@@ -12,10 +12,11 @@ const THUMBNAIL_SIZE: u32 = 192;
 
 /// 封面缓存上限：文件数与总大小，超出后按最旧清理
 const MAX_COVER_FILES: usize = 4_000;
-const MAX_COVER_DIR_BYTES: u64 = 400 * 1024 * 1024;
+/// 默认大小上限（可在设置中调整，前端传入后据此清理）
+pub const DEFAULT_COVER_CACHE_LIMIT: u64 = 400 * 1024 * 1024;
 
 // 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积
-pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
+pub fn purge_cover_cache(app: &AppHandle, max_bytes: u64) -> Result<u64, String> {
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -41,7 +42,7 @@ pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
         }
     }
     let file_count: u64 = groups.values().map(|files| files.len() as u64).sum();
-    if file_count <= MAX_COVER_FILES as u64 && total <= MAX_COVER_DIR_BYTES {
+    if file_count <= MAX_COVER_FILES as u64 && total <= max_bytes {
         return Ok(0);
     }
 
@@ -57,7 +58,7 @@ pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
 
     let mut removed: u64 = 0;
     for (files, _) in group_list {
-        if file_count - removed <= MAX_COVER_FILES as u64 && total <= MAX_COVER_DIR_BYTES {
+        if file_count - removed <= MAX_COVER_FILES as u64 && total <= max_bytes {
             break;
         }
         for (path, _) in files {
@@ -70,6 +71,12 @@ pub fn purge_cover_cache(app: &AppHandle) -> Result<u64, String> {
         }
     }
     Ok(removed)
+}
+
+/// 前端按设置阈值触发清理（设置页调整后立即执行一次）
+#[tauri::command]
+pub fn purge_cover_cache_cmd(app: AppHandle, max_bytes: u64) -> Result<u64, String> {
+    purge_cover_cache(&app, max_bytes)
 }
 
 #[derive(Debug, Clone, Serialize)]

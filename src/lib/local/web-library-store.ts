@@ -239,6 +239,7 @@ function groupImportedTracks(
     state: WebLibraryState,
     tracks: WebLocalTrack[],
     rootName = "",
+    groupByFolder = true,
 ): WebLibraryState {
     if (tracks.length === 0) {
         return state
@@ -252,7 +253,13 @@ function groupImportedTracks(
 
     const grouped = tracks.map((track) => {
         const dirParts = (track.relativePath ?? "").split("/").filter(Boolean)
-        const albumDir = dirParts.length >= 2 ? dirParts[0] : null
+        // 最后一段是文件名，倒数第二段是最内层文件夹（专辑名）。
+        // 多层级（艺人/专辑/歌曲）时取最内层而非第一段，避免艺人名被误当专辑；
+        // groupByFolder=false 时忽略文件夹，全部按标签/精选归组
+        const albumDir =
+            groupByFolder && dirParts.length >= 2
+                ? dirParts[dirParts.length - 2]
+                : null
         const artistName =
             track.artist && track.artist !== "未知艺人"
                 ? track.artist.trim()

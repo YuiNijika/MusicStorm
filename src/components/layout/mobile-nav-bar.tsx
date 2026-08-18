@@ -24,7 +24,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useTheme } from "@/components/app/theme-provider"
-import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { useNeteaseSessionSafe } from "@/hooks/use-netease-session"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import {
     ACCENT_OPTIONS,
@@ -68,7 +68,7 @@ type MobileNavBarProps = {
 }
 
 function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
-    const { ready, loggedIn, profile, logout } = useNeteaseSession()
+    const { ready, loggedIn, profile, logout } = useNeteaseSessionSafe()
     const { appearance, setAccent, setCustomHue } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
     const customActive = appearance.accent === "custom"
@@ -259,7 +259,7 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate }: SegmentedTabsPr
     const indicatorRef = useRef<HTMLButtonElement>(null)
 
     return (
-        <div className="relative flex rounded-full bg-foreground/[0.06] p-0.5">
+        <div className="material-segmented relative flex rounded-full p-0.5">
             {tabs.map((id) => {
                 const Icon = icons[id]
                 const item = NAV_ITEMS.find((n) => n.id === id)

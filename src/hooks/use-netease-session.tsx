@@ -126,7 +126,7 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                               userId: cached.userId,
                               nickname: cached.nickname,
                               avatarUrl: cached.avatarUrl,
-                              vipType: stateRef.current.profile?.vipType ?? 0,
+                              vipType: cached.vipType ?? 0,
                           }
                         : stateRef.current.profile,
                     error: cached ? "资料未刷新，稍后自动重试" : "账号资料暂不可用",
@@ -176,7 +176,7 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                               userId: cached.userId,
                               nickname: cached.nickname,
                               avatarUrl: cached.avatarUrl,
-                              vipType: stateRef.current.profile?.vipType ?? 0,
+                              vipType: cached.vipType ?? 0,
                           }
                         : stateRef.current.profile
                 })(),
@@ -329,4 +329,25 @@ function useNeteaseSession(): SessionContextValue {
     return ctx
 }
 
-export { NeteaseSessionProvider, useNeteaseSession }
+/**
+ * 安全版：context 缺失时不抛错，返回降级会话（未登录）。用于全局导航等
+ * 不该因 Provider 时序/独立入口缺位而整块崩溃的关键 UI，缺失时优雅隐藏登录态。
+ */
+function useNeteaseSessionSafe(): SessionContextValue {
+    const ctx = useContext(NeteaseSessionContext)
+    if (ctx) {
+        return ctx
+    }
+    return {
+        ...initial,
+        ready: false,
+        refresh: () => Promise.resolve(null),
+        logout: () => {
+            // Provider 缺失时无可登出
+        },
+        switchAccount: () => Promise.resolve(false),
+        removeAccount: () => Promise.resolve(),
+    }
+}
+
+export { NeteaseSessionProvider, useNeteaseSession, useNeteaseSessionSafe }

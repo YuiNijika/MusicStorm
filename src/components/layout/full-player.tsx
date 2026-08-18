@@ -3,6 +3,7 @@ import {
     ChevronDown,
     Heart,
     LayoutTemplate,
+    MessageCircle,
     Pause,
     Play,
     Repeat,
@@ -10,12 +11,15 @@ import {
     Shuffle,
     SkipBack,
     SkipForward,
+    SlidersHorizontal,
     Volume2,
     VolumeX,
 } from "lucide-react"
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { EqEditor } from "@/components/music/eq-editor"
+import { CommentSheet } from "@/components/music/comment-sheet"
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
@@ -46,6 +50,7 @@ import {
     setNeteaseQualityBr,
     type QualityBr,
 } from "@/lib/netease/quality"
+import { fetchSongStats } from "@/lib/netease/comment"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import {
     getInAppShortcuts,
@@ -117,6 +122,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
+    const [commentOpen, setCommentOpen] = useState(false)
+    const [likeCount, setLikeCount] = useState<number | null>(null)
     // 移动端只保留 封面/歌词 两种布局；classic 是桌面分栏，窄屏降级到封面
     const availableLayouts = isMobile
         ? FULL_PLAYER_LAYOUTS.filter((item) => item.id !== "classic")
@@ -227,6 +234,30 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
     }, [phase, onClose])
+
+    // 红心量/播放量：仅网易云曲目，游客态返回 0 时隐藏
+    useEffect(() => {
+        if (!currentTrack || currentTrack.source !== "netease" || !currentTrack.id) {
+            setLikeCount(null)
+            return
+        }
+        let cancelled = false
+        setLikeCount(null)
+        void fetchSongStats(currentTrack.id)
+            .then((stats) => {
+                if (!cancelled) {
+                    setLikeCount(stats.likedCount)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setLikeCount(null)
+                }
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [currentTrack?.id, currentTrack?.source])
 
     const displayTrack = mountedTrack ?? currentTrack
     if (phase === "closed" || !displayTrack) {
@@ -370,6 +401,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             onVolume={(v) => setVolume(v)}
             onQuality={handleQualityChange}
             onToggleLike={() => void handleToggleLike()}
+            likeCount={likeCount}
+            onOpenComments={() => setCommentOpen(true)}
+            trackId={displayTrack.id}
         />
     )
 
@@ -622,6 +656,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         {transport}
                     </div>
                 </div>
+
+                <CommentSheet
+                    track={displayTrack}
+                    open={commentOpen}
+                    onOpenChange={setCommentOpen}
+                />
             </div>
         </div>
     </div>
@@ -647,6 +687,9 @@ function TransportBar({
     onVolume,
     onQuality,
     onToggleLike,
+    likeCount,
+    onOpenComments,
+    trackId,
 }: {
     isPlaying: boolean
     shuffle: boolean
@@ -666,20 +709,32 @@ function TransportBar({
     onVolume: (v: number) => void
     onQuality: (br: QualityBr) => void
     onToggleLike: () => void
+    likeCount: number | null
+    onOpenComments: () => void
+    trackId: string | null
 }) {
     return (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="flex items-center justify-start">
                 {canLike ? (
-                    <IconBtn
-                        title={liked ? "取消喜欢" : "喜欢"}
-                        active={liked}
-                        onClick={onToggleLike}
-                    >
-                        <Heart
-                            className={cn("size-4", liked && "fill-current")}
-                        />
-                    </IconBtn>
+                    <>
+                        <IconBtn
+                            title={liked ? "取消喜欢" : "喜欢"}
+                            active={liked}
+                            onClick={onToggleLike}
+                        >
+                            <Heart
+                                className={cn("size-4", liked && "fill-current")}
+                            />
+                        </IconBtn>
+                        {likeCount != null && likeCount > 0 ? (
+                            <span className="ml-0.5 text-[11px] tabular-nums text-muted-foreground">
+                                {likeCount >= 10_000
+                                    ? `${(likeCount / 10_000).toFixed(1)}万`
+                                    : likeCount}
+                            </span>
+                        ) : null}
+                    </>
                 ) : (
                     <span className="size-10" aria-hidden />
                 )}
@@ -759,6 +814,24 @@ function TransportBar({
                     </PopoverContent>
                 </Popover>
 
+                <Popover>
+                    <PopoverTrigger
+                        className={cn(
+                            "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                            "text-muted-foreground transition-[color,background-color,transform]",
+                            "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                            "active:duration-[var(--duration-press)]",
+                        )}
+                        title="均衡器"
+                        aria-label="均衡器"
+                    >
+                        <SlidersHorizontal className="size-4" />
+                    </PopoverTrigger>
+                    <PopoverContent side="top" className="w-[min(92vw,380px)] p-3.5">
+                        <EqEditor compact trackId={trackId} />
+                    </PopoverContent>
+                </Popover>
+
                 {showQuality ? (
                     <Popover>
                         <PopoverTrigger
@@ -791,6 +864,12 @@ function TransportBar({
                             ))}
                         </PopoverContent>
                     </Popover>
+                ) : null}
+
+                {showQuality ? (
+                    <IconBtn title="评论" onClick={onOpenComments}>
+                        <MessageCircle className="size-4" />
+                    </IconBtn>
                 ) : null}
             </div>
         </div>

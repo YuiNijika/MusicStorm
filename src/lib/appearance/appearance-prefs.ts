@@ -28,6 +28,12 @@ type AppearancePrefs = {
     glassBlur: number
     /** 常驻毛玻璃（侧栏/底栏/面板），关闭可降低性能开销 */
     materialGlass: boolean
+    /** 自定义背景图 URL（data: / asset: / https:），空串 = 无 */
+    backgroundUrl: string
+    /** 0 – 1，背景图不透明度 */
+    backgroundOpacity: number
+    /** 0 – 40 px，背景图模糊 */
+    backgroundBlur: number
 }
 
 type AccentOption = {
@@ -62,6 +68,9 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
     glassOpacity: 0.58,
     glassBlur: 28,
     materialGlass: true,
+    backgroundUrl: "",
+    backgroundOpacity: 0.5,
+    backgroundBlur: 0,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -113,6 +122,18 @@ function readAppearancePrefs(): AppearancePrefs {
                 typeof data.materialGlass === "boolean"
                     ? data.materialGlass
                     : DEFAULT_APPEARANCE.materialGlass,
+            backgroundUrl:
+                typeof data.backgroundUrl === "string"
+                    ? data.backgroundUrl
+                    : DEFAULT_APPEARANCE.backgroundUrl,
+            backgroundOpacity:
+                typeof data.backgroundOpacity === "number"
+                    ? clamp(data.backgroundOpacity, 0, 1)
+                    : DEFAULT_APPEARANCE.backgroundOpacity,
+            backgroundBlur:
+                typeof data.backgroundBlur === "number"
+                    ? clamp(data.backgroundBlur, 0, 40)
+                    : DEFAULT_APPEARANCE.backgroundBlur,
         }
     } catch {
         return DEFAULT_APPEARANCE
@@ -156,6 +177,15 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
     root.dataset.tintScope = prefs.tintScope
     root.style.setProperty("--glass-opacity", String(prefs.glassOpacity))
     root.style.setProperty("--glass-blur", `${prefs.glassBlur}px`)
+
+    // 自定义背景：无图时移除变量，CSS 回落到默认渐变/纯色
+    if (prefs.backgroundUrl) {
+        root.style.setProperty("--app-bg-image", `url("${prefs.backgroundUrl}")`)
+    } else {
+        root.style.removeProperty("--app-bg-image")
+    }
+    root.style.setProperty("--app-bg-opacity", String(prefs.backgroundOpacity))
+    root.style.setProperty("--app-bg-blur", `${prefs.backgroundBlur}px`)
 
     const dark = root.classList.contains("dark")
 

@@ -1,6 +1,7 @@
 // rodio 本地播放内核；远程 URL 由前端 H5 处理
 
 use crate::audio::{emit_ended, emit_tick, AudioTickPayload};
+use crate::audio::eq::{eq_source, EqState};
 use rodio::source::SeekError as RodioSeekError;
 use rodio::{OutputStream, Sink, Source};
 use std::fs::File;
@@ -27,6 +28,7 @@ pub struct PlayerHandle {
     cmd_tx: Mutex<mpsc::Sender<PlayerCmd>>,
     volume: Arc<Mutex<f32>>,
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
+    eq: Arc<EqState>,
 }
 
 enum PlayerCmd {
@@ -106,6 +108,11 @@ impl PlayerHandle {
         }
     }
 
+    /// 实时更新 EQ 增益；enabled 为 false 时等效平直
+    pub fn set_eq(&self, gains: &[f32], enabled: bool) {
+        self.eq.set_gains(gains, enabled);
+    }
+
     pub fn stop(&self) {
         let _ = self.send(PlayerCmd::Stop);
     }
@@ -128,6 +135,8 @@ impl PlayerInner {
         let volume_worker = Arc::clone(&volume);
         let ffmpeg_path = Arc::new(Mutex::new(ffmpeg_path));
         let ffmpeg_path_worker = Arc::clone(&ffmpeg_path);
+        let eq = EqState::new();
+        let eq_worker = Arc::clone(&eq);
         let shared = Arc::new(SharedPlayback {
             position_ms: AtomicU64::new(0),
             duration_ms: AtomicU64::new(0),
@@ -140,7 +149,14 @@ impl PlayerInner {
         thread::Builder::new()
             .name("audio-player".into())
             .spawn(move || {
-                if let Err(error) = run_worker(app, rx, volume_worker, shared_tick, ffmpeg_path_worker) {
+                if let Err(error) = run_worker(
+                    app,
+                    rx,
+                    volume_worker,
+                    shared_tick,
+                    ffmpeg_path_worker,
+                    eq_worker,
+                ) {
                     eprintln!("[audio] worker exit: {error}");
                 }
             })
@@ -150,6 +166,7 @@ impl PlayerInner {
             cmd_tx: Mutex::new(tx),
             volume,
             ffmpeg_path,
+            eq,
         })
     }
 }
@@ -169,6 +186,7 @@ fn run_worker(
     volume: Arc<Mutex<f32>>,
     shared: Arc<SharedPlayback>,
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
+    eq: Arc<EqState>,
 ) -> Result<(), String> {
     let (_stream, handle) =
         OutputStream::try_default().map_err(|e| format!("无法打开音频输出: {e}"))?;
@@ -228,6 +246,7 @@ fn run_worker(
                     &mut current_source,
                     source,
                     current_ffmpeg_path(&ffmpeg_path).as_deref(),
+                    &eq,
                 );
                 let _ = reply.send(result);
             }
@@ -272,6 +291,7 @@ fn run_worker(
                     target,
                     want_resume,
                     current_ffmpeg_path(&ffmpeg_path).as_deref(),
+                    &eq,
                 );
                 shared.seeking.store(false, Ordering::Relaxed);
                 for r in replies {
@@ -306,6 +326,7 @@ fn run_worker(
                                 &mut current_source,
                                 source,
                                 current_ffmpeg_path(&ffmpeg_path).as_deref(),
+                                &eq,
                             );
                             let _ = reply.send(result);
                         }
@@ -337,6 +358,7 @@ fn run_worker(
                                 next_ms.max(0.0),
                                 next_resume,
                                 current_ffmpeg_path(&ffmpeg_path).as_deref(),
+                                &eq,
                             );
                             shared.seeking.store(false, Ordering::Relaxed);
                             let _ = next_reply.send(Ok(()));
@@ -400,6 +422,7 @@ fn apply_play(
     current_source: &mut Option<String>,
     source: String,
     ffmpeg_path: Option<&Path>,
+    eq: &Arc<EqState>,
 ) -> Result<(), String> {
     let same = current_source.as_ref() == Some(&source);
     // 仅同曲且 sink 仍有该曲缓冲时 resume；否则一律重开，避免切源后误续播
@@ -414,7 +437,7 @@ fn apply_play(
         return Ok(());
     }
 
-    match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path) {
+    match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path, eq) {
         Ok(()) => {
             *current_source = Some(source);
             *has_buffer = true;
@@ -447,6 +470,7 @@ fn apply_seek(
     target: f64,
     resume: bool,
     ffmpeg_path: Option<&Path>,
+    eq: &Arc<EqState>,
 ) {
     let Some(source) = current_source.clone() else {
         shared
@@ -481,7 +505,7 @@ fn apply_seek(
     *has_buffer = false;
     shared.playing.store(false, Ordering::Relaxed);
 
-    match start_playback_from(sink, &source, shared, target, ffmpeg_path) {
+    match start_playback_from(sink, &source, shared, target, ffmpeg_path, eq) {
         Ok(()) => {
             *has_buffer = true;
             if let Ok(v) = volume.lock() {
@@ -500,7 +524,7 @@ fn apply_seek(
         Err(error) => {
             eprintln!("[audio] seek error: {error}");
             if was_playing {
-                match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path) {
+                match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path, eq) {
                     Ok(()) => {
                         *has_buffer = true;
                         if let Ok(v) = volume.lock() {
@@ -914,6 +938,7 @@ fn start_playback_from(
     shared: &SharedPlayback,
     offset_ms: f64,
     ffmpeg_path: Option<&Path>,
+    eq: &Arc<EqState>,
 ) -> Result<(), String> {
     sink.stop();
 
@@ -935,7 +960,7 @@ fn start_playback_from(
             "FFMPEG_REQUIRED: 此格式需要外部 FFmpeg，请前往设置 > 播放配置 FFmpeg".to_string()
         })?;
         let source = FfmpegSource::open(executable, &path_buf, offset, duration_hint)?;
-        sink.append(source);
+        sink.append(eq_source(source, Arc::clone(eq)));
     } else {
         match SymphoniaSource::open(&path_buf, offset) {
             Ok(source) => {
@@ -947,14 +972,14 @@ fn start_playback_from(
                         );
                     }
                 }
-                sink.append(source);
+                sink.append(eq_source(source, Arc::clone(eq)));
             }
             Err(error) if error.contains("无法创建解码器") => {
                 let executable = ffmpeg_path.ok_or_else(|| {
                     "FFMPEG_REQUIRED: 音频编码不受内置解码器支持，请前往设置 > 播放配置 FFmpeg".to_string()
                 })?;
                 let source = FfmpegSource::open(executable, &path_buf, offset, duration_hint)?;
-                sink.append(source);
+                sink.append(eq_source(source, Arc::clone(eq)));
             }
             Err(error) => return Err(error),
         }

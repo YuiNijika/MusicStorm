@@ -1,6 +1,8 @@
 
 const LOCAL_ORDER_KEY = "musicstorm.local.track-order"
+const LOCAL_ALBUM_LIST_ORDER_KEY = "musicstorm.local.album-list-order"
 const PLAYLIST_ORDER_KEY = "musicstorm.playlist.track-order"
+const PLAYLIST_LIST_ORDER_KEY = "musicstorm.playlist.list-order"
 const RADIO_ORDER_KEY = "musicstorm.radio.order"
 const PROGRAM_ORDER_KEY = "musicstorm.radio.program-order"
 const ORDER_EVENT = "musicstorm-track-order"
@@ -88,6 +90,28 @@ function setPlaylistTrackOrder(playlistId: string, ids: string[]): void {
     emitOrder()
 }
 
+/** 资料库「我的歌单」列表的自定义顺序（list 视图拖拽排序） */
+function getPlaylistListOrder(): string[] {
+    const list = readJson<unknown>(PLAYLIST_LIST_ORDER_KEY, [])
+    return Array.isArray(list) ? list.filter((id): id is string => typeof id === "string") : []
+}
+
+function setPlaylistListOrder(ids: string[]): void {
+    window.localStorage.setItem(PLAYLIST_LIST_ORDER_KEY, JSON.stringify(ids))
+    emitOrder()
+}
+
+/** 本地资料库「专辑列表」的自定义顺序（list 视图拖拽排序） */
+function getLocalAlbumListOrder(): string[] {
+    const list = readJson<unknown>(LOCAL_ALBUM_LIST_ORDER_KEY, [])
+    return Array.isArray(list) ? list.filter((id): id is string => typeof id === "string") : []
+}
+
+function setLocalAlbumListOrder(ids: string[]): void {
+    window.localStorage.setItem(LOCAL_ALBUM_LIST_ORDER_KEY, JSON.stringify(ids))
+    emitOrder()
+}
+
 function getRadioOrder(scope: RadioOrderScope): string[] {
     const map = readJson<Partial<RadioOrderMap>>(RADIO_ORDER_KEY, {})
     const list = map[scope]
@@ -146,13 +170,17 @@ function applyIdOrder<T extends { id: string }>(
 export {
     ORDER_EVENT,
     applyIdOrder,
+    getLocalAlbumListOrder,
     getLocalOrderIds,
     getLocalTrackOrder,
+    getPlaylistListOrder,
     getPlaylistTrackOrder,
     getProgramOrder,
     getRadioOrder,
+    setLocalAlbumListOrder,
     setLocalAlbumOrder,
     setLocalAllOrder,
+    setPlaylistListOrder,
     setPlaylistTrackOrder,
     setProgramOrder,
     setRadioOrder,

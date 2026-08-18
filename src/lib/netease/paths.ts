@@ -1,6 +1,7 @@
 export const NETEASE_PATHS = {
     songUrl: "/song/url",
     songDetail: "/song/detail",
+    songDetailV1: "/song/detail/v1",
     lyric: "/lyric",
     search: "/cloudsearch",
     playlistDetail: "/playlist/detail",
@@ -19,6 +20,7 @@ export const NETEASE_PATHS = {
     userPlaylist: "/user/playlist",
     likelist: "/likelist",
     like: "/like",
+    commentMusic: "/comment/music",
     artists: "/artists",
     artistAlbum: "/artist/album",
     artistMv: "/artist/mv",
