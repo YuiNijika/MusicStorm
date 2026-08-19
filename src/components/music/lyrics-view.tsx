@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { usePlayer } from "@/hooks/use-player"
@@ -10,6 +10,7 @@ import {
 } from "@/lib/lyric/parse"
 import { getLyricOverride, LYRIC_OVERRIDE_EVENT } from "@/lib/lyric/overrides"
 import { fetchLyricLines } from "@/lib/netease/lyric"
+import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { PLAYER_PREFS_EVENT, getPlayerPreferences } from "@/lib/player/playback-prefs"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -81,6 +82,73 @@ function sidecarLrcCandidates(filePath: string): string[] {
     ]
 }
 
+// 单行歌词独立 memo：进度 tick 只重渲激活行，其余行复用 DOM 不重建
+type LyricLineButtonProps = {
+    line: LyricLine
+    index: number
+    isActive: boolean
+    isFull: boolean
+    timedLyrics: boolean
+    align: LyricsAlign
+    onSeek: (ms: number) => void
+}
+
+const LyricLineButton = memo(function LyricLineButton({
+    line,
+    index,
+    isActive,
+    isFull,
+    timedLyrics,
+    align,
+    onSeek,
+}: LyricLineButtonProps) {
+    const textAlignClass =
+        align === "center"
+            ? "text-center"
+            : align === "right"
+              ? "text-right"
+              : "text-left"
+    return (
+        <button
+            type="button"
+            data-lyric-index={index}
+            onClick={() => {
+                if (timedLyrics && line.timeMs > 0) {
+                    onSeek(line.timeMs)
+                }
+            }}
+            className={cn(
+                "block w-full transition-colors",
+                textAlignClass,
+                timedLyrics ? "cursor-pointer" : "cursor-default",
+                isFull
+                    ? "rounded-xl px-3 py-1.5 text-[18px] leading-snug tracking-[-0.01em]"
+                    : "rounded-lg px-2 py-1 text-[13px] leading-snug",
+                isActive
+                    ? "font-semibold text-foreground"
+                    : "font-normal text-muted-foreground hover:text-foreground/80",
+            )}
+        >
+            <span className="block w-full">{line.text}</span>
+            {line.translation ? (
+                <span
+                    className={cn(
+                        "block w-full font-normal",
+                        isFull
+                            ? "mt-1 text-[14px] leading-snug"
+                            : "mt-0.5 text-[11px] leading-snug",
+                        isActive
+                            ? "text-muted-foreground"
+                            : "text-muted-foreground/60",
+                    )}
+                >
+                    {line.translation}
+                </span>
+            ) : null}
+        </button>
+    )
+})
+
 function LyricsView({
     variant = "compact",
     active = true,
@@ -88,7 +156,8 @@ function LyricsView({
     className,
     listClassName,
 }: LyricsViewProps) {
-    const { currentTrack, positionMs, seek } = usePlayer()
+    const { currentTrack, seek } = usePlayer()
+    const { positionMs } = usePlaybackTick()
     const [lines, setLines] = useState<LyricLine[]>([])
     const [status, setStatus] = useState<"idle" | "loading" | "empty" | "error" | "ready">(
         "idle",
@@ -242,51 +311,18 @@ function LyricsView({
                             textAlignClass,
                         )}
                     >
-                        {lines.map((line, index) => {
-                            const isActive = timedLyrics && index === activeIndex
-                            return (
-                                <button
-                                    key={`${line.timeMs}-${index}`}
-                                    type="button"
-                                    data-lyric-index={index}
-                                    onClick={() => {
-                                        if (timedLyrics && line.timeMs > 0) {
-                                            seek(line.timeMs)
-                                        }
-                                    }}
-                                    className={cn(
-                                        "block w-full transition-colors",
-                                        textAlignClass,
-                                        timedLyrics
-                                            ? "cursor-pointer"
-                                            : "cursor-default",
-                                        isFull
-                                            ? "rounded-xl px-3 py-1.5 text-[18px] leading-snug tracking-[-0.01em]"
-                                            : "rounded-lg px-2 py-1 text-[13px] leading-snug",
-                                        isActive
-                                            ? "font-semibold text-foreground"
-                                            : "font-normal text-muted-foreground hover:text-foreground/80",
-                                    )}
-                                >
-                                    <span className="block w-full">{line.text}</span>
-                                    {line.translation ? (
-                                        <span
-                                            className={cn(
-                                                "block w-full font-normal",
-                                                isFull
-                                                    ? "mt-1 text-[14px] leading-snug"
-                                                    : "mt-0.5 text-[11px] leading-snug",
-                                                isActive
-                                                    ? "text-muted-foreground"
-                                                    : "text-muted-foreground/60",
-                                            )}
-                                        >
-                                            {line.translation}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            )
-                        })}
+                        {lines.map((line, index) => (
+                            <LyricLineButton
+                                key={`${line.timeMs}-${index}`}
+                                line={line}
+                                index={index}
+                                isActive={timedLyrics && index === activeIndex}
+                                isFull={isFull}
+                                timedLyrics={timedLyrics}
+                                align={align}
+                                onSeek={seek}
+                            />
+                        ))}
                     </div>
                 )}
             </div>

@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { DownloadBanner } from "@/components/app/download-banner"
 import { TitleBar, type TitleBarStyle } from "@/components/app/title-bar"
@@ -34,6 +34,12 @@ function AppShell({
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     const { detail, back } = useMusicNavigation()
+    const mainRef = useRef<HTMLElement>(null)
+    // 页面容器常驻，切页/详情变化时滚动位置会残留（表现为新页面居中），
+    // 每次路由变化统一回到顶部
+    useEffect(() => {
+        mainRef.current?.scrollTo({ top: 0, left: 0 })
+    }, [activeRoute, detail])
     // 网页版无窗口/托盘/系统媒体集成；桌面 hooks 内部自带 web 守卫
     usePlayerHotkeys()
     useCloseToTray()
@@ -73,7 +79,10 @@ function AppShell({
             <div className="flex min-h-0 flex-1">
                 <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
 
-                <main className="apple-scroll min-w-0 flex-1 overflow-y-auto">
+                <main
+                    ref={mainRef}
+                    className="apple-scroll min-w-0 flex-1 overflow-y-auto"
+                >
                     <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-8 md:pb-10 lg:px-10">
                         {children}
                     </div>

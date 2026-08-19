@@ -23,6 +23,7 @@ import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
+import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { cn } from "@/lib/utils"
 
 // 收合动画时长对齐 --duration-enter，避免与网格折叠动画错拍
@@ -40,8 +41,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     const {
         currentTrack,
         isPlaying,
-        positionMs,
-        durationMs,
         volume,
         isMuted,
         shuffle,
@@ -55,6 +54,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
         toggleShuffle,
         cycleRepeat,
     } = usePlayer()
+    const { positionMs, durationMs } = usePlaybackTick()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum } = useMusicNavigation()
@@ -292,10 +292,12 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                     className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 text-left active:opacity-80"
                                     title="全屏播放"
                                 >
-                                    <p className="truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
+                                    <p className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
                                         {currentTrack.title}
                                     </p>
-                                    <SourceBadge source={currentTrack.source} />
+                                    <span className="shrink-0">
+                                        <SourceBadge source={currentTrack.source} />
+                                    </span>
                                 </button>
                                 <p className="mt-0.5 min-w-0 truncate text-[13px] text-muted-foreground md:text-[12px]">
                                     {canOpenArtist ? (

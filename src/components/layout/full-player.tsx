@@ -19,7 +19,6 @@ import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as React
 
 import { Cover } from "@/components/music/cover"
 import { EqEditor } from "@/components/music/eq-editor"
-import { CommentSheet } from "@/components/music/comment-sheet"
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
@@ -66,6 +65,7 @@ import {
     type FullPlayerChrome,
     type FullPlayerLayout,
 } from "@/lib/player/full-player-prefs"
+import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { cn } from "@/lib/utils"
 
 type FullPlayerProps = {
@@ -102,8 +102,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const {
         currentTrack,
         isPlaying,
-        positionMs,
-        durationMs,
         volume,
         isMuted,
         shuffle,
@@ -118,10 +116,11 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         cycleRepeat,
         reloadCurrent,
     } = usePlayer()
+    const { positionMs, durationMs } = usePlaybackTick()
     const { startDragging } = useWindowControls()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
-    const { openArtist, openAlbum } = useMusicNavigation()
+    const { openArtist, openAlbum, openComments } = useMusicNavigation()
     const isMobile = useIsMobile()
 
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
@@ -129,7 +128,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
-    const [commentOpen, setCommentOpen] = useState(false)
     const [likeCount, setLikeCount] = useState<number | null>(null)
     // 移动端只保留 封面/歌词 两种布局；classic 是桌面分栏，窄屏降级到封面
     const availableLayouts = isMobile
@@ -503,7 +501,13 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             onQuality={handleQualityChange}
             onToggleLike={() => void handleToggleLike()}
             likeCount={likeCount}
-            onOpenComments={() => setCommentOpen(true)}
+            onOpenComments={() =>
+                openComments({
+                    id: displayTrack.id,
+                    title: displayTrack.title,
+                    subtitle: displayTrack.artist,
+                })
+            }
             trackId={displayTrack.id}
         />
     )
@@ -518,11 +522,13 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     const meta = (
         <div className="space-y-1.5 text-center">
-            <div className="flex items-center justify-center gap-2">
-                <h2 className="truncate text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px]">
+            <div className="flex min-w-0 items-center justify-center gap-2">
+                <h2 className="min-w-0 truncate text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px]">
                     {displayTrack.title}
                 </h2>
-                <SourceBadge source={displayTrack.source} />
+                <span className="shrink-0">
+                    <SourceBadge source={displayTrack.source} />
+                </span>
             </div>
             <p className="truncate text-[14px] text-muted-foreground sm:text-[15px]">
                 {canOpenArtist ? (
@@ -619,7 +625,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 return
                             if (event.pointerType !== "mouse") return
                             // 双击动作与主标题栏一致（最大化/还原）；
-                            // 微抖穿透点击已由 hook 的移动阈值过滤
+                            // 拖动由系统原生 HTCAPTION 拖拽接管
                             startDragging(event)
                         }}
                     >
@@ -806,12 +812,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         {transport}
                     </div>
                 </div>
-
-                <CommentSheet
-                    track={displayTrack}
-                    open={commentOpen}
-                    onOpenChange={setCommentOpen}
-                />
             </div>
         </div>
     </div>
