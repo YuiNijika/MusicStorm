@@ -7,6 +7,7 @@ MusicStorm 一键构建。
 """
 
 import codecs
+import json
 import os
 import shutil
 import subprocess
@@ -455,11 +456,20 @@ def build_android(java: str, sdk: str) -> tuple[int, str]:
         print("\n  Symlink 失败，使用文件复制兜底 …")
         rc = _android_fallback_gradle(java, sdk, env)
 
-    apk = (
+    apk = Path(
         "src-tauri/gen/android/app/build/outputs/apk"
-        f"/universal/release/app-universal-release.apk"
+        "/universal/release/app-universal-release.apk"
     )
-    return rc, apk if rc == 0 else ""
+    if rc == 0 and apk.is_file():
+        # 对齐 Windows 安装包命名（MusicStorm_<版本>-setup），便于发布区分
+        apk_version = json.loads(_APK_CONFIG).get("version", "0.0.1")
+        renamed = apk.with_name(f"MusicStorm_{apk_version}-setup.apk")
+        try:
+            shutil.copy2(apk, renamed)
+            return rc, str(renamed)
+        except OSError:
+            return rc, str(apk)
+    return rc, str(apk) if rc == 0 else ""
 
 
 def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
