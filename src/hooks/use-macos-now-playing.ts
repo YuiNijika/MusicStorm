@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
 import { getCoverOverride } from "@/lib/music/cover-overrides"
@@ -9,6 +9,7 @@ import {
     getCachedRemoteCover,
 } from "@/lib/music/remote-cover-cache"
 import { isNativeMacOS } from "@/lib/platform"
+import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
 
 type NowPlayingPayload = {
     title: string
@@ -40,8 +41,6 @@ function useMacOSNowPlaying() {
         currentIndex,
         queue,
         isPlaying,
-        positionMs,
-        durationMs,
     } = usePlayer()
     const [coverPath, setCoverPath] = useState<string | null>(null)
     const lastSentAtRef = useRef(0)
@@ -78,16 +77,12 @@ function useMacOSNowPlaying() {
         }
     }, [currentTrack])
 
-    useEffect(() => {
-        if (isWebMode() || !isNativeMacOS()) {
+    const pushNowPlaying = useCallback(() => {
+        if (isWebMode() || !isNativeMacOS() || !currentTrack) {
             return
         }
-        if (!currentTrack) {
-            lastIdentityRef.current = ""
-            void invoke("macos_now_playing_clear")
-            return
-        }
-
+        // 推送瞬间读取最新进度，避免整应用每 tick 重渲
+        const { positionMs, durationMs } = getPlaybackTickSnapshot()
         const total = durationMs > 0 ? durationMs : currentTrack.durationMs
         const identity = [
             currentTrack.id,
@@ -120,15 +115,29 @@ function useMacOSNowPlaying() {
             coverPath,
         }
         void invoke("macos_now_playing_update", { payload })
-    }, [
-        coverPath,
-        currentIndex,
-        currentTrack,
-        durationMs,
-        isPlaying,
-        positionMs,
-        queue.length,
-    ])
+    }, [coverPath, currentIndex, currentTrack, isPlaying, queue.length])
+
+    useEffect(() => {
+        if (isWebMode() || !isNativeMacOS()) {
+            return
+        }
+        if (!currentTrack) {
+            lastIdentityRef.current = ""
+            void invoke("macos_now_playing_clear")
+            return
+        }
+        // 曲目/封面/播放状态变化时立即推送
+        pushNowPlaying()
+    }, [currentTrack, pushNowPlaying])
+
+    useEffect(() => {
+        if (isWebMode() || !isNativeMacOS() || !currentTrack) {
+            return
+        }
+        // 锁屏进度周期刷新；改用定时器而非依赖 tick 重渲
+        const timer = window.setInterval(pushNowPlaying, 5_000)
+        return () => window.clearInterval(timer)
+    }, [currentTrack, pushNowPlaying])
 }
 
 export { useMacOSNowPlaying }

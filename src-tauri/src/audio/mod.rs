@@ -215,7 +215,7 @@ pub fn audio_probe() -> Result<AudioProbeResult, String> {
 }
 
 #[tauri::command]
-pub fn audio_load(
+pub async fn audio_load(
     app: AppHandle,
     state: State<'_, AudioState>,
     db: State<'_, DbState>,
@@ -227,11 +227,14 @@ pub fn audio_load(
     }
     let player = ensure_player(&state, &db, &app)?;
     player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
-    player.load(url_or_path, false)
+    // 等待 worker 打开解码源可能耗时（慢盘/大文件），移到阻塞线程池，避免卡主线程冻结 UI
+    tauri::async_runtime::spawn_blocking(move || player.load(url_or_path, false))
+        .await
+        .map_err(|e| format!("音频任务失败: {e}"))?
 }
 
 #[tauri::command]
-pub fn audio_play(
+pub async fn audio_play(
     app: AppHandle,
     state: State<'_, AudioState>,
     db: State<'_, DbState>,
@@ -243,7 +246,10 @@ pub fn audio_play(
     }
     let player = ensure_player(&state, &db, &app)?;
     player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
-    player.play(url_or_path, false)
+    // 等待 worker 解码打开可能耗时（probe + 预建索引），阻塞线程池执行，UI 保持响应
+    tauri::async_runtime::spawn_blocking(move || player.play(url_or_path, false))
+        .await
+        .map_err(|e| format!("音频任务失败: {e}"))?
 }
 
 #[tauri::command]
@@ -259,7 +265,7 @@ pub fn audio_pause(state: State<'_, AudioState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn audio_seek(
+pub async fn audio_seek(
     state: State<'_, AudioState>,
     position_ms: f64,
     resume: Option<bool>,
@@ -269,7 +275,13 @@ pub fn audio_seek(
         guard.as_ref().cloned()
     };
     if let Some(player) = player {
-        player.seek(position_ms, resume.unwrap_or(false))?;
+        // 无缓冲时 seek 会重开解码源（symphonia 容器 seek），阻塞线程池执行避免卡 UI
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            player.seek(position_ms, resume.unwrap_or(false))
+        })
+        .await
+        .map_err(|e| format!("音频任务失败: {e}"))?;
+        result?;
     }
     Ok(())
 }

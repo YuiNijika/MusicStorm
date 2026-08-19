@@ -18,6 +18,12 @@ type MusicNavigationValue = {
     openRadio: (id: string) => void
     openRadioProgram: (programId: string, radioId?: string) => void
     openMv: (id: string) => void
+    /** 歌曲评论页 */
+    openComments: (target: {
+        id: string
+        title?: string
+        subtitle?: string
+    }) => void
     /** 返回上一层；无更多历史时关闭详情 */
     back: () => void
     /** 清空详情栈，侧栏切页时用 */
@@ -120,6 +126,23 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
         [pushDetail],
     )
 
+    const openComments = useCallback(
+        (target: { id: string; title?: string; subtitle?: string }) => {
+            const next = target.id.trim()
+            if (!next || !/^\d+$/.test(next)) {
+                return
+            }
+            const detail: MusicDetail = {
+                type: "comments",
+                id: next,
+                ...(target.title ? { title: target.title } : {}),
+                ...(target.subtitle ? { subtitle: target.subtitle } : {}),
+            }
+            pushDetail(detail)
+        },
+        [pushDetail],
+    )
+
     const back = useCallback(() => {
         setStack((prev) => (prev.length <= 1 ? [] : prev.slice(0, -1)))
     }, [])
@@ -139,6 +162,7 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             openRadio,
             openRadioProgram,
             openMv,
+            openComments,
             back,
             closeDetail,
         }),
@@ -150,6 +174,7 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             openRadio,
             openRadioProgram,
             openMv,
+            openComments,
             back,
             closeDetail,
         ],

@@ -65,6 +65,7 @@ const RadioProgramPage = lazy(() => import("@/pages/radio-program").then(m => ({
 const RadiosPage = lazy(() => import("@/pages/radios").then(m => ({ default: m.RadiosPage })))
 const SearchPage = lazy(() => import("@/pages/search").then(m => ({ default: m.SearchPage })))
 const StatsPage = lazy(() => import("@/pages/stats").then(m => ({ default: m.StatsPage })))
+const CommentsPage = lazy(() => import("@/pages/comments").then(m => ({ default: m.CommentsPage })))
 
 import "./App.css"
 import "./Style.css"
@@ -115,6 +116,18 @@ function AppRoutes({
     }
     if (detail?.type === "mv") {
         return <Suspense fallback={mvFallback}><MvPage mvId={detail.id} onBack={back} /></Suspense>
+    }
+    if (detail?.type === "comments") {
+        return (
+            <Suspense fallback={mvFallback}>
+                <CommentsPage
+                    trackId={detail.id}
+                    title={detail.title}
+                    subtitle={detail.subtitle}
+                    onBack={back}
+                />
+            </Suspense>
+        )
     }
 
     if (route === "home") {

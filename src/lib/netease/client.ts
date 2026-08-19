@@ -46,6 +46,7 @@ const WRITE_PATHS = new Set<string>([
     NETEASE_PATHS.djSub,
     NETEASE_PATHS.userCloudDel,
     NETEASE_PATHS.fmTrash,
+    NETEASE_PATHS.comment,
 ])
 
 type RequestOptions = {

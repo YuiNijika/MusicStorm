@@ -270,6 +270,27 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 },
                 crypto: "weapi",
             }
+        case NETEASE_PATHS.comment: {
+            const t = qNum(query, "t", 1)
+            const data: Record<string, unknown> = {
+                threadId: `R_SO_4_${q(query, "id")}`,
+                type: qNum(query, "type", 1),
+                t,
+                content: q(query, "content"),
+            }
+            // 回复评论带上被回复的 commentId（普通评论不传）
+            if (query.commentId != null) {
+                data.commentId = qNum(query, "commentId", 0)
+            }
+            return {
+                uri:
+                    t === 1
+                        ? "/api/resource/comments/add"
+                        : "/api/resource/comments/delete",
+                data,
+                crypto: "weapi",
+            }
+        }
         case NETEASE_PATHS.artists:
             return {
                 uri: `/api/v1/artist/${q(query, "id")}`,

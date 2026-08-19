@@ -38,6 +38,7 @@ import {
     getPlayerPreferences,
     setPlayerPreferences,
 } from "@/lib/player/playback-prefs"
+import { setPlaybackTick } from "@/lib/player/playback-tick"
 import { createNativeEngine } from "@/lib/player/native-engine"
 import {
     hydrateLocalTracks,
@@ -62,7 +63,8 @@ import {
 import type { PlayerSnapshot, RepeatMode, Track } from "@/lib/types"
 import { isWebMode } from "@/lib/web-mode"
 
-type PlayerContextValue = PlayerSnapshot & {
+// 进度/时长不进 context：200ms tick 会让全应用每帧重渲；需消费方自行订阅 playback-tick
+type PlayerContextValue = Omit<PlayerSnapshot, "positionMs" | "durationMs"> & {
     currentTrack: Track | null
     engineStatus: EngineStatus
     playTrack: (track: Track, queue?: Track[]) => void
@@ -280,6 +282,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             // 偏好写入失败不影响当前播放
         }
     }, [volume, isMuted])
+
+    // 进度/时长同步到独立 tick store；store 去重后通知订阅方（进度条/歌词），
+    // 不再触发 PlayerContext 换引用，避免无关组件每 200ms 重渲
+    useEffect(() => {
+        setPlaybackTick({ positionMs, durationMs })
+    }, [positionMs, durationMs])
 
     useEffect(() => {
         function refreshLocalQueueMetadata() {
@@ -1420,8 +1428,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             queue,
             currentIndex,
             isPlaying,
-            positionMs,
-            durationMs,
             volume,
             isMuted,
             shuffle,
@@ -1462,8 +1468,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             queue,
             currentIndex,
             isPlaying,
-            positionMs,
-            durationMs,
             volume,
             isMuted,
             shuffle,

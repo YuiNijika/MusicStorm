@@ -7,6 +7,7 @@ import {
     keydownToInAppShortcut,
     type InAppShortcutMap,
 } from "@/lib/app/in-app-shortcut-prefs"
+import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
 
 function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
@@ -22,8 +23,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
 function usePlayerHotkeys() {
     const {
         currentTrack,
-        positionMs,
-        durationMs,
         volume,
         togglePlay,
         next,
@@ -66,6 +65,8 @@ function usePlayerHotkeys() {
                     break
                 case map.seekForward: {
                     event.preventDefault()
+                    // 事件发生时读取最新进度，避免监听因 tick 重挂
+                    const { positionMs, durationMs } = getPlaybackTickSnapshot()
                     const total =
                         durationMs > 0 ? durationMs : currentTrack.durationMs
                     seek(Math.min(total, positionMs + 5_000))
@@ -73,6 +74,7 @@ function usePlayerHotkeys() {
                 }
                 case map.seekBackward: {
                     event.preventDefault()
+                    const { positionMs } = getPlaybackTickSnapshot()
                     seek(Math.max(0, positionMs - 5_000))
                     break
                 }
@@ -103,9 +105,7 @@ function usePlayerHotkeys() {
         return () => window.removeEventListener("keydown", onKeyDown)
     }, [
         currentTrack,
-        durationMs,
         next,
-        positionMs,
         previous,
         seek,
         setVolume,

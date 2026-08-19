@@ -57,7 +57,14 @@ function setPlayerPreferences(patch: Partial<PlayerPreferences>): PlayerPreferen
                 : current.volume,
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    window.dispatchEvent(new Event(PLAYER_PREFS_EVENT))
+    // 音量/静音随播放频繁落盘，与界面消费者无关；仅在行为类偏好变化时广播，
+    // 避免调音量触发歌词等面板无意义地重新拉取
+    if (
+        next.showLyricTranslation !== current.showLyricTranslation ||
+        next.autoPlayOnStartup !== current.autoPlayOnStartup
+    ) {
+        window.dispatchEvent(new Event(PLAYER_PREFS_EVENT))
+    }
     return next
 }
 

@@ -81,5 +81,37 @@ async function fetchSongStats(id: string): Promise<SongStats> {
     }
 }
 
-export { fetchSongComments, fetchSongStats }
+type PostCommentData = {
+    code?: number
+    comment?: NeteaseComment
+}
+
+/**
+ * 发布/回复歌曲评论。
+ * replyTo 传入被回复评论时走回复，否则为普通评论。
+ */
+async function postSongComment(
+    id: string,
+    content: string,
+    replyTo?: { commentId: number; nickname: string },
+): Promise<NeteaseComment> {
+    const data = await neteaseRequest<PostCommentData>({
+        path: NETEASE_PATHS.comment,
+        method: "POST",
+        params: {
+            t: 1,
+            type: 1,
+            id,
+            content,
+            ...(replyTo ? { commentId: replyTo.commentId } : {}),
+        },
+    })
+    const comment = data.comment
+    if (!comment) {
+        throw new Error("评论发布失败")
+    }
+    return comment
+}
+
+export { fetchSongComments, fetchSongStats, postSongComment }
 export type { NeteaseComment, SongComments, SongStats }

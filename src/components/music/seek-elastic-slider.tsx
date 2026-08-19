@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 
 import { ElasticSlider } from "@/components/ui/elastic-slider"
 import { formatDuration } from "@/lib/format"
@@ -24,14 +24,9 @@ function SeekElasticSlider({
 }: SeekElasticSliderProps) {
     const total = durationMs > 0 ? durationMs : 1
     const external = Math.min(Math.max(0, positionMs), total)
-    const draggingRef = useRef(false)
-    const [displayMs, setDisplayMs] = useState(external)
-
-    useEffect(() => {
-        if (!draggingRef.current) {
-            setDisplayMs(external)
-        }
-    }, [external])
+    // 拖动中 displayMs 覆盖外部进度，松手清除让外部 tick 接管；避免 useEffect 二次同步
+    const [dragMs, setDragMs] = useState<number | null>(null)
+    const displayMs = dragMs ?? external
 
     return (
         <div className={cn("flex w-full min-w-0 items-center gap-2", className)}>
@@ -52,17 +47,15 @@ function SeekElasticSlider({
                 showValue={false}
                 aria-label="播放进度"
                 onValueChange={(next) => {
-                    draggingRef.current = true
-                    setDisplayMs(next)
+                    setDragMs(next)
                 }}
                 onValueCommit={(next) => {
-                    setDisplayMs(next)
                     onSeek(next)
-                    draggingRef.current = false
+                    setDragMs(null)
                 }}
             />
             {showTime ? (
-                <span className="w-9 shrink-0 text-[11px] tabular-nums text-muted-foreground sm:w-10">
+                <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground sm:w-10">
                     {formatDuration(durationMs > 0 ? durationMs : 0)}
                 </span>
             ) : null}

@@ -29,7 +29,6 @@ import {
 
 import { Cover } from "@/components/music/cover"
 import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
-import { CommentSheet } from "@/components/music/comment-sheet"
 import { LyricEditDialog } from "@/components/music/lyric-edit-dialog"
 import { SourceBadge } from "@/components/music/source-badge"
 import {
@@ -120,14 +119,13 @@ function TrackRow({
     onPlay,
     trailing,
 }: TrackRowProps) {
-    const { openArtist, openAlbum } = useMusicNavigation()
+    const { openArtist, openAlbum, openComments } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { playNext, addToQueue } = usePlayer()
     const [, setOverrideTick] = useState(0)
     const [lyricEditOpen, setLyricEditOpen] = useState(false)
     const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false)
-    const [commentOpen, setCommentOpen] = useState(false)
 
     const isNetease = track.source === "netease"
     const isLocal = track.source === "local"
@@ -168,6 +166,17 @@ function TrackRow({
         event.preventDefault()
         event.stopPropagation()
         action()
+    }
+
+    function handleOpenComments() {
+        if (!isNetease) {
+            return
+        }
+        openComments({
+            id: track.id,
+            title: track.title,
+            subtitle: track.artist,
+        })
     }
 
     async function handleLike(event: MouseEvent) {
@@ -560,7 +569,7 @@ function TrackRow({
                         ) : null}
                         {isNetease ? (
                             <DropdownMenuItem
-                                onClick={() => setCommentOpen(true)}
+                                onClick={() => handleOpenComments()}
                             >
                                 <MessageCircle />
                                 查看评论
@@ -680,7 +689,7 @@ function TrackRow({
                     </ContextMenuItem>
                 ) : null}
                 {isNetease ? (
-                    <ContextMenuItem onClick={() => setCommentOpen(true)}>
+                    <ContextMenuItem onClick={handleOpenComments}>
                         <MessageCircle />
                         查看评论
                     </ContextMenuItem>
@@ -769,12 +778,6 @@ function TrackRow({
             track={track}
             open={addToPlaylistOpen}
             onOpenChange={setAddToPlaylistOpen}
-        />
-
-        <CommentSheet
-            track={track}
-            open={commentOpen}
-            onOpenChange={setCommentOpen}
         />
         </>
     )

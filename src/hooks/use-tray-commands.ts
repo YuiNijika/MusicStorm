@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
+import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
 import { isWebMode } from "@/lib/web-mode"
 
 type PlayerCommandPayload =
@@ -13,9 +14,7 @@ type PlayerCommandPayload =
 function useTrayCommands() {
     const {
         currentTrack,
-        durationMs,
         isPlaying,
-        positionMs,
         volume,
         togglePlay,
         next,
@@ -40,6 +39,8 @@ function useTrayCommands() {
                 return
             }
             void listen<PlayerCommandPayload>("musicstorm:player-command", (event) => {
+                // 事件发生时读取最新进度，避免监听因 tick 重挂
+                const { positionMs, durationMs } = getPlaybackTickSnapshot()
                 const action =
                     typeof event.payload === "string"
                         ? event.payload
@@ -120,10 +121,8 @@ function useTrayCommands() {
         }
     }, [
         currentTrack,
-        durationMs,
         isPlaying,
         next,
-        positionMs,
         previous,
         seek,
         setVolume,

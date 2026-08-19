@@ -34,3 +34,4 @@ export type MusicDetail =
     | { type: "radio"; id: string }
     | { type: "radio-program"; id: string; radioId?: string }
     | { type: "mv"; id: string }
+    | { type: "comments"; id: string; title?: string; subtitle?: string }

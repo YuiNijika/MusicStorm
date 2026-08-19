@@ -21,6 +21,7 @@ export const NETEASE_PATHS = {
     likelist: "/likelist",
     like: "/like",
     commentMusic: "/comment/music",
+    comment: "/comment",
     artists: "/artists",
     artistAlbum: "/artist/album",
     artistMv: "/artist/mv",

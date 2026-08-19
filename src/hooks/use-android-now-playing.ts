@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
 import {
@@ -13,6 +13,7 @@ import {
     getCachedRemoteCover,
 } from "@/lib/music/remote-cover-cache"
 import { isAndroid } from "@/lib/platform"
+import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
 import { isWebMode } from "@/lib/web-mode"
 
 // Android 系统媒体通知（对齐 macOS now-playing hook 的角色）：
@@ -21,9 +22,7 @@ import { isWebMode } from "@/lib/web-mode"
 function useAndroidNowPlaying() {
     const {
         currentTrack,
-        durationMs,
         isPlaying,
-        positionMs,
         togglePlay,
         next,
         previous,
@@ -104,15 +103,12 @@ function useAndroidNowPlaying() {
     }, [currentTrack])
 
     // 推送元数据：身份变化立即发，否则 5s 节流；进度交给 session 自动外推
-    useEffect(() => {
-        if (isWebMode() || !isAndroid() || !hasAndroidAudio()) {
+    const pushNowPlaying = useCallback(() => {
+        if (isWebMode() || !isAndroid() || !hasAndroidAudio() || !currentTrack) {
             return
         }
-        if (!currentTrack) {
-            lastIdentityRef.current = ""
-            clearAndroidNowPlaying()
-            return
-        }
+        // 推送瞬间读取最新进度，避免整应用每 tick 重渲
+        const { positionMs, durationMs } = getPlaybackTickSnapshot()
         const total = durationMs > 0 ? durationMs : currentTrack.durationMs
         const identity = [
             currentTrack.id,
@@ -139,7 +135,29 @@ function useAndroidNowPlaying() {
             playing: isPlaying,
             positionMs: Math.max(0, positionMs),
         })
-    }, [coverUrl, currentTrack, durationMs, isPlaying, positionMs])
+    }, [coverUrl, currentTrack, isPlaying])
+
+    useEffect(() => {
+        if (isWebMode() || !isAndroid() || !hasAndroidAudio()) {
+            return
+        }
+        if (!currentTrack) {
+            lastIdentityRef.current = ""
+            clearAndroidNowPlaying()
+            return
+        }
+        // 曲目/封面/播放状态变化时立即推送
+        pushNowPlaying()
+    }, [currentTrack, pushNowPlaying])
+
+    useEffect(() => {
+        if (isWebMode() || !isAndroid() || !hasAndroidAudio() || !currentTrack) {
+            return
+        }
+        // 系统通知进度周期刷新；改用定时器而非依赖 tick 重渲
+        const timer = window.setInterval(pushNowPlaying, 5_000)
+        return () => window.clearInterval(timer)
+    }, [currentTrack, pushNowPlaying])
 }
 
 export { useAndroidNowPlaying }
