@@ -9,12 +9,17 @@ import {
     type ReactNode,
 } from "react"
 
+import { hasAndroidAudio } from "@/lib/android/native-bridge"
 import { recordPlaySessionEnd, startPlaySession } from "@/lib/db/play-stats"
 import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import { LOCAL_LIBRARY_EVENT } from "@/lib/local/library-store"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import { notifyError, notifyWarning } from "@/lib/notify"
+import { isAndroid } from "@/lib/platform"
+import {
+    createAndroidEngine,
+} from "@/lib/player/android-engine"
 import {
     createHtml5Engine,
     type AudioEngine,
@@ -667,7 +672,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             // 仅探测并挂载 native 实例；默认显示 H5，按曲再切原生输出
             if (choice.nativeReady) {
                 try {
-                    nativeRef.current = createNativeEngine(handlers)
+                    nativeRef.current =
+                        isAndroid() && hasAndroidAudio()
+                            ? createAndroidEngine(handlers)
+                            : createNativeEngine(handlers)
                     nativeAvailableRef.current = true
                     // native 引擎已集成 biquad EQ，挂载时同步当前增益
                     nativeRef.current.setEq(

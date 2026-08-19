@@ -116,7 +116,7 @@ function LocalAlbumDrawer({
     return (
         <>
             <Drawer open={open} onOpenChange={onOpenChange}>
-                <DrawerContent className="w-full max-w-none rounded-t-[28px] border-border/60 bg-background/96 px-0 pb-0 shadow-[0_30px_120px_rgba(15,23,42,0.22)] backdrop-blur-2xl dark:border-white/10 dark:bg-[#10131a]/96">
+                <DrawerContent className="w-full max-w-none rounded-t-[28px] border-border/60 bg-background/96 px-0 pb-0 shadow-[0_30px_120px_rgba(15,23,42,0.22)] backdrop-blur-2xl dark:border-white/10 dark:bg-background/96">
                     <div className="px-4 pt-3">
                         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/15" />
                     </div>

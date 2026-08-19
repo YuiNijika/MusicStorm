@@ -14,6 +14,9 @@ const LIMIT_PRESETS: { id: string; label: string; bytes: number }[] = [
 
 const DEFAULT_LIMIT_BYTES = 400 * MB
 
+// 移动端内部存储宝贵：启动时按此上限收敛封面缓存，即使未改设置
+const MOBILE_COVER_CACHE_LIMIT = 128 * MB
+
 function getCoverCacheLimitBytes(): number {
     if (typeof window === "undefined") {
         return DEFAULT_LIMIT_BYTES
@@ -39,6 +42,7 @@ export {
     DEFAULT_LIMIT_BYTES,
     LIMIT_EVENT,
     LIMIT_PRESETS,
+    MOBILE_COVER_CACHE_LIMIT,
     getCoverCacheLimitBytes,
     setCoverCacheLimitBytes,
 }

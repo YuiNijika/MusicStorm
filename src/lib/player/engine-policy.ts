@@ -1,3 +1,4 @@
+import { hasAndroidAudio } from "@/lib/android/native-bridge"
 import { audioProbe, isTauriRuntime } from "@/lib/player/native-bridge"
 
 const ENGINE_PREF_KEY = "musicstorm-player-engine"
@@ -58,6 +59,11 @@ async function resolveEngineChoice(
 ): Promise<{ nativeReady: boolean; status: EngineStatus; message?: string }> {
     if (pref === "html5" || !isTauriRuntime()) {
         return { nativeReady: false, status: "html5" }
+    }
+
+    // Android 无 audio_* 命令（Rust 引擎被 cfg 排除），系统 MediaPlayer 桥即原生后端
+    if (hasAndroidAudio()) {
+        return { nativeReady: true, status: "html5" }
     }
 
     const probe = await audioProbe()

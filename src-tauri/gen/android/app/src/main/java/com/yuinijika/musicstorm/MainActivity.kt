@@ -14,6 +14,11 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
   }
 
+  override fun onDestroy() {
+    bridge.destroy()
+    super.onDestroy()
+  }
+
   // WryActivity.setWebView 末尾调用；父类的 back callback 此时已注册，
   // 这里再注册一个 → dispatcher 按 LIFO 优先走这里，
   // 把返回手势转发给前端决策（返回上一级/退出），而不是直接 finish 退出

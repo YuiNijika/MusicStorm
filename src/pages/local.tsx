@@ -719,6 +719,9 @@ function LocalPage() {
                                         onPlay={(item) =>
                                             playOrToggle(item, sortedTracks)
                                         }
+                                        onLocalRemove={() =>
+                                            lib.deleteTrack(track.id)
+                                        }
                                     />
                                 )}
                             />
@@ -738,6 +741,9 @@ function LocalPage() {
                                         showSource={false}
                                         onPlay={(item) =>
                                             playOrToggle(item, sortedTracks)
+                                        }
+                                        onLocalRemove={() =>
+                                            lib.deleteTrack(track.id)
                                         }
                                     />
                                 )}

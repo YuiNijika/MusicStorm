@@ -12,8 +12,10 @@ import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
 import {
     DEFAULT_LIMIT_BYTES,
     getCoverCacheLimitBytes,
+    MOBILE_COVER_CACHE_LIMIT,
 } from "@/lib/music/cover-cache-prefs"
 import { isWebMode } from "@/lib/web-mode"
+import { isAndroid } from "@/lib/platform"
 import {
     PERFORMANCE_MODE_EVENT,
     applyPerformanceModeClass,
@@ -180,13 +182,17 @@ function App() {
     useDevtoolsShortcut()
 
     useEffect(() => {
-        // 桌面端按用户设置的封面缓存阈值清理一次，覆盖 Rust 侧默认值
+        // 桌面端按用户设置的封面缓存阈值清理一次，覆盖 Rust 侧默认值；
+        // 移动端存储宝贵，即使未改设置也按移动上限收敛
         if (isWebMode()) {
             return
         }
         const limit = getCoverCacheLimitBytes()
-        if (limit !== DEFAULT_LIMIT_BYTES) {
-            void invoke("purge_cover_cache_cmd", { maxBytes: limit }).catch(
+        const target = isAndroid()
+            ? Math.min(limit, MOBILE_COVER_CACHE_LIMIT)
+            : limit
+        if (target !== DEFAULT_LIMIT_BYTES) {
+            void invoke("purge_cover_cache_cmd", { maxBytes: target }).catch(
                 () => {},
             )
         }

@@ -169,6 +169,20 @@
             var(--background);
     }
 
+    /* 旧 WebView 不认 oklch/color-mix：整条渐变声明失效会让底色变白，
+     * 回退纯背景色保持与 PC 一致的明暗基调（渐变只是装饰层） */
+    @supports not (
+        (color: oklch(0.5 0.1 250)) and
+            (color: color-mix(in oklab, red, blue))
+    ) {
+        body,
+        .dark body,
+        .app-root,
+        .dark .app-root {
+            background: var(--background);
+        }
+    }
+
     /* 自定义背景：fixed 层叠加在渐变底之上、内容之下；z-index -1 依赖 app-root 的 isolate 层叠上下文 */
     .app-root::before {
         content: "";
@@ -711,6 +725,44 @@ html.performance-mode [class*="animate-out"] {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
+}
+
+/* 移动端（Android WebView GPU 弱）：全屏/大面积 backdrop-filter 每帧重绘整层，
+ * 降模糊半径 + 去掉 saturate（额外整屏合成 pass），滚动/翻页不再掉帧；
+ * 视觉与桌面接近，代价仅是玻璃略微没那么浓。 */
+html[data-platform="android"] .glass,
+html[data-platform="android"] .glass-panel,
+html[data-platform="android"] .glass-chip,
+html[data-platform="android"] .material-chrome,
+html[data-platform="android"] .material-sidebar,
+html[data-platform="android"] .material-player,
+html[data-platform="android"] .material-panel,
+html[data-platform="android"] .material-field,
+html[data-platform="android"] .material-surface,
+html[data-platform="android"] .material-segmented,
+html[data-platform="android"] .apple-list-surface,
+html[data-platform="android"] .mobile-nav-bar,
+html[data-platform="android"] .download-banner {
+    backdrop-filter: blur(min(10px, var(--glass-blur, 28px))) !important;
+    -webkit-backdrop-filter: blur(min(10px, var(--glass-blur, 28px))) !important;
+}
+
+/* 全屏播放器背板是最大开销源：58px 全屏模糊收敛到 24px，弱机接近实时合成 */
+html[data-platform="android"] .full-player-backdrop-image {
+    filter: blur(24px) brightness(1.1);
+    transform: scale(1.02);
+}
+html[data-platform="android"] .dark .full-player-backdrop-image {
+    filter: blur(22px) brightness(0.75);
+}
+html[data-platform="android"] .full-player-backdrop-tint {
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* 呼吸动画持续触发合成层，弱机直接停掉，封面静止即可 */
+html[data-platform="android"] [class*="cover-breathe"] {
+    animation: none !important;
 }
 
 @keyframes download-banner-in {

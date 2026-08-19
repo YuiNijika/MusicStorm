@@ -14,10 +14,51 @@ export type SafProgressPayload = {
     total: number
 }
 
+export type AudioStatePayload = {
+    playing: boolean
+    prepared?: boolean
+    positionMs?: number
+    durationMs?: number
+    ended?: boolean
+    error?: string
+}
+
+export type NowPlayingPayload = {
+    title: string
+    artist: string
+    album: string
+    durationMs: number
+    coverUrl: string
+    playing: boolean
+    positionMs: number
+}
+
+export type TransportCommandPayload = {
+    command: "play" | "pause" | "next" | "previous" | "seek" | "stop"
+    positionMs?: number
+}
+
 type NativeBridge = {
     pickFolder?: () => void
     pickFiles?: () => void
     download?: (url: string, name: string) => void
+    prepareFile?: (path: string) => void
+    startPlayback?: () => void
+    pausePlayback?: () => void
+    seekPlayback?: (positionMs: number, resume: boolean) => void
+    setPlaybackVolume?: (volume: number) => void
+    setPlaybackMuted?: (muted: boolean) => void
+    stopPlayback?: () => void
+    updateNowPlaying?: (
+        title: string,
+        artist: string,
+        album: string,
+        durationMs: number,
+        coverUrl: string,
+        playing: boolean,
+        positionMs: number,
+    ) => void
+    clearNowPlaying?: () => void
 }
 
 function bridge(): NativeBridge {
@@ -88,10 +129,100 @@ function downloadViaBridge(url: string, name: string): boolean {
     return true
 }
 
+// ---- Android 系统 MediaPlayer ----
+
+function hasAndroidAudio(): boolean {
+    return isAndroid() && typeof bridge().prepareFile === "function"
+}
+
+function prepareAndroidFile(path: string): void {
+    bridge().prepareFile?.(path)
+}
+
+function startAndroidPlayback(): void {
+    bridge().startPlayback?.()
+}
+
+function pauseAndroidPlayback(): void {
+    bridge().pausePlayback?.()
+}
+
+function seekAndroidPlayback(positionMs: number, resume: boolean): void {
+    bridge().seekPlayback?.(positionMs, resume)
+}
+
+function setAndroidPlaybackVolume(volume: number): void {
+    bridge().setPlaybackVolume?.(volume)
+}
+
+function setAndroidPlaybackMuted(muted: boolean): void {
+    bridge().setPlaybackMuted?.(muted)
+}
+
+function stopAndroidPlayback(): void {
+    bridge().stopPlayback?.()
+}
+
+function listenAndroidAudioState(
+    handler: (payload: AudioStatePayload) => void,
+): () => void {
+    const listener = (event: Event) => {
+        const detail = (event as CustomEvent<AudioStatePayload>).detail
+        if (detail) {
+            handler(detail)
+        }
+    }
+    window.addEventListener("musicstorm:audio-state", listener)
+    return () => window.removeEventListener("musicstorm:audio-state", listener)
+}
+
+// ---- 系统媒体通知（MediaStyle + MediaSession）----
+
+function updateAndroidNowPlaying(payload: NowPlayingPayload): void {
+    bridge().updateNowPlaying?.(
+        payload.title,
+        payload.artist,
+        payload.album,
+        payload.durationMs,
+        payload.coverUrl,
+        payload.playing,
+        payload.positionMs,
+    )
+}
+
+function clearAndroidNowPlaying(): void {
+    bridge().clearNowPlaying?.()
+}
+
+function listenAndroidTransport(
+    handler: (payload: TransportCommandPayload) => void,
+): () => void {
+    const listener = (event: Event) => {
+        const detail = (event as CustomEvent<TransportCommandPayload>).detail
+        if (detail && typeof detail.command === "string") {
+            handler(detail)
+        }
+    }
+    window.addEventListener("musicstorm:transport-command", listener)
+    return () => window.removeEventListener("musicstorm:transport-command", listener)
+}
+
 export {
+    clearAndroidNowPlaying,
     downloadViaBridge,
+    hasAndroidAudio,
     hasNativeBridge,
+    listenAndroidAudioState,
+    listenAndroidTransport,
+    pauseAndroidPlayback,
     pickSafFiles,
     pickSafFolder,
+    prepareAndroidFile,
+    seekAndroidPlayback,
+    setAndroidPlaybackMuted,
+    setAndroidPlaybackVolume,
+    startAndroidPlayback,
+    stopAndroidPlayback,
+    updateAndroidNowPlaying,
 }
 export type { NativeBridge }

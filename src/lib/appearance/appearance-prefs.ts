@@ -1,3 +1,5 @@
+import { accentSwatch, needsColorFallback } from "@/lib/appearance/color-capability"
+
 const STORAGE_KEY = "musicstorm-appearance"
 
 type AccentTone =
@@ -156,11 +158,6 @@ function isNeutralAccent(prefs: AppearancePrefs): boolean {
     return prefs.accent === "neutral"
 }
 
-// 色点预览色，标题栏与设置共用
-function accentSwatch(hue: number, neutral = false): string {
-    return neutral ? `oklch(0.72 0.02 ${hue})` : `oklch(0.62 0.14 ${hue})`
-}
-
 // 日间必须给背景/玻璃/primary 上 chroma，否则色调看不出；浮层走高不透明度保证菜单可读
 function applyAppearanceToDom(prefs: AppearancePrefs): void {
     const root = document.documentElement
@@ -188,6 +185,20 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
     root.style.setProperty("--app-bg-blur", `${prefs.backgroundBlur}px`)
 
     const dark = root.classList.contains("dark")
+
+    // 旧 WebView 不支持 oklch/color-mix 时走 HSL 近似色板，桌面/移动观感一致
+    if (needsColorFallback()) {
+        applyFallbackPalette(
+            root,
+            hue,
+            neutral,
+            tintAllSurfaces,
+            opacityPct,
+            strongPct,
+            dark,
+        )
+        return
+    }
 
     if (dark) {
         const accentChroma = neutral ? 0.025 : 0.15
@@ -449,6 +460,142 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
     root.style.setProperty(
         "--glass-shadow",
         "0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset",
+    )
+}
+
+// oklch 不可用时的 HSL 近似：保持 PC 默认色的明度/色相族，强调色随 hue 走。
+// 仅旧 WebView 命中，色彩数值允许有 ±5% 级近似，结构性一致即可。
+function applyFallbackPalette(
+    root: HTMLElement,
+    hue: number,
+    neutral: boolean,
+    tintAllSurfaces: boolean,
+    opacityPct: number,
+    strongPct: number,
+    dark: boolean,
+): void {
+    const set = (name: string, value: string) => root.style.setProperty(name, value)
+    const foreground = dark ? "hsl(260 3% 96%)" : "hsl(260 4% 21%)"
+    const accentHue = neutral ? 260 : hue
+    const accentSat = neutral ? (dark ? 14 : 14) : (dark ? 52 : 56)
+    const accentLight = neutral ? (dark ? 72 : 43) : (dark ? 72 : 50)
+    const primary = `hsl(${accentHue} ${accentSat}% ${accentLight}%)`
+    const secondaryHue = neutral ? 260 : hue
+    const neutralHue = 260
+
+    set(
+        "--background",
+        tintAllSurfaces
+            ? `hsl(${hue} 8% ${dark ? 15 : 97}%)`
+            : dark
+              ? "hsl(260 3% 15%)"
+              : "hsl(260 3% 97%)",
+    )
+    set("--foreground", foreground)
+    set(
+        "--card",
+        tintAllSurfaces
+            ? `hsl(${hue} 6% ${dark ? 22 : 99}% / ${dark ? 88 : 94}%)`
+            : dark
+              ? "hsl(260 4% 21% / 88%)"
+              : "rgb(255 255 255 / 94%)",
+    )
+    set("--card-foreground", foreground)
+    set("--popover", dark ? "hsl(260 4% 23% / 97%)" : "hsl(260 3% 99% / 98%)")
+    set("--popover-foreground", foreground)
+    set("--primary", primary)
+    set(
+        "--primary-foreground",
+        dark ? `hsl(${accentHue} 30% 14%)` : "rgb(255 255 255)",
+    )
+    set("--secondary", dark ? "hsl(260 3% 26% / 82%)" : "hsl(260 3% 94% / 88%)")
+    set("--secondary-foreground", foreground)
+    set("--muted", dark ? "hsl(260 3% 25% / 80%)" : "hsl(260 3% 94% / 84%)")
+    set("--muted-foreground", dark ? "hsl(260 4% 70%)" : "hsl(260 4% 49%)")
+    set(
+        "--accent",
+        tintAllSurfaces
+            ? `hsl(${hue} ${dark ? 10 : 12}% ${dark ? 29 : 92}%)`
+            : `hsl(${neutralHue} 4% ${dark ? 29 : 92}% / ${dark ? 82 : 86}%)`,
+    )
+    set("--accent-foreground", foreground)
+    set("--destructive", dark ? "hsl(24 55% 62%)" : "hsl(27 60% 55%)")
+    set("--border", dark ? "rgb(255 255 255 / 11%)" : "hsl(260 4% 80% / 42%)")
+    set("--input", dark ? "rgb(255 255 255 / 14%)" : "hsl(260 4% 90% / 76%)")
+    set(
+        "--ring",
+        neutral
+            ? `hsl(260 ${dark ? 15 : 15}% ${dark ? 62 : 58}%)`
+            : `hsl(${hue} ${dark ? 55 : 60}% ${dark ? 68 : 58}%)`,
+    )
+    set(
+        "--sidebar",
+        tintAllSurfaces
+            ? `hsl(${hue} 6% ${dark ? 19 : 96}% / ${dark ? 90 : 86}%)`
+            : dark
+              ? "hsl(260 4% 18% / 90%)"
+              : "hsl(260 3% 96% / 86%)",
+    )
+    set("--sidebar-foreground", foreground)
+    set("--sidebar-primary", "var(--primary)")
+    set("--sidebar-primary-foreground", "var(--primary-foreground)")
+    set("--sidebar-accent", `hsl(${secondaryHue} 15% ${dark ? 22 : 88}% / 40%)`)
+    set("--sidebar-accent-foreground", foreground)
+    set("--sidebar-border", dark ? "rgb(255 255 255 / 8%)" : "hsl(260 4% 78% / 30%)")
+    set("--sidebar-ring", "var(--ring)")
+    set("--chart-1", "var(--primary)")
+    set(
+        "--chart-2",
+        neutral
+            ? dark
+                ? "hsl(210 12% 68%)"
+                : "hsl(210 14% 62%)"
+            : `hsl(${(hue + 70) % 360} ${dark ? 52 : 55}% ${dark ? 72 : 64}%)`,
+    )
+    set(
+        "--chart-3",
+        neutral
+            ? dark
+                ? "hsl(120 12% 72%)"
+                : "hsl(120 14% 66%)"
+            : `hsl(${(hue + 140) % 360} ${dark ? 55 : 55}% ${dark ? 75 : 68}%)`,
+    )
+    set(
+        "--chart-4",
+        neutral
+            ? dark
+                ? "hsl(310 12% 66%)"
+                : "hsl(310 14% 60%)"
+            : `hsl(${(hue + 210) % 360} ${dark ? 55 : 55}% ${dark ? 70 : 62}%)`,
+    )
+    set(
+        "--chart-5",
+        neutral
+            ? dark
+                ? "hsl(40 12% 70%)"
+                : "hsl(40 14% 64%)"
+            : `hsl(${(hue + 285) % 360} ${dark ? 55 : 56}% ${dark ? 72 : 65}%)`,
+    )
+
+    set(
+        "--glass-bg",
+        dark ? `rgb(24 25 29 / ${opacityPct}%)` : `rgb(255 255 255 / ${opacityPct}%)`,
+    )
+    set(
+        "--glass-bg-strong",
+        dark ? `rgb(28 29 33 / ${strongPct}%)` : `rgb(255 255 255 / ${strongPct}%)`,
+    )
+    set("--surface-raised", dark ? "hsl(260 4% 24% / 92%)" : "rgb(255 255 255 / 90%)")
+    set("--surface-fill", dark ? "rgb(255 255 255 / 7%)" : "rgb(0 0 0 / 4.5%)")
+    set("--surface-fill-hover", dark ? "rgb(255 255 255 / 11%)" : "rgb(0 0 0 / 7%)")
+    set("--surface-fill-pressed", dark ? "rgb(255 255 255 / 15%)" : "rgb(0 0 0 / 10%)")
+    set("--glass-border", dark ? "rgb(255 255 255 / 10%)" : "rgb(255 255 255 / 46%)")
+    set("--glass-highlight", dark ? "rgb(255 255 255 / 9%)" : "rgb(255 255 255 / 62%)")
+    set(
+        "--glass-shadow",
+        dark
+            ? "0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset"
+            : "0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset",
     )
 }
 

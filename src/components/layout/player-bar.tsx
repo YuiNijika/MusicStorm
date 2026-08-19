@@ -8,7 +8,8 @@ import {
     SkipBack,
     SkipForward,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { QueuePanel } from "@/components/layout/queue-panel"
@@ -16,12 +17,20 @@ import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import { cn } from "@/lib/utils"
+
+// 收合动画时长对齐 --duration-enter，避免与网格折叠动画错拍
+const COLLAPSE_MS = 340
+const DRAG_START_PX = 6
+const COLLAPSE_FRACTION = 0.25
+const FLING_VELOCITY_PX_MS = 0.6
+const STRIP_REVEAL_PX = 28
 
 type PlayerBarProps = {
     onOpenFullPlayer?: () => void
@@ -72,14 +81,183 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
         }
     }
 
+    // 迷你播放条手势：下滑隐藏，隐藏态底部细条上滑恢复
+    const isMobile = useIsMobile()
+    const [collapsed, setCollapsed] = useState(false)
+    const [dragDy, setDragDy] = useState(0)
+    const footerRef = useRef<HTMLElement | null>(null)
+    const dragStartRef = useRef<{ y: number; t: number } | null>(null)
+    const dragActiveRef = useRef(false)
+
+    // 换新曲自动恢复，避免用户以为播放停了
+    useEffect(() => {
+        if (currentTrack) {
+            setCollapsed(false)
+        }
+    }, [currentTrack])
+
+    useEffect(() => {
+        return () => {
+            document.removeEventListener("click", swallowClick, true)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    function swallowClick(event: MouseEvent) {
+        if (!dragActiveRef.current) {
+            return
+        }
+        dragActiveRef.current = false
+        document.removeEventListener("click", swallowClick, true)
+        event.preventDefault()
+        event.stopPropagation()
+    }
+
+    function beginDrag(event: ReactPointerEvent<HTMLElement>) {
+        if (!isMobile || event.pointerType !== "touch") {
+            return
+        }
+        dragStartRef.current = { y: event.clientY, t: performance.now() }
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+    }
+
+    function handleFooterPointerDown(event: ReactPointerEvent<HTMLElement>) {
+        if (!currentTrack) {
+            return
+        }
+        const target = event.target as HTMLElement | null
+        if (target?.closest("[role='slider']")) {
+            return
+        }
+        beginDrag(event)
+    }
+
+    function handleFooterPointerMove(event: ReactPointerEvent<HTMLElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        const dy = Math.max(0, event.clientY - start.y)
+        if (!dragActiveRef.current && dy > DRAG_START_PX) {
+            dragActiveRef.current = true
+            document.addEventListener("click", swallowClick, true)
+        }
+        setDragDy(dy)
+    }
+
+    function handleFooterPointerUp(event: ReactPointerEvent<HTMLElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        const dy = Math.max(0, event.clientY - start.y)
+        const velocity = dy / Math.max(1, performance.now() - start.t)
+        const height = footerRef.current?.offsetHeight ?? 64
+        if (dy > height * COLLAPSE_FRACTION || velocity > FLING_VELOCITY_PX_MS) {
+            setCollapsed(true)
+            // 收起时保留下推位移，等网格折完再回位
+            window.setTimeout(() => setDragDy(0), COLLAPSE_MS)
+        } else {
+            setDragDy(0)
+        }
+        if (dragActiveRef.current) {
+            // click 在 pointerup 之后触发，监听器留到点击消费；无点击由超时兜底清理
+            window.setTimeout(() => {
+                dragActiveRef.current = false
+                document.removeEventListener("click", swallowClick, true)
+            }, 0)
+        }
+        dragStartRef.current = null
+    }
+
+    function handleFooterPointerCancel() {
+        dragStartRef.current = null
+        setDragDy(0)
+        if (dragActiveRef.current) {
+            dragActiveRef.current = false
+            document.removeEventListener("click", swallowClick, true)
+        }
+    }
+
+    function handleStripPointerDown(event: ReactPointerEvent<HTMLElement>) {
+        beginDrag(event)
+    }
+
+    function handleStripPointerMove(event: ReactPointerEvent<HTMLElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        const dy = event.clientY - start.y
+        if (!dragActiveRef.current && dy < -DRAG_START_PX) {
+            dragActiveRef.current = true
+            document.addEventListener("click", swallowClick, true)
+        }
+        setDragDy(dy)
+    }
+
+    function handleStripPointerUp(event: ReactPointerEvent<HTMLElement>) {
+        const start = dragStartRef.current
+        if (!start) {
+            return
+        }
+        const distance = -(event.clientY - start.y)
+        const velocity = distance / Math.max(1, performance.now() - start.t)
+        if (distance > STRIP_REVEAL_PX || velocity > FLING_VELOCITY_PX_MS) {
+            setDragDy(0)
+            setCollapsed(false)
+        } else {
+            setDragDy(0)
+        }
+        if (dragActiveRef.current) {
+            window.setTimeout(() => {
+                dragActiveRef.current = false
+                document.removeEventListener("click", swallowClick, true)
+            }, 0)
+        }
+        dragStartRef.current = null
+    }
+
+    function handleStripPointerCancel() {
+        handleFooterPointerCancel()
+    }
+
+    const dragging = dragDy !== 0
+    const footerTransform =
+        !collapsed && dragDy > 0
+            ? `translateY(${Math.min(dragDy, 200)}px)`
+            : ""
+    const footerTransition = dragging
+        ? "none"
+        : `transform ${COLLAPSE_MS}ms var(--ease-enter)`
+    const stripTransform =
+        collapsed && dragDy < 0
+            ? `translateY(${Math.max(dragDy, -72)}px)`
+            : ""
+    const stripTransition = dragDy < 0
+        ? "none"
+        : `transform ${COLLAPSE_MS}ms var(--ease-enter)`
+
     return (
         <>
+        <div
+            className="grid shrink-0 transition-[grid-template-rows] duration-[var(--duration-enter)] ease-[var(--ease-enter)]"
+            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+        >
+            <div className="min-h-0 overflow-hidden">
         <footer
-            className="material-player shrink-0 border-t border-black/[0.06] dark:border-white/[0.06]"
+            ref={footerRef}
+            className="material-player border-t border-black/[0.06] dark:border-white/[0.06]"
             style={{
                 // iOS 底部安全区：播放条贴在手势条上方（移动端 Tab 已含自身 safe-area）
                 paddingBottom: "env(safe-area-inset-bottom)",
+                transform: footerTransform,
+                transition: footerTransition,
             }}
+            onPointerDown={handleFooterPointerDown}
+            onPointerMove={handleFooterPointerMove}
+            onPointerUp={handleFooterPointerUp}
+            onPointerCancel={handleFooterPointerCancel}
         >
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2 md:h-[84px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center md:gap-4 md:px-4 md:py-0">
                 <div className="flex min-w-0 items-center gap-3 md:col-span-1">
@@ -275,6 +453,30 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
             </div>
         </footer>
+            </div>
+        </div>
+        {collapsed ? (
+            <div
+                role="button"
+                title="显示播放条"
+                aria-label="显示播放条"
+                className="flex shrink-0 cursor-pointer items-center justify-center"
+                style={{
+                    // 隐藏态细条仍贴安全区上方，留出拇指上滑热区
+                    height: "calc(1.25rem + env(safe-area-inset-bottom))",
+                    paddingTop: "0.5rem",
+                    transform: stripTransform,
+                    transition: stripTransition,
+                }}
+                onClick={() => setCollapsed(false)}
+                onPointerDown={handleStripPointerDown}
+                onPointerMove={handleStripPointerMove}
+                onPointerUp={handleStripPointerUp}
+                onPointerCancel={handleStripPointerCancel}
+            >
+                <div className="h-1 w-12 rounded-full bg-foreground/20" />
+            </div>
+        ) : null}
         </>
     )
 }

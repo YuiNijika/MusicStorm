@@ -11,6 +11,7 @@ import {
     ListMinus,
     ListPlus,
     ListStart,
+    ListX,
     MessageCircle,
     MoreHorizontal,
     Pause,
@@ -92,6 +93,8 @@ type TrackRowProps = {
     onRemoved?: (trackId: string) => void
     /** 传入时在更多菜单显示「从云盘删除」 */
     onCloudDelete?: () => void
+    /** 传入时在更多菜单显示「从本地移除」（仅索引，文件保留） */
+    onLocalRemove?: () => void
     /** showActions=false 的精简列表独立开启「添加到歌单」入口（时长列内按钮） */
     showAddToPlaylist?: boolean
     trailing?: ReactNode
@@ -113,6 +116,7 @@ function TrackRow({
     onRemoved,
     onCloudDelete,
     showAddToPlaylist = false,
+    onLocalRemove,
     onPlay,
     trailing,
 }: TrackRowProps) {
@@ -628,6 +632,18 @@ function TrackRow({
                                 ) : null}
                             </>
                         ) : null}
+                        {isLocal && onLocalRemove ? (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => onLocalRemove?.()}
+                                >
+                                    <ListX />
+                                    从本地移除
+                                </DropdownMenuItem>
+                            </>
+                        ) : null}
                     </DropdownMenuContent>
                 </DropdownMenu>
             ) : null}
@@ -726,6 +742,18 @@ function TrackRow({
                                 清除自定义封面
                             </ContextMenuItem>
                         ) : null}
+                    </>
+                ) : null}
+                {isLocal && onLocalRemove ? (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            variant="destructive"
+                            onClick={() => onLocalRemove?.()}
+                        >
+                            <ListX />
+                            从本地移除
+                        </ContextMenuItem>
                     </>
                 ) : null}
             </ContextMenuContent>

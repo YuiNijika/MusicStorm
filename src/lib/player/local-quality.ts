@@ -1,8 +1,10 @@
+import { hasAndroidAudio } from "@/lib/android/native-bridge"
 import {
     extensionOf,
     HIGH_QUALITY_EXTS,
     NATIVE_DECODER_EXTS,
 } from "@/lib/local/audio-formats"
+import { isAndroid } from "@/lib/platform"
 import { isTauriRuntime } from "@/lib/player/native-bridge"
 import type { EnginePref } from "@/lib/player/engine-policy"
 import type { Track } from "@/lib/types"
@@ -46,6 +48,10 @@ function shouldUseNativeForTrack(track: Track, pref: EnginePref): boolean {
     }
     if (/^https?:\/\//i.test(track.filePath)) {
         return false
+    }
+    // Android：本地一律走系统 MediaPlayer——WebView 的 asset/audio 在移动端不可靠
+    if (isAndroid() && hasAndroidAudio()) {
+        return true
     }
     if (pref === "native") {
         return true

@@ -83,6 +83,13 @@ type Phase = "closed" | "entering" | "open" | "exiting"
 // 时长与 App.css 的 motion token 对齐（--duration-enter/exit、reduced-motion cross-fade 150ms）
 const DRAWER_MS = 340
 const REDUCED_FADE_MS = 150
+// 移动端双轴手势：超过该位移才锁定主轴，避免误判点按/滚动
+const AXIS_LOCK_PX = 8
+// 首尾页越界拖动的阻尼系数
+const PAGE_RUBBER = 0.35
+const PAGE_THRESHOLD_FRACTION = 0.33
+const FLING_VELOCITY_PX_MS = 0.6
+const CLOSE_FLING_VELOCITY_PX_MS = 0.8
 
 function prefersReducedMotion(): boolean {
     if (typeof window === "undefined") {
@@ -130,9 +137,25 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         : FULL_PLAYER_LAYOUTS
     const effectiveLayout: FullPlayerLayout =
         isMobile && layout === "classic" ? "cover" : layout
-    // 移动端下滑收起手势：跟手位移（px）+ 起始 Y（区分水平滚动）
+    // 歌词页首次滑到才挂载，保持按需加载；滑回不卸载避免重复拉取
+    useEffect(() => {
+        if (effectiveLayout === "lyrics") {
+            setLyricsMounted(true)
+        }
+    }, [effectiveLayout])
+    // 移动端翻页器当前页：0 = 封面，1 = 歌词
+    const page = effectiveLayout === "lyrics" ? 1 : 0
+    // 移动端手势：纵向下滑收起，横向在封面/歌词两页间翻页
     const [dragDy, setDragDy] = useState(0)
-    const dragStartRef = useRef<{ y: number; startDy: number } | null>(null)
+    const [pageOffset, setPageOffset] = useState(0)
+    const [lyricsMounted, setLyricsMounted] = useState(false)
+    const dragStartRef = useRef<{
+        x: number
+        y: number
+        t: number
+        inScroll: boolean
+    } | null>(null)
+    const axisRef = useRef<"h" | "v" | null>(null)
     // 进出场计时器不能挂在 phase 依赖的 effect 上：phase→exiting 会触发 cleanup 清掉 closed 定时器
     const enterTimerRef = useRef<number | null>(null)
     const exitTimerRef = useRef<number | null>(null)
@@ -311,6 +334,21 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         onClose()
     }
 
+    function resolveAxis(
+        dx: number,
+        dy: number,
+        inScroll: boolean,
+    ): "h" | "v" | null {
+        if (Math.abs(dx) > AXIS_LOCK_PX && Math.abs(dx) > Math.abs(dy)) {
+            return "h"
+        }
+        // 滚动区纵向交给浏览器原生滚动，不接管为收起
+        if (!inScroll && dy > AXIS_LOCK_PX && dy > Math.abs(dx)) {
+            return "v"
+        }
+        return null
+    }
+
     function handleSheetPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
         if (
             phase !== "open" ||
@@ -319,13 +357,35 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         ) {
             return
         }
-        // 歌词/列表等滚动容器内按下 → 交给浏览器垂直滚动，不触发收起手势
+        // 歌词等滚动区不捕获，垂直交给原生滚动；控件区不抢点按
         const target = event.target as HTMLElement | null
-        if (target?.closest("[data-sheet-scroll], .apple-scroll, button")) {
+        const inScroll = Boolean(
+            target?.closest("[data-sheet-scroll], .apple-scroll"),
+        )
+        if (!inScroll && target?.closest("button, [role='slider']")) {
             return
         }
-        dragStartRef.current = { y: event.clientY, startDy: dragDy }
-        ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+        dragStartRef.current = {
+            x: event.clientX,
+            y: event.clientY,
+            t: performance.now(),
+            inScroll,
+        }
+        axisRef.current = null
+        if (!inScroll) {
+            event.currentTarget.setPointerCapture?.(event.pointerId)
+        }
+    }
+
+    function dragPageOffset(dx: number, currentPage: number): number {
+        // 首页右滑、尾页左滑超屏宽做阻尼，松手才回位
+        if (
+            (currentPage === 0 && dx > 0) ||
+            (currentPage === 1 && dx < 0)
+        ) {
+            return dx * PAGE_RUBBER
+        }
+        return dx
     }
 
     function handleSheetPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
@@ -333,8 +393,35 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         if (!start) {
             return
         }
-        const dy = Math.max(0, event.clientY - start.y + start.startDy)
-        setDragDy(dy)
+        const dx = event.clientX - start.x
+        const dy = event.clientY - start.y
+        const axis = axisRef.current ?? resolveAxis(dx, dy, start.inScroll)
+        if (!axis) {
+            return
+        }
+        axisRef.current = axis
+        if (axis === "h") {
+            // 滚动区起手未捕获，锁轴后补捕获，防止拖出容器断流
+            event.currentTarget.setPointerCapture?.(event.pointerId)
+            setPageOffset(dragPageOffset(dx, page))
+        } else if (dy > 0) {
+            setDragDy(dy)
+        }
+    }
+
+    function commitPage(dx: number, elapsed: number) {
+        const velocity = Math.abs(dx) / Math.max(1, elapsed)
+        const threshold = window.innerWidth * PAGE_THRESHOLD_FRACTION
+        let next = page
+        if (dx < 0 && (Math.abs(dx) > threshold || velocity > FLING_VELOCITY_PX_MS)) {
+            next = 1
+        } else if (dx > 0 && (dx > threshold || velocity > FLING_VELOCITY_PX_MS)) {
+            next = 0
+        }
+        setPageOffset(0)
+        if (next !== page) {
+            handleLayoutChange(next === 1 ? "lyrics" : "cover")
+        }
     }
 
     function handleSheetPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
@@ -342,14 +429,28 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         if (!start) {
             return
         }
+        const axis = axisRef.current
         dragStartRef.current = null
-        const dy = Math.max(0, event.clientY - start.y + start.startDy)
+        axisRef.current = null
+        const elapsed = performance.now() - start.t
+        if (axis === "h") {
+            commitPage(event.clientX - start.x, elapsed)
+            return
+        }
         setDragDy(0)
-        // 跟手距离超过 1/4 屏高或松手速度较快 → 收起；否则回弹
-        const threshold = window.innerHeight * 0.25
-        if (dy > threshold) {
+        const dy = Math.max(0, event.clientY - start.y)
+        const velocity = dy / Math.max(1, elapsed)
+        // 跟手距离超 1/4 屏高或甩动较快 → 收起；否则回弹
+        if (dy > window.innerHeight * 0.25 || velocity > CLOSE_FLING_VELOCITY_PX_MS) {
             onClose()
         }
+    }
+
+    function handleSheetPointerCancel() {
+        dragStartRef.current = null
+        axisRef.current = null
+        setDragDy(0)
+        setPageOffset(0)
     }
     function navigateAlbum() {
         if (!displayTrack?.albumId) {
@@ -480,7 +581,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 onPointerDown={handleSheetPointerDown}
                 onPointerMove={handleSheetPointerMove}
                 onPointerUp={handleSheetPointerUp}
-                onPointerCancel={handleSheetPointerUp}
+                onPointerCancel={handleSheetPointerCancel}
             >
                 <div
                     aria-hidden
@@ -609,40 +710,89 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     </div>
                 ) : null}
 
-                {effectiveLayout === "cover" ? (
-                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
-                        <div className="w-full max-w-[min(440px,82vw)]">
-                            <Cover
-                                src={displayCover}
-                                alt={displayTrack.title}
-                                size="xl"
-                                className={cn(
-                                    "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
-                                    "ring-1 ring-white/20 dark:ring-white/10",
-                                    isPlaying &&
-                                        "animate-[cover-breathe_6s_ease-in-out_infinite]",
-                                )}
-                            />
+                {isMobile ? (
+                    <div className="relative min-h-0 flex-1 overflow-hidden">
+                        <div
+                            className="flex h-full min-h-0"
+                            style={{
+                                transform: `translateX(calc(${-page * 100}% + ${pageOffset}px))`,
+                                transition:
+                                    pageOffset !== 0
+                                        ? "none"
+                                        : `transform ${DRAWER_MS}ms var(--ease-enter)`,
+                            }}
+                        >
+                            <div className="flex w-full min-h-0 shrink-0 flex-col items-center justify-center gap-6 px-6 pb-3">
+                                <div className="w-full max-w-[min(440px,82vw)]">
+                                    <Cover
+                                        src={displayCover}
+                                        alt={displayTrack.title}
+                                        size="xl"
+                                        className={cn(
+                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                            "ring-1 ring-white/20 dark:ring-white/10",
+                                            isPlaying &&
+                                                "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                        )}
+                                    />
+                                </div>
+                                <div className="w-full max-w-[min(440px,82vw)] space-y-2">
+                                    {meta}
+                                </div>
+                            </div>
+                            <div className="flex w-full min-h-0 shrink-0 flex-col px-4 pb-2 pt-1 sm:px-8">
+                                {lyricsMounted ? (
+                                    <Suspense fallback={<LyricsSkeleton />}>
+                                        <LyricsView
+                                            variant="full"
+                                            active={lyricsActive && page === 1}
+                                            align={chrome.lyricsAlign}
+                                            className="h-full min-h-0 flex-1"
+                                            listClassName="h-full py-2"
+                                        />
+                                    </Suspense>
+                                ) : null}
+                            </div>
                         </div>
-                        <div className="w-full max-w-[min(440px,82vw)] space-y-2">{meta}</div>
                     </div>
-                ) : null}
-
-                {effectiveLayout === "lyrics" ? (
-                    <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
-                        {lyricsActive ? (
-                            <Suspense fallback={<LyricsSkeleton />}>
-                                <LyricsView
-                                    variant="full"
-                                    active={lyricsActive}
-                                    align={chrome.lyricsAlign}
-                                    className="h-full min-h-0 flex-1"
-                                    listClassName="h-full py-2"
-                                />
-                            </Suspense>
+                ) : (
+                    <>
+                        {effectiveLayout === "cover" ? (
+                            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
+                                <div className="w-full max-w-[min(440px,82vw)]">
+                                    <Cover
+                                        src={displayCover}
+                                        alt={displayTrack.title}
+                                        size="xl"
+                                        className={cn(
+                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                            "ring-1 ring-white/20 dark:ring-white/10",
+                                            isPlaying &&
+                                                "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                        )}
+                                    />
+                                </div>
+                                <div className="w-full max-w-[min(440px,82vw)] space-y-2">{meta}</div>
+                            </div>
                         ) : null}
-                    </div>
-                ) : null}
+
+                        {effectiveLayout === "lyrics" ? (
+                            <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
+                                {lyricsActive ? (
+                                    <Suspense fallback={<LyricsSkeleton />}>
+                                        <LyricsView
+                                            variant="full"
+                                            active={lyricsActive}
+                                            align={chrome.lyricsAlign}
+                                            className="h-full min-h-0 flex-1"
+                                            listClassName="h-full py-2"
+                                        />
+                                    </Suspense>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </>
+                )}
 
                 <div
                     className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"

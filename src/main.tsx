@@ -1,6 +1,13 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 
+import { isAndroid } from "@/lib/platform"
+
+// 挂平台标记供 CSS 定向降级（Android 弱 GPU 上收敛毛玻璃开销）
+if (isAndroid()) {
+    document.documentElement.dataset.platform = "android"
+}
+
 async function mountApp(): Promise<void> {
     try {
         const { default: App } = await import("./App")

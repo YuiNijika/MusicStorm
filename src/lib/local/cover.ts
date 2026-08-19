@@ -26,13 +26,19 @@ function coverPathToUrl(path: string | null | undefined): string {
     }
 }
 
-// Android 无桌面选图命令，退回 WebView 文件选择器（浏览器预览同理）
+// Android 无桌面选图命令，退回 WebView 文件选择器；选中图落盘封面缓存，避免 base64 进 localStorage
 async function pickCoverImage(): Promise<CachedCover | null> {
     if (isTauriRuntime() && !isAndroid()) {
         return invoke<CachedCover | null>("pick_cover_image")
     }
     const dataUrl = await pickImageViaFileInput()
-    return dataUrl ? { originalPath: dataUrl, thumbnailPath: dataUrl } : null
+    if (!dataUrl) {
+        return null
+    }
+    if (isTauriRuntime()) {
+        return invoke<CachedCover>("cache_cover_data_url", { dataUrl })
+    }
+    return { originalPath: dataUrl, thumbnailPath: dataUrl }
 }
 
 async function cacheCoverUrl(url: string): Promise<CachedCover> {

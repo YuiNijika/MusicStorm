@@ -19,6 +19,7 @@ import {
     removeAlbum,
     removeAlbumsBulk,
     removeArtistsBulk,
+    removeTracksBulk,
     resolveAlbumCoverUrl,
     saveLocalLibrary,
     toThumbnailUrl,
@@ -533,6 +534,18 @@ function useLocalLibrary() {
         [library, nav],
     )
 
+    const deleteTrack = useCallback(
+        (trackId: string) => {
+            const track = library.tracks.find((item) => item.id === trackId)
+            setLibrary(removeTracksBulk(library, new Set([trackId])))
+            if (track) {
+                setStatusText(`已移除 ${track.title}`)
+                notifySuccess("已从本地移除", { description: track.title })
+            }
+        },
+        [library],
+    )
+
     const clearAll = useCallback(() => {
         setLibrary(clearLocalLibrary())
         setNav({ kind: "root" })
@@ -586,6 +599,7 @@ function useLocalLibrary() {
         deleteAlbums,
         deleteArtist,
         deleteArtists,
+        deleteTrack,
         clearAll,
         albumCover,
         albumCoverThumb,

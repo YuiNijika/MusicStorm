@@ -774,6 +774,36 @@ function removeAlbum(state: LocalLibraryState, albumId: string): LocalLibrarySta
     return next
 }
 
+/** 批量移除曲目索引；不删磁盘文件。已无引用的 folder 一并清理 */
+function removeTracksBulk(
+    state: LocalLibraryState,
+    trackIds: ReadonlySet<string>,
+): LocalLibraryState {
+    if (trackIds.size === 0) {
+        return state
+    }
+    const remainingTracks = state.tracks.filter((track) => !trackIds.has(track.id))
+    const usedFolders = new Set<string>()
+    for (const album of state.albums) {
+        if (album.folderPath) {
+            usedFolders.add(album.folderPath)
+        }
+    }
+    for (const track of remainingTracks) {
+        if (track.folderPath) {
+            usedFolders.add(track.folderPath)
+        }
+    }
+    const next: LocalLibraryState = {
+        folders: state.folders.filter((folder) => usedFolders.has(folder)),
+        artists: state.artists,
+        albums: state.albums,
+        tracks: remainingTracks,
+    }
+    saveLocalLibrary(next)
+    return next
+}
+
 /** 新增或更新艺人分组；folderPath 相同视为同一艺人（重扫时复用） */
 function upsertArtist(
     state: LocalLibraryState,
@@ -1036,6 +1066,7 @@ export {
     removeArtist,
     removeArtistsBulk,
     removeFolder,
+    removeTracksBulk,
     resolveAlbumCoverUrl,
     saveLocalLibrary,
     storedToTrack,
