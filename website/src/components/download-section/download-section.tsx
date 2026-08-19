@@ -10,6 +10,7 @@ function DownloadSection() {
     const { data: release, loading } = useLatestRelease()
 
     const windowsUrl = release?.url ?? RELEASES_URL
+    const androidUrl = release?.androidUrl ?? RELEASES_URL
 
     return (
         <section className="download">
@@ -56,6 +57,29 @@ function DownloadSection() {
                             </span>
                         </span>
                     </StarBorder>
+                    <a
+                        href={androidUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="download__button download__button--secondary"
+                    >
+                        <AndroidIcon />
+                        <span className="download__button-text">
+                            <span className="download__button-label">
+                                下载 Android 版
+                            </span>
+                            {loading ? (
+                                <span
+                                    className="skeleton download__version-skeleton"
+                                    aria-hidden="true"
+                                />
+                            ) : release?.androidVersion ? (
+                                <span className="download__button-version">
+                                    v{release.androidVersion}
+                                </span>
+                            ) : null}
+                        </span>
+                    </a>
                     <span
                         className="download__button download__button--disabled"
                         aria-disabled="true"
@@ -63,16 +87,6 @@ function DownloadSection() {
                         <AppleIcon />
                         <span className="download__button-text">
                             <span className="download__button-label">macOS 版</span>
-                            <span className="download__button-version">即将推出</span>
-                        </span>
-                    </span>
-                    <span
-                        className="download__button download__button--disabled"
-                        aria-disabled="true"
-                    >
-                        <AndroidIcon />
-                        <span className="download__button-text">
-                            <span className="download__button-label">Android 版</span>
                             <span className="download__button-version">即将推出</span>
                         </span>
                     </span>

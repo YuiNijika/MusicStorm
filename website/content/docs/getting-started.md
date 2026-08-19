@@ -11,8 +11,8 @@ order: 1
 | 平台 | 状态 |
 | --- | --- |
 | Windows | 已发布 |
+| Android | 已发布 |
 | macOS | 即将推出 |
-| Android | 即将推出 |
 
 Windows 版为 NSIS 安装包，双击后按提示完成安装即可，无需管理员权限。
 

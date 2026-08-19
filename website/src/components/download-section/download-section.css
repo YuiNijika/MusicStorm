@@ -79,6 +79,18 @@
     margin-top: 4px;
 }
 
+.download__button--secondary {
+    border: 1px solid var(--color-accent);
+    color: var(--color-accent);
+    background: transparent;
+}
+
+.download__button--secondary:hover {
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+    text-decoration: none;
+}
+
 .download__button--disabled {
     border: 1px solid var(--color-separator);
     color: var(--color-text-tertiary);

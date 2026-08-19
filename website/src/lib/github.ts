@@ -12,6 +12,9 @@ const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`
 interface ReleaseInfo {
     version: string
     url: string
+    /** Android 独立版本线（vX.Y.Z-android），未发布时为 null */
+    androidVersion: string | null
+    androidUrl: string | null
 }
 
 interface Contributor {
@@ -69,16 +72,22 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 
 async function requestLatestRelease(): Promise<ReleaseInfo | null> {
     const releases = await fetchJson<{ tag_name: string; html_url: string }[]>(
-        `${API_BASE}/releases?per_page=20`,
+        `${API_BASE}/releases?per_page=30`,
     )
-    const desktop = releases?.find((r) => !r.tag_name.endsWith("-android"))
+    if (!releases) {
+        return null
+    }
+    const desktop = releases.find((r) => !r.tag_name.endsWith("-android"))
     if (!desktop) {
         return null
     }
+    const android = releases.find((r) => r.tag_name.endsWith("-android"))
 
     const info: ReleaseInfo = {
         version: desktop.tag_name.replace(/^v/, ""),
         url: desktop.html_url,
+        androidVersion: android ? android.tag_name.replace(/^v/, "") : null,
+        androidUrl: android?.html_url ?? null,
     }
     writeCache(CACHE_KEY_RELEASE, info)
     return info
