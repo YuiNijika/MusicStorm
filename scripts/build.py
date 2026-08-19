@@ -6,6 +6,7 @@ MusicStorm 一键构建。
 检测不到才进入交互输入，无任何用户特定路径硬编码。
 """
 
+import codecs
 import os
 import shutil
 import subprocess
@@ -325,7 +326,7 @@ def _run_node_vite(*args: str) -> int:
         print(f"[ERROR] 未找到 {vite}，请先运行 pnpm install")
         return 1
     print(f"  node {vite} {' '.join(args)}")
-    return subprocess.call([node, str(vite), *args], shell=False)
+    return _run([node, str(vite), *args])
 
 
 def _print_web_storage() -> None:
@@ -370,13 +371,46 @@ def _env_for_android(java: str, sdk: str) -> dict[str, str]:
     return env
 
 
+def _run(
+    args: list[str],
+    env: dict[str, str] | None = None,
+    cwd: str | Path | None = None,
+) -> int:
+    """子进程输出经 UTF-8 解码后由 Python 转发到控制台。
+
+    JDK 18+（含 21）默认以 UTF-8 输出 javac/gradle 中文消息，而 Windows
+    控制台通常是 GBK 代码页，直接透传字节会乱码；Python 写控制台走
+    Unicode API，可正常显示。增量解码避免多字节字符被跨块截断。
+    """
+    popen = subprocess.Popen(
+        args,
+        env=env,
+        cwd=cwd,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    assert popen.stdout is not None
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    try:
+        for chunk in iter(lambda: popen.stdout.read(4096), b""):
+            sys.stdout.write(decoder.decode(chunk))
+            sys.stdout.flush()
+        sys.stdout.write(decoder.decode(b"", final=True))
+        sys.stdout.flush()
+    except KeyboardInterrupt:
+        popen.kill()
+    popen.wait()
+    return popen.returncode
+
+
 def _run_pnpm(*args: str, env: dict[str, str] | None = None) -> int:
     pm = _detect_pm()
     if not pm:
         print("[ERROR] 未找到包管理器 (pnpm/npm/yarn)")
         return 1
     # shell=False 避免 PowerShell 编码偏差产生冗余转义
-    return subprocess.call([pm, *args], env=env, shell=False)
+    return _run([pm, *args], env=env)
 
 
 def build_windows() -> tuple[int, str]:
@@ -458,7 +492,7 @@ def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
         "-x", "rustBuildUniversalRelease",
     ]
     print(f"  执行 {' '.join(gradle_args)} …")
-    return subprocess.call(gradle_args, env=env, shell=False, cwd=str(gen_dir))
+    return _run(gradle_args, env=env, cwd=str(gen_dir))
 
 
 def _menu() -> str:
