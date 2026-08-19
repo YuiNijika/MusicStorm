@@ -341,7 +341,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人
                             </p>
-                            <h1 className="text-[24px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.04em] sm:text-[28px] md:text-[32px] md:font-semibold">
                                 {profile.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">

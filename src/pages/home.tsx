@@ -289,7 +289,7 @@ function HomePage({ onOpenPlaylist, onOpenRadio }: HomePageProps) {
                         <p className="text-[11px] font-semibold tracking-[0.04em] text-primary uppercase sm:text-[12px]">
                             精选歌单
                         </p>
-                        <p className="line-clamp-2 text-[18px] font-bold tracking-[-0.04em] text-foreground sm:text-[26px] md:text-[30px]">
+                        <p className="line-clamp-2 text-[22px] font-bold tracking-[-0.04em] text-foreground sm:text-[26px] md:text-[30px]">
                             {featured.title}
                         </p>
                         <p className="line-clamp-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground sm:text-[14px]">

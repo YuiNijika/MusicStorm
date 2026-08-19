@@ -55,11 +55,11 @@ function MediaCard({
                 {overlay}
             </div>
             <div className="w-full min-w-0 max-w-full px-0.5">
-                <p className="truncate text-[13px] font-semibold tracking-[-0.02em] text-foreground">
+                <p className="truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground md:text-[13px]">
                     {title}
                 </p>
                 {subtitle ? (
-                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    <p className="mt-0.5 truncate text-[13px] text-muted-foreground md:text-[12px]">
                         {subtitle}
                     </p>
                 ) : null}

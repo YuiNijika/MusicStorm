@@ -291,7 +291,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                     </span>
                                 ) : null}
                             </div>
-                            <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.04em]">
+                            <h1 className="text-[28px] leading-[1.15] font-bold tracking-[-0.04em] md:font-semibold">
                                 {playlist.title}
                             </h1>
                             {playlist.description ? (

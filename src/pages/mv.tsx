@@ -239,7 +239,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                 MV
                                 {data?.br ? ` · ${data.br}p` : ""}
                             </p>
-                            <h1 className="line-clamp-2 text-[22px] leading-[1.2] font-semibold tracking-[-0.03em]">
+                            <h1 className="line-clamp-2 text-[26px] leading-[1.2] font-bold tracking-[-0.03em] md:font-semibold">
                                 {profile.title}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">

@@ -132,7 +132,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                 电台专栏
                                 {radio.category ? ` · ${radio.category}` : ""}
                             </p>
-                            <h1 className="line-clamp-2 break-words text-[28px] font-semibold leading-tight tracking-[-0.04em] sm:text-[32px]">
+                            <h1 className="line-clamp-2 break-words text-[28px] font-bold leading-tight tracking-[-0.04em] sm:text-[32px] md:font-semibold">
                                 {radio.title}
                             </h1>
                             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">

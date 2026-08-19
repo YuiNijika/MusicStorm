@@ -692,7 +692,7 @@ function LocalWebPage() {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人 / 合集
                             </p>
-                            <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.04em] sm:text-[28px] md:text-[32px] md:font-semibold">
                                 {artist.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -786,7 +786,7 @@ function LocalWebPage() {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 专辑
                             </p>
-                            <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.04em] sm:text-[28px] md:text-[32px] md:font-semibold">
                                 {album.title}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">

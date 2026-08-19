@@ -19,7 +19,7 @@ function PageTitle({ title, subtitle, trailing, className }: PageTitleProps) {
             )}
         >
             <div className="min-w-0 space-y-0.5">
-                <h1 className="truncate text-[24px] font-semibold leading-tight tracking-[-0.025em] text-foreground">
+                <h1 className="truncate text-[26px] font-bold leading-tight tracking-[-0.03em] text-foreground sm:text-[28px] md:text-[24px] md:font-semibold md:tracking-[-0.025em]">
                     {title}
                 </h1>
                 {subtitle ? (

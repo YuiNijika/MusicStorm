@@ -375,7 +375,7 @@ function TrackRow({
                     <p
                         className={cn(
                             "min-w-0 flex-1 truncate font-medium tracking-[-0.01em]",
-                            dense ? "text-[12px]" : "text-[13px]",
+                            dense ? "text-[14px] md:text-[12px]" : "text-[15px] md:text-[13px]",
                             isActive ? "text-primary" : "text-foreground",
                         )}
                     >
@@ -390,7 +390,7 @@ function TrackRow({
                 <p
                     className={cn(
                         "mt-0.5 truncate text-muted-foreground",
-                        dense ? "text-[11px]" : "text-[12px]",
+                        dense ? "text-[12px] md:text-[11px]" : "text-[13px] md:text-[12px]",
                     )}
                 >
                     {artists.map((artist, i) => (

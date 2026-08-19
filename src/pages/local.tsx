@@ -398,7 +398,7 @@ function LocalPage() {
                             <p className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase sm:text-[12px]">
                                 艺人 / 合集
                             </p>
-                            <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[28px] md:text-[32px]">
+                            <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.04em] sm:text-[28px] md:text-[32px] md:font-semibold">
                                 {artist.name}
                             </h1>
                             <p className="text-[13px] text-muted-foreground">
@@ -592,7 +592,7 @@ function LocalPage() {
 
                 <header className="flex flex-wrap items-end justify-between gap-3 px-0.5">
                     <div className="min-w-0">
-                        <h1 className="text-[22px] leading-[1.15] font-semibold tracking-[-0.04em] sm:text-[26px] md:text-[28px]">
+                        <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.04em] sm:text-[26px] md:text-[28px] md:font-semibold">
                             {title}
                         </h1>
                         <p className="mt-0.5 text-[12px] text-muted-foreground sm:text-[13px]">

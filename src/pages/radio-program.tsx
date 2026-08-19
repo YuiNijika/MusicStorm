@@ -87,7 +87,7 @@ function RadioProgramPage({
                         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                             电台节目
                         </p>
-                        <h1 className="line-clamp-3 break-words text-[26px] font-semibold leading-tight tracking-[-0.04em] sm:text-[30px]">
+                        <h1 className="line-clamp-3 break-words text-[26px] font-bold leading-tight tracking-[-0.04em] sm:text-[30px] md:font-semibold">
                             {program.title}
                         </h1>
                         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">

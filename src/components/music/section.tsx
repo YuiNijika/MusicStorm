@@ -27,7 +27,7 @@ function Section({
                 <div className="min-w-0">
                     <h2
                         className={cn(
-                            "font-semibold tracking-[-0.03em] text-foreground",
+                            "font-bold tracking-[-0.03em] text-foreground md:font-semibold",
                             isListen ? "text-[22px]" : "text-[20px]",
                         )}
                     >
