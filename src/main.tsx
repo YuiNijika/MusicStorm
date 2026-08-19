@@ -3,14 +3,30 @@ import ReactDOM from "react-dom/client"
 
 import { isAndroid } from "@/lib/platform"
 
-// 挂平台标记供 CSS 定向降级（Android 弱 GPU 上收敛毛玻璃开销）
+// 挂平台标记供 CSS 定向降级
 if (isAndroid()) {
     document.documentElement.dataset.platform = "android"
+}
+
+function consoleLog(): void {
+    console.log(`
+                                                                                                    
+/$$      /$$                     /$$            /$$$$$$   /$$                                      
+| $$$    /$$$                    |__/           /$$__  $$ | $$                                      
+| $$$$  /$$$$ /$$   /$$  /$$$$$$$ /$$  /$$$$$$$| $$  \__//$$$$$$    /$$$$$$   /$$$$$$  /$$$$$$/$$$$ 
+| $$ $$/$$ $$| $$  | $$ /$$_____/| $$ /$$_____/|  $$$$$$|_  $$_/   /$$__  $$ /$$__  $$| $$_  $$_  $$
+| $$  $$$| $$| $$  | $$|  $$$$$$ | $$| $$       \____  $$ | $$    | $$  \ $$| $$  \__/| $$ \ $$ \ $$
+| $$\  $ | $$| $$  | $$ \____  $$| $$| $$       /$$  \ $$ | $$ /$$| $$  | $$| $$      | $$ | $$ | $$
+| $$ \/  | $$|  $$$$$$/ /$$$$$$$/| $$|  $$$$$$$|  $$$$$$/ |  $$$$/|  $$$$$$/| $$      | $$ | $$ | $$
+|__/     |__/ \______/ |_______/ |__/ \_______/ \______/   \___/   \______/ |__/      |__/ |__/ |__/
+                                                                                                    
+        `)
 }
 
 async function mountApp(): Promise<void> {
     try {
         const { default: App } = await import("./App")
+        consoleLog()
         ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
             <React.StrictMode>
                 <App />

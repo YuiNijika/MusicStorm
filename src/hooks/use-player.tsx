@@ -76,6 +76,8 @@ type PlayerContextValue = PlayerSnapshot & {
     jumpTo: (index: number) => void
     /** 队列内拖动排序 */
     reorderQueue: (from: number, to: number) => void
+    /** 将队列内某曲移到当前曲目之后（下一首播放） */
+    moveToNext: (index: number) => void
     /** 清空队列并停止 */
     clearQueue: () => void
     reloadCurrent: () => void
@@ -1397,6 +1399,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setIsPlaying(false)
     }, [])
 
+    /** 将队列内某曲移到当前曲目之后，不改变正在播放的歌曲 */
+    const moveToNext = useCallback((index: number) => {
+        const list = [...queueRef.current]
+        const current = indexRef.current
+        if (current < 0 || index === current) {
+            return
+        }
+        if (index < 0 || index >= list.length) {
+            return
+        }
+        const [item] = list.splice(index, 1)
+        const currentAfter = index < current ? current - 1 : current
+        list.splice(currentAfter + 1, 0, item)
+        setQueue(list)
+    }, [])
+
     const value = useMemo<PlayerContextValue>(
         () => ({
             queue,
@@ -1417,6 +1435,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             removeFromQueue,
             jumpTo,
             reorderQueue,
+            moveToNext,
             clearQueue,
             reloadCurrent,
             togglePlay,
@@ -1458,6 +1477,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             removeFromQueue,
             jumpTo,
             reorderQueue,
+            moveToNext,
             clearQueue,
             reloadCurrent,
             togglePlay,

@@ -5,12 +5,14 @@ type PlayerPreferences = {
     volume: number
     isMuted: boolean
     autoPlayOnStartup: boolean
+    showLyricTranslation: boolean
 }
 
 const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
     volume: 0.8,
     isMuted: false,
     autoPlayOnStartup: false,
+    showLyricTranslation: true,
 }
 
 function clampVolume(value: number): number {
@@ -37,6 +39,7 @@ function getPlayerPreferences(): PlayerPreferences {
                     ? data.isMuted
                     : DEFAULT_PLAYER_PREFERENCES.isMuted,
             autoPlayOnStartup: data.autoPlayOnStartup === true,
+            showLyricTranslation: data.showLyricTranslation !== false,
         }
     } catch {
         return { ...DEFAULT_PLAYER_PREFERENCES }
@@ -62,11 +65,16 @@ function setStartupAutoPlay(enabled: boolean): void {
     setPlayerPreferences({ autoPlayOnStartup: enabled })
 }
 
+function setShowLyricTranslation(enabled: boolean): void {
+    setPlayerPreferences({ showLyricTranslation: enabled })
+}
+
 export {
     DEFAULT_PLAYER_PREFERENCES,
     PLAYER_PREFS_EVENT,
     getPlayerPreferences,
     setPlayerPreferences,
+    setShowLyricTranslation,
     setStartupAutoPlay,
 }
 export type { PlayerPreferences }

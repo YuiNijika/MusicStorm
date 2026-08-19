@@ -10,6 +10,7 @@ import {
 } from "@/lib/lyric/parse"
 import { getLyricOverride, LYRIC_OVERRIDE_EVENT } from "@/lib/lyric/overrides"
 import { fetchLyricLines } from "@/lib/netease/lyric"
+import { PLAYER_PREFS_EVENT, getPlayerPreferences } from "@/lib/player/playback-prefs"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -93,6 +94,7 @@ function LyricsView({
         "idle",
     )
     const [overrideTick, setOverrideTick] = useState(0)
+    const [prefsTick, setPrefsTick] = useState(0)
     const listRef = useRef<HTMLDivElement>(null)
     const activeIndex = useMemo(
         () => findActiveLyricIndex(lines, positionMs),
@@ -109,6 +111,15 @@ function LyricsView({
         }
         window.addEventListener(LYRIC_OVERRIDE_EVENT, onOverride)
         return () => window.removeEventListener(LYRIC_OVERRIDE_EVENT, onOverride)
+    }, [])
+
+    // 翻译歌词开关变化时重新加载
+    useEffect(() => {
+        function onPrefs() {
+            setPrefsTick((n) => n + 1)
+        }
+        window.addEventListener(PLAYER_PREFS_EVENT, onPrefs)
+        return () => window.removeEventListener(PLAYER_PREFS_EVENT, onPrefs)
     }, [])
 
     useEffect(() => {
@@ -144,7 +155,10 @@ function LyricsView({
                 }
 
                 if (currentTrack.source === "netease" && /^\d+$/.test(currentTrack.id)) {
-                    const remote = await fetchLyricLines(currentTrack.id)
+                    const remote = await fetchLyricLines(
+                        currentTrack.id,
+                        getPlayerPreferences().showLyricTranslation,
+                    )
                     const result =
                         remote.length > 0
                             ? remote
@@ -182,6 +196,7 @@ function LyricsView({
         currentTrack?.lrcPath,
         currentTrack?.filePath,
         overrideTick,
+        prefsTick,
     ])
 
     useEffect(() => {
@@ -253,7 +268,22 @@ function LyricsView({
                                             : "font-normal text-muted-foreground hover:text-foreground/80",
                                     )}
                                 >
-                                    {line.text}
+                                    <span className="block w-full">{line.text}</span>
+                                    {line.translation ? (
+                                        <span
+                                            className={cn(
+                                                "block w-full font-normal",
+                                                isFull
+                                                    ? "mt-1 text-[14px] leading-snug"
+                                                    : "mt-0.5 text-[11px] leading-snug",
+                                                isActive
+                                                    ? "text-muted-foreground"
+                                                    : "text-muted-foreground/60",
+                                            )}
+                                        >
+                                            {line.translation}
+                                        </span>
+                                    ) : null}
                                 </button>
                             )
                         })}

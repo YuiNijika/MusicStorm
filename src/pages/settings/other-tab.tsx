@@ -301,7 +301,7 @@ function OtherTab() {
                     <SettingsGroup>
                         <SwitchRow
                             title="启用 DevTools"
-                            description="启用后按 F12 打开开发者工具（仅开发构建生效）"
+                            description="默认 F12 打开开发者工具"
                             checked={devtoolsEnabled}
                             onCheckedChange={(checked) => {
                                 setDevToolsEnabled(checked)

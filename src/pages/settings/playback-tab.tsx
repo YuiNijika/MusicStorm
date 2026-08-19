@@ -37,6 +37,7 @@ import {
 } from "@/lib/player/ffmpeg"
 import {
     getPlayerPreferences,
+    setShowLyricTranslation,
     setStartupAutoPlay,
 } from "@/lib/player/playback-prefs"
 import { EqEditor } from "@/components/music/eq-editor"
@@ -79,6 +80,9 @@ function PlaybackTab() {
     const [fadeMs, setFadeMsState] = useState(() => getFadePrefs().durationMs)
     const [autoPlayOnStartup, setAutoPlayOnStartup] = useState(
         () => getPlayerPreferences().autoPlayOnStartup,
+    )
+    const [showLyricTranslation, setShowLyricTranslationState] = useState(
+        () => getPlayerPreferences().showLyricTranslation,
     )
     const [titleBarDoubleClick, setTitleBarDoubleClickState] = useState(() =>
         getTitleBarDoubleClickAction(),
@@ -191,6 +195,18 @@ function PlaybackTab() {
                         onCheckedChange={(checked) => {
                             setStartupAutoPlay(checked)
                             setAutoPlayOnStartup(checked)
+                        }}
+                    />
+                </SettingsGroup>
+
+                <SettingsGroup title="歌词">
+                    <SwitchRow
+                        title="启用翻译歌词"
+                        description="网易云歌曲在原文歌词下方一起显示翻译"
+                        checked={showLyricTranslation}
+                        onCheckedChange={(checked) => {
+                            setShowLyricTranslation(checked)
+                            setShowLyricTranslationState(checked)
                         }}
                     />
                 </SettingsGroup>

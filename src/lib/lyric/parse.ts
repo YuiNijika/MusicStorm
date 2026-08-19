@@ -1,6 +1,7 @@
 type LyricLine = {
     timeMs: number
     text: string
+    translation?: string
 }
 
 const LINE_RE = /^(\[[\d:.]+\])+(.+)$/

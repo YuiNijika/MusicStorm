@@ -14,7 +14,12 @@ import { TrackRow } from "@/components/music/track-row"
 import { VirtualList } from "@/components/music/virtual-list"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { usePlayer } from "@/hooks/use-player"
-import { listLocalPlayableTracks } from "@/lib/local/library-store"
+import {
+    LOCAL_LIBRARY_EVENT,
+    listLocalPlayableTracks,
+    loadLocalLibrary,
+    removeTracksBulk,
+} from "@/lib/local/library-store"
 import {
     searchNeteaseAll,
     type NeteaseSearchBundle,
@@ -54,13 +59,29 @@ function SearchPage() {
     const [remote, setRemote] = useState<NeteaseSearchBundle>(EMPTY_BUNDLE)
     const [isLoading, setIsLoading] = useState(false)
     const [errorText, setErrorText] = useState<string | null>(null)
+    // 本地曲库变更时刷新搜索目录（移除单曲后立即可见）
+    const [localRevision, setLocalRevision] = useState(0)
+
+    useEffect(() => {
+        const bump = () => setLocalRevision((n) => n + 1)
+        window.addEventListener(LOCAL_LIBRARY_EVENT, bump)
+        return () => window.removeEventListener(LOCAL_LIBRARY_EVENT, bump)
+    }, [])
 
     const artistRail = useRailApi()
     const albumRail = useRailApi()
     const playlistRail = useRailApi()
     const radioRail = useRailApi()
 
-    const localCatalog = useMemo(() => listLocalPlayableTracks(), [])
+    const localCatalog = useMemo(
+        () => listLocalPlayableTracks(),
+        [localRevision],
+    )
+
+    function handleRemoveTrack(track: Track) {
+        removeTracksBulk(loadLocalLibrary(), new Set([track.id]))
+        notifySuccess("已从本地移除", { description: track.title })
+    }
 
     const localResults = useMemo(() => {
         const keyword = query.trim().toLowerCase()
@@ -516,6 +537,7 @@ function SearchPage() {
                         currentTrack={currentTrack}
                         isPlaying={isPlaying}
                         onPlay={(item, list) => playOrToggle(item, list)}
+                        onLocalRemove={handleRemoveTrack}
                     />
                 </Section>
             ) : localResults.length === 0 &&
@@ -539,6 +561,7 @@ function SearchPage() {
                                 currentTrack={currentTrack}
                                 isPlaying={isPlaying}
                                 onPlay={(item, list) => playOrToggle(item, list)}
+                                onLocalRemove={handleRemoveTrack}
                             />
                         </Section>
                     ) : null}
@@ -593,11 +616,13 @@ function TrackList({
     currentTrack,
     isPlaying,
     onPlay,
+    onLocalRemove,
 }: {
     tracks: Track[]
     currentTrack: Track | null | undefined
     isPlaying: boolean
     onPlay: (item: Track, list: Track[]) => void
+    onLocalRemove?: (track: Track) => void
 }) {
     return (
         <VirtualList
@@ -613,6 +638,11 @@ function TrackList({
                     isActive={currentTrack?.id === track.id}
                     isPlaying={currentTrack?.id === track.id && isPlaying}
                     onPlay={(item) => onPlay(item, tracks)}
+                    onLocalRemove={
+                        track.source === "local" && onLocalRemove
+                            ? () => onLocalRemove(track)
+                            : undefined
+                    }
                 />
             )}
         />

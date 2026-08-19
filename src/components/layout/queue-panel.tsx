@@ -1,5 +1,5 @@
-import { Library, ListMusic, Pause, Play, Trash2, X } from "lucide-react"
-import { useState } from "react"
+import { Library, ListMusic, ListStart, Pause, Play, Trash2, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
@@ -20,16 +20,33 @@ function QueuePanel() {
         currentIndex,
         isPlaying,
         jumpTo,
+        moveToNext,
         removeFromQueue,
         clearQueue,
         reorderQueue,
     } = usePlayer()
 
+    const [open, setOpen] = useState(false)
     const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
         null,
     )
+    const scrollRef = useRef<HTMLDivElement>(null)
 
     const count = queue.length
+
+    // 打开面板时滚动到当前播放曲目
+    useEffect(() => {
+        if (!open || currentIndex < 0) {
+            return
+        }
+        const frame = requestAnimationFrame(() => {
+            const node = scrollRef.current?.querySelector<HTMLElement>(
+                `[data-queue-index="${currentIndex}"]`,
+            )
+            node?.scrollIntoView({ block: "center", behavior: "smooth" })
+        })
+        return () => cancelAnimationFrame(frame)
+    }, [open, currentIndex])
 
     function handleReorder(next: Track[]) {
         const prev = queue
@@ -55,7 +72,7 @@ function QueuePanel() {
 
     return (
         <>
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger
                 title="播放队列"
                 aria-label="播放队列"
@@ -104,7 +121,10 @@ function QueuePanel() {
                         </p>
                     </div>
                 ) : (
-                    <div className="max-h-[min(52vh,420px)] overflow-y-auto p-2">
+                    <div
+                        ref={scrollRef}
+                        className="max-h-[min(52vh,420px)] overflow-y-auto p-2"
+                    >
                         <DragList
                             items={queue}
                             enabled={count > 1}
@@ -113,6 +133,7 @@ function QueuePanel() {
                                 const active = index === currentIndex
                                 return (
                                     <div
+                                        data-queue-index={index}
                                         className={cn(
                                             "group flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5",
                                             active
@@ -196,17 +217,30 @@ function QueuePanel() {
                                                     播放中
                                                 </span>
                                             ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        removeFromQueue(index)
-                                                    }
-                                                    title="从队列移除"
-                                                    aria-label={`移除 ${track.title}`}
-                                                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
-                                                >
-                                                    <X className="size-3.5" />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            moveToNext(index)
+                                                        }
+                                                        title="下一首播放"
+                                                        aria-label={`将 ${track.title} 移到下一首播放`}
+                                                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground group-hover:opacity-100"
+                                                    >
+                                                        <ListStart className="size-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            removeFromQueue(index)
+                                                        }
+                                                        title="从队列移除"
+                                                        aria-label={`移除 ${track.title}`}
+                                                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
+                                                    >
+                                                        <X className="size-3.5" />
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     </div>

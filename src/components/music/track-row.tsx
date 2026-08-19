@@ -616,7 +616,7 @@ function TrackRow({
                                     onClick={() => void handleNeteaseMetadata()}
                                 >
                                     <CloudDownload />
-                                    从网易云获取封面和歌词
+                                    获取封面和歌词
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => void handleOverrideCover()}
@@ -728,7 +728,7 @@ function TrackRow({
                             onClick={() => void handleNeteaseMetadata()}
                         >
                             <CloudDownload />
-                            从网易云获取封面和歌词
+                            获取封面和歌词
                         </ContextMenuItem>
                         <ContextMenuItem
                             onClick={() => void handleOverrideCover()}
