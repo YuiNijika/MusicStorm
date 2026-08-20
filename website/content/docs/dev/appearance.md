@@ -19,6 +19,17 @@ order: 14
 - 明暗由 `html[data-theme="dark"]` 驱动，`index.html` 内联脚本在首帧前按 localStorage / 系统偏好落定，避免闪烁
 - `prefers-color-scheme` 只作为未手动设置时的默认来源；手动偏好存 `musicstorm-appearance`
 
+## 外观入口
+
+两处调色板共用同一偏好模型，改动即时 `applyAppearanceToDom`：
+
+| 入口 | 位置 | 控件 |
+|---|---|---|
+| 桌面顶栏 | `src/components/app/title-bar.tsx` | 明暗（跟随系统/浅色/深色）、色调范围、强调色、自定义色相、毛玻璃透明度/模糊 |
+| 移动端导航 | `src/components/layout/mobile-nav-bar.tsx` | 与顶栏对齐：同样覆盖明暗、色调、强调色、毛玻璃 |
+
+播放样式（经典/封面/歌词）选择器不在外观调色板内，统一收在设置页与全屏播放器，避免两处重复入口漂移。
+
 ## 偏好模型
 
 `AppearancePrefs`（`src/lib/appearance/appearance-prefs.ts`）：

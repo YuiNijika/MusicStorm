@@ -53,7 +53,7 @@ un()
 | 版本来源 | `readAppVersion()` 读应用版本（Tauri 版本） |
 | 缓存 key 分平台 | `cacheKeyForPlatform()`，Android / 桌面不共用缓存 |
 
-发布时桌面 tag 用 `vX.Y.Z`，Android 用 `vX.Y.Z-android`，两者互不干扰。官网 releases 数据层（`website/src/lib/github.ts`）沿用同一过滤规则。
+发布时桌面 tag 用 `vX.Y.Z`，Android 用 `vX.Y.Z-android`，两者互不干扰。官网 releases 数据层（`website/src/lib/github.ts`）沿用同一过滤规则：先丢草稿发布，再取首个非 `-android` 作桌面下载、首个 `-android` 作安卓下载，两个链接各自独立。
 
 ## 发布流程
 

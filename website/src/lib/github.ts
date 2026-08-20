@@ -33,6 +33,12 @@ interface CacheEnvelope<T> {
     data: T
 }
 
+interface ReleaseRaw {
+    tag_name: string
+    html_url: string
+    draft?: boolean
+}
+
 function readCache<T>(key: string): CacheEnvelope<T> | null {
     try {
         const raw = localStorage.getItem(key)
@@ -71,17 +77,19 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 }
 
 async function requestLatestRelease(): Promise<ReleaseInfo | null> {
-    const releases = await fetchJson<{ tag_name: string; html_url: string }[]>(
+    const releases = await fetchJson<ReleaseRaw[]>(
         `${API_BASE}/releases?per_page=30`,
     )
     if (!releases) {
         return null
     }
-    const desktop = releases.find((r) => !r.tag_name.endsWith("-android"))
+    // 与 App 内更新检查同源：桌面找纯 vX.Y.Z，Android 找 vX.Y.Z-android，草稿跳过
+    const published = releases.filter((r) => !r.draft)
+    const desktop = published.find((r) => !r.tag_name.endsWith("-android"))
     if (!desktop) {
         return null
     }
-    const android = releases.find((r) => r.tag_name.endsWith("-android"))
+    const android = published.find((r) => r.tag_name.endsWith("-android"))
 
     const info: ReleaseInfo = {
         version: desktop.tag_name.replace(/^v/, ""),

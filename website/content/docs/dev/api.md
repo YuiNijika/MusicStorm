@@ -100,10 +100,31 @@ netease_http_post (Rust)  绕过 CORS 的无状态 POST 代理
 | `dj.ts` | `fetchDjDetail`、`fetchDjPrograms`、`fetchDjSublist`、`subscribeDjRadio`、`fetchHomeRadios` 等 | 电台 |
 | `mv.ts` | `fetchMvDetail`、`fetchMvPlayable`、`fetchMvUrl`、`fetchMvSublist`、`subscribeMv`、`fetchSimiMvs` | MV 与收藏 |
 | `lyric.ts` | `fetchLyricLines`、`fetchLyricText` | 歌词 |
+| `comment.ts` | `fetchSongComments`、`fetchSongStats`、`postSongComment` | 歌曲评论列表、红心量/播放量、发布/回复评论 |
 | `quality.ts` | `getNeteaseQualityBr`、`setNeteaseQualityBr`、`QUALITY_OPTIONS` | 音质偏好（标准 128k / 较高 192k / 极高 320k / 无损优先） |
 | `song-privilege.ts` | `isSongUrlPlayable`、`pickRicherSongUrlEntry`、`describeSongUrlFailure` | 播放 URL 校验与降级 |
 | `track-actions.ts` | `downloadNeteaseTrack`、`overrideTrackLyric`、`removeTracksFromPlaylist` | 下载 / 歌词覆写 / 移除 |
 | `account-vault.ts` | 账号库读写 | 多账号切换 |
+
+### 评论与歌曲统计
+
+```ts
+import {
+    fetchSongComments,
+    fetchSongStats,
+    postSongComment,
+} from "@/lib/netease/comment"
+
+const { comments, hotComments, total, more } = await fetchSongComments(id, {
+    limit: 20,
+})
+const { likedCount, playCount } = await fetchSongStats(id)   // 需登录才带量
+const comment = await postSongComment(id, "好听的", replyTo)
+```
+
+- 评论列表走 `comment/music`（weapi），写评论走 `comment`（eapi，需登录态）
+- `postSongComment` 固定发 `t:1`、`type:1`（歌曲）；带 `replyTo` 时附 `commentId` 走回复
+- external 模式需对接的后端支持 `/comment` 写路径（CloudMusicAPI 已实现）
 
 ### 扫码登录
 

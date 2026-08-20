@@ -37,7 +37,7 @@ const lines = await fetchLyricLines("1817864981") // 已解析的 LyricLine[]
 
 | 函数 | 输入 → 输出 | 说明 |
 |---|---|---|
-| `parseLrc(lrc: string)` | LRC 文本 → `LyricLine[]` | 标准 `[mm:ss.xx]` 标签解析 |
+| `parseLrc(lrc: string)` | LRC 文本 → `LyricLine[]` | 标准 `[mm:ss.xx]` 标签解析；支持全局/行内偏移与逐字标签剥离 |
 | `parseLyricText(text: string)` | 纯文本 → `LyricLine[]` | 无时间轴文本逐行摊开 |
 | `plainTextToLyricLines(text: string)` | 纯文本 → `LyricLine[]` | 同上（内部用） |
 | `findActiveLyricIndex(lines, positionMs)` | 行数组 + 播放位置 → 活动行下标 | 二分匹配，供高亮 |
@@ -49,6 +49,25 @@ const lines = parseLrc(lrcText)
 const activeIndex = findActiveLyricIndex(lines, positionMs)
 // 高亮 lines[activeIndex]
 ```
+
+## 时间轴校正
+
+`parseLrc` 内置三类时间轴处理，优先于歌词覆写使用：
+
+| 语法 | 作用域 | 说明 |
+|---|---|---|
+| `[offset:±毫秒]` | 全文 | LRC 头部的全局偏移元信息；正值推迟、负值提前，作用于所有行 |
+| `[±N]` | 单行 | 紧跟时间戳后的行内微调（如 `[00:12.00][+120]歌词`），仅该行生效 |
+| `<mm:ss.xx>` 逐字标签 | 文本 | 增强型 LRC 的逐字时间标签对整行同步无用，解析时剥掉，防止串进歌词文本 |
+
+```lrc
+[offset:-300]
+[ti:示例]
+[00:12.00][+120]第一行歌词
+[00:16.50]<00:16.50><00:17.20>第二行歌词
+```
+
+全局偏移按毫秒加在每行 `timeMs` 上；行内偏移再叠加。三者只影响解析结果，不改动原始文本。
 
 ## 歌词覆写
 

@@ -36,6 +36,7 @@ order: 7
 | `pause()` | 暂停 |
 | `seek(ms, opts?)` | 跳转；`opts.resume` 供原生引擎快进后继续播 |
 | `setVolume(v)` / `setMuted(b)` | 音量 / 静音 |
+| `setSpeed(rate)` | 倍速（0.5–2）；HTML5 走 `playbackRate`，原生走音频采样 rate，换源后需重下发 |
 | `getPositionMs()` / `getDurationMs()` | 进度查询 |
 | `destroy()` | 销毁释放 |
 
@@ -86,11 +87,23 @@ const {
     toggleMute,
     toggleShuffle,
     cycleRepeat,
+    playbackRate,
+    setPlaybackRate,
 } = usePlayer()
 
 // 歌曲行点击的标准入口：同曲切换播放/暂停，异曲切队列
 playOrToggle(track, queue)
 ```
+
+## 倍速播放
+
+| 导出 | 位置 | 说明 |
+|---|---|---|
+| `PLAYBACK_RATES` | `src/lib/player/playback-prefs.ts` | 档位 `[0.5, 0.75, 1, 1.25, 1.5, 2]` |
+| `setPlaybackRate(rate)` | `usePlayer` | 收窄到 0.5–2，写回播放偏好并广播；切曲后按当前倍速重下发到引擎 |
+| `SpeedPopover` | `src/components/music/speed-popover.tsx` | 底栏/全屏播放器的速度选择胶囊；`compact` 形态用于播放条 |
+
+倍速不改变音高语义（变速不变调由引擎侧实现差异决定），且只在换曲时重下发，不会在播放中反复重置。
 
 调用约定：
 
