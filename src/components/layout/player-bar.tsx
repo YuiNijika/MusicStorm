@@ -1,5 +1,6 @@
 import {
     Heart,
+    MessageCircle,
     Pause,
     Play,
     Repeat,
@@ -60,7 +61,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     const { positionMs, durationMs } = usePlaybackTick()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
-    const { openArtist, openAlbum } = useMusicNavigation()
+    const { openArtist, openAlbum, openComments } = useMusicNavigation()
 
     const totalMs =
         durationMs > 0 ? durationMs : (currentTrack?.durationMs ?? 0)
@@ -448,6 +449,21 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                         onSpeed={setPlaybackRate}
                         compact
                     />
+                    {currentTrack?.source === "netease" && currentTrack.id ? (
+                        <ControlButton
+                            title="评论"
+                            onClick={() =>
+                                openComments({
+                                    id: currentTrack.id,
+                                    title: currentTrack.title,
+                                    subtitle: currentTrack.artist,
+                                })
+                            }
+                            disabled={!currentTrack}
+                        >
+                            <MessageCircle className="size-3.5" />
+                        </ControlButton>
+                    ) : null}
                     <QueuePanel />
                     <VolumeElasticSlider
                         volume={volume}
