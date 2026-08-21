@@ -172,7 +172,7 @@ function ToastList() {
                 <ToastIcon type={toastItem.type} />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1">
                     <ToastTitle />
-                    <ToastDescription />
+                    {toastItem.description ? <ToastDescription /> : null}
                 </div>
                 {toastItem.actionProps ? <ToastAction /> : null}
                 <ToastClose />

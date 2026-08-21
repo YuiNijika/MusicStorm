@@ -125,6 +125,7 @@ function pickRicherSongUrlEntry(
 
 export {
     describeSongUrlFailure,
+    hasUsableTrial,
     isSongUrlPlayable,
     pickRicherSongUrlEntry,
 }

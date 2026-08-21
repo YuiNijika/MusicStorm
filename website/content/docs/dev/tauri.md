@@ -24,10 +24,10 @@ order: 8
 | 扫描 | `scan_music_folder`、`scan_music_files`、`scan_music_artist_folder` | 本地音乐扫描 |
 | SQLite | `db_upsert_folder`、`db_upsert_tracks`、`db_start_play_session`、`db_end_play_session`、`db_get_listen_stats`、`db_list_listen_stats`、`db_list_top_tracks`、`db_listen_source_breakdown`、`db_get_setting`、`db_set_setting` | 曲库 / 听歌统计 / 设置 |
 | API 缓存 | `api_cache_get`、`api_cache_set`、`api_cache_clear`、`api_cache_purge_expired` | 网易云响应磁盘缓存 |
-| 封面缓存 | `cache_cover_url`、`cache_cover_data_url`、`clear_cover_cache` | 封面磁盘缓存 |
+| 封面缓存 | `cache_cover_url`、`cache_cover_data_url`、`clear_cover_cache` | 封面磁盘缓存；下载走阻塞线程池，带连接/总超时，配合前端并发闸防止死链占满线程池 |
 | 音频 | `audio_list_devices`、`audio_get_output_mode`、`audio_set_device`、`audio_set_exclusive`、`audio_probe`、`audio_load`、`audio_play`、`audio_pause`、`audio_seek`、`audio_set_volume`、`audio_stop` | 原生播放引擎 |
 | ffmpeg | `ffmpeg_detect`、`ffmpeg_validate`、`ffmpeg_set_path`、`pick_ffmpeg_executable` | 检测 / 校验 / 选路径 |
-| 网络代理 | `netease_http_post` | 无 CORS POST（仅放行 music.163.com 域） |
+| 网络代理 | `netease_http_post` | 无 CORS POST（仅放行 music.163.com 域）；`async fn` + `spawn_blocking`，慢/挂死的网易云接口不占 UI 主线程 |
 | 系统 | `get_storage_paths`、`update_global_shortcut` | 路径 / 全局快捷键 |
 | macOS | `macos_now_playing_update`、`macos_now_playing_clear` | Now Playing 集成 |
 

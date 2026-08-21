@@ -74,10 +74,10 @@ function AppShell({
             {/* 网页版下载提示条：navbar 下方、内容上方；桌面版不渲染 */}
             <DownloadBanner />
 
-            <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} />
+            <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
 
             <div className="flex min-h-0 flex-1">
-                <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} />
+                <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
 
                 <main
                     ref={mainRef}

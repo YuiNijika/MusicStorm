@@ -318,7 +318,7 @@ function SearchPage() {
                                 : false
                         }
                         className={cn(
-                            "h-11 shrink-0 cursor-pointer rounded-2xl bg-foreground px-4 text-[13px] font-medium text-background",
+                            "apple-primary-action h-11 shrink-0 cursor-pointer rounded-2xl px-4 text-[13px] font-medium",
                             "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
                         )}
                     >

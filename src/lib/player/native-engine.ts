@@ -123,6 +123,10 @@ function createNativeEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
             muted = next
             applyVolume()
         },
+        setSpeed(rate) {
+            // rodio Speed 包装器随 Sink 内 factor 实时变速；get_pos 已按倍速折算
+            void invoke("audio_set_speed", { rate }).catch(() => {})
+        },
         setEq(gains, enabled) {
             // native 引擎（rodio）已集成 biquad EQ：实时下发增益，Rust 侧逐样本过滤
             void invoke("audio_set_eq", { gains, enabled }).catch(() => {})

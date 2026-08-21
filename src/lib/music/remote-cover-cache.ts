@@ -8,6 +8,11 @@ import { cacheCoverUrl, type CachedCover } from "@/lib/local/cover"
 const SETTING_KEY = "cover.remote.v1"
 const REMOTE_COVER_EVENT = "musicstorm-remote-cover-ready"
 
+// 下载失败后短时间内不再重试，防止滚动触发对同一死链的反复下载
+const FAILED_RETRY_MS = 10 * 60 * 1000
+// 并发下载上限：封面集中在首屏时避免一次性占满 Rust 阻塞线程池
+const MAX_CONCURRENT_DOWNLOADS = 4
+
 type RemoteCoverMap = Record<string, CachedCover>
 
 let cache: RemoteCoverMap = {}
@@ -15,6 +20,27 @@ let ready = false
 let loadPromise: Promise<void> | null = null
 // 进行中的下载去重，避免同一 URL 并发重复请求
 const inFlight = new Map<string, Promise<CachedCover | null>>()
+// 失败墓碑：urlHash → 失败时刻，仅内存态，重启后自然重置
+const failedAt = new Map<string, number>()
+// 并发闸：活跃下载数 + 排队等待者
+let activeDownloads = 0
+const downloadWaiters: Array<() => void> = []
+
+async function withDownloadSlot<T>(task: () => Promise<T>): Promise<T> {
+    if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+        await new Promise<void>((resolve) => downloadWaiters.push(resolve))
+    }
+    activeDownloads += 1
+    try {
+        return await task()
+    } finally {
+        activeDownloads -= 1
+        const next = downloadWaiters.shift()
+        if (next) {
+            next()
+        }
+    }
+}
 
 function normalizeMap(value: unknown): RemoteCoverMap {
     if (!value || typeof value !== "object") {
@@ -94,23 +120,28 @@ async function ensureRemoteCoverCached(url: string): Promise<CachedCover | null>
     if (hit) {
         return hit
     }
+    const failedTs = failedAt.get(urlHash(trimmed))
+    if (failedTs !== undefined && Date.now() - failedTs < FAILED_RETRY_MS) {
+        return null
+    }
     const pending = inFlight.get(trimmed)
     if (pending) {
         return pending
     }
-    const task = (async () => {
+    const task = withDownloadSlot(async () => {
         try {
             const cached = await cacheCoverUrl(trimmed)
             await writeMap({ ...cache, [urlHash(trimmed)]: cached })
             window.dispatchEvent(new CustomEvent(REMOTE_COVER_EVENT, { detail: trimmed }))
             return cached
         } catch {
-            // 下载失败保持远程 URL，下次渲染再试
+            // 下载失败记住失败时刻，避免滚动时反复请求死链
+            failedAt.set(urlHash(trimmed), Date.now())
             return null
         } finally {
             inFlight.delete(trimmed)
         }
-    })()
+    })
     inFlight.set(trimmed, task)
     return task
 }

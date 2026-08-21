@@ -3,6 +3,7 @@ import { convertFileSrc } from "@tauri-apps/api/core"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import {
     describeSongUrlFailure,
+    hasUsableTrial,
     isSongUrlPlayable,
     pickRicherSongUrlEntry,
     type SongUrlItem,
@@ -12,7 +13,7 @@ import type { Track } from "@/lib/types"
 import { isWebMode } from "@/lib/web-mode"
 
 export type ResolvePlayableResult =
-    | { ok: true; url: string }
+    | { ok: true; url: string; trial?: boolean }
     | { ok: false; reason: string; entry?: SongUrlItem }
 
 /**
@@ -74,9 +75,12 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
                 const entry = result.data?.[0]
                 bestEntry = pickRicherSongUrlEntry(bestEntry, entry)
                 if (isSongUrlPlayable(entry) && entry?.url) {
+                    // 检测是否为试听：fee=1(VIP) 或有可用试听权限
+                    const isTrial = hasUsableTrial(entry)
                     return {
                         ok: true,
                         url: normalizeNeteaseMediaUrl(entry.url),
+                        trial: isTrial,
                     }
                 }
             } catch {

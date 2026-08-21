@@ -5,10 +5,14 @@ use md5::{Digest, Md5};
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tauri::AppHandle;
 
 const MAX_COVER_BYTES: usize = 12 * 1024 * 1024;
 const THUMBNAIL_SIZE: u32 = 192;
+// 下载超时：CDN 挂死时快速放行阻塞线程，避免占满线程池拖垮其他 IPC
+const COVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
+const COVER_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// 封面缓存上限：文件数与总大小，超出后按最旧清理
 const MAX_COVER_FILES: usize = 4_000;
@@ -233,7 +237,14 @@ pub async fn cache_cover_url(app: AppHandle, url: String) -> Result<CachedCover,
         if url.is_empty() {
             return Err("封面地址为空".into());
         }
-        let response = reqwest::blocking::get(url)
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(COVER_CONNECT_TIMEOUT)
+            .timeout(COVER_DOWNLOAD_TIMEOUT)
+            .build()
+            .map_err(|error| format!("创建封面下载客户端失败: {error}"))?;
+        let response = client
+            .get(url)
+            .send()
             .map_err(|error| format!("下载封面失败: {error}"))?
             .error_for_status()
             .map_err(|error| format!("下载封面失败: {error}"))?;

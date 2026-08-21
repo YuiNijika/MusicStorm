@@ -104,6 +104,9 @@ function createAndroidEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
         setMuted(next) {
             setAndroidPlaybackMuted(next)
         },
+        setSpeed(_rate) {
+            // 系统 MediaPlayer 无变速能力；后续可改 ExoPlayer PlaybackParameters
+        },
         setEq(_gains, _enabled) {
             // Android 系统解码无 10 段 biquad；音量直通系统，EQ 暂不生效
         },

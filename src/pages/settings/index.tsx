@@ -6,6 +6,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control"
 import { isWebMode } from "@/lib/web-mode"
 import { AccountTab } from "@/pages/settings/account-tab"
 import { AppearanceTab } from "@/pages/settings/appearance-tab"
+import { FaqTab } from "@/pages/settings/faq-tab"
 import { HotkeysTab } from "@/pages/settings/hotkeys-tab"
 import { OtherTab } from "@/pages/settings/other-tab"
 import { PlaybackTab } from "@/pages/settings/playback-tab"
@@ -20,6 +21,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
     { id: "account", label: "账号" },
     { id: "update", label: "更新" },
     { id: "hotkeys", label: "快捷键" },
+    { id: "faq", label: "常见问题" },
     { id: "other", label: "其他" },
 ]
 
@@ -73,6 +75,7 @@ function SettingsPage({
                 ) : null}
                 {!isWebMode() && tab === "update" ? <UpdateTab /> : null}
                 {tab === "hotkeys" ? <HotkeysTab /> : null}
+                {tab === "faq" ? <FaqTab /> : null}
                 {tab === "other" ? <OtherTab /> : null}
             </div>
 

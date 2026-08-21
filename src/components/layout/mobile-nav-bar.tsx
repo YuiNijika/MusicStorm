@@ -6,20 +6,35 @@ import {
     Library,
     LogIn,
     LogOut,
+    Monitor,
+    MoonStar,
     Palette,
     Podcast,
     Search,
     Settings2,
+    SunMedium,
     User,
     UserPlus,
     type LucideIcon,
 } from "lucide-react"
-import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from "react"
+import {
+    lazy,
+    Suspense,
+    useCallback,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+} from "react"
 
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -67,11 +82,21 @@ const NeteaseAuthDialog = lazy(() =>
 type MobileNavBarProps = {
     activeRoute: AppRoute
     onNavigate: (route: AppRoute) => void
+    showActive?: boolean
 }
 
-function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
+function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavBarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSessionSafe()
-    const { appearance, setAccent, setCustomHue } = useTheme()
+    const {
+        theme,
+        setTheme,
+        appearance,
+        setAccent,
+        setTintScope,
+        setCustomHue,
+        setGlassOpacity,
+        setGlassBlur,
+    } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
     const customActive = appearance.accent === "custom"
     const customHue = resolveAccentHue(appearance)
@@ -89,6 +114,7 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                     icons={ICONS}
                     activeRoute={activeRoute}
                     onNavigate={onNavigate}
+                    showActive={showActive}
                 />
 
                 <div className="flex shrink-0 items-center">
@@ -107,74 +133,226 @@ function MobileNavBar({ activeRoute, onNavigate }: MobileNavBarProps) {
                         <DropdownMenuContent
                             side="bottom"
                             align="end"
-                            className="w-56 p-3"
+                            className="w-72 max-w-[calc(100vw-2rem)] p-3"
                         >
-                            <p className="mb-2 text-[12px] font-medium text-foreground">
-                                主题色
-                            </p>
-                            <div className="flex flex-wrap gap-2.5">
-                                {ACCENT_OPTIONS.map((option) => {
-                                    const active = appearance.accent === option.id
-                                    return (
-                                        <button
-                                            key={option.id}
-                                            type="button"
-                                            aria-label={option.label}
-                                            onClick={() => setAccent(option.id)}
-                                            className={cn(
-                                                "size-7 cursor-pointer rounded-full transition-transform",
-                                                "ring-offset-2 ring-offset-background active:scale-95",
-                                                active
-                                                    ? "ring-2 ring-foreground/80"
-                                                    : "ring-1 ring-black/10 dark:ring-white/15",
-                                            )}
-                                            style={{
-                                                background: accentSwatch(
-                                                    option.hue,
-                                                    option.id === "neutral",
-                                                ),
-                                            }}
-                                        />
-                                    )
-                                })}
-                                <button
-                                    type="button"
-                                    aria-label="自定义色相"
-                                    onClick={() => setCustomHue(customHue)}
-                                    className={cn(
-                                        "size-7 cursor-pointer overflow-hidden rounded-full transition-transform",
-                                        "ring-offset-2 ring-offset-background active:scale-95",
-                                        customActive
-                                            ? "ring-2 ring-foreground/80"
-                                            : "ring-1 ring-black/10 dark:ring-white/15",
-                                    )}
-                                    style={{
-                                        background: `conic-gradient(
-                                            oklch(0.7 0.16 0),
-                                            oklch(0.7 0.16 60),
-                                            oklch(0.7 0.16 120),
-                                            oklch(0.7 0.16 180),
-                                            oklch(0.7 0.16 240),
-                                            oklch(0.7 0.16 300),
-                                            oklch(0.7 0.16 360)
-                                        )`,
-                                    }}
-                                />
-                            </div>
-                            {customActive ? (
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={359}
-                                    step={1}
-                                    value={customHue}
-                                    onChange={(event) =>
-                                        setCustomHue(Number(event.currentTarget.value))
+                            <DropdownMenuRadioGroup
+                                value={theme}
+                                onValueChange={(value) => {
+                                    if (
+                                        value === "light" ||
+                                        value === "dark" ||
+                                        value === "system"
+                                    ) {
+                                        setTheme(value)
                                     }
-                                    className="progress-range mt-3 w-full"
-                                    aria-label="自定义色相"
-                                />
-                            ) : null}
+                                }}
+                            >
+                                <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                                    明暗
+                                </DropdownMenuLabel>
+                                <div className="flex flex-col">
+                                    <DropdownMenuRadioItem
+                                        value="system"
+                                        className="cursor-pointer"
+                                    >
+                                        <Monitor className="mr-1.5 size-3.5" />
+                                        跟随系统
+                                    </DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem
+                                        value="light"
+                                        className="cursor-pointer"
+                                    >
+                                        <SunMedium className="mr-1.5 size-3.5" />
+                                        浅色
+                                    </DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem
+                                        value="dark"
+                                        className="cursor-pointer"
+                                    >
+                                        <MoonStar className="mr-1.5 size-3.5" />
+                                        深色
+                                    </DropdownMenuRadioItem>
+                                </div>
+                            </DropdownMenuRadioGroup>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuGroup>
+                                <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                                    色调
+                                </DropdownMenuLabel>
+                                <div
+                                    className="apple-segmented mx-1 mb-2 flex"
+                                    role="group"
+                                    aria-label="调色范围"
+                                >
+                                    <button
+                                        type="button"
+                                        aria-pressed={appearance.tintScope === "accent"}
+                                        onClick={() => setTintScope("accent")}
+                                        className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-2.5 text-[11px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                                    >
+                                        强调色
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-pressed={appearance.tintScope === "global"}
+                                        onClick={() => setTintScope("global")}
+                                        className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-2.5 text-[11px] font-medium text-muted-foreground aria-pressed:text-foreground"
+                                    >
+                                        全局色调
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2.5">
+                                    {ACCENT_OPTIONS.map((option) => {
+                                        const active = appearance.accent === option.id
+                                        return (
+                                            <button
+                                                key={option.id}
+                                                type="button"
+                                                aria-label={option.label}
+                                                onClick={() => setAccent(option.id)}
+                                                className={cn(
+                                                    "size-7 cursor-pointer rounded-full transition-transform",
+                                                    "ring-offset-2 ring-offset-popover active:scale-95",
+                                                    active
+                                                        ? "ring-2 ring-foreground/80"
+                                                        : "ring-1 ring-black/10 dark:ring-white/15",
+                                                )}
+                                                style={{
+                                                    background: accentSwatch(
+                                                        option.hue,
+                                                        option.id === "neutral",
+                                                    ),
+                                                }}
+                                            />
+                                        )
+                                    })}
+                                    <button
+                                        type="button"
+                                        aria-label="自定义色相"
+                                        onClick={() => setCustomHue(customHue)}
+                                        className={cn(
+                                            "size-7 cursor-pointer overflow-hidden rounded-full transition-transform",
+                                            "ring-offset-2 ring-offset-popover active:scale-95",
+                                            customActive
+                                                ? "ring-2 ring-foreground/80"
+                                                : "ring-1 ring-black/10 dark:ring-white/15",
+                                        )}
+                                        style={{
+                                            background: `conic-gradient(
+                                                oklch(0.7 0.16 0),
+                                                oklch(0.7 0.16 60),
+                                                oklch(0.7 0.16 120),
+                                                oklch(0.7 0.16 180),
+                                                oklch(0.7 0.16 240),
+                                                oklch(0.7 0.16 300),
+                                                oklch(0.7 0.16 360)
+                                            )`,
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-1.5 px-1 pb-1.5">
+                                    <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                        自定义色相
+                                        <span className="tabular-nums">
+                                            {customHue}°
+                                        </span>
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={359}
+                                        step={1}
+                                        value={customHue}
+                                        onChange={(event) =>
+                                            setCustomHue(Number(event.currentTarget.value))
+                                        }
+                                        className="progress-range w-full"
+                                        aria-label="自定义色相"
+                                        style={
+                                            {
+                                                "--progress": `${(customHue / 359) * 100}%`,
+                                            } as CSSProperties
+                                        }
+                                    />
+                                    <div
+                                        className="h-1.5 w-full rounded-full"
+                                        style={{
+                                            background: `linear-gradient(
+                                                to right,
+                                                oklch(0.7 0.16 0),
+                                                oklch(0.7 0.16 60),
+                                                oklch(0.7 0.16 120),
+                                                oklch(0.7 0.16 180),
+                                                oklch(0.7 0.16 240),
+                                                oklch(0.7 0.16 300),
+                                                oklch(0.7 0.16 360)
+                                            )`,
+                                        }}
+                                    />
+                                </div>
+                            </DropdownMenuGroup>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuGroup>
+                                <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                                    毛玻璃
+                                </DropdownMenuLabel>
+                                <div className="space-y-3 px-1 py-1.5">
+                                    <label className="block space-y-1.5">
+                                        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                            透明度
+                                            <span className="tabular-nums">
+                                                {Math.round(appearance.glassOpacity * 100)}%
+                                            </span>
+                                        </span>
+                                        <input
+                                            type="range"
+                                            min={0.35}
+                                            max={0.9}
+                                            step={0.01}
+                                            value={appearance.glassOpacity}
+                                            onChange={(event) =>
+                                                setGlassOpacity(Number(event.currentTarget.value))
+                                            }
+                                            className="progress-range w-full"
+                                            aria-label="毛玻璃透明度"
+                                            style={
+                                                {
+                                                    "--progress": `${((appearance.glassOpacity - 0.35) / 0.55) * 100}%`,
+                                                } as CSSProperties
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block space-y-1.5">
+                                        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                            模糊
+                                            <span className="tabular-nums">
+                                                {Math.round(appearance.glassBlur)}px
+                                            </span>
+                                        </span>
+                                        <input
+                                            type="range"
+                                            min={8}
+                                            max={48}
+                                            step={1}
+                                            value={appearance.glassBlur}
+                                            onChange={(event) =>
+                                                setGlassBlur(Number(event.currentTarget.value))
+                                            }
+                                            className="progress-range w-full"
+                                            aria-label="模糊强度"
+                                            style={
+                                                {
+                                                    "--progress": `${((appearance.glassBlur - 8) / 40) * 100}%`,
+                                                } as CSSProperties
+                                            }
+                                        />
+                                    </label>
+                                </div>
+                            </DropdownMenuGroup>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
@@ -255,9 +433,10 @@ type SegmentedTabsProps = {
     icons: Record<AppRoute, LucideIcon>
     activeRoute: AppRoute
     onNavigate: (route: AppRoute) => void
+    showActive?: boolean
 }
 
-function SegmentedTabs({ tabs, icons, activeRoute, onNavigate }: SegmentedTabsProps) {
+function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true }: SegmentedTabsProps) {
     const indicatorRef = useRef<HTMLButtonElement>(null)
 
     return (
@@ -265,7 +444,7 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate }: SegmentedTabsPr
             {tabs.map((id) => {
                 const Icon = icons[id]
                 const item = NAV_ITEMS.find((n) => n.id === id)
-                const isActive = activeRoute === id
+                const isActive = showActive && activeRoute === id
                 return (
                     <button
                         key={id}

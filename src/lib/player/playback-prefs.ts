@@ -1,11 +1,15 @@
 const STORAGE_KEY = "musicstorm-player-preferences"
 const PLAYER_PREFS_EVENT = "musicstorm:player-preferences"
 
+// 倍速档位，UI 循环/选单共用
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
+
 type PlayerPreferences = {
     volume: number
     isMuted: boolean
     autoPlayOnStartup: boolean
     showLyricTranslation: boolean
+    playbackRate: number
 }
 
 const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
@@ -13,10 +17,18 @@ const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
     isMuted: false,
     autoPlayOnStartup: false,
     showLyricTranslation: true,
+    playbackRate: 1,
 }
 
 function clampVolume(value: number): number {
     return Math.min(1, Math.max(0, value))
+}
+
+function clampRate(value: number): number {
+    if (!Number.isFinite(value)) {
+        return DEFAULT_PLAYER_PREFERENCES.playbackRate
+    }
+    return Math.min(2, Math.max(0.5, value))
 }
 
 function getPlayerPreferences(): PlayerPreferences {
@@ -40,6 +52,10 @@ function getPlayerPreferences(): PlayerPreferences {
                     : DEFAULT_PLAYER_PREFERENCES.isMuted,
             autoPlayOnStartup: data.autoPlayOnStartup === true,
             showLyricTranslation: data.showLyricTranslation !== false,
+            playbackRate:
+                typeof data.playbackRate === "number"
+                    ? clampRate(data.playbackRate)
+                    : DEFAULT_PLAYER_PREFERENCES.playbackRate,
         }
     } catch {
         return { ...DEFAULT_PLAYER_PREFERENCES }
@@ -78,6 +94,7 @@ function setShowLyricTranslation(enabled: boolean): void {
 
 export {
     DEFAULT_PLAYER_PREFERENCES,
+    PLAYBACK_RATES,
     PLAYER_PREFS_EVENT,
     getPlayerPreferences,
     setPlayerPreferences,

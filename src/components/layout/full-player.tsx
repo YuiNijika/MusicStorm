@@ -22,6 +22,7 @@ import { EqEditor } from "@/components/music/eq-editor"
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
+import { SpeedPopover } from "@/components/music/speed-popover"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
@@ -106,6 +107,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         isMuted,
         shuffle,
         repeat,
+        playbackRate,
+        setPlaybackRate,
         togglePlay,
         next,
         previous,
@@ -485,6 +488,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             isPlaying={isPlaying}
             shuffle={shuffle}
             repeat={repeat}
+            playbackRate={playbackRate}
+            onSpeed={setPlaybackRate}
             showQuality={showQuality}
             canLike={canLike}
             liked={liked}
@@ -501,13 +506,14 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             onQuality={handleQualityChange}
             onToggleLike={() => void handleToggleLike()}
             likeCount={likeCount}
-            onOpenComments={() =>
+            onOpenComments={() => {
                 openComments({
                     id: displayTrack.id,
                     title: displayTrack.title,
                     subtitle: displayTrack.artist,
                 })
-            }
+                onClose()
+            }}
             trackId={displayTrack.id}
         />
     )
@@ -822,6 +828,8 @@ function TransportBar({
     isPlaying,
     shuffle,
     repeat,
+    playbackRate,
+    onSpeed,
     showQuality,
     canLike,
     liked,
@@ -844,6 +852,8 @@ function TransportBar({
     isPlaying: boolean
     shuffle: boolean
     repeat: "off" | "all" | "one"
+    playbackRate: number
+    onSpeed: (rate: number) => void
     showQuality: boolean
     canLike: boolean
     liked: boolean
@@ -934,6 +944,8 @@ function TransportBar({
             </div>
 
             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
+
                 <Popover>
                     <PopoverTrigger
                         className={cn(

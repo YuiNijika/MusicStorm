@@ -8,6 +8,7 @@ import {
     fetchSongComments,
     fetchSongStats,
     postSongComment,
+    type CommentSortType,
     type NeteaseComment,
     type SongStats,
 } from "@/lib/netease/comment"
@@ -61,44 +62,57 @@ function CommentItem({
     comment,
     hot = false,
     onReply,
+    level = 1,
 }: {
     comment: NeteaseComment
     hot?: boolean
     onReply: () => void
+    level?: number
 }) {
     const user = comment.user
     const nickname = user?.nickname?.trim() || "网易云用户"
     const replied = comment.beReplied?.[0]
     const [avatarFailed, setAvatarFailed] = useState(false)
 
+    // 三级及以上：引用被回复内容
+    const isQuoted = level >= 3 && replied
+
     return (
-        <div className="flex gap-3">
+        <div className={cn("flex gap-3", level > 1 && "ml-8 mt-2")}>
             {avatarFailed || !user?.avatarUrl ? (
-                <span className="size-9 shrink-0 rounded-full bg-[var(--surface-fill)]" />
+                <span className={cn("shrink-0 rounded-full bg-[var(--surface-fill)]", level > 2 ? "size-6" : "size-9")} />
             ) : (
                 <img
                     src={user.avatarUrl}
                     alt={nickname}
                     loading="lazy"
                     onError={() => setAvatarFailed(true)}
-                    className="size-9 shrink-0 rounded-full object-cover"
+                    className={cn("shrink-0 rounded-full object-cover", level > 2 ? "size-6" : "size-9")}
                 />
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                     <span
                         className={cn(
-                            "truncate text-[12px] font-medium",
+                            "truncate font-medium",
+                            level > 2 ? "text-[11px]" : "text-[12px]",
                             hot ? "text-primary" : "text-foreground",
                         )}
                     >
                         {nickname}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                    <span className={cn("shrink-0 text-muted-foreground", level > 2 ? "text-[10px]" : "text-[11px]")}>
                         {formatCommentTime(comment.time)}
                     </span>
                 </div>
-                {replied ? (
+                {isQuoted && replied ? (
+                    <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[11px] text-muted-foreground">
+                        <span className="font-medium">
+                            @{replied.user?.nickname?.trim() || "用户"}
+                        </span>
+                        ：{replied.content}
+                    </p>
+                ) : replied && level === 2 ? (
                     <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[12px] text-muted-foreground">
                         <span className="font-medium">
                             @{replied.user?.nickname?.trim() || "用户"}
@@ -106,10 +120,13 @@ function CommentItem({
                         ：{replied.content}
                     </p>
                 ) : null}
-                <p className="mt-1 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+                <p className={cn(
+                    "mt-1 break-words whitespace-pre-wrap leading-relaxed text-foreground",
+                    level > 2 ? "text-[12px]" : "text-[13px]",
+                )}>
                     {comment.content}
                 </p>
-                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                <div className={cn("mt-1 flex items-center gap-3 text-muted-foreground", level > 2 ? "text-[10px]" : "text-[11px]")}>
                     {comment.ipLocation?.location ? (
                         <span>{comment.ipLocation.location}</span>
                     ) : null}
@@ -142,6 +159,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
     const [loadingMore, setLoadingMore] = useState(false)
     const [hasMore, setHasMore] = useState(false)
     const offsetRef = useRef(0)
+    const [sortBy, setSortBy] = useState<CommentSortType>("hot")
 
     const [content, setContent] = useState("")
     const [posting, setPosting] = useState(false)
@@ -162,7 +180,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
         offsetRef.current = 0
 
         void Promise.all([
-            fetchSongComments(trackId, { limit: PAGE_SIZE, offset: 0 }),
+            fetchSongComments(trackId, { limit: PAGE_SIZE, offset: 0, sort: sortBy }),
             fetchSongStats(trackId),
         ])
             .then(([data, songStats]) => {
@@ -186,7 +204,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
         return () => {
             cancelled = true
         }
-    }, [trackId])
+    }, [trackId, sortBy])
 
     async function loadMore() {
         if (loadingMore || !hasMore) {
@@ -198,6 +216,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
             const data = await fetchSongComments(trackId, {
                 limit: PAGE_SIZE,
                 offset: nextOffset,
+                sort: sortBy,
             })
             offsetRef.current = nextOffset
             setComments((prev) => {
@@ -291,6 +310,34 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
             </div>
 
             <div className="space-y-5">
+                {/* 排序切换 */}
+                <div className="flex items-center gap-1 rounded-full bg-[var(--surface-fill)] p-0.5">
+                    <button
+                        type="button"
+                        onClick={() => setSortBy("hot")}
+                        className={cn(
+                            "flex-1 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                            sortBy === "hot"
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:text-foreground",
+                        )}
+                    >
+                        最热
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSortBy("time")}
+                        className={cn(
+                            "flex-1 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                            sortBy === "time"
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:text-foreground",
+                        )}
+                    >
+                        最新
+                    </button>
+                </div>
+
                 {status === "loading" ? (
                     <p className="px-3 py-10 text-center text-[12px] text-muted-foreground">
                         加载评论…
@@ -335,6 +382,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                                             key={comment.commentId}
                                             comment={comment}
                                             onReply={() => handleReply(comment)}
+                                            level={comment.beReplied?.length ? 2 : 1}
                                         />
                                     ))}
                                 </div>

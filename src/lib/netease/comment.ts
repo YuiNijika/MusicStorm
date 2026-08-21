@@ -37,9 +37,11 @@ type SongComments = {
     hotComments: NeteaseComment[]
 }
 
+export type CommentSortType = "hot" | "time"
+
 async function fetchSongComments(
     id: string,
-    options: { limit?: number; offset?: number; before?: number } = {},
+    options: { limit?: number; offset?: number; before?: number; sort?: CommentSortType } = {},
 ): Promise<SongComments> {
     const data = await neteaseRequest<SongCommentsData>({
         path: NETEASE_PATHS.commentMusic,
@@ -48,6 +50,8 @@ async function fetchSongComments(
             limit: options.limit ?? 20,
             offset: options.offset ?? 0,
             before: options.before ?? 0,
+            // 0=推荐(热), 1=按时间排序
+            type: options.sort === "time" ? 1 : 0,
         },
     })
     return {

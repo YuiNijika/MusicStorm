@@ -50,9 +50,11 @@ const ICONS: Record<AppRoute, LucideIcon> = {
 type SidebarProps = {
     activeRoute: AppRoute
     onNavigate: (route: AppRoute) => void
+    /** 详情页覆盖侧栏时隐藏选中态（如评论页） */
+    showActive?: boolean
 }
 
-function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
+function Sidebar({ activeRoute, onNavigate, showActive = true }: SidebarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSession()
     const [authOpen, setAuthOpen] = useState(false)
 
@@ -61,7 +63,7 @@ function Sidebar({ activeRoute, onNavigate }: SidebarProps) {
             <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-2 pb-2">
                 {NAV_ITEMS.map((item) => {
                     const Icon = ICONS[item.id]
-                    const isActive = activeRoute === item.id
+                    const isActive = showActive && activeRoute === item.id
 
                     return (
                         <button

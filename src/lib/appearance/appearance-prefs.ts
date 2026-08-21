@@ -330,6 +330,12 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
         root.style.setProperty("--glass-border", "rgb(255 255 255 / 10%)")
         root.style.setProperty("--glass-highlight", "rgb(255 255 255 / 9%)")
         root.style.setProperty(
+            "--glass-surface",
+            tintAllSurfaces
+                ? `oklch(0.235 0.014 ${hue} / 72%)`
+                : "oklch(0.235 0.005 260 / 72%)",
+        )
+        root.style.setProperty(
             "--glass-shadow",
             "0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset",
         )
@@ -455,13 +461,19 @@ function applyAppearanceToDom(prefs: AppearancePrefs): void {
             ? "color-mix(in oklab, var(--primary) 13%, rgb(0 0 0 / 6%))"
             : "rgb(0 0 0 / 10%)",
     )
-    root.style.setProperty("--glass-border", "rgb(255 255 255 / 46%)")
-    root.style.setProperty("--glass-highlight", "rgb(255 255 255 / 62%)")
-    root.style.setProperty(
-        "--glass-shadow",
-        "0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset",
-    )
-}
+        root.style.setProperty("--glass-border", "rgb(255 255 255 / 46%)")
+        root.style.setProperty("--glass-highlight", "rgb(255 255 255 / 62%)")
+        root.style.setProperty(
+            "--glass-surface",
+            tintAllSurfaces
+                ? `oklch(0.995 0.01 ${hue} / 68%)`
+                : "oklch(1 0 0 / 68%)",
+        )
+        root.style.setProperty(
+            "--glass-shadow",
+            "0 8px 30px rgb(0 0 0 / 8%), 0 1px 0 rgb(255 255 255 / 52%) inset",
+        )
+    }
 
 // oklch 不可用时的 HSL 近似：保持 PC 默认色的明度/色相族，强调色随 hue 走。
 // 仅旧 WebView 命中，色彩数值允许有 ±5% 级近似，结构性一致即可。
@@ -591,6 +603,16 @@ function applyFallbackPalette(
     set("--surface-fill-pressed", dark ? "rgb(255 255 255 / 15%)" : "rgb(0 0 0 / 10%)")
     set("--glass-border", dark ? "rgb(255 255 255 / 10%)" : "rgb(255 255 255 / 46%)")
     set("--glass-highlight", dark ? "rgb(255 255 255 / 9%)" : "rgb(255 255 255 / 62%)")
+    set(
+        "--glass-surface",
+        tintAllSurfaces
+            ? dark
+                ? `hsl(${hue} 10% ${24}% / 72%)`
+                : `hsl(${hue} 6% ${100}% / 68%)`
+            : dark
+                ? "hsl(260 4% 24% / 72%)"
+                : "hsl(0 0% 100% / 68%)",
+    )
     set(
         "--glass-shadow",
         dark

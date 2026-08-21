@@ -298,6 +298,18 @@ pub fn audio_set_volume(state: State<'_, AudioState>, volume: f32) -> Result<(),
     Ok(())
 }
 
+#[tauri::command]
+pub fn audio_set_speed(state: State<'_, AudioState>, rate: f32) -> Result<(), String> {
+    let player = {
+        let guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
+        guard.as_ref().cloned()
+    };
+    if let Some(player) = player {
+        player.set_speed(rate);
+    }
+    Ok(())
+}
+
 /// 设置 10 段均衡器增益；enabled 关闭时等效平直
 #[tauri::command]
 pub fn audio_set_eq(

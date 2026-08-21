@@ -15,7 +15,8 @@ mod tray;
 #[cfg(not(target_os = "android"))]
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
-    audio_seek, audio_set_device, audio_set_eq, audio_set_exclusive, audio_set_volume, audio_stop,
+    audio_seek, audio_set_device, audio_set_eq, audio_set_exclusive, audio_set_speed,
+    audio_set_volume, audio_stop,
     AudioState,
 };
 use cover_cache::{
@@ -852,6 +853,8 @@ pub fn run() {
             audio_set_exclusive,
             #[cfg(not(target_os = "android"))]
             audio_set_eq,
+            #[cfg(not(target_os = "android"))]
+            audio_set_speed,
             #[cfg(not(target_os = "android"))]
             audio_probe,
             #[cfg(not(target_os = "android"))]

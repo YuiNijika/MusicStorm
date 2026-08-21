@@ -22,7 +22,24 @@ fn build_client() -> Result<Client, String> {
 }
 
 #[tauri::command]
-pub fn netease_http_post(
+pub async fn netease_http_post(
+    url: String,
+    body: String,
+    cookie: Option<String>,
+    user_agent: Option<String>,
+    referer: Option<String>,
+    origin: Option<String>,
+    real_ip: Option<String>,
+) -> Result<NeteaseHttpResponse, String> {
+    // 同步请求挪到阻塞线程池，避免慢/挂死的网易云接口占住 UI 主线程
+    tauri::async_runtime::spawn_blocking(move || {
+        post_blocking(url, body, cookie, user_agent, referer, origin, real_ip)
+    })
+    .await
+    .map_err(|error| format!("网易云请求任务失败: {error}"))?
+}
+
+fn post_blocking(
     url: String,
     body: String,
     cookie: Option<String>,

@@ -15,6 +15,8 @@ type AudioEngine = {
     seek: (positionMs: number, opts?: { resume?: boolean }) => void | Promise<void>
     setVolume: (volume: number) => void
     setMuted: (muted: boolean) => void
+    /** 倍速播放：0.5–2，1 为正常 */
+    setSpeed: (rate: number) => void
     /** 10 段均衡器：gains 为各频段增益 dB，enabled 关闭时等效平直 */
     setEq: (gains: number[], enabled: boolean) => void
     getPositionMs: () => number
@@ -39,9 +41,14 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     // 加载完成后 resolve 的 Promise；切曲时取消等待避免卡死
     let readyPromise: Promise<void> | null = null
     let readyCancel = false
+    // load() 会重置 playbackRate，需在换源后按当前倍速重新设置
+    let currentRate = 1
     // Web Audio 均衡器：惰性创建，仅启用 EQ 时才接管音频输出
     let eqContext: AudioContext | null = null
     let eqFilters: BiquadFilterNode[] = []
+    // 后台恢复：记录播放状态，visibilitychange 时恢复
+    let wasPlayingBeforeHidden = false
+    let hiddenByVisibilityChange = false
 
     function ensureEqGraph(): void {
         if (eqContext) {
@@ -105,6 +112,41 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     audio.addEventListener("pause", onPause)
     audio.addEventListener("error", onError)
 
+    // WebView 进入后台会暂停 Audio 元素，回到前台后需手动恢复
+    const onVisibilityChange = () => {
+        if (document.hidden) {
+            wasPlayingBeforeHidden = !audio.paused
+            hiddenByVisibilityChange = true
+        } else if (hiddenByVisibilityChange && wasPlayingBeforeHidden) {
+            hiddenByVisibilityChange = false
+            if (audio.ended || audio.error) {
+                return
+            }
+            // 延迟恢复，等待系统音频设备就绪
+            setTimeout(() => {
+                if (wasPlayingBeforeHidden && audio.paused && !audio.ended && !audio.error) {
+                    audio.play().catch(() => {})
+                }
+                wasPlayingBeforeHidden = false
+            }, 100)
+        }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    // Tauri/Android resume 事件：原生应用从后台回到前台
+    const onResume = () => {
+        if (wasPlayingBeforeHidden && audio.paused && !audio.ended && !audio.error) {
+            setTimeout(() => {
+                if (wasPlayingBeforeHidden && audio.paused && !audio.ended && !audio.error) {
+                    audio.play().catch(() => {})
+                }
+                wasPlayingBeforeHidden = false
+            }, 150)
+        }
+    }
+    window.addEventListener("focus", onResume)
+    window.addEventListener("resume", onResume as EventListener)
+
     return {
         load(url) {
             if (audio.src === url) {
@@ -115,6 +157,8 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             audio.src = url
             audio.load()
             readyCancel = false
+            // 元数据未就绪时设置 playbackRate 等价于改 defaultPlaybackRate，加载后仍生效
+            audio.playbackRate = currentRate
         },
         async play() {
             // 移动端 WebView 中，load() 尚未完成时 play() 会抛 AbortError。
@@ -182,6 +226,12 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
         setMuted(muted) {
             audio.muted = muted
         },
+        setSpeed(rate) {
+            const clamped = Math.min(2, Math.max(0.5, rate))
+            currentRate = clamped
+            // WebView2/WKWebView 默认 preservePitch，变速不变调
+            audio.playbackRate = clamped
+        },
         setEq(gains, enabled) {
             if (!enabled) {
                 // 旁路：graph 已建时增益归零等效平直；未建则 audio 直接输出，无需处理
@@ -202,6 +252,10 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             return safeDurationMs(audio)
         },
         destroy() {
+            document.removeEventListener("visibilitychange", onVisibilityChange)
+            window.removeEventListener("focus", onResume)
+            window.removeEventListener("resume", onResume as EventListener)
+
             audio.pause()
             audio.removeEventListener("timeupdate", onTimeUpdate)
             audio.removeEventListener("durationchange", onTimeUpdate)

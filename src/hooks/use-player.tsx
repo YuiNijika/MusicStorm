@@ -89,6 +89,9 @@ type PlayerContextValue = Omit<PlayerSnapshot, "positionMs" | "durationMs"> & {
     seek: (positionMs: number) => void
     setVolume: (volume: number) => void
     toggleMute: () => void
+    /** 倍速：0.5–2，1 为正常 */
+    playbackRate: number
+    setPlaybackRate: (rate: number) => void
     toggleShuffle: () => void
     cycleRepeat: () => void
     eq: EqPrefs
@@ -192,6 +195,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [volume, setVolumeState] = useState(() => playerPrefs.volume)
     const [reloadNonce, setReloadNonce] = useState(0)
     const [isMuted, setIsMuted] = useState(() => playerPrefs.isMuted)
+    const [playbackRate, setPlaybackRateState] = useState(
+        () => playerPrefs.playbackRate,
+    )
     const [shuffle, setShuffle] = useState(() => restored?.shuffle ?? false)
     const [repeat, setRepeat] = useState<RepeatMode>(
         () => restored?.repeat ?? "off",
@@ -216,6 +222,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const isPlayingRef = useRef(isPlaying)
     const volumeRef = useRef(volume)
     const mutedRef = useRef(isMuted)
+    const playbackRateRef = useRef(playbackRate)
     const loadedTrackIdRef = useRef<string | null>(null)
     /** load 完成后才为 true，pause/resume 才接管 */
     const mediaReadyRef = useRef(false)
@@ -260,6 +267,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isPlayingRef.current = isPlaying
         volumeRef.current = volume
         mutedRef.current = isMuted
+        playbackRateRef.current = playbackRate
         positionRef.current = positionMs
         durationRef.current = durationMs
         engineStatusRef.current = engineStatus
@@ -270,6 +278,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isPlaying,
         volume,
         isMuted,
+        playbackRate,
         positionMs,
         durationMs,
         engineStatus,
@@ -277,11 +286,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         try {
-            setPlayerPreferences({ volume, isMuted })
+            setPlayerPreferences({ volume, isMuted, playbackRate })
         } catch {
             // 偏好写入失败不影响当前播放
         }
-    }, [volume, isMuted])
+    }, [volume, isMuted, playbackRate])
 
     // 进度/时长同步到独立 tick store；store 去重后通知订阅方（进度条/歌词），
     // 不再触发 PlayerContext 换引用，避免无关组件每 200ms 重渲
@@ -742,6 +751,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         html5Ref.current?.setEq(gains, eq.enabled)
         nativeRef.current?.setEq(gains, eq.enabled)
     }, [eq, currentTrackId])
+
+    // 倍速随播放曲目变化重下发：H5 load 会重置 playbackRate，原生新缓冲要重新吃到 factor
+    useEffect(() => {
+        playbackRateRef.current = playbackRate
+        html5Ref.current?.setSpeed(playbackRate)
+        nativeRef.current?.setSpeed(playbackRate)
+    }, [playbackRate, currentTrackId])
 
     // load + seek；play 交给 pause/resume effect
     useEffect(() => {
@@ -1262,6 +1278,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setIsMuted((value) => !value)
     }, [])
 
+    const setPlaybackRate = useCallback((nextRate: number) => {
+        const clamped = Math.min(2, Math.max(0.5, nextRate))
+        playbackRateRef.current = clamped
+        // 同步落引擎，避免只靠 effect 一帧延迟
+        activeRef.current?.setSpeed(clamped)
+        setPlaybackRateState(clamped)
+    }, [])
+
     const toggleShuffle = useCallback(() => {
         setShuffle((value) => !value)
     }, [])
@@ -1450,6 +1474,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             seek,
             setVolume,
             toggleMute,
+            playbackRate,
+            setPlaybackRate,
             toggleShuffle,
             cycleRepeat,
             eq,
@@ -1490,6 +1516,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             seek,
             setVolume,
             toggleMute,
+            playbackRate,
+            setPlaybackRate,
             toggleShuffle,
             cycleRepeat,
             eq,

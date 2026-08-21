@@ -101,6 +101,7 @@ netease_http_post (Rust)  绕过 CORS 的无状态 POST 代理
 | `mv.ts` | `fetchMvDetail`、`fetchMvPlayable`、`fetchMvUrl`、`fetchMvSublist`、`subscribeMv`、`fetchSimiMvs` | MV 与收藏 |
 | `lyric.ts` | `fetchLyricLines`、`fetchLyricText` | 歌词 |
 | `comment.ts` | `fetchSongComments`、`fetchSongStats`、`postSongComment` | 歌曲评论列表、红心量/播放量、发布/回复评论 |
+| `faq.ts` | `fetchFaqItems`、`BUILTIN_FAQ` | 设置页「常见问题」：external 模式走 `/musicstorm/faq`，integrated 模式回退内置数组 |
 | `quality.ts` | `getNeteaseQualityBr`、`setNeteaseQualityBr`、`QUALITY_OPTIONS` | 音质偏好（标准 128k / 较高 192k / 极高 320k / 无损优先） |
 | `song-privilege.ts` | `isSongUrlPlayable`、`pickRicherSongUrlEntry`、`describeSongUrlFailure` | 播放 URL 校验与降级 |
 | `track-actions.ts` | `downloadNeteaseTrack`、`overrideTrackLyric`、`removeTracksFromPlaylist` | 下载 / 歌词覆写 / 移除 |

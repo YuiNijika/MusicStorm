@@ -27,6 +27,7 @@ use tauri::AppHandle;
 pub struct PlayerHandle {
     cmd_tx: Mutex<mpsc::Sender<PlayerCmd>>,
     volume: Arc<Mutex<f32>>,
+    speed: Arc<Mutex<f32>>,
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
     eq: Arc<EqState>,
 }
@@ -102,6 +103,12 @@ impl PlayerHandle {
         }
     }
 
+    pub fn set_speed(&self, rate: f32) {
+        if let Ok(mut s) = self.speed.lock() {
+            *s = rate.clamp(0.5, 2.0);
+        }
+    }
+
     pub fn set_ffmpeg_path(&self, path: Option<PathBuf>) {
         if let Ok(mut current) = self.ffmpeg_path.lock() {
             *current = path;
@@ -133,6 +140,8 @@ impl PlayerInner {
         let (tx, rx) = mpsc::channel::<PlayerCmd>();
         let volume = Arc::new(Mutex::new(0.8_f32));
         let volume_worker = Arc::clone(&volume);
+        let speed = Arc::new(Mutex::new(1.0_f32));
+        let speed_worker = Arc::clone(&speed);
         let ffmpeg_path = Arc::new(Mutex::new(ffmpeg_path));
         let ffmpeg_path_worker = Arc::clone(&ffmpeg_path);
         let eq = EqState::new();
@@ -153,6 +162,7 @@ impl PlayerInner {
                     app,
                     rx,
                     volume_worker,
+                    speed_worker,
                     shared_tick,
                     ffmpeg_path_worker,
                     eq_worker,
@@ -165,6 +175,7 @@ impl PlayerInner {
         Ok(PlayerHandle {
             cmd_tx: Mutex::new(tx),
             volume,
+            speed,
             ffmpeg_path,
             eq,
         })
@@ -184,6 +195,7 @@ fn run_worker(
     app: AppHandle,
     rx: mpsc::Receiver<PlayerCmd>,
     volume: Arc<Mutex<f32>>,
+    speed: Arc<Mutex<f32>>,
     shared: Arc<SharedPlayback>,
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
     eq: Arc<EqState>,
@@ -194,9 +206,12 @@ fn run_worker(
     sink.pause();
 
     let mut last_volume = -1.0_f32;
+    let mut last_speed = -1.0_f32;
     let mut current_source: Option<String> = None;
     // sink 内是否已有可恢复缓冲；同 path 的 play 只 resume
     let mut has_buffer = false;
+    // 上一轮 sink.get_pos() 读数：按真实输出样本累进，替代固定 50ms 计数器
+    let mut last_real_pos = 0.0f64;
 
     let app_tick = app.clone();
     let shared_tick = Arc::clone(&shared);
@@ -248,6 +263,7 @@ fn run_worker(
                     current_ffmpeg_path(&ffmpeg_path).as_deref(),
                     &eq,
                 );
+                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
                 let _ = reply.send(result);
             }
             Ok(PlayerCmd::Pause) => {
@@ -294,6 +310,7 @@ fn run_worker(
                     &eq,
                 );
                 shared.seeking.store(false, Ordering::Relaxed);
+                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
                 for r in replies {
                     let _ = r.send(Ok(()));
                 }
@@ -328,6 +345,7 @@ fn run_worker(
                                 current_ffmpeg_path(&ffmpeg_path).as_deref(),
                                 &eq,
                             );
+                            last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
                             let _ = reply.send(result);
                         }
                         PlayerCmd::Pause => {
@@ -361,6 +379,7 @@ fn run_worker(
                                 &eq,
                             );
                             shared.seeking.store(false, Ordering::Relaxed);
+                            last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
                             let _ = next_reply.send(Ok(()));
                         }
                     }
@@ -383,6 +402,13 @@ fn run_worker(
             }
         }
 
+        if let Ok(s) = speed.lock() {
+            if (*s - last_speed).abs() > 0.001 {
+                sink.set_speed(*s);
+                last_speed = *s;
+            }
+        }
+
         // seek 中 sink 可能短暂 empty，禁止误 ended；也不虚增进度
         if shared.seeking.load(Ordering::Relaxed) {
             continue;
@@ -398,15 +424,22 @@ fn run_worker(
                 .position_ms
                 .store(duration.to_bits(), Ordering::Relaxed);
             emit_ended(&app);
-        } else if shared.playing.load(Ordering::Relaxed) {
-            let pos = f64::from_bits(shared.position_ms.load(Ordering::Relaxed));
-            let duration = f64::from_bits(shared.duration_ms.load(Ordering::Relaxed));
-            let next = if duration > 0.0 {
-                (pos + 50.0).min(duration)
-            } else {
-                pos + 50.0
-            };
-            shared.position_ms.store(next.to_bits(), Ordering::Relaxed);
+        } else if shared.playing.load(Ordering::Relaxed) && has_buffer {
+            // 真实输出位置随播放前进；暂停时 Pausable 不消费内层，get_pos 冻结，
+            // 速度/丢帧/负载都不会让进度漂移，速度变化也会如实反映
+            let real_ms = sink.get_pos().as_secs_f64() * 1000.0;
+            if real_ms >= last_real_pos {
+                let pos = f64::from_bits(shared.position_ms.load(Ordering::Relaxed));
+                let duration = f64::from_bits(shared.duration_ms.load(Ordering::Relaxed));
+                let next = pos + (real_ms - last_real_pos);
+                let next = if duration > 0.0 {
+                    next.min(duration)
+                } else {
+                    next
+                };
+                shared.position_ms.store(next.to_bits(), Ordering::Relaxed);
+            }
+            last_real_pos = real_ms;
         }
     }
 

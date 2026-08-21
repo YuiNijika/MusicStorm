@@ -15,6 +15,7 @@ import { Cover } from "@/components/music/cover"
 import { QueuePanel } from "@/components/layout/queue-panel"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { SourceBadge } from "@/components/music/source-badge"
+import { SpeedPopover } from "@/components/music/speed-popover"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -45,6 +46,8 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
         isMuted,
         shuffle,
         repeat,
+        playbackRate,
+        setPlaybackRate,
         togglePlay,
         next,
         previous,
@@ -366,13 +369,11 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
 
                 <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
                     <div className="flex items-center gap-1">
-                        <span className="md:hidden" aria-hidden />
                         <ControlButton
                             title="随机"
                             active={shuffle}
                             onClick={toggleShuffle}
                             disabled={!currentTrack}
-                            className="hidden md:flex"
                         >
                             <Shuffle className="size-3.5" />
                         </ControlButton>
@@ -412,7 +413,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                             active={repeat !== "off"}
                             onClick={cycleRepeat}
                             disabled={!currentTrack}
-                            className="hidden md:flex"
                         >
                             {repeat === "one" ? (
                                 <Repeat1 className="size-3.5" />
@@ -443,6 +443,11 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
 
                 <div className="hidden items-center justify-end gap-1 md:flex">
+                    <SpeedPopover
+                        rate={playbackRate}
+                        onSpeed={setPlaybackRate}
+                        compact
+                    />
                     <QueuePanel />
                     <VolumeElasticSlider
                         volume={volume}

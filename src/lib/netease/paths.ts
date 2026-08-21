@@ -59,6 +59,7 @@ export const NETEASE_PATHS = {
     playlistDelete: "/playlist/delete",
     dailySignin: "/daily_signin",
     loginEmail: "/login",
+    faq: "/musicstorm/faq",
 } as const
 
 export type NeteasePath =
