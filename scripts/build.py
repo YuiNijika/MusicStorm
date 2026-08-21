@@ -45,8 +45,20 @@ _SDK_MARKER_FILES = ("platform-tools/adb.exe", "platform-tools/adb", "platforms"
 # AGP/Gradle 不兼容 JDK 25+（AS 自带 JBR 是 25，仅作最后兜底并告警）
 _JDK_MAX_MAJOR = 24
 
-# Android 独立版本线，与 PC 的 0.0.x 分开发布
-_APK_CONFIG = '{"version":"0.0.1"}'
+# Android 版本号从 tauri.properties 读取
+def _load_apk_config() -> str:
+    props_file = PROJECT / "src-tauri" / "gen" / "android" / "app" / "tauri.properties"
+    if props_file.is_file():
+        try:
+            with codecs.open(str(props_file), encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("tauri.android.versionName="):
+                        version = line.split("=", 1)[1].strip()
+                        return json.dumps({"version": version})
+        except OSError:
+            pass
+    return '{"version":"0.0.1"}'
 _DEFAULT_ANDROID_TARGET = "aarch64"
 
 _ANDROID_ABI_MAP: dict[str, tuple[str, str]] = {
@@ -442,11 +454,12 @@ def build_android(java: str, sdk: str) -> tuple[int, str]:
     print("\n[1/2] 清理 dist …")
     _clean_dist()
     print(f"[2/2] 编译 + 打包 (target {_DEFAULT_ANDROID_TARGET}) …")
+    apk_config = _load_apk_config()
     rc = _run_pnpm(
         "tauri", "android", "build",
         "--apk",
         "--target", _DEFAULT_ANDROID_TARGET,
-        "--config", _APK_CONFIG,
+        "--config", apk_config,
         env=env,
     )
 
@@ -462,7 +475,7 @@ def build_android(java: str, sdk: str) -> tuple[int, str]:
     )
     if rc == 0 and apk.is_file():
         # 对齐 Windows 安装包命名（MusicStorm_<版本>-setup），便于发布区分
-        apk_version = json.loads(_APK_CONFIG).get("version", "0.0.1")
+        apk_version = json.loads(apk_config).get("version", "0.0.1")
         renamed = apk.with_name(f"MusicStorm_{apk_version}-setup.apk")
         try:
             shutil.copy2(apk, renamed)
