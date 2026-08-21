@@ -60,6 +60,7 @@ export const NETEASE_PATHS = {
     dailySignin: "/daily_signin",
     loginEmail: "/login",
     faq: "/musicstorm/faq",
+    commentReply: "/comment/reply",
 } as const
 
 export type NeteasePath =

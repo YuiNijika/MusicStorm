@@ -1,10 +1,12 @@
 import { Heart, LoaderCircle, MessageCircle, Send } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
+import { SortSelect } from "@/components/music/sort-select"
 import { Textarea } from "@/components/ui/textarea"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import {
+    fetchCommentReplies,
     fetchSongComments,
     fetchSongStats,
     postSongComment,
@@ -16,6 +18,12 @@ import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 20
+const REPLY_PAGE_SIZE = 20
+
+const SORT_OPTIONS: ReadonlyArray<{ value: CommentSortType; label: string }> = [
+    { value: "hot", label: "最热" },
+    { value: "time", label: "最新" },
+]
 
 type CommentsPageProps = {
     trackId: string
@@ -58,81 +66,49 @@ function formatCommentTime(ms: number): string {
     return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-function CommentItem({
+function ReplyItem({
     comment,
-    hot = false,
     onReply,
-    level = 1,
 }: {
     comment: NeteaseComment
-    hot?: boolean
     onReply: () => void
-    level?: number
 }) {
     const user = comment.user
     const nickname = user?.nickname?.trim() || "网易云用户"
-    const replied = comment.beReplied?.[0]
     const [avatarFailed, setAvatarFailed] = useState(false)
 
-    // 三级及以上：引用被回复内容
-    const isQuoted = level >= 3 && replied
-
     return (
-        <div className={cn("flex gap-3", level > 1 && "ml-8 mt-2")}>
+        <div className="flex gap-2.5">
             {avatarFailed || !user?.avatarUrl ? (
-                <span className={cn("shrink-0 rounded-full bg-[var(--surface-fill)]", level > 2 ? "size-6" : "size-9")} />
+                <span className="size-6 shrink-0 rounded-full bg-[var(--surface-fill)]" />
             ) : (
                 <img
                     src={user.avatarUrl}
                     alt={nickname}
                     loading="lazy"
                     onError={() => setAvatarFailed(true)}
-                    className={cn("shrink-0 rounded-full object-cover", level > 2 ? "size-6" : "size-9")}
+                    className="size-6 shrink-0 rounded-full object-cover"
                 />
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <span
-                        className={cn(
-                            "truncate font-medium",
-                            level > 2 ? "text-[11px]" : "text-[12px]",
-                            hot ? "text-primary" : "text-foreground",
-                        )}
-                    >
+                    <span className="truncate text-[11px] font-medium text-foreground">
                         {nickname}
                     </span>
-                    <span className={cn("shrink-0 text-muted-foreground", level > 2 ? "text-[10px]" : "text-[11px]")}>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
                         {formatCommentTime(comment.time)}
                     </span>
                 </div>
-                {isQuoted && replied ? (
-                    <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[11px] text-muted-foreground">
-                        <span className="font-medium">
-                            @{replied.user?.nickname?.trim() || "用户"}
-                        </span>
-                        ：{replied.content}
-                    </p>
-                ) : replied && level === 2 ? (
-                    <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[12px] text-muted-foreground">
-                        <span className="font-medium">
-                            @{replied.user?.nickname?.trim() || "用户"}
-                        </span>
-                        ：{replied.content}
-                    </p>
-                ) : null}
-                <p className={cn(
-                    "mt-1 break-words whitespace-pre-wrap leading-relaxed text-foreground",
-                    level > 2 ? "text-[12px]" : "text-[13px]",
-                )}>
+                <p className="mt-0.5 break-words whitespace-pre-wrap text-[12px] leading-relaxed text-foreground">
                     {comment.content}
                 </p>
-                <div className={cn("mt-1 flex items-center gap-3 text-muted-foreground", level > 2 ? "text-[10px]" : "text-[11px]")}>
+                <div className="mt-0.5 flex items-center gap-3 text-[10px] text-muted-foreground">
                     {comment.ipLocation?.location ? (
                         <span>{comment.ipLocation.location}</span>
                     ) : null}
                     {comment.likedCount > 0 ? (
                         <span className="flex items-center gap-1">
-                            <Heart className="size-3" />
+                            <Heart className="size-2.5" />
                             {formatCount(comment.likedCount)}
                         </span>
                     ) : null}
@@ -145,6 +121,162 @@ function CommentItem({
                     </button>
                 </div>
             </div>
+        </div>
+    )
+}
+
+function CommentItem({
+    comment,
+    hot = false,
+    onReply,
+}: {
+    comment: NeteaseComment
+    hot?: boolean
+    onReply: () => void
+}) {
+    const user = comment.user
+    const nickname = user?.nickname?.trim() || "网易云用户"
+    const replied = comment.beReplied?.[0]
+    const [avatarFailed, setAvatarFailed] = useState(false)
+
+    const [replies, setReplies] = useState<NeteaseComment[]>([])
+    const [replyTotal, setReplyTotal] = useState(0)
+    const [replyMore, setReplyMore] = useState(false)
+    const [replyLoading, setReplyLoading] = useState(false)
+    const [showAllReplies, setShowAllReplies] = useState(false)
+    const replyOffsetRef = useRef(0)
+
+    const loadReplies = useCallback(
+        async (append: boolean) => {
+            if (replyLoading) {
+                return
+            }
+            setReplyLoading(true)
+            try {
+                const nextOffset = append ? replyOffsetRef.current + REPLY_PAGE_SIZE : 0
+                const data = await fetchCommentReplies(String(comment.commentId), {
+                    limit: REPLY_PAGE_SIZE,
+                    offset: nextOffset,
+                })
+                replyOffsetRef.current = nextOffset
+                setReplies((prev) => {
+                    if (append) {
+                        const seen = new Set(prev.map((item) => item.commentId))
+                        const merged = data.comments.filter(
+                            (item) => !seen.has(item.commentId),
+                        )
+                        return [...prev, ...merged]
+                    }
+                    return data.comments
+                })
+                setReplyTotal(data.total)
+                setReplyMore(data.more && data.comments.length > 0)
+            } catch {
+                // 加载失败保持现状
+            } finally {
+                setReplyLoading(false)
+            }
+        },
+        [comment.commentId, replyLoading],
+    )
+
+    const handleExpandReplies = useCallback(() => {
+        setShowAllReplies(true)
+        void loadReplies(false)
+    }, [loadReplies])
+
+    return (
+        <div className="space-y-2.5">
+            <div className="flex gap-3">
+                {avatarFailed || !user?.avatarUrl ? (
+                    <span className="size-9 shrink-0 rounded-full bg-[var(--surface-fill)]" />
+                ) : (
+                    <img
+                        src={user.avatarUrl}
+                        alt={nickname}
+                        loading="lazy"
+                        onError={() => setAvatarFailed(true)}
+                        className="size-9 shrink-0 rounded-full object-cover"
+                    />
+                )}
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                        <span
+                            className={cn(
+                                "truncate text-[12px] font-medium",
+                                hot ? "text-primary" : "text-foreground",
+                            )}
+                        >
+                            {nickname}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {formatCommentTime(comment.time)}
+                        </span>
+                    </div>
+                    {replied ? (
+                        <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[12px] text-muted-foreground">
+                            <span className="font-medium">
+                                @{replied.user?.nickname?.trim() || "用户"}
+                            </span>
+                            ：{replied.content}
+                        </p>
+                    ) : null}
+                    <p className="mt-1 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+                        {comment.content}
+                    </p>
+                    <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                        {comment.ipLocation?.location ? (
+                            <span>{comment.ipLocation.location}</span>
+                        ) : null}
+                        {comment.likedCount > 0 ? (
+                            <span className="flex items-center gap-1">
+                                <Heart className="size-3" />
+                                {formatCount(comment.likedCount)}
+                            </span>
+                        ) : null}
+                        <button
+                            type="button"
+                            onClick={onReply}
+                            className="cursor-pointer hover:text-foreground"
+                        >
+                            回复
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {showAllReplies && replies.length > 0 ? (
+                <div className="ml-12 space-y-2.5 border-l-2 border-[var(--surface-fill)] pl-3">
+                    {replies.map((reply) => (
+                        <ReplyItem
+                            key={reply.commentId}
+                            comment={reply}
+                            onReply={onReply}
+                        />
+                    ))}
+                    {replyLoading ? (
+                        <p className="py-2 text-center text-[11px] text-muted-foreground">
+                            加载中…
+                        </p>
+                    ) : replyMore ? (
+                        <button
+                            type="button"
+                            onClick={() => void loadReplies(true)}
+                            className="w-full cursor-pointer py-2 text-center text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            加载更多回复
+                        </button>
+                    ) : null}
+                </div>
+            ) : !showAllReplies && replyTotal > 0 ? (
+                <button
+                    type="button"
+                    onClick={handleExpandReplies}
+                    className="ml-12 cursor-pointer py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                >
+                    查看 {replyTotal} 条回复
+                </button>
+            ) : null}
         </div>
     )
 }
@@ -168,6 +300,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
         nickname: string
     } | null>(null)
     const composerRef = useRef<HTMLTextAreaElement>(null)
+    const sentinelRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         let cancelled = false
@@ -206,7 +339,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
         }
     }, [trackId, sortBy])
 
-    async function loadMore() {
+    const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore) {
             return
         }
@@ -232,7 +365,24 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
         } finally {
             setLoadingMore(false)
         }
-    }
+    }, [trackId, sortBy, loadingMore, hasMore])
+
+    useEffect(() => {
+        const sentinel = sentinelRef.current
+        if (!sentinel) {
+            return
+        }
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0]?.isIntersecting) {
+                    void loadMore()
+                }
+            },
+            { rootMargin: "200px" },
+        )
+        observer.observe(sentinel)
+        return () => observer.disconnect()
+    }, [loadMore])
 
     function focusComposer() {
         composerRef.current?.focus()
@@ -285,7 +435,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
     const heading = title ? `《${title}》的评论` : "歌曲评论"
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <BackButton onClick={onBack} />
@@ -298,46 +448,28 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                         </p>
                     ) : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-3 pt-9 text-[12px] text-muted-foreground">
-                    {total > 0 ? <span>评论 {formatCount(total)}</span> : null}
+                <div className="flex shrink-0 items-center gap-3 pt-9">
+                    {total > 0 ? (
+                        <span className="text-[12px] text-muted-foreground">
+                            评论 {formatCount(total)}
+                        </span>
+                    ) : null}
                     {stats && stats.likedCount > 0 ? (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
                             <Heart className="size-3 text-rose-500" />
                             收藏 {formatCount(stats.likedCount)}
                         </span>
                     ) : null}
+                    <SortSelect
+                        value={sortBy}
+                        options={SORT_OPTIONS}
+                        onChange={setSortBy}
+                        label="评论排序"
+                    />
                 </div>
             </div>
 
-            <div className="space-y-5">
-                {/* 排序切换 */}
-                <div className="flex items-center gap-1 rounded-full bg-[var(--surface-fill)] p-0.5">
-                    <button
-                        type="button"
-                        onClick={() => setSortBy("hot")}
-                        className={cn(
-                            "flex-1 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
-                            sortBy === "hot"
-                                ? "bg-foreground text-background"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        最热
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSortBy("time")}
-                        className={cn(
-                            "flex-1 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
-                            sortBy === "time"
-                                ? "bg-foreground text-background"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        最新
-                    </button>
-                </div>
-
+            <div className="space-y-4">
                 {status === "loading" ? (
                     <p className="px-3 py-10 text-center text-[12px] text-muted-foreground">
                         加载评论…
@@ -382,7 +514,6 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                                             key={comment.commentId}
                                             comment={comment}
                                             onReply={() => handleReply(comment)}
-                                            level={comment.beReplied?.length ? 2 : 1}
                                         />
                                     ))}
                                 </div>
@@ -391,16 +522,13 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                     </>
                 )}
 
-                {hasMore ? (
-                    <button
-                        type="button"
-                        disabled={loadingMore}
-                        onClick={() => void loadMore()}
-                        className="h-9 w-full cursor-pointer rounded-full bg-[var(--surface-fill)] text-[12px] font-medium text-foreground transition-colors hover:bg-[var(--surface-fill-hover)] disabled:opacity-50"
-                    >
-                        {loadingMore ? "加载中…" : "加载更多"}
-                    </button>
+                {loadingMore ? (
+                    <p className="py-4 text-center text-[12px] text-muted-foreground">
+                        <LoaderCircle className="mx-auto size-4 animate-spin" />
+                    </p>
                 ) : null}
+
+                <div ref={sentinelRef} />
             </div>
 
             <div className="sticky bottom-4 z-10 rounded-2xl border border-[var(--separator)] bg-[var(--surface-raised)]/95 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.14)] backdrop-blur">

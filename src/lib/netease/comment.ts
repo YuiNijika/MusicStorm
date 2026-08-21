@@ -37,7 +37,42 @@ type SongComments = {
     hotComments: NeteaseComment[]
 }
 
+type ReplyCommentsData = {
+    code?: number
+    total?: number
+    more?: boolean
+    comments?: NeteaseComment[]
+}
+
+type ReplyComments = {
+    total: number
+    more: boolean
+    comments: NeteaseComment[]
+}
+
 export type CommentSortType = "hot" | "time"
+
+// 每条主评论默认展示的子评论数
+export const REPLY_PREVIEW_COUNT = 3
+
+async function fetchCommentReplies(
+    commentId: string,
+    options: { limit?: number; offset?: number } = {},
+): Promise<ReplyComments> {
+    const data = await neteaseRequest<ReplyCommentsData>({
+        path: NETEASE_PATHS.commentReply,
+        params: {
+            commentId,
+            limit: options.limit ?? 20,
+            offset: options.offset ?? 0,
+        },
+    })
+    return {
+        total: data.total ?? 0,
+        more: data.more ?? false,
+        comments: data.comments ?? [],
+    }
+}
 
 async function fetchSongComments(
     id: string,
@@ -117,5 +152,5 @@ async function postSongComment(
     return comment
 }
 
-export { fetchSongComments, fetchSongStats, postSongComment }
-export type { NeteaseComment, SongComments, SongStats }
+export { fetchCommentReplies, fetchSongComments, fetchSongStats, postSongComment }
+export type { NeteaseComment, ReplyComments, SongComments, SongStats }
