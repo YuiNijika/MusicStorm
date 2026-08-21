@@ -47,7 +47,7 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
                 "group/toast pointer-events-auto relative w-full origin-bottom",
                 "rounded-2xl border border-black/[0.08] bg-popover text-popover-foreground shadow-lg outline-none",
                 "dark:border-white/[0.1] dark:bg-zinc-900/95",
-                "min-h-[3.25rem] backdrop-blur-xl",
+                "backdrop-blur-xl",
                 // 入场/退场动画在 Style.css：[data-slot="toast"] 材质化入场，
                 // data-limited 走对称退场，由 Base UI 等 transition 结束再卸载
                 className,
@@ -57,13 +57,17 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
     )
 }
 
-function ToastContent({ className, ...props }: ToastPrimitive.Content.Props) {
+function ToastContent({
+    className,
+    compact,
+    ...props
+}: ToastPrimitive.Content.Props & { compact?: boolean }) {
     return (
         <ToastPrimitive.Content
             data-slot="toast-content"
             className={cn(
-                // 始终可读；不依赖 expanded 才显示
-                "flex items-start gap-3 p-3.5 sm:p-4",
+                "flex items-center",
+                compact ? "gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5" : "gap-3 p-3.5 sm:p-4",
                 className,
             )}
             {...props}
@@ -168,15 +172,15 @@ function ToastList() {
 
     return toasts.map((toastItem) => (
         <Toast key={toastItem.id} toast={toastItem}>
-            <ToastContent>
-                <ToastIcon type={toastItem.type} />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1">
-                    <ToastTitle />
-                    {toastItem.description ? <ToastDescription /> : null}
-                </div>
-                {toastItem.actionProps ? <ToastAction /> : null}
-                <ToastClose />
-            </ToastContent>
+                <ToastContent compact={!toastItem.description}>
+                    <ToastIcon type={toastItem.type} />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1">
+                        <ToastTitle />
+                        {toastItem.description ? <ToastDescription /> : null}
+                    </div>
+                    {toastItem.actionProps ? <ToastAction /> : null}
+                    <ToastClose />
+                </ToastContent>
         </Toast>
     ))
 }
