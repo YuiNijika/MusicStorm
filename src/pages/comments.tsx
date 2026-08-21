@@ -78,7 +78,7 @@ function ReplyItem({
     const [avatarFailed, setAvatarFailed] = useState(false)
 
     return (
-        <div className="flex gap-2.5">
+        <div className="flex gap-2.5 rounded-xl bg-[var(--surface-fill)]/50 p-2.5">
             {avatarFailed || !user?.avatarUrl ? (
                 <span className="size-6 shrink-0 rounded-full bg-[var(--surface-fill)]" />
             ) : (
@@ -214,17 +214,17 @@ function CommentItem({
                         </span>
                     </div>
                     {replied ? (
-                        <p className="mt-1 truncate rounded-lg bg-[var(--surface-fill)] px-2.5 py-1 text-[12px] text-muted-foreground">
+                        <p className="mt-1 truncate rounded-xl bg-[var(--surface-fill)] px-2.5 py-1.5 text-[12px] text-muted-foreground">
                             <span className="font-medium">
                                 @{replied.user?.nickname?.trim() || "用户"}
                             </span>
                             ：{replied.content}
                         </p>
                     ) : null}
-                    <p className="mt-1 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+                    <p className="mt-1.5 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
                         {comment.content}
                     </p>
-                    <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
                         {comment.ipLocation?.location ? (
                             <span>{comment.ipLocation.location}</span>
                         ) : null}
@@ -435,7 +435,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
     const heading = title ? `《${title}》的评论` : "歌曲评论"
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <BackButton onClick={onBack} />
@@ -469,27 +469,27 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="apple-list-surface rounded-2xl p-4 space-y-3">
                 {status === "loading" ? (
-                    <p className="px-3 py-10 text-center text-[12px] text-muted-foreground">
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">
                         加载评论…
                     </p>
                 ) : status === "error" ? (
-                    <p className="px-3 py-10 text-center text-[12px] text-muted-foreground">
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">
                         评论加载失败
                     </p>
                 ) : comments.length === 0 && hotComments.length === 0 ? (
-                    <p className="px-3 py-10 text-center text-[12px] text-muted-foreground">
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">
                         暂无评论，来抢沙发
                     </p>
                 ) : (
                     <>
                         {hotComments.length > 0 ? (
                             <div>
-                                <p className="mb-3 text-[13px] font-semibold text-foreground">
+                                <p className="mb-2 text-[13px] font-semibold text-foreground">
                                     精彩评论
                                 </p>
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     {hotComments.map((comment) => (
                                         <CommentItem
                                             key={comment.commentId}
@@ -504,11 +504,11 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                         {comments.length > 0 ? (
                             <div>
                                 {hotComments.length > 0 ? (
-                                    <p className="mb-3 text-[13px] font-semibold text-foreground">
+                                    <p className="mb-2 text-[13px] font-semibold text-foreground">
                                         最新评论
                                     </p>
                                 ) : null}
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     {comments.map((comment) => (
                                         <CommentItem
                                             key={comment.commentId}

@@ -30,6 +30,8 @@ async function setTrackLiked(trackId: string, like: boolean): Promise<void> {
             like,
             timestamp: Date.now(),
         },
+        skipCache: true,
+        method: "POST",
     })
     if (data.code != null && data.code !== 200) {
         throw new Error(`喜欢操作失败: ${data.code}`)

@@ -139,7 +139,27 @@ async function fetchExternal<T>(
     // 去掉前导斜杠让 base 路径段生效；对无子路径的第三方源结果不变
     const url = new URL(path.replace(/^\/+/, ""), baseUrl)
 
-    if (params) {
+    // realIP 和 cookie 始终走查询参数（PHP 端 $_GET 读取）
+    if (!url.searchParams.has("realIP")) {
+        url.searchParams.set("realIP", resolveRealIp())
+    }
+    if (cookie && !url.searchParams.has("cookie")) {
+        url.searchParams.set("cookie", cookie)
+    }
+
+    // POST 请求把业务参数放入请求体（form-urlencoded），
+    // 避免超长查询字符串被截断，同时兼容 $_POST 读取的 PHP 端
+    const isPost = method.toUpperCase() === "POST"
+    const bodyParams = isPost && params
+        ? new URLSearchParams(
+              Object.entries(params)
+                  .filter(([, v]) => v !== undefined)
+                  .map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : undefined
+
+    // GET 请求把业务参数放查询参数
+    if (!isPost && params) {
         for (const [key, value] of Object.entries(params)) {
             if (value === undefined) {
                 continue
@@ -148,20 +168,19 @@ async function fetchExternal<T>(
         }
     }
 
-    if (!url.searchParams.has("realIP")) {
-        url.searchParams.set("realIP", resolveRealIp())
-    }
-    if (cookie && !url.searchParams.has("cookie")) {
-        url.searchParams.set("cookie", cookie)
-    }
-
     // 登录凭证经 URL cookie 参数透传（auth-cookie 体系），不依赖浏览器 cookie；
     // 必须 omit——credentials: include 会让 CORS 要求响应头返回具体 origin，
     // 与官方源/第三方源的 `Access-Control-Allow-Origin: *` 冲突而被浏览器拦截
-    const response = await fetch(url.toString(), {
+    const fetchInit: RequestInit = {
         method,
         credentials: "omit",
-    })
+    }
+    if (isPost && bodyParams) {
+        fetchInit.body = bodyParams
+        fetchInit.headers = { "Content-Type": "application/x-www-form-urlencoded" }
+    }
+
+    const response = await fetch(url.toString(), fetchInit)
 
     if (!response.ok) {
         let detail = `HTTP ${response.status}`
