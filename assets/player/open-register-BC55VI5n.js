@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./dist-js-xz2opZkU.js","./core-DQXjEiBM.js","./rolldown-runtime-Dd_uD5pT.js"])))=>i.map(i=>d[i]);
+import{t as e}from"./player-BnGycAjr.js";var t=`https://music.163.com`;async function n(){try{let{openUrl:n}=await e(async()=>{let{openUrl:e}=await import(`./dist-js-xz2opZkU.js`);return{openUrl:e}},__vite__mapDeps([0,1,2]),import.meta.url);await n(t);return}catch{}window.open(t,`_blank`,`noopener,noreferrer`)}export{n as t};

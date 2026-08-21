@@ -1,0 +1,1 @@
+function e(e){let t=Math.max(0,Math.floor(e/1e3));return`${Math.floor(t/60)}:${(t%60).toString().padStart(2,`0`)}`}function t(e){let t=Math.max(0,Math.floor(e/6e4));if(t<60)return`${t} 分钟`;let n=Math.floor(t/60),r=t%60;return r===0?`${n} 小时`:`${n} 小时 ${r} 分`}export{t as n,e as t};
