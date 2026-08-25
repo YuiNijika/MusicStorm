@@ -94,6 +94,8 @@ type PlayerContextValue = Omit<PlayerSnapshot, "positionMs" | "durationMs"> & {
     setPlaybackRate: (rate: number) => void
     toggleShuffle: () => void
     cycleRepeat: () => void
+    /** 单按钮轮换播放模式，对齐网易云：顺序、列表循环、单曲循环、随机 */
+    cyclePlayMode: () => void
     eq: EqPrefs
     setEqEnabled: (enabled: boolean) => void
     applyEqPreset: (presetId: string) => void
@@ -1302,6 +1304,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    // 播放模式单一入口，点击依序轮换并最终回到关闭，网易云同款单按钮交互
+    const cyclePlayMode = useCallback(() => {
+        if (shuffle) {
+            setShuffle(false)
+            return
+        }
+        if (repeat === "off") {
+            setRepeat("all")
+            return
+        }
+        if (repeat === "all") {
+            setRepeat("one")
+            return
+        }
+        setRepeat("off")
+        setShuffle(true)
+    }, [shuffle, repeat])
+
     /** 将曲目插入当前播放之后并立即播放（"下一首播放"） */
     const playNext = useCallback((track: Track) => {
         const list = [...queueRef.current]
@@ -1478,6 +1498,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             setPlaybackRate,
             toggleShuffle,
             cycleRepeat,
+            cyclePlayMode,
             eq,
             setEqEnabled,
             applyEqPreset,
@@ -1520,6 +1541,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             setPlaybackRate,
             toggleShuffle,
             cycleRepeat,
+            cyclePlayMode,
             eq,
             setEqEnabled,
             applyEqPreset,

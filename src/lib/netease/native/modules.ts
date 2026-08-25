@@ -307,6 +307,20 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 },
                 crypto: "weapi",
             }
+        case NETEASE_PATHS.artistSongs:
+            // 歌手全部歌曲分页：默认热门序，与 /artists 的 hotSongs 前段重叠，
+            // 前端从 offset=hotSongs.length 起跳，正好错开热门重叠
+            return {
+                uri: "/api/v1/artist/songs",
+                data: {
+                    id: q(query, "id"),
+                    limit: qNum(query, "limit", 50),
+                    offset: qNum(query, "offset", 0),
+                    order: q(query, "order", "hot"),
+                    work: 1,
+                },
+                crypto: "weapi",
+            }
         case NETEASE_PATHS.artistMv:
             return {
                 uri: "/api/artist/mvs",

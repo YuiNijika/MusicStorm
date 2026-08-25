@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 
 import { Section } from "@/components/music/section"
 import { usePlayer } from "@/hooks/use-player"
+import { useDesktopLyric } from "@/hooks/use-desktop-lyric"
 import {
     TITLE_BAR_DOUBLE_CLICK_OPTIONS,
     getTitleBarDoubleClickAction,
@@ -71,6 +72,7 @@ function formatSettingsError(error: unknown): string {
 
 function PlaybackTab() {
     const { engineStatus } = usePlayer()
+    const { isVisible: isDesktopLyricVisible, toggle: toggleDesktopLyric } = useDesktopLyric()
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() =>
         getEnginePref(),
     )
@@ -209,6 +211,14 @@ function PlaybackTab() {
                             setShowLyricTranslationState(checked)
                         }}
                     />
+                    {!isWebMode() ? (
+                        <SwitchRow
+                            title="桌面歌词"
+                            description="在桌面上显示浮动歌词窗口，可拖动位置"
+                            checked={isDesktopLyricVisible}
+                            onCheckedChange={toggleDesktopLyric}
+                        />
+                    ) : null}
                 </SettingsGroup>
 
                 <SettingsGroup

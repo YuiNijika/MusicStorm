@@ -6,8 +6,11 @@ import { Section } from "@/components/music/section"
 import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/app/theme-provider"
 import {
+    CLOSE_ASK_EVENT,
     CLOSE_TO_TRAY_EVENT,
+    getCloseAsk,
     getCloseToTray,
+    setCloseAsk,
     setCloseToTray,
 } from "@/lib/app/close-to-tray-prefs"
 import {
@@ -85,6 +88,7 @@ function OtherTab() {
         getPerformanceMode(),
     )
     const [closeToTray, setCloseToTrayState] = useState(() => getCloseToTray())
+    const [closeAsk, setCloseAskState] = useState(() => getCloseAsk())
     const [cacheTtl, setCacheTtl] = useState(() => getApiCacheTtlMs())
     const [autoPurge, setAutoPurge] = useState(() => getApiCacheAutoPurge())
     const [coverCacheLimit, setCoverCacheLimit] = useState(() =>
@@ -102,6 +106,9 @@ function OtherTab() {
         function onCloseToTray() {
             setCloseToTrayState(getCloseToTray())
         }
+        function onCloseAsk() {
+            setCloseAskState(getCloseAsk())
+        }
         function onTtl() {
             setCacheTtl(getApiCacheTtlMs())
         }
@@ -113,12 +120,14 @@ function OtherTab() {
         }
         window.addEventListener(DEVTOOLS_EVENT, onDevtools)
         window.addEventListener(CLOSE_TO_TRAY_EVENT, onCloseToTray)
+        window.addEventListener(CLOSE_ASK_EVENT, onCloseAsk)
         window.addEventListener(TTL_EVENT, onTtl)
         window.addEventListener(AUTO_PURGE_EVENT, onAutoPurge)
         window.addEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
         return () => {
             window.removeEventListener(DEVTOOLS_EVENT, onDevtools)
             window.removeEventListener(CLOSE_TO_TRAY_EVENT, onCloseToTray)
+            window.removeEventListener(CLOSE_ASK_EVENT, onCloseAsk)
             window.removeEventListener(TTL_EVENT, onTtl)
             window.removeEventListener(AUTO_PURGE_EVENT, onAutoPurge)
             window.removeEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
@@ -221,6 +230,19 @@ function OtherTab() {
                     description="关闭窗口的行为与恢复方式"
                 >
                     <SettingsGroup>
+                        <SwitchRow
+                            title="关闭前询问"
+                            description={
+                                isMacOS()
+                                    ? "点击关闭按钮时先确认保留到菜单栏还是退出"
+                                    : "点击关闭按钮时先确认最小化到托盘还是退出"
+                            }
+                            checked={closeAsk}
+                            onCheckedChange={(checked) => {
+                                setCloseAskState(checked)
+                                void setCloseAsk(checked)
+                            }}
+                        />
                         <SwitchRow
                             title={
                                 isMacOS()

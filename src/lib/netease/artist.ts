@@ -26,6 +26,11 @@ type ArtistAlbumApiData = {
     }[]
 }
 
+type ArtistSongsApiData = {
+    code?: number
+    songs?: NeteaseSong[]
+}
+
 type ArtistMvApiData = {
     code?: number
     mvs?: {
@@ -277,11 +282,26 @@ async function subscribeArtist(artistId: string, subscribe: boolean): Promise<vo
     })
 }
 
+/** 歌手全部歌曲分页：热门序 offset 从 hotSongs.length 起跳，避开 /artists 重叠段 */
+async function fetchArtistSongsPage(
+    artistId: string,
+    offset: number,
+    limit = 50,
+): Promise<Track[]> {
+    const id = assertArtistId(artistId)
+    const data = await neteaseRequest<ArtistSongsApiData>({
+        path: NETEASE_PATHS.artistSongs,
+        params: { id, limit, offset },
+    })
+    return (data.songs ?? []).map(mapNeteaseSongToTrack)
+}
+
 export {
     fetchArtistAlbumsPage,
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,
+    fetchArtistSongsPage,
     fetchArtistSublist,
     fetchSimiArtists,
     subscribeArtist,

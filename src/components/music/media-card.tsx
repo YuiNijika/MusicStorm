@@ -1,5 +1,7 @@
 import type { ReactNode } from "react"
 
+import { Play } from "lucide-react"
+
 import { Cover } from "@/components/music/cover"
 import { cn } from "@/lib/utils"
 
@@ -53,6 +55,22 @@ function MediaCard({
                     className="rounded-[14px] shadow-none transition-transform duration-[var(--duration-enter)] ease-[var(--ease-enter)] group-hover:scale-[1.02]"
                 />
                 {overlay}
+                {/* hover 播放键是纯装饰，点击仍走整卡；外部已注入覆盖层时不再重复叠加 */}
+                {!overlay ? (
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "pointer-events-none absolute bottom-2 right-2 z-[1] flex size-9 items-center justify-center rounded-full",
+                            "bg-primary text-primary-foreground shadow-[var(--shadow-float)]",
+                            "translate-y-1 opacity-0 transition-[opacity,transform] duration-[var(--duration-hover)] ease-[var(--ease-enter)]",
+                            "group-hover:translate-y-0 group-hover:opacity-100",
+                            "group-focus-visible:translate-y-0 group-focus-visible:opacity-100",
+                            active && "translate-y-0 opacity-100",
+                        )}
+                    >
+                        <Play className="size-4 fill-current" />
+                    </span>
+                ) : null}
             </div>
             <div className="w-full min-w-0 max-w-full px-0.5">
                 <p className="truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground md:text-[13px]">

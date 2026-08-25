@@ -7,6 +7,7 @@ import type { TitleBarStyle } from "@/components/app/title-bar"
 import { Toaster, toast } from "@/components/ui/toast"
 import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
+import { useDesktopLyricSync } from "@/hooks/use-desktop-lyric-sync"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
 import {
@@ -256,6 +257,7 @@ function App() {
                     <NeteaseSessionProvider>
                         <LikedProvider>
                             <PlayerProvider>
+                                <DesktopLyricSyncProvider />
                                 <MusicNavigationProvider>
                                     <AppWithNav
                                         route={route}
@@ -287,6 +289,12 @@ function IntegratedApiBootEffect() {    useEffect(() => {
         }, 2_500)
         return () => window.clearTimeout(timer)
     }, [])
+    return null
+}
+
+/** 桌面歌词同步：监听播放状态变化并更新桌面歌词窗口 */
+function DesktopLyricSyncProvider() {
+    useDesktopLyricSync()
     return null
 }
 

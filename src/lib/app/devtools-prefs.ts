@@ -16,6 +16,10 @@ function setDevToolsEnabled(enabled: boolean): void {
     window.dispatchEvent(new Event(DEVTOOLS_EVENT))
 }
 
+// F12 开关态：Rust 侧查不到 DevTools 是否已打开，用模块级标志维护 toggle，
+// 避免重复按 F12 累积出多个 DevTools 进程（面板进程 + 远程调试进程约 270MB）
+let devtoolsOpen = false
+
 // 仅开发构建生效
 function useDevtoolsShortcut(): void {
     useEffect(() => {
@@ -25,7 +29,13 @@ function useDevtoolsShortcut(): void {
         function onKeyDown(event: KeyboardEvent) {
             if (event.key === "F12" && getDevToolsEnabled()) {
                 event.preventDefault()
-                void invoke("open_devtools")
+                if (devtoolsOpen) {
+                    devtoolsOpen = false
+                    void invoke("close_devtools")
+                } else {
+                    devtoolsOpen = true
+                    void invoke("open_devtools")
+                }
             }
         }
         window.addEventListener("keydown", onKeyDown)

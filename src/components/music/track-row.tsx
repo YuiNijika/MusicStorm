@@ -82,7 +82,7 @@ type TrackRowProps = {
     isPlaying?: boolean
     showSource?: boolean
     showAlbumColumn?: boolean
-    // 是否展示专辑名；首页三栏等窄布局应 false
+    // 首页三栏等窄布局关闭专辑信息，保证行密度
     showAlbumMeta?: boolean
     showActions?: boolean
     /** 更紧凑的 padding 与字号，首页三栏 */
@@ -344,11 +344,10 @@ function TrackRow({
                           : hasTrailing
                             ? "grid-cols-[auto_minmax(0,1fr)_auto_auto]"
                             : "grid-cols-[auto_minmax(0,1fr)_auto]",
-                // outline 交给全局 focus-visible 环，行内不再叠第二层 ring
+                // 键盘聚焦环由全局样式统一提供，行内叠加描边会产生双环
+                // 当前播放交给封面徽标与主色标题表达，整行高亮会抢走列表层级
                 "active:scale-[0.995]",
-                isActive
-                    ? "bg-[var(--surface-fill-hover)]"
-                    : "hover:bg-[var(--surface-fill)]",
+                "hover:bg-[var(--surface-fill)]",
             )}
         >
             {leading ? (
@@ -363,11 +362,28 @@ function TrackRow({
 
             <div className={cn("relative shrink-0", dense && "scale-90 origin-left")}>
                 <Cover src={coverUrl} alt={track.title} size="sm" />
+                {/* 当前播放徽标放在封面右下角，悬停预览浮层出现时同步隐去避免遮挡 */}
+                {isActive ? (
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "pointer-events-none absolute bottom-1 right-1 z-[1] flex items-center justify-center rounded-full",
+                            "bg-background/85 text-primary shadow-sm ring-1 ring-black/[0.06] backdrop-blur-sm dark:ring-white/[0.12]",
+                            "transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0",
+                            dense ? "size-4" : "size-[18px]",
+                        )}
+                    >
+                        <span className={cn("track-eq", !isPlaying && "is-paused")}>
+                            <i />
+                            <i />
+                            <i />
+                        </span>
+                    </span>
+                ) : null}
                 <span
                     className={cn(
-                        "pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-black/35 text-white opacity-0 transition-opacity",
+                        "pointer-events-none absolute inset-0 z-[1] flex items-center justify-center rounded-lg bg-black/35 text-white opacity-0 transition-opacity",
                         "group-hover:opacity-100 group-focus-visible:opacity-100",
-                        isActive && "opacity-100",
                     )}
                 >
                     {isPlaying ? (
@@ -387,9 +403,9 @@ function TrackRow({
                     ) : null}
                     <p
                         className={cn(
-                            "min-w-0 flex-1 truncate font-medium tracking-[-0.01em]",
+                            "min-w-0 flex-1 truncate tracking-[-0.01em]",
                             dense ? "text-[14px] md:text-[12px]" : "text-[15px] md:text-[13px]",
-                            isActive ? "text-primary" : "text-foreground",
+                            isActive ? "font-semibold text-primary" : "font-medium text-foreground",
                         )}
                     >
                         {track.title}

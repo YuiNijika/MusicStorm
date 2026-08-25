@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
@@ -17,6 +17,7 @@ import {
     fetchArtistDesc,
     fetchArtistDetail,
     fetchArtistMvs,
+    fetchArtistSongsPage,
     fetchArtistSublist,
     fetchSimiArtists,
     subscribeArtist,
@@ -76,6 +77,19 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
+
+    // 歌曲分页，更多歌曲追加在热门 50 后，offset 从 hotTracks.length 起跳
+    const [moreSongs, setMoreSongs] = useState<Track[]>([])
+    const [songsOffset, setSongsOffset] = useState(0)
+    const [songsLoading, setSongsLoading] = useState(false)
+    const [songsHasMore, setSongsHasMore] = useState(false)
+    const songsSentinelRef = useRef<HTMLDivElement>(null)
+
+    // 歌曲全集 = 热门列表 + 分页追加（追加侧已按 id 去重），列表与播放队列共用
+    const allSongs = useMemo(
+        () => (moreSongs.length ? [...hotTracks, ...moreSongs] : hotTracks),
+        [hotTracks, moreSongs],
+    )
 
     // 专辑无限滚动：偏移量、加载中、是否还有下一页
     const [albumsOffset, setAlbumsOffset] = useState(0)
@@ -139,6 +153,10 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         setAlbumsOffset(0)
         setAlbumsHasMore(true)
         setAlbumsLoading(false)
+        setMoreSongs([])
+        setSongsOffset(0)
+        setSongsLoading(false)
+        setSongsHasMore(false)
         setMvs(emptyLazy([]))
         setDesc(emptyLazy({ brief: "", sections: [] }))
         setSimilar(emptyLazy([]))
@@ -150,6 +168,14 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 }
                 setProfile(result.profile)
                 setHotTracks(result.hotTracks)
+                // 热门 50 后再接全量分页：有总曲数按总曲数判，未知时以拉满一页为有更多
+                setMoreSongs([])
+                setSongsOffset(result.hotTracks.length)
+                setSongsHasMore(
+                    result.profile.songCount == null
+                        ? result.hotTracks.length >= 50
+                        : result.profile.songCount > result.hotTracks.length,
+                )
                 setAlbums(result.albums)
                 // 首屏拿满一页（50 张）视为可能还有更多，靠下滑追加
                 setAlbumsOffset(result.albums.length)
@@ -162,6 +188,9 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 }
                 setProfile(null)
                 setHotTracks([])
+                setMoreSongs([])
+                setSongsOffset(0)
+                setSongsHasMore(false)
                 setAlbums([])
                 setAlbumsOffset(0)
                 setAlbumsHasMore(false)
@@ -216,6 +245,51 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         io.observe(sentinel)
         return () => io.disconnect()
     }, [tab, albumsHasMore, albumsLoading, loadMoreAlbums])
+
+    // 歌曲追加，热门 50 之后按全量接口翻页，与热门按 id 去重
+    const loadMoreSongs = useCallback(async () => {
+        if (songsLoading || !songsHasMore) {
+            return
+        }
+        setSongsLoading(true)
+        try {
+            const next = await fetchArtistSongsPage(artistId, songsOffset)
+            setMoreSongs((prev) => {
+                const seen = new Set(hotTracks.map((track) => track.id))
+                for (const track of prev) {
+                    seen.add(track.id)
+                }
+                const fresh = next.filter((track) => !seen.has(track.id))
+                return [...prev, ...fresh]
+            })
+            setSongsOffset((offset) => offset + next.length)
+            if (next.length < 50) {
+                setSongsHasMore(false)
+            }
+        } catch (err) {
+            notifyFromError("加载更多歌曲失败", err)
+        } finally {
+            setSongsLoading(false)
+        }
+    }, [artistId, songsOffset, songsLoading, songsHasMore, hotTracks])
+
+    useEffect(() => {
+        const sentinel = songsSentinelRef.current
+        if (tab !== "songs" || !songsHasMore || !sentinel) {
+            return
+        }
+        // 与专辑同款提前 300px 触底自动加载，按钮兜底手动
+        const io = new IntersectionObserver(
+            (entries) => {
+                if (entries[0]?.isIntersecting) {
+                    void loadMoreSongs()
+                }
+            },
+            { rootMargin: "300px" },
+        )
+        io.observe(sentinel)
+        return () => io.disconnect()
+    }, [tab, songsHasMore, songsLoading, loadMoreSongs])
 
     // Tab 懒加载：勿把 status 放进 deps，否则 set loading 会 cleanup 取消请求导致永久卡 loading
     useEffect(() => {
@@ -427,27 +501,58 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             {hotTracks.length === 0 ? (
                                 <StateHero variant="empty" title="暂无热门歌曲" />
                             ) : (
-                                <VirtualList
-                                    items={hotTracks}
-                                    itemHeight={58}
-                                    className="apple-list-surface p-1.5"
-                                    getItemKey={(track) => track.id}
-                                    renderItem={(track, index) => (
-                                        <TrackRow
-                                            track={track}
-                                            index={index}
-                                            isActive={currentTrack?.id === track.id}
-                                            isPlaying={
-                                                currentTrack?.id === track.id &&
-                                                isPlaying
-                                            }
-                                            showSource={false}
-                                            onPlay={(item) =>
-                                                playOrToggle(item, hotTracks)
-                                            }
-                                        />
-                                    )}
-                                />
+                                <>
+                                    <VirtualList
+                                        items={allSongs}
+                                        itemHeight={58}
+                                        className="apple-list-surface p-1.5"
+                                        getItemKey={(track) => track.id}
+                                        renderItem={(track, index) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                isActive={
+                                                    currentTrack?.id === track.id
+                                                }
+                                                isPlaying={
+                                                    currentTrack?.id ===
+                                                        track.id && isPlaying
+                                                }
+                                                showSource={false}
+                                                onPlay={(item) =>
+                                                    playOrToggle(item, allSongs)
+                                                }
+                                            />
+                                        )}
+                                    />
+                                    {/* 下滑哨兵 + 状态区：热门 50 后接全量歌曲分页 */}
+                                    <div
+                                        ref={songsSentinelRef}
+                                        className="h-1"
+                                        aria-hidden
+                                    />
+                                    <div className="flex flex-col items-center gap-3 py-6">
+                                        {songsLoading ? (
+                                            <p className="text-[12px] text-muted-foreground">
+                                                加载中…
+                                            </p>
+                                        ) : songsHasMore ? (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void loadMoreSongs()
+                                                }
+                                                className="inline-flex h-9 cursor-pointer items-center rounded-full bg-[var(--surface-fill)] px-5 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                            >
+                                                加载更多
+                                            </button>
+                                        ) : (
+                                            <p className="text-[12px] text-muted-foreground">
+                                                没有更多歌曲了
+                                            </p>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </TabsContent>
 
@@ -483,15 +588,29 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                         className="h-1"
                                         aria-hidden
                                     />
-                                    {albumsLoading ? (
-                                        <p className="py-6 text-center text-[12px] text-muted-foreground">
-                                            加载中…
-                                        </p>
-                                    ) : !albumsHasMore ? (
-                                        <p className="py-6 text-center text-[12px] text-muted-foreground">
-                                            没有更多专辑了
-                                        </p>
-                                    ) : null}
+                                    {/* 状态区：加载中 / 还有下一页的手动按钮 / 到底提示；
+                                        下滑哨兵与按钮双通道，自动触发失败时点按钮兜底 */}
+                                    <div className="flex flex-col items-center gap-3 py-6">
+                                        {albumsLoading ? (
+                                            <p className="text-[12px] text-muted-foreground">
+                                                加载中…
+                                            </p>
+                                        ) : albumsHasMore ? (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void loadMoreAlbums()
+                                                }
+                                                className="inline-flex h-9 cursor-pointer items-center rounded-full bg-[var(--surface-fill)] px-5 text-[13px] font-medium text-muted-foreground transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                            >
+                                                加载更多
+                                            </button>
+                                        ) : (
+                                            <p className="text-[12px] text-muted-foreground">
+                                                没有更多专辑了
+                                            </p>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </TabsContent>

@@ -115,8 +115,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         seek,
         setVolume,
         toggleMute,
-        toggleShuffle,
-        cycleRepeat,
+        cyclePlayMode,
         reloadCurrent,
     } = usePlayer()
     const { positionMs, durationMs } = usePlaybackTick()
@@ -129,6 +128,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
+    // 动画结束后移除标记，下一次切换才能重新播放淡入
+    const [layoutFade, setLayoutFade] = useState(false)
     const [phase, setPhase] = useState<Phase>("closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
     const [likeCount, setLikeCount] = useState<number | null>(null)
@@ -468,6 +469,10 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     }
 
     function handleLayoutChange(next: FullPlayerLayout) {
+        // 移动端翻页器自带滑动过渡，桌面菜单切换才需要淡入避免内容跳变
+        if (next !== effectiveLayout && !isMobile) {
+            setLayoutFade(true)
+        }
         setFullPlayerLayout(next)
         setLayout(next)
     }
@@ -499,8 +504,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             onTogglePlay={togglePlay}
             onPrevious={previous}
             onNext={next}
-            onToggleShuffle={toggleShuffle}
-            onCycleRepeat={cycleRepeat}
+            onCyclePlayMode={cyclePlayMode}
             onToggleMute={toggleMute}
             onVolume={(v) => setVolume(v)}
             onQuality={handleQualityChange}
@@ -529,7 +533,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const meta = (
         <div className="space-y-1.5 text-center">
             <div className="flex min-w-0 items-center justify-center gap-2">
-                <h2 className="min-w-0 truncate text-[22px] font-semibold tracking-[-0.04em] sm:text-[26px]">
+                <h2 className="min-w-0 truncate text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">
                     {displayTrack.title}
                 </h2>
                 <span className="shrink-0">
@@ -689,6 +693,21 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div className="w-[72px]" aria-hidden />
                 </div>
 
+                <div
+                    className={cn(
+                        "flex min-h-0 flex-1 flex-col",
+                        !isMobile && layoutFade && "full-player-layout-in",
+                    )}
+                    onAnimationEnd={(event) => {
+                        // 封面呼吸等子元素动画结束后会向上冒泡，只有布局淡入自身结束才允许复位
+                        if (
+                            event.target === event.currentTarget &&
+                            event.animationName === "full-player-layout-in"
+                        ) {
+                            setLayoutFade(false)
+                        }
+                    }}
+                >
                 {effectiveLayout === "classic" ? (
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
                         <div className="flex min-h-0 flex-col items-center justify-center gap-6">
@@ -805,6 +824,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         ) : null}
                     </>
                 )}
+                </div>
 
                 <div
                     className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"
@@ -813,7 +833,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)",
                     }}
                 >
-                    <div className="mx-auto flex w-full max-w-[min(92vw,1100px)] flex-col gap-2.5">
+                    <div className="flex w-full flex-col gap-2.5">
                         {progressRow}
                         {transport}
                     </div>
@@ -839,8 +859,7 @@ function TransportBar({
     onTogglePlay,
     onPrevious,
     onNext,
-    onToggleShuffle,
-    onCycleRepeat,
+    onCyclePlayMode,
     onToggleMute,
     onVolume,
     onQuality,
@@ -863,8 +882,7 @@ function TransportBar({
     onTogglePlay: () => void
     onPrevious: () => void
     onNext: () => void
-    onToggleShuffle: () => void
-    onCycleRepeat: () => void
+    onCyclePlayMode: () => void
     onToggleMute: () => void
     onVolume: (v: number) => void
     onQuality: (br: QualityBr) => void
@@ -901,9 +919,7 @@ function TransportBar({
             </div>
 
             <div className="flex items-center justify-center gap-1 sm:gap-1.5">
-                <IconBtn title="随机" active={shuffle} onClick={onToggleShuffle}>
-                    <Shuffle className="size-4" />
-                </IconBtn>
+                <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
                 <IconBtn title="上一首" onClick={onPrevious}>
                     <SkipBack className="size-5 fill-current" />
                 </IconBtn>
@@ -924,27 +940,30 @@ function TransportBar({
                 <IconBtn title="下一首" onClick={onNext}>
                     <SkipForward className="size-5 fill-current" />
                 </IconBtn>
+            </div>
+
+            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 <IconBtn
                     title={
-                        repeat === "off"
-                            ? "循环：关"
-                            : repeat === "all"
-                              ? "循环：列表"
-                              : "循环：单曲"
+                        shuffle
+                            ? "随机播放"
+                            : repeat === "one"
+                              ? "循环：单曲"
+                              : repeat === "all"
+                                ? "循环：列表"
+                                : "顺序播放"
                     }
-                    active={repeat !== "off"}
-                    onClick={onCycleRepeat}
+                    active={shuffle || repeat !== "off"}
+                    onClick={onCyclePlayMode}
                 >
-                    {repeat === "one" ? (
+                    {shuffle ? (
+                        <Shuffle className="size-4" />
+                    ) : repeat === "one" ? (
                         <Repeat1 className="size-4" />
                     ) : (
                         <Repeat className="size-4" />
                     )}
                 </IconBtn>
-            </div>
-
-            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
 
                 <Popover>
                     <PopoverTrigger

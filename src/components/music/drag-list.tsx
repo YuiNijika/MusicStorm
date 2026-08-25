@@ -17,7 +17,7 @@ type DragListProps<T extends { id: string }> = {
     className?: string
 }
 
-// 轻量指针拖拽排序：按住 Grip 拖动；仅 list 视图 / 自定义排序时启用
+// 拖拽排序只在自定义排序视图启用，其余列表保持静止避免误触发
 function DragList<T extends { id: string }>({
     items,
     enabled,
@@ -113,12 +113,14 @@ function DragList<T extends { id: string }>({
                         key={item.id}
                         data-drag-id={item.id}
                         className={cn(
-                            "transition-opacity",
-                            dragId === item.id && "opacity-60",
+                            // 被拖行压低并留虚线占位，目标行用主色示线标出落点
+                            "transition-[transform,opacity,box-shadow] duration-[var(--duration-control)]",
+                            dragId === item.id &&
+                                "scale-[0.97] opacity-40 shadow-[var(--shadow-float)] outline-1 outline-dashed outline-foreground/25",
                             overId === item.id &&
                                 dragId &&
                                 dragId !== item.id &&
-                                "ring-1 ring-primary/40 rounded-xl",
+                                "ring-1 ring-primary/50",
                         )}
                     >
                         {renderItem(item, index, handle)}

@@ -1,4 +1,9 @@
-import { Monitor, MoonStar, Palette, SunMedium } from "lucide-react"
+import {
+    Monitor,
+    MoonStar,
+    Palette,
+    SunMedium,
+} from "lucide-react"
 import { type CSSProperties, type PointerEvent, type ReactNode } from "react"
 
 import { useTheme } from "@/components/app/theme-provider"
@@ -154,7 +159,7 @@ function TitleBar({
                                 </DropdownMenuLabel>
                                 <DropdownMenuRadioItem value="system" className="cursor-pointer">
                                     <Monitor className="mr-1.5 size-3.5" />
-                                    跟随系统
+                                    系统
                                 </DropdownMenuRadioItem>
                                 <DropdownMenuRadioItem value="light" className="cursor-pointer">
                                     <SunMedium className="mr-1.5 size-3.5" />

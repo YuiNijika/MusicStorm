@@ -345,6 +345,18 @@
     -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%) !important;
 }
 
+/* 桌面 WebView2 常驻结构的毛玻璃默认收敛：侧栏/顶栏/底栏/面板这些从首帧
+ * 持续存在的整面 backdrop-filter，在 Chromium 里即使画面静止也会被持续重采样。
+ * 半径减半让每帧成本近似减半，28 到 16 在近似纯色的背景上几乎无视觉差；
+ * 瞬时浮层（dialog/popover/select）保持浓玻璃，不受此规则影响。 */
+.material-chrome,
+.material-sidebar,
+.material-player,
+.material-panel {
+    backdrop-filter: blur(16px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+}
+
 .glass {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
@@ -394,13 +406,13 @@
     height: 120%;
     object-fit: cover;
     /* blur 动画每帧重绘整个 surface——全屏模糊是 GPU 合成杀手 */
-    filter: blur(58px) saturate(125%) brightness(1.18);
+    filter: blur(40px) saturate(125%) brightness(1.18);
     opacity: 0.38;
     transform: scale(1.08);
 }
 
 .dark .full-player-backdrop-image {
-    filter: blur(54px) saturate(145%) brightness(0.72);
+    filter: blur(40px) saturate(145%) brightness(0.72);
     opacity: 0.58;
 }
 
@@ -410,8 +422,8 @@
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(246, 248, 252, 0.7)),
         rgba(248, 249, 253, 0.36);
-    backdrop-filter: blur(34px) saturate(135%);
-    -webkit-backdrop-filter: blur(34px) saturate(135%);
+    backdrop-filter: blur(28px) saturate(135%);
+    -webkit-backdrop-filter: blur(28px) saturate(135%);
 }
 
 .dark .full-player-backdrop-tint {
@@ -498,6 +510,63 @@
     }
 }
 
+/* 播放音波只驱动缩放属性以留在合成层运行，暂停时停跳但保留形态避免歧义，
+ * 弱动画偏好由全局关键帧收敛规则自动静止 */
+.track-eq {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1.5px;
+    height: 10px;
+}
+.track-eq i {
+    width: 2.5px;
+    height: 100%;
+    border-radius: 999px;
+    background: currentColor;
+    transform-origin: bottom;
+    animation: track-eq-bounce 1.05s var(--ease-enter) infinite;
+}
+.track-eq i:nth-child(2) {
+    animation-delay: -0.35s;
+}
+.track-eq i:nth-child(3) {
+    animation-delay: -0.7s;
+}
+.track-eq.is-paused i {
+    animation-play-state: paused;
+}
+@keyframes track-eq-bounce {
+    0%,
+    100% {
+        transform: scaleY(0.3);
+    }
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+/* 布局切换时整块内容淡入，只动透明度避免触发重排 */
+.full-player-layout-in {
+    animation: full-player-layout-in var(--duration-enter) var(--ease-enter) both;
+}
+@keyframes full-player-layout-in {
+    from {
+        opacity: 0.25;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 浮层进出动画统一指数缓动，时长由各自的 enter 与 exit token 控制 */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="context-menu-content"],
+[data-slot="dialog-content"],
+[data-slot="dialog-overlay"] {
+    animation-timing-function: var(--ease-enter);
+}
+
 .full-player-exit {
     animation: full-player-exit var(--duration-exit) var(--ease-exit) forwards;
 }
@@ -548,6 +617,43 @@
     }
 }
 
+/* 明暗切换用 View Transitions 圆形扩散，圆心取最近点击处，新主题从该点展开；
+   深色方向收缩旧快照露出新色，反方向对称
+   mix-blend-mode 必须改回 normal：Chromium 给 VT 快照默认 plus-lighter，
+   黑底快照与白底快照加色混合后整屏趋白，黑切白时就靠它闪出一片白 */
+::view-transition-old(root) {
+    animation: none;
+    mix-blend-mode: normal;
+    z-index: 1;
+}
+
+::view-transition-new(root) {
+    animation: theme-clip-reveal 500ms var(--ease-enter);
+    mix-blend-mode: normal;
+    z-index: 9999;
+}
+
+html.dark::view-transition-old(root) {
+    animation: theme-clip-reveal 500ms var(--ease-enter) reverse;
+    mix-blend-mode: normal;
+    z-index: 9999;
+}
+
+html.dark::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+    z-index: 1;
+}
+
+@keyframes theme-clip-reveal {
+    from {
+        clip-path: circle(0 at var(--theme-x) var(--theme-y));
+    }
+    to {
+        clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y));
+    }
+}
+
 /* reduced-motion 非"零反馈"——用短 cross-fade（150ms opacity）保留状态反馈，
  * 同时关闭移位/缩放/关键帧动画，避免前庭性触发器（Apple HIG） */
 @media (prefers-reduced-motion: reduce) {
@@ -560,6 +666,11 @@
         transition-duration: 150ms !important;
         transition-property:
             color, background-color, border-color, opacity, box-shadow, outline-color !important;
+    }
+
+    .full-player-layout-in {
+        animation-duration: 150ms !important;
+        animation-timing-function: ease-out;
     }
 
     .full-player-exit {
@@ -626,38 +737,8 @@
     }
 }
 
-html.glass-disabled .glass,
-html.glass-disabled .glass-panel,
-html.glass-disabled .glass-chip,
-html.glass-disabled .material-chrome,
-html.glass-disabled .material-sidebar,
-html.glass-disabled .material-player,
-html.glass-disabled .material-panel,
-html.glass-disabled .material-field,
-html.glass-disabled .material-surface,
-html.glass-disabled .material-segmented,
-html.glass-disabled .apple-list-surface,
-html.glass-disabled .full-player-backdrop,
-html.glass-disabled .full-player-backdrop-tint {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-html.glass-disabled .material-sidebar {
-    background: var(--sidebar, #f5f5f7) !important;
-}
-html.glass-disabled .material-player,
-html.glass-disabled .full-player-backdrop-tint {
-    background: var(--background, #f5f5f7) !important;
-}
-html.glass-disabled .material-panel,
-html.glass-disabled .material-field,
-html.glass-disabled .material-surface,
-html.glass-disabled .apple-list-surface {
-    background: var(--surface-raised, #ffffff) !important;
-}
-html.glass-disabled .material-segmented {
-    background: var(--surface-fill, rgba(0, 0, 0, 0.05)) !important;
-}
+/* glass-disabled 完全关玻璃的规则统一在文件末尾声明，确保压过
+ * performance-mode / android 的降级规则（同级 !important 时靠后者胜）。 */
 
 html.performance-mode *,
 html.performance-mode *::before,
@@ -727,41 +808,63 @@ html.performance-mode [class*="animate-out"] {
     }
 }
 
-/* 移动端（Android WebView GPU 弱）：全屏/大面积 backdrop-filter 每帧重绘整层，
+/* Android WebView GPU 弱 + 桌面性能模式：全屏/大面积 backdrop-filter 每帧重绘整层，
  * 降模糊半径 + 去掉 saturate（额外整屏合成 pass），滚动/翻页不再掉帧；
  * 视觉与桌面接近，代价仅是玻璃略微没那么浓。 */
 html[data-platform="android"] .glass,
+html.performance-mode .glass,
 html[data-platform="android"] .glass-panel,
+html.performance-mode .glass-panel,
 html[data-platform="android"] .glass-chip,
+html.performance-mode .glass-chip,
 html[data-platform="android"] .material-chrome,
+html.performance-mode .material-chrome,
 html[data-platform="android"] .material-sidebar,
+html.performance-mode .material-sidebar,
 html[data-platform="android"] .material-player,
+html.performance-mode .material-player,
 html[data-platform="android"] .material-panel,
+html.performance-mode .material-panel,
 html[data-platform="android"] .material-field,
+html.performance-mode .material-field,
 html[data-platform="android"] .material-surface,
+html.performance-mode .material-surface,
 html[data-platform="android"] .material-segmented,
+html.performance-mode .material-segmented,
 html[data-platform="android"] .apple-list-surface,
+html.performance-mode .apple-list-surface,
 html[data-platform="android"] .mobile-nav-bar,
-html[data-platform="android"] .download-banner {
+html.performance-mode .mobile-nav-bar,
+html[data-platform="android"] .download-banner,
+html.performance-mode .download-banner {
     backdrop-filter: blur(min(10px, var(--glass-blur, 28px))) !important;
     -webkit-backdrop-filter: blur(min(10px, var(--glass-blur, 28px))) !important;
 }
 
-/* 全屏播放器背板是最大开销源：58px 全屏模糊收敛到 24px，弱机接近实时合成 */
-html[data-platform="android"] .full-player-backdrop-image {
+/* 全屏播放器背板是最大开销源：40px 全屏模糊收敛到 24px，弱机接近实时合成 */
+html[data-platform="android"] .full-player-backdrop-image,
+html.performance-mode .full-player-backdrop-image {
     filter: blur(24px) brightness(1.1);
     transform: scale(1.02);
 }
-html[data-platform="android"] .dark .full-player-backdrop-image {
+html[data-platform="android"] .dark .full-player-backdrop-image,
+html.performance-mode .dark .full-player-backdrop-image {
     filter: blur(22px) brightness(0.75);
 }
-html[data-platform="android"] .full-player-backdrop-tint {
+html[data-platform="android"] .full-player-backdrop-tint,
+html.performance-mode .full-player-backdrop-tint {
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
 
 /* 呼吸动画持续触发合成层，弱机直接停掉，封面静止即可 */
-html[data-platform="android"] [class*="cover-breathe"] {
+html[data-platform="android"] [class*="cover-breathe"],
+html.performance-mode [class*="cover-breathe"] {
+    animation: none !important;
+}
+
+/* 音波指示器同理：小面积但持续动画，弱机停跳动保留形态 */
+html[data-platform="android"] .track-eq i {
     animation: none !important;
 }
 
@@ -774,4 +877,38 @@ html[data-platform="android"] [class*="cover-breathe"] {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* 完全关闭毛玻璃：优先级最高，压过 performance-mode / android 的收敛规则 */
+html.glass-disabled .glass,
+html.glass-disabled .glass-panel,
+html.glass-disabled .glass-chip,
+html.glass-disabled .material-chrome,
+html.glass-disabled .material-sidebar,
+html.glass-disabled .material-player,
+html.glass-disabled .material-panel,
+html.glass-disabled .material-field,
+html.glass-disabled .material-surface,
+html.glass-disabled .material-segmented,
+html.glass-disabled .apple-list-surface,
+html.glass-disabled .full-player-backdrop,
+html.glass-disabled .full-player-backdrop-tint {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html.glass-disabled .material-sidebar {
+    background: var(--sidebar, #f5f5f7) !important;
+}
+html.glass-disabled .material-player,
+html.glass-disabled .full-player-backdrop-tint {
+    background: var(--background, #f5f5f7) !important;
+}
+html.glass-disabled .material-panel,
+html.glass-disabled .material-field,
+html.glass-disabled .material-surface,
+html.glass-disabled .apple-list-surface {
+    background: var(--surface-raised, #ffffff) !important;
+}
+html.glass-disabled .material-segmented {
+    background: var(--surface-fill, rgba(0, 0, 0, 0.05)) !important;
 }

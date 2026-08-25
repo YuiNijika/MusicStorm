@@ -6,6 +6,12 @@ import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import {
+    SIDEBAR_STYLE_EVENT,
+    readSidebarStyle,
+    setSidebarStyle,
+    type SidebarStyle,
+} from "@/lib/app/sidebar-prefs"
+import {
     PERFORMANCE_MODE_EVENT,
     getPerformanceMode,
 } from "@/lib/app/performance-prefs"
@@ -74,6 +80,9 @@ function AppearanceTab({
     const [performanceMode, setPerformanceModeState] = useState(() =>
         getPerformanceMode(),
     )
+    const [sidebarStyle, setSidebarStyleState] = useState<SidebarStyle>(() =>
+        readSidebarStyle(),
+    )
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
     const nativeMacOS = isNativeMacOS()
@@ -87,6 +96,16 @@ function AppearanceTab({
         window.addEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
         return () =>
             window.removeEventListener(PERFORMANCE_MODE_EVENT, onPerformance)
+    }, [])
+
+    // 侧栏风格可能被其他入口修改，监听事件保持选中态同步
+    useEffect(() => {
+        function onSidebarStyle() {
+            setSidebarStyleState(readSidebarStyle())
+        }
+        window.addEventListener(SIDEBAR_STYLE_EVENT, onSidebarStyle)
+        return () =>
+            window.removeEventListener(SIDEBAR_STYLE_EVENT, onSidebarStyle)
     }, [])
 
     useEffect(() => {
@@ -392,6 +411,30 @@ function AppearanceTab({
                         </div>
                     </SettingsCard>
                 ) : null}
+
+                <SettingsCard
+                    title="侧栏样式"
+                    description="窄条紧凑或经典分组导航"
+                >
+                    <div className="flex flex-wrap gap-2">
+                        <ChoiceChip
+                            active={sidebarStyle === "compact"}
+                            onClick={() => {
+                                setSidebarStyle("compact")
+                                setSidebarStyleState("compact")
+                            }}
+                            label="紧凑"
+                        />
+                        <ChoiceChip
+                            active={sidebarStyle === "classic"}
+                            onClick={() => {
+                                setSidebarStyle("classic")
+                                setSidebarStyleState("classic")
+                            }}
+                            label="经典"
+                        />
+                    </div>
+                </SettingsCard>
 
                 <SettingsCard
                     title="歌单展示"

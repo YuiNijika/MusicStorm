@@ -55,8 +55,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
         seek,
         setVolume,
         toggleMute,
-        toggleShuffle,
-        cycleRepeat,
+        cyclePlayMode,
     } = usePlayer()
     const { positionMs, durationMs } = usePlaybackTick()
     const { loggedIn } = useNeteaseSession()
@@ -68,6 +67,14 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     const canLike =
         loggedIn && currentTrack?.source === "netease" && Boolean(currentTrack.id)
     const liked = currentTrack ? isTrackLiked(currentTrack.id) : false
+    // 模式按钮文案随当前播放模式变化，网易云同款单按钮轮换
+    const playModeTitle = shuffle
+        ? "随机播放"
+        : repeat === "one"
+          ? "循环：单曲"
+          : repeat === "all"
+            ? "循环：列表"
+            : "顺序播放"
     const primaryArtist = currentTrack?.artists?.find((item) => item.id)
     const canOpenArtist =
         currentTrack?.source === "netease" && Boolean(primaryArtist?.id)
@@ -370,14 +377,11 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
 
                 <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
                     <div className="flex items-center gap-1">
-                        <ControlButton
-                            title="随机"
-                            active={shuffle}
-                            onClick={toggleShuffle}
-                            disabled={!currentTrack}
-                        >
-                            <Shuffle className="size-3.5" />
-                        </ControlButton>
+                        <SpeedPopover
+                            rate={playbackRate}
+                            onSpeed={setPlaybackRate}
+                            compact
+                        />
                         <ControlButton
                             title="上一首"
                             onClick={previous}
@@ -404,18 +408,14 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                             <SkipForward className="size-4 fill-current" />
                         </ControlButton>
                         <ControlButton
-                            title={
-                                repeat === "off"
-                                    ? "循环：关"
-                                    : repeat === "all"
-                                      ? "循环：列表"
-                                      : "循环：单曲"
-                            }
-                            active={repeat !== "off"}
-                            onClick={cycleRepeat}
+                            title={playModeTitle}
+                            active={shuffle || repeat !== "off"}
+                            onClick={cyclePlayMode}
                             disabled={!currentTrack}
                         >
-                            {repeat === "one" ? (
+                            {shuffle ? (
+                                <Shuffle className="size-3.5" />
+                            ) : repeat === "one" ? (
                                 <Repeat1 className="size-3.5" />
                             ) : (
                                 <Repeat className="size-3.5" />
@@ -444,11 +444,6 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
 
                 <div className="hidden items-center justify-end gap-1 md:flex">
-                    <SpeedPopover
-                        rate={playbackRate}
-                        onSpeed={setPlaybackRate}
-                        compact
-                    />
                     {currentTrack?.source === "netease" && currentTrack.id ? (
                         <ControlButton
                             title="评论"

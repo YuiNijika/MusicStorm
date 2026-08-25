@@ -3,7 +3,9 @@ mod audio;
 #[cfg(test)]
 mod bundle_config;
 mod cover_cache;
+#[cfg(not(target_os = "android"))]
 mod db;
+mod desktop_lyric;
 mod ffmpeg;
 mod local_meta;
 #[cfg(target_os = "macos")]
@@ -83,6 +85,16 @@ struct LocalScanTrack {
 fn open_devtools(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         window.open_devtools();
+    }
+    Ok(())
+}
+
+// DevTools 是独立 WebView2 进程（面板约 200MB+ 远程调试另占几十 MB），
+// 窗口隐藏/退出时不回收会一直在托盘里挂着；前端在 hide/exit 前调用
+#[tauri::command]
+fn close_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.close_devtools();
     }
     Ok(())
 }
@@ -716,7 +728,7 @@ pub fn run() {
                     --disable-extensions --disable-component-update --disable-pdf-viewer \
                     --disable-breakpad --disable-hang-monitor --disable-speech-api --no-pings \
                     --aggressive-cache-discard \
-                    --disable-features=TranslateUI,AutofillServerCommunication,CalculateNativeWinOcclusion,AudioServiceOutOfProcess \
+                    --disable-features=TranslateUI,AutofillServerCommunication,CalculateNativeWinOcclusion,AudioServiceOutOfProcess,WinUseBrowserSpellChecker,msWebOOUI \
                     --enable-aggressive-domstorage-flushing \
                     --enable-features=DestroyProfileOnBrowserClose \
                     --js-flags=--max-old-space-size=160";
@@ -769,6 +781,8 @@ pub fn run() {
             app.manage(DbState(Mutex::new(conn)));
             #[cfg(not(target_os = "android"))]
             app.manage(AudioState::default());
+            #[cfg(not(target_os = "android"))]
+            app.manage(desktop_lyric::DesktopLyricStateWrapper::new());
 
             #[cfg(target_os = "macos")]
             app.manage(macos_now_playing::setup(app.handle()));
@@ -802,6 +816,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             open_devtools,
+            close_devtools,
             exit_app,
             #[cfg(not(target_os = "android"))]
             pick_music_folder,
@@ -876,6 +891,14 @@ pub fn run() {
             macos_now_playing::macos_now_playing_clear,
             #[cfg(not(target_os = "android"))]
             tray::update_global_shortcut,
+            #[cfg(not(target_os = "android"))]
+            desktop_lyric::show_desktop_lyric,
+            #[cfg(not(target_os = "android"))]
+            desktop_lyric::hide_desktop_lyric,
+            #[cfg(not(target_os = "android"))]
+            desktop_lyric::is_desktop_lyric_visible,
+            #[cfg(not(target_os = "android"))]
+            desktop_lyric::update_desktop_lyric,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -4,9 +4,11 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode,
 } from "react"
+import { flushSync } from "react-dom"
 
 import {
     applyAppearanceToDom,
@@ -43,6 +45,47 @@ const STORAGE_KEY = "musicstorm-theme"
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
+// 扩散圆心取最近一次点击位置，键盘或程序触发时落在视口中心
+let themeOriginX = -1
+let themeOriginY = -1
+if (typeof window !== "undefined") {
+    window.addEventListener(
+        "pointerdown",
+        (event) => {
+            themeOriginX = event.clientX
+            themeOriginY = event.clientY
+        },
+        true,
+    )
+}
+
+function runThemeTransition(mutate: () => void) {
+    const root = document.documentElement
+    if (
+        typeof document === "undefined" ||
+        !document.startViewTransition ||
+        // 系统降低动态效果 / 应用内关闭过渡特效：都直接切，不建快照
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        root.classList.contains("performance-mode")
+    ) {
+        mutate()
+        return
+    }
+    const x = themeOriginX >= 0 ? themeOriginX : window.innerWidth / 2
+    const y = themeOriginY >= 0 ? themeOriginY : window.innerHeight / 2
+    const radius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y),
+    )
+    root.style.setProperty("--theme-x", `${x}px`)
+    root.style.setProperty("--theme-y", `${y}px`)
+    root.style.setProperty("--theme-r", `${radius}px`)
+    document.startViewTransition(() => {
+        // flushSync 让 React 提交先行完成，截图才能捕捉到新主题
+        flushSync(mutate)
+    })
+}
+
 function getSystemTheme(): ResolvedTheme {
     if (typeof window === "undefined") {
         return "light"
@@ -78,6 +121,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         readAppearancePrefs(),
     )
 
+    // 外观最新值镜像：render 期同步，保证过渡闭包能取到最新外观
+    const appearanceRef = useRef(appearance)
+    appearanceRef.current = appearance
+
     useEffect(() => {
         const next = resolveTheme(theme)
         setResolvedTheme(next)
@@ -102,14 +149,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }, [theme, appearance])
 
     const setTheme = useCallback((next: Theme) => {
-        setThemeState(next)
+        runThemeTransition(() => {
+            // DOM 明暗 + 颜色变量必须在截帧前同步落地：applyTheme 切 class，
+            // applyAppearanceToDom 注入 --background 等 inline 变量——两者留到
+            // effect 再跑的话，startViewTransition 截到的新快照还是旧外观，
+            // 动画空转，结束后才跳变（白切黑"黑了还闪一下"就是这么来的）
+            applyTheme(resolveTheme(next))
+            applyAppearanceToDom(appearanceRef.current)
+            setThemeState(next)
+        })
     }, [])
 
     const toggleTheme = useCallback(() => {
-        setThemeState((current) => {
-            const resolved = resolveTheme(current)
-            return resolved === "dark" ? "light" : "dark"
-        })
+        runThemeTransition(() =>
+            setThemeState((current) => {
+                const resolved = resolveTheme(current)
+                const next = resolved === "dark" ? "light" : "dark"
+                applyTheme(next)
+                applyAppearanceToDom(appearanceRef.current)
+                return next
+            }),
+        )
     }, [])
 
     const setAccent = useCallback((accent: AccentTone) => {

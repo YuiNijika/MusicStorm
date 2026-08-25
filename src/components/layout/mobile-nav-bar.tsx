@@ -156,7 +156,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                                         className="cursor-pointer"
                                     >
                                         <Monitor className="mr-1.5 size-3.5" />
-                                        跟随系统
+                                        系统
                                     </DropdownMenuRadioItem>
                                     <DropdownMenuRadioItem
                                         value="light"

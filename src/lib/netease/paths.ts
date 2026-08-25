@@ -23,6 +23,7 @@ export const NETEASE_PATHS = {
     commentMusic: "/comment/music",
     comment: "/comment",
     artists: "/artists",
+    artistSongs: "/artist/songs",
     artistAlbum: "/artist/album",
     artistMv: "/artist/mv",
     artistDesc: "/artist/desc",
