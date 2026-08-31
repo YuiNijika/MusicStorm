@@ -34,13 +34,20 @@ order: 9
 | `musicstorm:api-settings-change` | 前端内 | API 模式 / 来源变更 |
 | `musicstorm:api-cache-ttl` | 前端内 | API 缓存 TTL 偏好变更 |
 | `musicstorm:api-cache-auto-purge` | 前端内 | 缓存自动清理偏好变更 |
-| `musicstorm:player-command` | 前端内 | 播放器命令（全局快捷键入口） |
+| `musicstorm:player-command` | 跨窗口 | 播放器命令：托盘 / 全局快捷键 / 桌面小播放器均发此事件，主窗口 `useTrayCommands` 统一消费（`toggle` / `next` / `seek-to` 等） |
+| `musicstorm:mini-player-state` | Rust → 前端 | `MiniPlayerState`（title / artist / coverUrl / isPlaying / positionMs / durationMs），主窗口经 `update_mini_player` 推送，mini-player 窗口监听 |
+| `musicstorm:mini-player-visibility` | 前端内 | 桌面小播放器窗口可见性广播（`useMiniPlayer` / `useMiniPlayerSync` 同步开关状态） |
+| `musicstorm:desktop-lyric-update` | Rust → 前端 | 桌面歌词状态（当前行文本等），主窗口推送，desktop-lyric 窗口监听 |
+| `musicstorm:desktop-lyric-visibility` | 前端内 | 桌面歌词窗口可见性广播 |
 | `musicstorm:player-preferences` | 前端内 | 播放偏好变更 |
 | `musicstorm:update-status` | 前端内 | 更新状态 |
 | `musicstorm:full-player-chrome` | 前端内 | 全屏播放器界面偏好变更 |
 | `musicstorm:full-player-layout` | 前端内 | 全屏播放器布局偏好变更 |
 | `musicstorm:engine-pref` | 前端内 | 播放引擎偏好变更 |
 | `musicstorm:devtools-enabled` | 前端内 | 开发者工具开关变更 |
+| `musicstorm-sidebar-style` | 前端内 | 侧栏风格（compact / classic）变更 |
+| `musicstorm-signin-log` | 前端内 | 每日签到记录变更（自动 / 手动签到后广播，账号页刷新状态） |
+| `musicstorm-remote-cover-ready` | 前端内 | 远程封面缓存就绪 / 失效（detail 为原始 URL，空串广播表示需全量重新解析，见 [封面与播放 URL](#/docs/dev/media)） |
 
 ## 监听写法
 
@@ -77,7 +84,7 @@ const un = await listen("musicstorm:engine-pref", () => {
 
 ## 新增事件规范
 
-- 命名：前端内 `musicstorm:kebab-case`；Rust → 前端 `audio://x` 等协议域
+- 命名：跨窗口 / Rust → 前端用 `musicstorm:kebab-case`（带冒号）；新近的前端内偏好广播用 `musicstorm-kebab-case`（不带冒号，如 `musicstorm-sidebar-style`）。新增事件先 grep 两种前缀防冲突，并优先沿用同模块已有形态
 - 方向与载荷：Rust 事件在 emit 处定义 payload 类型（`AudioTickPayload` 等），前端建同名类型
 - 广播时机：偏好模块在 `writeXxxPrefs` 内广播（见 [偏好存储](#/docs/dev/prefs)），不要在组件里手发
 - 高频事件（tick）：载荷要小，监听方组件卸载必须注销

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { Section } from "@/components/music/section"
 import { usePlayer } from "@/hooks/use-player"
-import { useDesktopLyric } from "@/hooks/use-desktop-lyric"
 import {
     TITLE_BAR_DOUBLE_CLICK_OPTIONS,
     getTitleBarDoubleClickAction,
@@ -51,11 +49,14 @@ import {
     type AudioOutputMode,
 } from "@/lib/player/native-bridge"
 import {
+    ActionButton,
     ChoiceChip,
-    SettingsCard,
+    ChoiceRow,
+    ChipRow,
     SettingsGroup,
     SliderField,
     SwitchRow,
+    TabHeader,
 } from "@/pages/settings/settings-ui"
 import { cn } from "@/lib/utils"
 import { isWebMode } from "@/lib/web-mode"
@@ -72,7 +73,6 @@ function formatSettingsError(error: unknown): string {
 
 function PlaybackTab() {
     const { engineStatus } = usePlayer()
-    const { isVisible: isDesktopLyricVisible, toggle: toggleDesktopLyric } = useDesktopLyric()
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() =>
         getEnginePref(),
     )
@@ -187,68 +187,77 @@ function PlaybackTab() {
     }
 
     return (
-        <Section title="播放" description="引擎、淡入淡出与输出设备">
-            <div className="space-y-3">
-                <SettingsGroup>
-                    <SwitchRow
-                        title="启动时自动播放"
-                        description="打开应用后自动播放上次队列，默认关闭"
-                        checked={autoPlayOnStartup}
-                        onCheckedChange={(checked) => {
-                            setStartupAutoPlay(checked)
-                            setAutoPlayOnStartup(checked)
-                        }}
-                    />
-                </SettingsGroup>
+        <div className="space-y-3">
+            <TabHeader title="播放" description="引擎、输出设备、歌词与播放行为" />
 
-                <SettingsGroup title="歌词">
-                    <SwitchRow
-                        title="启用翻译歌词"
-                        description="网易云歌曲在原文歌词下方一起显示翻译"
-                        checked={showLyricTranslation}
-                        onCheckedChange={(checked) => {
-                            setShowLyricTranslation(checked)
-                            setShowLyricTranslationState(checked)
-                        }}
-                    />
-                    {!isWebMode() ? (
-                        <SwitchRow
-                            title="桌面歌词"
-                            description="在桌面上显示浮动歌词窗口，可拖动位置"
-                            checked={isDesktopLyricVisible}
-                            onCheckedChange={toggleDesktopLyric}
+            {/* 播放行为：整卡置于顶部，不用分组组件 */}
+            <div className="material-surface flex flex-col gap-3 rounded-2xl px-4 py-3.5">
+                <p className="text-[15px] font-semibold tracking-[-0.01em]">
+                    播放行为
+                </p>
+                <SwitchRow
+                    title="启动时自动播放"
+                    description="打开应用后自动播放上次队列"
+                    checked={autoPlayOnStartup}
+                    onCheckedChange={(checked) => {
+                        setStartupAutoPlay(checked)
+                        setAutoPlayOnStartup(checked)
+                    }}
+                />
+                <SwitchRow
+                    title="播放淡入淡出"
+                    description="暂停、恢复与切歌时平滑音量"
+                    checked={fadeEnabled}
+                    onCheckedChange={(checked) => {
+                        setFadeEnabled(checked)
+                        setFadeEnabledState(checked)
+                    }}
+                />
+                <SliderField
+                    label="淡入淡出时长"
+                    display={`${fadeMs} ms`}
+                    min={FADE_MS_MIN}
+                    max={FADE_MS_MAX}
+                    step={FADE_MS_STEP}
+                    value={fadeMs}
+                    disabled={!fadeEnabled}
+                    onChange={(next) => {
+                        setFadeDurationMs(next)
+                        setFadeMsState(next)
+                    }}
+                />
+                <ChoiceRow label="双击标题栏">
+                    {TITLE_BAR_DOUBLE_CLICK_OPTIONS.map((option) => (
+                        <ChoiceChip
+                            key={option.id}
+                            label={option.label}
+                            active={titleBarDoubleClick === option.id}
+                            onClick={() => {
+                                setTitleBarDoubleClickState(option.id)
+                                setTitleBarDoubleClickAction(option.id)
+                            }}
                         />
-                    ) : null}
-                </SettingsGroup>
+                    ))}
+                </ChoiceRow>
+                <SwitchRow
+                    title="启用翻译歌词"
+                    description="原文歌词下方一起显示翻译"
+                    checked={showLyricTranslation}
+                    onCheckedChange={(checked) => {
+                        setShowLyricTranslation(checked)
+                        setShowLyricTranslationState(checked)
+                    }}
+                />
+            </div>
 
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <SettingsGroup
-                    title="双击标题栏"
-                    description="桌面端主标题栏与全屏播放器头部均生效"
+                    title="音频输出"
+                    description="引擎、设备与解码"
+                    className={isWebMode() ? "lg:col-span-2" : undefined}
                 >
-                    <div className="flex flex-wrap gap-2">
-                        {TITLE_BAR_DOUBLE_CLICK_OPTIONS.map((option) => (
-                            <ChoiceChip
-                                key={option.id}
-                                label={option.label}
-                                active={titleBarDoubleClick === option.id}
-                                onClick={() => {
-                                    setTitleBarDoubleClickState(option.id)
-                                    setTitleBarDoubleClickAction(option.id)
-                                }}
-                            />
-                        ))}
-                    </div>
-                </SettingsGroup>
-
-                {!isWebMode() ? (
-                    <SettingsGroup
-                        title="播放引擎"
-                        description={`当前：${labelForEngineStatus(
-                            engineStatus,
-                            audioMode?.backend,
-                        )}${audioMode?.note ? ` · ${audioMode.note}` : ""}`}
-                    >
-                        <div className="flex flex-wrap gap-2">
+                    {!isWebMode() ? (
+                        <ChoiceRow label="播放引擎">
                             {ENGINE_PREF_OPTIONS.map((option) => (
                                 <ChoiceChip
                                     key={option.id}
@@ -260,174 +269,147 @@ function PlaybackTab() {
                                     }}
                                 />
                             ))}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                            无损/高规格本地走{nativeBackendLabel}，在线与普通 mp3
-                            走 H5；切换后将在下次启动播放会话时生效
+                        </ChoiceRow>
+                    ) : null}
+                    {!isWebMode() ? (
+                        <p className="text-[13px] text-muted-foreground">
+                            当前：{labelForEngineStatus(engineStatus, audioMode?.backend)}
+                            {audioMode?.note ? ` · ${audioMode.note}` : ""} ·
+                            无损/高规格本地走{nativeBackendLabel}，在线与普通
+                            mp3 走 H5；切换后下次启动播放会话生效
                         </p>
-                    </SettingsGroup>
-                ) : null}
-
-                <SettingsGroup>
-                    <SwitchRow
-                        title="播放淡入淡出"
-                        description="暂停、恢复与切歌时平滑音量"
-                        checked={fadeEnabled}
-                        onCheckedChange={(checked) => {
-                            setFadeEnabled(checked)
-                            setFadeEnabledState(checked)
-                        }}
-                    />
-                    <SliderField
-                        label="淡入淡出时长"
-                        display={`${fadeMs} ms`}
-                        min={FADE_MS_MIN}
-                        max={FADE_MS_MAX}
-                        step={FADE_MS_STEP}
-                        value={fadeMs}
-                        disabled={!fadeEnabled}
-                        onChange={(next) => {
-                            setFadeDurationMs(next)
-                            setFadeMsState(next)
-                        }}
-                    />
+                    ) : null}
+                    <div className="space-y-2">
+                        <p className="text-[15px] font-medium">输出设备</p>
+                        <ChipRow>
+                            {devices.map((device) => (
+                                <ChoiceChip
+                                    key={device.id}
+                                    label={device.name}
+                                    active={
+                                        (audioMode?.deviceId ?? "default") ===
+                                        device.id
+                                    }
+                                    onClick={() => {
+                                        void setAudioDevice(device.id)
+                                            .then(() =>
+                                                getAudioOutputMode().then(
+                                                    setAudioMode,
+                                                ),
+                                            )
+                                            .catch((error: unknown) => {
+                                                notifyError("切换输出设备失败", {
+                                                    description:
+                                                        error instanceof Error
+                                                            ? error.message
+                                                            : "请重试",
+                                                })
+                                            })
+                                    }}
+                                />
+                            ))}
+                        </ChipRow>
+                    </div>
+                    {audioMode?.supportsExclusive ? (
+                        <ChoiceRow
+                            label="WASAPI 独占"
+                            description={
+                                audioMode.exclusive
+                                    ? "已开启（设备支持时生效）"
+                                    : "共享模式（当前）"
+                            }
+                        >
+                            <ChoiceChip
+                                label={
+                                    audioMode.exclusive ? "独占开" : "独占关"
+                                }
+                                active={audioMode.exclusive}
+                                onClick={() => {
+                                    const next = !audioMode.exclusive
+                                    void setAudioExclusive(next)
+                                        .then(() =>
+                                            getAudioOutputMode().then(
+                                                setAudioMode,
+                                            ),
+                                        )
+                                        .catch((error: unknown) => {
+                                            notifyError(
+                                                next
+                                                    ? "独占模式开启失败"
+                                                    : "独占模式关闭失败",
+                                                {
+                                                    description:
+                                                        error instanceof Error
+                                                            ? error.message
+                                                            : "设备可能不支持，请重试",
+                                                },
+                                            )
+                                        })
+                                }}
+                            />
+                        </ChoiceRow>
+                    ) : null}
+                    <div className="space-y-2">
+                        <p className="text-[15px] font-medium">FFmpeg 解码器</p>
+                        <p className="text-[13px] text-muted-foreground">
+                            仅在内置解码器不支持格式时调用，输出 32-bit 浮点
+                            PCM 并保留源采样率
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span
+                                className={cn(
+                                    "rounded-full px-2.5 py-1 text-[13px] font-medium",
+                                    ffmpegStatus?.available
+                                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                        : "bg-[var(--surface-fill)] text-muted-foreground",
+                                )}
+                            >
+                                {ffmpegStatus?.available ? "可用" : "未配置"}
+                            </span>
+                            <ActionButton
+                                disabled={ffmpegBusy}
+                                onClick={() => void refreshFfmpeg()}
+                            >
+                                自动检测
+                            </ActionButton>
+                            <ActionButton
+                                variant="primary"
+                                disabled={ffmpegBusy}
+                                onClick={() => void chooseFfmpeg()}
+                            >
+                                选择文件
+                            </ActionButton>
+                            {ffmpegStatus?.source === "configured" ? (
+                                <ActionButton
+                                    variant="ghost"
+                                    disabled={ffmpegBusy}
+                                    onClick={() => void clearFfmpeg()}
+                                >
+                                    清除
+                                </ActionButton>
+                            ) : null}
+                            {ffmpegStatus?.path ? (
+                                <span
+                                    className="max-w-full truncate font-mono text-[13px] text-muted-foreground"
+                                    title={ffmpegStatus.path}
+                                >
+                                    {ffmpegStatus.path}
+                                </span>
+                            ) : (
+                                <span className="text-[13px] text-muted-foreground">
+                                    {ffmpegStatus?.error ?? "正在检测…"}
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </SettingsGroup>
 
+                {/* EqEditor 自带标题，分组不再重复 */}
                 <SettingsGroup>
                     <EqEditor />
                 </SettingsGroup>
-
-                <SettingsGroup>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                FFmpeg 解码器
-                            </p>
-                            <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                仅在内置解码器不支持格式时调用外部 FFmpeg
-                            </p>
-                        </div>
-                        <span
-                            className={cn(
-                                "rounded-full px-2.5 py-1 text-[11px] font-medium",
-                                ffmpegStatus?.available
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                                    : "bg-[var(--surface-fill)] text-muted-foreground",
-                            )}
-                        >
-                            {ffmpegStatus?.available ? "可用" : "未配置"}
-                        </span>
-                    </div>
-                    <div className="space-y-1 rounded-xl bg-[var(--surface-fill)] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                        {ffmpegStatus?.path ? (
-                            <p
-                                className="break-all font-mono"
-                                title={ffmpegStatus.path}
-                            >
-                                {ffmpegStatus.path}
-                            </p>
-                        ) : (
-                            <p>
-                                {ffmpegStatus?.error ?? "正在检测 FFmpeg…"}
-                            </p>
-                        )}
-                        {ffmpegStatus?.version ? (
-                            <p
-                                className="truncate"
-                                title={ffmpegStatus.version}
-                            >
-                                {ffmpegStatus.version}
-                            </p>
-                        ) : null}
-                        {ffmpegStatus?.available ? (
-                            <p>
-                                {ffmpegStatus.source === "configured"
-                                    ? "来源 · 手动配置"
-                                    : "来源 · 环境变量 / PATH"}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            disabled={ffmpegBusy}
-                            onClick={() => void refreshFfmpeg()}
-                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-45"
-                        >
-                            自动检测
-                        </button>
-                        <button
-                            type="button"
-                            disabled={ffmpegBusy}
-                            onClick={() => void chooseFfmpeg()}
-                            className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97] disabled:opacity-45"
-                        >
-                            选择文件
-                        </button>
-                        {ffmpegStatus?.source === "configured" ? (
-                            <button
-                                type="button"
-                                disabled={ffmpegBusy}
-                                onClick={() => void clearFfmpeg()}
-                                className="h-9 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] disabled:opacity-45"
-                            >
-                                清除
-                            </button>
-                        ) : null}
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        FFmpeg 输出 32-bit 浮点 PCM，并保留源采样率；共享模式下系统仍可能按设备混音格式重采样。
-                    </p>
-                </SettingsGroup>
-
-                <SettingsGroup
-                    title="输出设备"
-                    description={`${nativeBackendLabel} 接通后可切换设备`}
-                >
-                    <div className="flex flex-wrap gap-2">
-                        {devices.map((device) => (
-                            <ChoiceChip
-                                key={device.id}
-                                label={device.name}
-                                active={
-                                    (audioMode?.deviceId ?? "default") ===
-                                    device.id
-                                }
-                                onClick={() => {
-                                    void setAudioDevice(device.id).then(() =>
-                                        getAudioOutputMode().then(setAudioMode),
-                                    )
-                                }}
-                            />
-                        ))}
-                    </div>
-                </SettingsGroup>
-
-                {audioMode?.supportsExclusive ? (
-                    <SettingsCard
-                        title="WASAPI 独占"
-                        description={
-                            audioMode.exclusive
-                                ? "已开启（设备支持时生效）"
-                                : "共享模式（当前）"
-                        }
-                    >
-                        <ChoiceChip
-                            label={
-                                audioMode.exclusive ? "独占开" : "独占关"
-                            }
-                            active={audioMode.exclusive}
-                            onClick={() => {
-                                const next = !audioMode.exclusive
-                                void setAudioExclusive(next).then(() =>
-                                    getAudioOutputMode().then(setAudioMode),
-                                )
-                            }}
-                        />
-                    </SettingsCard>
-                ) : null}
             </div>
-        </Section>
+        </div>
     )
 }
 

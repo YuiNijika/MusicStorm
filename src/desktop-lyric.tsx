@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 
@@ -24,6 +25,11 @@ function DesktopLyricApp() {
   })
 
   useEffect(() => {
+    // Windows 上以 visible(false) 创建的 WebView2 偶发不触发首帧渲染，
+    // 透明窗口表现为完全不可见；挂载后重走一次 hide→show 强制上屏
+    const win = getCurrentWindow()
+    win.hide().then(() => win.show()).catch(() => {})
+
     const unlisten = listen<DesktopLyricState>("musicstorm:desktop-lyric-update", (event) => {
       setState(event.payload)
     })

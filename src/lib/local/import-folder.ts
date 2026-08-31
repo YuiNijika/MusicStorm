@@ -340,6 +340,84 @@ async function rescanMissingTrackMeta(
     return state
 }
 
+let coverRepairInFlight: Promise<LocalLibraryState> | null = null
+let lastCoverRepairAt = 0
+
+/**
+ * 本地封面缓存自愈：封面缓存被清理后，曲库条目里的 coverPath 仍指向已删除的
+ * originals/{hash}.<ext>，渲染层 404。这里批量对账磁盘，对失效条目重新解析
+ * 原音频文件提取封面（Rust 侧按内容 MD5 幂等写盘），合并回曲库并广播。
+ * 非强制调用带 30s 冷却，避免多张图同时 404 引发重复重扫。
+ */
+async function reextractLocalCovers(
+    options: { force?: boolean } = {},
+): Promise<LocalLibraryState> {
+    const prev = loadLocalLibrary()
+    if (!isTauriRuntime()) {
+        return prev
+    }
+    if (coverRepairInFlight) {
+        return coverRepairInFlight
+    }
+    if (!options.force && Date.now() - lastCoverRepairAt < 30_000) {
+        return prev
+    }
+
+    coverRepairInFlight = repairMissingLocalCovers(prev).finally(() => {
+        coverRepairInFlight = null
+    })
+    return coverRepairInFlight
+}
+
+async function repairMissingLocalCovers(
+    prev: LocalLibraryState,
+): Promise<LocalLibraryState> {
+    lastCoverRepairAt = Date.now()
+    const candidates = prev.tracks.filter((track) => track.coverPath)
+    if (candidates.length === 0) {
+        return prev
+    }
+
+    let exist: boolean[]
+    try {
+        exist = await invoke<boolean[]>("cover_paths_exist", {
+            paths: candidates.map((track) => track.coverPath),
+        })
+    } catch {
+        return prev
+    }
+    const dead = candidates.filter((_, index) => exist[index] === false)
+    if (dead.length === 0) {
+        return prev
+    }
+
+    const scanned = await scanMusicFiles(dead.map((track) => track.path))
+    const state = mergeScannedTrackMeta(
+        prev,
+        scanned,
+        new Set(dead.map((track) => track.id)),
+    )
+
+    // 同步 SQLite 双写，保持与扫描导入链路一致
+    const albumById = new Map(state.albums.map((album) => [album.id, album]))
+    const trackById = new Map(state.tracks.map((track) => [track.id, track]))
+    const grouped = new Map<string, ScanTrackDto[]>()
+    for (const item of scanned) {
+        const stored = trackById.get(item.id)
+        if (!stored?.albumId) {
+            continue
+        }
+        const items = grouped.get(stored.albumId) ?? []
+        items.push(item)
+        grouped.set(stored.albumId, items)
+    }
+    for (const [albumId, items] of grouped) {
+        void dualWriteTracksToSqlite(items, albumById.get(albumId) ?? null)
+    }
+
+    return state
+}
+
 function libraryNeedsMetaRescan(state: LocalLibraryState): boolean {
     return state.tracks.some(
         (track) => track.metadataVersion < CURRENT_METADATA_VERSION,
@@ -414,6 +492,7 @@ export {
     libraryNeedsMetaRescan,
     pickMusicFiles,
     pickMusicFolder,
+    reextractLocalCovers,
     rescanLocalLibraryMeta,
     scanMusicFiles,
     scanMusicFolder,

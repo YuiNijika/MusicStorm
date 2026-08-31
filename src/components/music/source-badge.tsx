@@ -1,3 +1,5 @@
+import { memo } from "react"
+
 import type { MusicSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +13,8 @@ type SourceBadgeProps = {
     className?: string
 }
 
-function SourceBadge({ source, className }: SourceBadgeProps) {
+// memo：source/className 稳定 props，高频父重渲（200ms tick）时跳过
+const SourceBadge = memo(function SourceBadge({ source, className }: SourceBadgeProps) {
     return (
         <span
             className={cn(
@@ -25,6 +28,6 @@ function SourceBadge({ source, className }: SourceBadgeProps) {
             {LABELS[source]}
         </span>
     )
-}
+})
 
 export { SourceBadge }

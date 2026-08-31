@@ -55,6 +55,7 @@ function useCachedCoverUrl(
 
         function onReady(event: Event) {
             const detail = (event as CustomEvent<string>).detail
+            // 空 detail 是索引剪枝的全局广播，所有挂载中的封面都重新解析
             if (detail && detail !== src) {
                 return
             }
@@ -67,7 +68,11 @@ function useCachedCoverUrl(
                             : latest.originalPath,
                     ),
                 )
+                return
             }
+            // 索引条目已被剪枝（本地文件被清理）：回退远程渲染并重新下载
+            setResolved(src)
+            void ensureRemoteCoverCached(src)
         }
         window.addEventListener(REMOTE_COVER_EVENT, onReady)
         return () => window.removeEventListener(REMOTE_COVER_EVENT, onReady)
@@ -76,4 +81,4 @@ function useCachedCoverUrl(
     return resolved
 }
 
-export { useCachedCoverUrl }
+export { useCachedCoverUrl, isRemoteUrl }

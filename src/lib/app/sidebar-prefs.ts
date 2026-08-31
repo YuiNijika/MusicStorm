@@ -12,14 +12,40 @@ function readSidebarStyle(): SidebarStyle {
     }
     try {
         const raw = window.localStorage.getItem(STORAGE_KEY)
-        return raw === "classic" ? "classic" : DEFAULT_SIDEBAR_STYLE
+        // 新版本存 JSON，旧版本只存风格字符串，两种都兼容
+        if (raw === "classic" || raw === "compact") {
+            return raw
+        }
+        if (!raw) {
+            return DEFAULT_SIDEBAR_STYLE
+        }
+        const parsed = JSON.parse(raw) as { style?: unknown }
+        return parsed.style === "classic" ? "classic" : DEFAULT_SIDEBAR_STYLE
     } catch {
         return DEFAULT_SIDEBAR_STYLE
     }
 }
 
 function setSidebarStyle(style: SidebarStyle): void {
-    window.localStorage.setItem(STORAGE_KEY, style)
+    // 保留 JSON 形态，便于未来扩展其他侧栏偏好
+    let navOrder: string[] = []
+    try {
+        const raw = window.localStorage.getItem(STORAGE_KEY)
+        if (raw && raw !== "classic" && raw !== "compact") {
+            const parsed = JSON.parse(raw) as { navOrder?: unknown }
+            if (Array.isArray(parsed.navOrder)) {
+                navOrder = parsed.navOrder.filter(
+                    (id): id is string => typeof id === "string",
+                )
+            }
+        }
+    } catch {
+        // 解析失败按空处理
+    }
+    window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ style, navOrder }),
+    )
     // 广播让侧栏与设置页即时同步，避免跨组件传状态
     window.dispatchEvent(new Event(SIDEBAR_STYLE_EVENT))
 }

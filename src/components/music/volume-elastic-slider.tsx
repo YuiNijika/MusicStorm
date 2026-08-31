@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Volume1, Volume2, VolumeX } from "lucide-react"
 
 import { ElasticSlider } from "@/components/ui/elastic-slider"
@@ -16,7 +17,8 @@ type VolumeElasticSliderProps = {
 }
 
 // 内部 0–100 连续值，对外 0–1；静音时仍显示真实 volume，避免从 0 拖出时爆音
-function VolumeElasticSlider({
+// memo：volume/muted 变化才重渲；播放条 200ms tick 的父重渲全部跳过
+const VolumeElasticSlider = memo(function VolumeElasticSlider({
     volume,
     muted = false,
     onVolume,
@@ -70,7 +72,7 @@ function VolumeElasticSlider({
             }}
         />
     )
-}
+})
 
 export { VolumeElasticSlider }
 export type { VolumeElasticSliderProps }

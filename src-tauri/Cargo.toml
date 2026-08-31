@@ -1,6 +1,6 @@
 [package]
 name = "music-storm"
-version = "0.1.2"
+version = "0.1.3"
 description = "MusicStrom: Apple Design supports NetEase Cloud and local high-quality music players"
 authors = ["you"]
 edition = "2021"

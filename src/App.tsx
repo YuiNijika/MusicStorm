@@ -5,18 +5,21 @@ import { AppShell } from "@/components/app/app-shell"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { Toaster, toast } from "@/components/ui/toast"
+import { StarToast } from "@/components/app/star-toast"
 import { AppUpdateProvider } from "@/hooks/use-app-update"
 import { useApiCacheAutoPurge } from "@/hooks/use-api-cache-auto-purge"
 import { useDesktopLyricSync } from "@/hooks/use-desktop-lyric-sync"
+import { useMiniPlayerSync } from "@/hooks/use-mini-player-sync"
 import { bootIntegratedApiProbe } from "@/lib/app/integrated-api-boot"
 import { useDevtoolsShortcut } from "@/lib/app/devtools-prefs"
 import {
-    DEFAULT_LIMIT_BYTES,
     getCoverCacheLimitBytes,
     MOBILE_COVER_CACHE_LIMIT,
 } from "@/lib/music/cover-cache-prefs"
 import { isWebMode } from "@/lib/web-mode"
 import { isAndroid } from "@/lib/platform"
+import { runRouteTransition } from "@/lib/app/route-transition"
+import { reextractLocalCovers } from "@/lib/local/import-folder"
 import {
     PERFORMANCE_MODE_EVENT,
     applyPerformanceModeClass,
@@ -27,7 +30,10 @@ import {
     TITLE_BAR_STORAGE_KEY,
     type SettingsTab,
 } from "@/lib/app/title-bar-prefs"
-import { migrateLegacyOverrides } from "@/lib/music/cover-overrides"
+import {
+    collectCoverKeepHashes,
+    migrateLegacyOverrides,
+} from "@/lib/music/cover-overrides"
 import {
     MusicNavigationProvider,
     useMusicNavigation,
@@ -205,11 +211,13 @@ function App() {
         const target = isAndroid()
             ? Math.min(limit, MOBILE_COVER_CACHE_LIMIT)
             : limit
-        if (target !== DEFAULT_LIMIT_BYTES) {
-            void invoke("purge_cover_cache_cmd", { maxBytes: target }).catch(
-                () => {},
-            )
-        }
+        // 引用中的封面（自选覆盖/本地库封面）不参与容量回收
+        void invoke("purge_cover_cache_cmd", {
+            maxBytes: target,
+            keepHashes: collectCoverKeepHashes(),
+        }).catch(() => {})
+        // 兼容旧版本遗留的死封面引用：启动时对账一次，失效条目重解析音频提取
+        void reextractLocalCovers().catch(() => {})
     }, [])
 
     useEffect(() => {
@@ -258,6 +266,7 @@ function App() {
                         <LikedProvider>
                             <PlayerProvider>
                                 <DesktopLyricSyncProvider />
+                                <MiniPlayerSyncProvider />
                                 <MusicNavigationProvider>
                                     <AppWithNav
                                         route={route}
@@ -274,6 +283,7 @@ function App() {
                         </LikedProvider>
                     </NeteaseSessionProvider>
                 </AppUpdateProvider>
+                <StarToast />
             </Toaster>
         </ThemeProvider>
     )
@@ -295,6 +305,12 @@ function IntegratedApiBootEffect() {    useEffect(() => {
 /** 桌面歌词同步：监听播放状态变化并更新桌面歌词窗口 */
 function DesktopLyricSyncProvider() {
     useDesktopLyricSync()
+    return null
+}
+
+/** 桌面小播放器同步：向 mini 窗口推送播放状态 */
+function MiniPlayerSyncProvider() {
+    useMiniPlayerSync()
     return null
 }
 
@@ -342,11 +358,15 @@ function AppWithNav({
 
     const handleNavigate = useCallback(
         (next: AppRoute) => {
-            closeDetail()
-            if (next !== "settings") {
-                setSettingsTab(undefined)
-            }
-            setRoute(next)
+            // 路由切换载入动画（fade/slide/zoom，外观设置可控）：包裹整次
+            // 导航提交，关详情页/设置 tab/路由一起在快照里完成
+            runRouteTransition(() => {
+                closeDetail()
+                if (next !== "settings") {
+                    setSettingsTab(undefined)
+                }
+                setRoute(next)
+            })
         },
         [closeDetail, setRoute, setSettingsTab],
     )

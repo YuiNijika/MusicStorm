@@ -16,14 +16,20 @@ const COVER_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// 封面缓存上限：文件数与总大小，超出后按最旧清理
 const MAX_COVER_FILES: usize = 4_000;
-/// 默认大小上限（可在设置中调整，前端传入后据此清理）
-pub const DEFAULT_COVER_CACHE_LIMIT: u64 = 400 * 1024 * 1024;
+// 大小上限由前端传入（默认 400MB，可在设置中调整），Rust 侧不重复定义
 
-// 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积
-pub fn purge_cover_cache(app: &AppHandle, max_bytes: u64) -> Result<u64, String> {
+// 文件名即内容 MD5，同一封面天然去重；清理按 hash 成对删除，避免孤儿文件堆积。
+// keep：受引用保护的 hash（用户自选封面/本地库封面），容量清理也不能回收，
+// 否则覆盖索引指向唯一副本被删，封面永久失效
+pub fn purge_cover_cache(
+    app: &AppHandle,
+    max_bytes: u64,
+    keep_hashes: Vec<String>,
+) -> Result<u64, String> {
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    let keep: std::collections::HashSet<String> = keep_hashes.into_iter().collect();
     let (originals, thumbnails) = cover_dirs(app)?;
     // 按 hash 分组：同一封面的原图与缩略图成对存在
     let mut groups: HashMap<String, Vec<(PathBuf, SystemTime)>> = HashMap::new();
@@ -66,6 +72,14 @@ pub fn purge_cover_cache(app: &AppHandle, max_bytes: u64) -> Result<u64, String>
             break;
         }
         for (path, _) in files {
+            // 受引用保护的封面整组跳过
+            if path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(|hash| keep.contains(hash))
+            {
+                continue;
+            }
             if let Ok(meta) = fs::metadata(&path) {
                 total = total.saturating_sub(meta.len());
             }
@@ -77,10 +91,29 @@ pub fn purge_cover_cache(app: &AppHandle, max_bytes: u64) -> Result<u64, String>
     Ok(removed)
 }
 
-/// 前端按设置阈值触发清理（设置页调整后立即执行一次）
+/// 前端按设置阈值触发清理（设置页调整后立即执行一次）。
+/// keepHashes 与 clear_cover_cache 同义：引用中的封面不回收
 #[tauri::command]
-pub fn purge_cover_cache_cmd(app: AppHandle, max_bytes: u64) -> Result<u64, String> {
-    purge_cover_cache(&app, max_bytes)
+pub fn purge_cover_cache_cmd(
+    app: AppHandle,
+    max_bytes: u64,
+    keep_hashes: Vec<String>,
+) -> Result<u64, String> {
+    purge_cover_cache(&app, max_bytes, keep_hashes)
+}
+
+/// 批量检查封面文件是否仍在磁盘上。
+/// 清理命令直接删文件，前端索引（cover.remote.v1）不随行失效，
+/// 靠这个命令对账后把失效条目从索引中剪掉，封面才能重新回源下载。
+#[tauri::command]
+pub fn cover_paths_exist(paths: Vec<String>) -> Vec<bool> {
+    paths
+        .iter()
+        .map(|p| {
+            let trimmed = p.trim();
+            !trimmed.is_empty() && Path::new(trimmed).is_file()
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize)]

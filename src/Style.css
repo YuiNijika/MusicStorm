@@ -348,11 +348,14 @@
 /* 桌面 WebView2 常驻结构的毛玻璃默认收敛：侧栏/顶栏/底栏/面板这些从首帧
  * 持续存在的整面 backdrop-filter，在 Chromium 里即使画面静止也会被持续重采样。
  * 半径减半让每帧成本近似减半，28 到 16 在近似纯色的背景上几乎无视觉差；
- * 瞬时浮层（dialog/popover/select）保持浓玻璃，不受此规则影响。 */
+ * 瞬时浮层（dialog/popover/select）保持浓玻璃，不受此规则影响。
+ * apple-list-surface 同为常驻大面容器（列表底板），滚动时每帧重采样，
+ * 一并收敛到 16px。 */
 .material-chrome,
 .material-sidebar,
 .material-player,
-.material-panel {
+.material-panel,
+.apple-list-surface {
     backdrop-filter: blur(16px) saturate(140%) !important;
     -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
 }
@@ -620,29 +623,64 @@
 /* 明暗切换用 View Transitions 圆形扩散，圆心取最近点击处，新主题从该点展开；
    深色方向收缩旧快照露出新色，反方向对称
    mix-blend-mode 必须改回 normal：Chromium 给 VT 快照默认 plus-lighter，
-   黑底快照与白底快照加色混合后整屏趋白，黑切白时就靠它闪出一片白 */
-::view-transition-old(root) {
+   黑底快照与白底快照加色混合后整屏趋白，黑切白时就靠它闪出一片白
+   圆扩散规则挂在 .theme-switching 作用域下：路由切换的 VT 不吃这套动画 */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(page-content),
+::view-transition-new(page-content) {
     animation: none;
     mix-blend-mode: normal;
+}
+
+/* 主内容区独立快照：路由载入动画只作用于页面主内容，
+   侧栏/底栏/标题栏不建快照保持不动 */
+.page-content-host {
+    view-transition-name: page-content;
+}
+
+/* 主题切换走整窗圆扩散：临时归还主内容到根快照，
+   否则 content 层独立悬浮在圆扩散之上会盖住扩散效果 */
+html.theme-switching .page-content-host {
+    view-transition-name: none;
+}
+
+html.theme-switching::view-transition-old(root) {
     z-index: 1;
 }
 
-::view-transition-new(root) {
+html.theme-switching::view-transition-new(root) {
     animation: theme-clip-reveal 500ms var(--ease-enter);
-    mix-blend-mode: normal;
     z-index: 9999;
 }
 
-html.dark::view-transition-old(root) {
+html.dark.theme-switching::view-transition-old(root) {
     animation: theme-clip-reveal 500ms var(--ease-enter) reverse;
-    mix-blend-mode: normal;
     z-index: 9999;
 }
 
-html.dark::view-transition-new(root) {
+html.dark.theme-switching::view-transition-new(root) {
     animation: none;
-    mix-blend-mode: normal;
     z-index: 1;
+}
+
+/* 主题切换期间压掉逐元素过渡/动画，玻璃层暂停重采样：
+   全树变量一次落地时逐元素动画与 backdrop-filter 全量重绘是卡顿主源，
+   视觉完全交给 VT 快照动画，结束后（theme-switching 移除）恢复原渲染路径 */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+}
+
+html.theme-switching .material-chrome,
+html.theme-switching .material-sidebar,
+html.theme-switching .material-panel,
+html.theme-switching [class*="material-"],
+html.theme-switching [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
 }
 
 @keyframes theme-clip-reveal {
@@ -651,6 +689,138 @@ html.dark::view-transition-new(root) {
     }
     to {
         clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y));
+    }
+}
+
+/* 路由切换载入动画（六套变体），由外观设置「载入动画」开关与样式控制；
+   类由 route-transition.ts 在 VT 期间挂到 html 上，只作用于主内容区快照 */
+html.vt-route-fade::view-transition-old(page-content) {
+    animation: vt-fade-out 140ms ease both;
+}
+
+html.vt-route-fade::view-transition-new(page-content) {
+    animation: vt-fade-in 180ms ease both;
+}
+
+html.vt-route-slide::view-transition-old(page-content) {
+    animation: vt-slide-out 140ms ease-in both;
+}
+
+html.vt-route-slide::view-transition-new(page-content) {
+    animation: vt-slide-in 200ms var(--ease-enter) both;
+}
+
+html.vt-route-zoom::view-transition-old(page-content) {
+    animation: vt-zoom-out 140ms ease both;
+}
+
+html.vt-route-zoom::view-transition-new(page-content) {
+    animation: vt-zoom-in 200ms var(--ease-enter) both;
+}
+
+html.vt-route-rise::view-transition-old(page-content) {
+    animation: vt-rise-out 140ms ease-in both;
+}
+
+html.vt-route-rise::view-transition-new(page-content) {
+    animation: vt-rise-in 200ms var(--ease-enter) both;
+}
+
+html.vt-route-blur::view-transition-old(page-content) {
+    animation: vt-blur-out 150ms ease-in both;
+}
+
+html.vt-route-blur::view-transition-new(page-content) {
+    animation: vt-blur-in 200ms var(--ease-enter) both;
+}
+
+html.vt-route-push::view-transition-old(page-content) {
+    animation: vt-push-out 160ms ease-in both;
+}
+
+html.vt-route-push::view-transition-new(page-content) {
+    animation: vt-push-in 220ms var(--ease-enter) both;
+}
+
+@keyframes vt-fade-out {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes vt-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes vt-slide-out {
+    to {
+        opacity: 0;
+        transform: translateX(-24px);
+    }
+}
+
+@keyframes vt-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+}
+
+@keyframes vt-zoom-out {
+    to {
+        opacity: 0;
+        transform: scale(0.985);
+    }
+}
+
+@keyframes vt-zoom-in {
+    from {
+        opacity: 0;
+        transform: scale(1.015);
+    }
+}
+
+@keyframes vt-rise-out {
+    to {
+        opacity: 0;
+        transform: translateY(-18px);
+    }
+}
+
+@keyframes vt-rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+}
+
+@keyframes vt-blur-out {
+    to {
+        opacity: 0;
+        filter: blur(10px);
+    }
+}
+
+@keyframes vt-blur-in {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+    }
+}
+
+@keyframes vt-push-out {
+    to {
+        opacity: 0.25;
+        transform: translateX(-48px);
+    }
+}
+
+@keyframes vt-push-in {
+    from {
+        opacity: 0;
+        transform: translateX(48px);
     }
 }
 

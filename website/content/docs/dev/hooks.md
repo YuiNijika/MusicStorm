@@ -40,6 +40,9 @@ ThemeProvider
 | `useTrayCommands` | 托盘 / 全局命令 → 播放 | 监听 `musicstorm:player-command` |
 | `useAppUpdate` | 更新检查状态 | 见 [更新与发布](#/docs/dev/update) |
 | `useCloseToTray` | 关闭到托盘 | — |
+| `useDesktopLyric` / `useDesktopLyricSync` | 桌面歌词开关与状态推送 | 开关先查窗口真实可见性再 show/hide；仅可见时向 Rust 推状态 |
+| `useMiniPlayer` / `useMiniPlayerSync` | 桌面小播放器开关与状态推送 | 同桌面歌词模式；Rust 缓存状态并广播 `musicstorm:mini-player-state`（见 [事件](#/docs/dev/events)） |
+| `useAutoSignin` | 每日自动签到调度 | 登录态就绪后检查一次 + 每分钟检查跨天（见 [登录与会话](#/docs/dev/auth)） |
 | `useMacOSNowPlaying` | macOS Now Playing | — |
 | `useWindowControls` | 标题栏窗口控制 | 最小化 / 最大化 / 关闭 |
 | `useQrLogin` | 扫码登录弹窗流程 | — |

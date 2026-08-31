@@ -50,6 +50,20 @@ const cover = await ensureRemoteCoverCached(url)  // 缺则缓存后返回
 
 组件层用 `use-cached-cover-url` hook（`src/hooks/use-cached-cover-url.ts`），不直接操作缓存。
 
+### 缓存自愈与对账
+
+清理命令直接删文件而索引不知道，失效条目会让封面永远指向已删除的本地文件且不再重下。`remote-cover-cache.ts` 内建三层自愈：
+
+| 机制 | 触发时机 | 行为 |
+|---|---|---|
+| 启动对账 | 加载索引后延迟 2.5s（`scheduleStartupPrune`） | `cover_paths_exist` 批量核对原图 + 缩略图存在性，剔除失效条目后按 URL 精确广播 `musicstorm-remote-cover-ready`；无 URL 的旧条目广播空 detail，让挂载中的封面全量重新解析 |
+| 渲染层 onError | 封面加载失败 | `invalidateRemoteCover(url)` 剔除条目并立刻回源重下；失败墓碑（10 分钟冷却）防止坏图无限「重下 → onError」循环 |
+| 并发闸 | 后台下载 | 同 URL 去重（`inFlight`），全局并发上限 4（`withDownloadSlot`），防止首屏大量封面占满 Rust 阻塞线程池 |
+
+本地封面（内嵌提取）与远程封面的恢复路径不同：清理缓存后本地封面在渲染时重新解析提取，远程封面回源重下。`clear_cover_cache` 的 `keep_hashes` 保护引用中的封面（手动设置、背景图等）不被回收。
+
+读库失败时 `persistDisabled` 置位：本轮会话只更新内存、禁止写回，防止用空索引覆盖持久层导致封面索引全量丢失。
+
 ## 封面覆写
 
 `src/lib/music/cover-overrides.ts`——用户手动换封面，localStorage（`musicstorm-cover-override(s)`），含旧版本迁移：

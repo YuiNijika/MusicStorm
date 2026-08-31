@@ -48,6 +48,10 @@ order: 10
 | `musicstorm-performance-mode` / `musicstorm-performance-material-glass` | 性能模式 | `app/performance-prefs.ts` |
 | `musicstorm-devtools-enabled` | 开发者工具开关 | `app/devtools-prefs.ts` |
 | `musicstorm-search-history` | 搜索历史 | `lib/search-history.ts` |
+| `musicstorm-sidebar` | 侧栏风格（compact / classic + navOrder） | `app/sidebar-prefs.ts` |
+| `musicstorm-auto-signin` | 每日自动签到开关（默认开） | `netease/daily-signin.ts` |
+| `musicstorm-signin-log` | 签到记录（按账号 × 自然日） | 同上 |
+| `musicstorm-star-toast-seen` | 求 star 提示展示去重（按天） | `app/star-toast.tsx` |
 | `musicstorm-playback-session` | 播放会话恢复 | `player/playback-session.ts` |
 | `musicstorm-remote-cover-ready` | 远程封面就绪标记 | `lib/music/remote-cover-cache.ts` |
 | `musicstorm-update-boot-toasted` | 更新提示去重 | `lib/app/github-update.ts` |

@@ -1,5 +1,5 @@
 import { Library, ListMusic, ListStart, Pause, Play, Trash2, X } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
@@ -14,7 +14,8 @@ import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-function QueuePanel() {
+// memo：无 props；播放条 200ms tick 连带重渲时整块跳过，自身仍走 usePlayer 按需更新
+const QueuePanel = memo(function QueuePanel() {
     const {
         queue,
         currentIndex,
@@ -263,6 +264,6 @@ function QueuePanel() {
         />
         </>
     )
-}
+})
 
 export { QueuePanel }

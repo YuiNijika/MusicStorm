@@ -1,11 +1,32 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
-import { Section } from "@/components/music/section"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
-import { notifyFromError, notifyInfo, notifySuccess } from "@/lib/notify"
+import {
+    formatError,
+    notifyInfo,
+    notifyPromise,
+} from "@/lib/notify"
+import {
+    SIGNIN_LOG_EVENT,
+    performDailySignin,
+    readAutoSigninEnabled,
+    readSigninEntry,
+    setAutoSigninEnabled,
+    type SigninLogEntry,
+} from "@/lib/netease/daily-signin"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
-import { dailySignin, resolveVipTier } from "@/lib/netease/user"
-import { SettingsGroup } from "@/pages/settings/settings-ui"
+import { resolveVipTier } from "@/lib/netease/user"
+import {
+    ActionButton,
+    SettingsGroup,
+    SwitchRow,
+    TabHeader,
+} from "@/pages/settings/settings-ui"
+
+function formatSigninTime(ts: number): string {
+    const date = new Date(ts)
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+}
 
 function AccountTab({ onLogin }: { onLogin: () => void }) {
     const {
@@ -20,30 +41,52 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
     } = useNeteaseSession()
     const [busyId, setBusyId] = useState<number | null>(null)
     const [signinBusy, setSigninBusy] = useState(false)
+    const [signinEntry, setSigninEntry] = useState<SigninLogEntry | null>(null)
+    const [autoSignin, setAutoSigninState] = useState(() =>
+        readAutoSigninEnabled(),
+    )
+
+    // 签到记录跟随当前账号，自动/手动签到后经事件广播刷新
+    useEffect(() => {
+        function sync() {
+            setSigninEntry(
+                loggedIn && activeUserId != null
+                    ? readSigninEntry(activeUserId)
+                    : null,
+            )
+        }
+        sync()
+        window.addEventListener(SIGNIN_LOG_EVENT, sync)
+        return () => {
+            window.removeEventListener(SIGNIN_LOG_EVENT, sync)
+        }
+    }, [loggedIn, activeUserId])
 
     async function handleSignin() {
-        if (signinBusy) {
+        if (signinBusy || activeUserId == null) {
             return
         }
         setSigninBusy(true)
         try {
-            const [android, web] = await Promise.all([
-                dailySignin(0),
-                dailySignin(1),
-            ])
-            if (android.ok || web.ok) {
-                notifySuccess("签到成功", {
-                    description: [android.message, web.message]
-                        .filter(Boolean)
-                        .join(" · "),
-                })
-            } else {
-                notifyInfo("签到", {
-                    description: web.message || android.message,
-                })
-            }
-        } catch (err) {
-            notifyFromError("签到失败", err)
+            // Promise 状态 toast：签到中 → 成功/已签/未完成就地变换
+            await notifyPromise(performDailySignin(activeUserId), {
+                loading: "签到中…",
+                success: (entry) => ({
+                    title:
+                        entry.state === "failed"
+                            ? "签到未完成"
+                            : entry.state === "already"
+                              ? "今日已签到"
+                              : "签到完成",
+                    description: entry.message,
+                }),
+                error: (error) => ({
+                    title: "签到失败",
+                    description: formatError(error),
+                }),
+            })
+        } catch {
+            // 终态已由 promise toast 呈现
         } finally {
             setSigninBusy(false)
         }
@@ -79,13 +122,21 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
     }
 
     return (
-        <Section title="账号" description="多账号登录，设置内手动切换">
+        <div className="space-y-3">
+            <TabHeader
+                title="账号"
+                description="登录网易云，支持多账号切换与每日签到"
+            />
+
             <div className="space-y-3">
-                <SettingsGroup>
+                <SettingsGroup
+                    title="当前账号"
+                    description="签到与退出只影响当前登录的账号"
+                >
                     {!ready ? (
                         <div className="h-12 animate-pulse rounded-xl bg-[var(--surface-fill)]" />
                     ) : loggedIn && profile ? (
-                        <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex min-h-11 flex-wrap items-center gap-3">
                             {profile.avatarUrl ? (
                                 <img
                                     src={profile.avatarUrl}
@@ -101,49 +152,58 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                 <p className="truncate text-[15px] font-medium tracking-[-0.01em]">
                                     {profile.nickname}
                                 </p>
-                                <p className="text-[12px] text-muted-foreground">
-                                    当前使用 · {resolveVipTier(profile)} · uid{" "}
+                                <p className="text-[13px] text-muted-foreground">
+                                    {resolveVipTier(profile)} · uid{" "}
                                     {profile.userId}
                                 </p>
                             </div>
-                            <button
-                                type="button"
+                            <ActionButton
                                 disabled={signinBusy}
                                 onClick={() => void handleSignin()}
-                                className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
                             >
                                 {signinBusy ? "签到中…" : "每日签到"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={logout}
-                                className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
-                            >
-                                退出当前
-                            </button>
+                            </ActionButton>
+                            <ActionButton onClick={logout}>退出当前</ActionButton>
                         </div>
                     ) : (
-                        <p className="text-[13px] text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                             当前未登录。可登录新账号，或从下方已保存列表切换。
                         </p>
                     )}
 
                     <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={onLogin}
-                            className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background active:scale-[0.97]"
-                        >
+                        <ActionButton variant="primary" onClick={onLogin}>
                             {loggedIn ? "添加账号" : "登录"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => void openNeteaseRegister()}
-                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
-                        >
+                        </ActionButton>
+                        <ActionButton onClick={() => void openNeteaseRegister()}>
                             注册（官网）
-                        </button>
+                        </ActionButton>
                     </div>
+                </SettingsGroup>
+
+                <SettingsGroup
+                    title="每日签到"
+                    description="自动签到跟随登录态，只作用于当前账号"
+                >
+                    {loggedIn && signinEntry ? (
+                        <p className="text-sm text-muted-foreground">
+                            {signinEntry.day ===
+                            new Date().toLocaleDateString("sv")
+                                ? signinEntry.ok
+                                    ? `今日已签到 · ${signinEntry.message}`
+                                    : `今日签到未完成 · ${signinEntry.message}`
+                                : `上次签到记录 ${formatSigninTime(signinEntry.at)}`}
+                        </p>
+                    ) : null}
+                    <SwitchRow
+                        title="自动签到"
+                        description="打开应用或跨零点后自动执行，未签到则补签"
+                        checked={autoSignin}
+                        onCheckedChange={(checked) => {
+                            setAutoSigninEnabled(checked)
+                            setAutoSigninState(checked)
+                        }}
+                    />
                 </SettingsGroup>
 
                 {accounts.length > 0 ? (
@@ -159,7 +219,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                 return (
                                     <li
                                         key={account.userId}
-                                        className="flex flex-wrap items-center gap-3 py-3 first:pt-1 last:pb-1"
+                                        className="flex min-h-11 flex-wrap items-center gap-3 py-3 first:pt-1 last:pb-1"
                                     >
                                         {account.avatarUrl ? (
                                             <img
@@ -168,20 +228,20 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                                 className="size-9 rounded-full object-cover"
                                             />
                                         ) : (
-                                            <div className="flex size-9 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[12px] font-medium">
+                                            <div className="flex size-9 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[13px] font-medium">
                                                 {account.nickname.slice(0, 1)}
                                             </div>
                                         )}
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-[13px] font-medium">
+                                            <p className="truncate text-sm font-medium">
                                                 {account.nickname}
                                                 {isActive ? (
-                                                    <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                                                    <span className="ml-2 text-[13px] font-normal text-muted-foreground">
                                                         使用中
                                                     </span>
                                                 ) : null}
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground">
+                                            <p className="text-[13px] text-muted-foreground">
                                                 uid {account.userId}
                                             </p>
                                         </div>
@@ -194,7 +254,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                                         account.userId,
                                                     )
                                                 }
-                                                className="h-8 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[11px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] disabled:cursor-default disabled:opacity-40 active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                                className="h-8 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] disabled:cursor-default disabled:opacity-40 active:scale-[0.97] active:duration-[var(--duration-press)]"
                                             >
                                                 {busy && !isActive
                                                     ? "切换中"
@@ -210,7 +270,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                                         account.userId,
                                                     )
                                                 }
-                                                className="h-8 cursor-pointer rounded-full px-3 text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 disabled:opacity-40 dark:text-rose-300"
+                                                className="h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium text-rose-600 hover:bg-rose-500/10 disabled:opacity-40 dark:text-rose-300"
                                             >
                                                 移除
                                             </button>
@@ -222,7 +282,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                     </SettingsGroup>
                 ) : null}
             </div>
-        </Section>
+        </div>
     )
 }
 

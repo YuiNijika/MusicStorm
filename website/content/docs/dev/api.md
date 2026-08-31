@@ -19,9 +19,11 @@ order: 5
 | 模式 | 说明 | 入口 |
 |---|---|---|
 | `integrated`（默认） | 内置 TS 直连 `music.163.com`：TS 完成 weapi/eapi 加密，经 Rust 代理发 POST | `src/lib/netease/native/request.ts` |
-| `external` | 对接第三方 NCM API 服务（官方源 / 锦木祈杰源 / 自定义 URL） | `src/lib/netease/client.ts` |
+| `external` | 对接第三方 NCM API 服务（MusicStorm 官方源 / 自定义 URL） | `src/lib/netease/client.ts` |
 
 模式与来源统一存于 localStorage `musicstorm-api-settings`，`src/lib/netease/api-settings.ts` 是唯一读写入口，变更广播事件 `musicstorm-api-settings-change`。
+
+外部源清单（`EXTERNAL_SOURCES`）只有两项：`official`（MusicStorm 官方源，默认 `DEFAULT_BASE_URL`）与 `custom`（自定义 Base URL）。自定义 URL 在设置页输入后**回车或失焦自动保存**（`handleSaveCustom`，值未变化时短路不重复落盘）；旧版「锦木祈杰源」预设已移除，旧 localStorage 会经 `migrateLegacy` 自动迁移到 `custom`。
 
 ## 统一请求入口
 

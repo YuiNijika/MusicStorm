@@ -1,7 +1,8 @@
-import { Loader2, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
     Dialog,
     DialogContent,
@@ -114,8 +115,8 @@ function NeteaseAlbumPickerDialog({
 
                     <div className="apple-scroll min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-0.5">
                         {loading ? (
-                            <div className="flex items-center justify-center gap-2 py-12 text-[13px] text-muted-foreground">
-                                <Loader2 className="size-4 animate-spin" />
+                            <div className="flex items-center justify-center gap-2.5 py-12 text-[13px] text-muted-foreground">
+                                <LoadingSpinner size={20} />
                                 搜索中…
                             </div>
                         ) : results.length > 0 ? (

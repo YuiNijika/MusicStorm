@@ -1,8 +1,14 @@
 import * as React from "react"
+import { useEffect, useState, type CSSProperties } from "react"
 import { Toast as ToastPrimitive } from "@base-ui/react/toast"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+    TOAST_PREFS_EVENT,
+    readToastPrefs,
+    type ToastPrefs,
+} from "@/lib/appearance/toast-prefs"
 import {
     XIcon,
     CircleCheckIcon,
@@ -23,16 +29,55 @@ function ToastPortal({ ...props }: ToastPrimitive.Portal.Props) {
     return <ToastPrimitive.Portal data-slot="toast-portal" {...props} />
 }
 
+// Toast 位置/边距偏好（外观设置可调，默认右下）
+function useToastPrefs(): ToastPrefs {
+    const [prefs, setPrefs] = useState<ToastPrefs>(() => readToastPrefs())
+
+    useEffect(() => {
+        function sync() {
+            setPrefs(readToastPrefs())
+        }
+        window.addEventListener(TOAST_PREFS_EVENT, sync)
+        return () => {
+            window.removeEventListener(TOAST_PREFS_EVENT, sync)
+        }
+    }, [])
+
+    return prefs
+}
+
+function toastViewportStyle(prefs: ToastPrefs): CSSProperties {
+    const m = prefs.margin
+    switch (prefs.position) {
+        case "top-right":
+            return { top: m, right: m }
+        case "top-center":
+            return { top: m, left: "50%", transform: "translateX(-50%)" }
+        case "bottom-center":
+            return { bottom: m, left: "50%", transform: "translateX(-50%)" }
+        default:
+            return { bottom: m, right: m }
+    }
+}
+
 function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
+    const prefs = useToastPrefs()
+    const centered =
+        prefs.position === "top-center" || prefs.position === "bottom-center"
+
     return (
         <ToastPrimitive.Viewport
             data-slot="toast-viewport"
             className={cn(
-                // 播放栏之上，流式堆叠
-                "pointer-events-none fixed inset-x-4 bottom-24 z-[200] mx-auto flex w-auto max-w-sm flex-col-reverse gap-2 outline-none",
-                "sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
+                "pointer-events-none fixed z-[200] flex max-w-sm flex-col-reverse gap-2 outline-none",
+                "w-[min(92vw,24rem)]",
+                !centered && "sm:w-full",
                 className,
             )}
+            style={{
+                ...toastViewportStyle(prefs),
+                ...props.style,
+            }}
             {...props}
         />
     )
@@ -154,7 +199,8 @@ function ToastIcon({ type }: { type: string | undefined }) {
     }
 
     if (!icon) {
-        return null
+        // 未指定类型时回退 info 图标，避免呈现成无图标的 Default 观感
+        icon = <InfoIcon className="text-sky-600 dark:text-sky-400" aria-hidden="true" />
     }
 
     return (

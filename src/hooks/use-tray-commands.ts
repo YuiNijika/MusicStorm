@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 
 import { usePlayer } from "@/hooks/use-player"
 import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
@@ -23,6 +23,13 @@ function useTrayCommands() {
         setVolume,
     } = usePlayer()
 
+    // 命令处理读 ref 快照：监听只注册一次，
+    // 否则每次音量变化/切歌都会重挂，重挂窗口内托盘命令直接丢失
+    const stateRef = useRef({ currentTrack, isPlaying, volume })
+    const actionsRef = useRef({ togglePlay, next, previous, seek, setVolume })
+    stateRef.current = { currentTrack, isPlaying, volume }
+    actionsRef.current = { togglePlay, next, previous, seek, setVolume }
+
     useEffect(() => {
         let unlisten: (() => void) | null = null
         let cancelled = false
@@ -41,6 +48,14 @@ function useTrayCommands() {
             void listen<PlayerCommandPayload>("musicstorm:player-command", (event) => {
                 // 事件发生时读取最新进度，避免监听因 tick 重挂
                 const { positionMs, durationMs } = getPlaybackTickSnapshot()
+                const { currentTrack, isPlaying, volume } = stateRef.current
+                const {
+                    togglePlay,
+                    next,
+                    previous,
+                    seek,
+                    setVolume,
+                } = actionsRef.current
                 const action =
                     typeof event.payload === "string"
                         ? event.payload
@@ -119,16 +134,8 @@ function useTrayCommands() {
             cancelled = true
             unlisten?.()
         }
-    }, [
-        currentTrack,
-        isPlaying,
-        next,
-        previous,
-        seek,
-        setVolume,
-        togglePlay,
-        volume,
-    ])
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 依赖全部走 ref 快照，只注册一次
+    }, [])
 }
 
 export { useTrayCommands }

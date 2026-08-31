@@ -35,6 +35,7 @@ CloudMusicAPI
 CloudMusicAPI_New
 CloudMusicAPI_PHP
 CloudMusicAPI_Node
+server-api
 docs
 
 # Android generated files (src-tauri/gen/android/app/)

@@ -1,7 +1,8 @@
 // 歌曲封面覆盖：SQLite 保存短路径索引，图片二进制在 cache/covers
 
 import { dbGetSetting, dbSetSetting } from "@/lib/db/play-stats"
-import { coverPathToUrl, type CachedCover } from "@/lib/local/cover"
+import { coverPathToUrl, extractCoverHash, type CachedCover } from "@/lib/local/cover"
+import { loadLocalLibrary } from "@/lib/local/library-store"
 
 const SETTING_KEY = "cover.overrides.v2"
 const LEGACY_STORAGE_KEY = "musicstorm-cover-overrides"
@@ -70,6 +71,52 @@ async function writeMap(next: OverrideMap): Promise<void> {
     cache = next
     window.dispatchEvent(new Event(COVER_OVERRIDE_EVENT))
     await dbSetSetting(SETTING_KEY, JSON.stringify(next))
+}
+
+// 覆盖索引与磁盘对账：容量清理/手动删除文件后索引残留死路径，
+// 剪掉失效条目让封面回退原远程 URL，避免永久占位
+async function pruneCoverOverrides(): Promise<void> {
+    if (!("__TAURI_INTERNALS__" in window)) {
+        return
+    }
+    await ensureCoverOverridesLoaded()
+    const entries = Object.entries(cache)
+    if (entries.length === 0) {
+        return
+    }
+    const paths: string[] = []
+    for (const [, item] of entries) {
+        paths.push(item.originalPath, item.thumbnailPath)
+    }
+    let existence: boolean[]
+    try {
+        const { invoke } = await import("@tauri-apps/api/core")
+        existence = await invoke<boolean[]>("cover_paths_exist", { paths })
+    } catch {
+        return
+    }
+    const staleIds: string[] = []
+    entries.forEach(([, item], index) => {
+        const exists = existence[index * 2] && existence[index * 2 + 1]
+        if (!exists) {
+            staleIds.push(item.originalPath ? entries[index][0] : "")
+        }
+    })
+    const valid = staleIds.filter(Boolean)
+    if (valid.length === 0) {
+        return
+    }
+    const next = { ...cache }
+    for (const trackId of valid) {
+        delete next[trackId]
+    }
+    cache = next
+    try {
+        await dbSetSetting(SETTING_KEY, JSON.stringify(next))
+    } catch {
+        // 写库失败：内存已更新，持久层下次对账再收敛
+    }
+    window.dispatchEvent(new Event(COVER_OVERRIDE_EVENT))
 }
 
 async function setCoverOverride(trackId: string, cover: CachedCover): Promise<void> {
@@ -180,14 +227,52 @@ function collectCoverRefHashes(): string[] {
     return [...hashes]
 }
 
+// 清理封面缓存时受引用保护的内容 MD5：
+// 本地库专辑/艺人封面 + 曲目内嵌封面（coverPath 指向缓存盘）+ 歌曲封面覆盖
+// （自选封面的唯一副本不能被回收）
+function collectCoverKeepHashes(): string[] {
+    const hashes = new Set<string>()
+    try {
+        const lib = loadLocalLibrary()
+        for (const album of lib.albums) {
+            const hash = extractCoverHash(album.coverDataUrl)
+            if (hash) {
+                hashes.add(hash)
+            }
+        }
+        for (const artist of lib.artists) {
+            const hash = extractCoverHash(artist.coverDataUrl)
+            if (hash) {
+                hashes.add(hash)
+            }
+        }
+        for (const track of lib.tracks) {
+            const hash = track.coverPath
+                ? extractCoverHash(track.coverPath)
+                : null
+            if (hash) {
+                hashes.add(hash)
+            }
+        }
+    } catch {
+        // 库读取失败时不保留专辑封面
+    }
+    for (const hash of collectCoverRefHashes()) {
+        hashes.add(hash)
+    }
+    return [...hashes]
+}
+
 export {
     clearCoverOverride,
     clearLegacyCoverOverrides,
     COVER_OVERRIDE_EVENT,
+    collectCoverKeepHashes,
     collectCoverRefHashes,
     ensureCoverOverridesLoaded,
     getCoverOverride,
     migrateLegacyOverrides,
+    pruneCoverOverrides,
     resolveTrackCoverUrl,
     setCoverOverride,
 }

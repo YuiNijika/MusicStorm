@@ -10,7 +10,7 @@ order: 14
 
 ## 本页边界
 
-覆盖：`src/lib/appearance/appearance-prefs.ts`、`src/lib/app/performance-prefs.ts`、主题 token 体系（`src/App.css`）。
+覆盖：`src/lib/appearance/appearance-prefs.ts`、`src/lib/app/performance-prefs.ts`、`src/lib/app/sidebar-prefs.ts`、主题 token 体系（`src/App.css`）。
 
 **不**覆盖：动效 token 的取值清单（见 [规范](#/docs/dev/conventions)）。
 
@@ -70,6 +70,28 @@ applyAppearanceToDom()
 | 性能模式 | `src/lib/app/performance-prefs.ts` | `getPerformanceMode()` / `setPerformanceMode(enabled)`；开启后 `html.performance-mode` class + 关闭毛玻璃等重特效 |
 
 性能模式同时落 localStorage（`musicstorm-performance-mode`）与 SQLite（`performance_mode`），变更广播 `musicstorm-performance-mode-change`。
+
+### 主题切换圆扩散（View Transitions）
+
+`theme-provider.tsx` 切换主题时用 `document.startViewTransition` 包裹变更，配合 `html.theme-switching` 作用域（`Style.css`）实现圆扩散动画：
+
+- `theme-switching` class 只在切换期间存在，结束后移除恢复原渲染路径
+- 路由切换的 VT（见 [规范](#/docs/dev/conventions)）不挂 `theme-switching`，两套动画互不污染
+- 切换期间压制毛玻璃等重特效（`.material-*`、`backdrop-blur` 全部静态化），视觉完全交给 VT 快照，避免每帧重绘
+- `prefers-reduced-motion` 或性能模式下跳过 `startViewTransition`，直接切换
+
+注意：`startViewTransition` 回调内用 `flushSync` 让新外观在截帧前提交，否则新快照还是旧外观。
+
+## 侧栏双风格
+
+`src/lib/app/sidebar-prefs.ts`，偏好存 localStorage `musicstorm-sidebar`（JSON `{ style, navOrder }`，兼容旧版纯字符串）：
+
+| 风格 | 说明 |
+|---|---|
+| `compact` | Bilibili 式窄条图标栏，默认 |
+| `classic` | 旧版分组宽栏 |
+
+`setSidebarStyle` 写入后广播 `musicstorm-sidebar-style`（不带冒号），侧栏与设置页监听同步；JSON 形态保留 `navOrder` 字段便于未来扩展。
 
 ## 常见问题
 

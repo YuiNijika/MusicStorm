@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react"
+import { memo, useEffect, useState } from "react"
 
-import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
+import { useCachedCoverUrl, isRemoteUrl } from "@/hooks/use-cached-cover-url"
+import { reextractLocalCovers } from "@/lib/local/import-folder"
+import { invalidateRemoteCover } from "@/lib/music/remote-cover-cache"
 import { cn } from "@/lib/utils"
 
 type CoverProps = {
@@ -26,17 +28,35 @@ const SIZE_PX = {
     xl: { width: 320, height: 320 },
 } as const
 
-function Cover({ src, alt, size = "md", className }: CoverProps) {
+// memo：src/alt/size/className 均为稳定字符串 props，父组件高频重渲（如播放条 200ms tick）时整棵跳过
+const Cover = memo(function Cover({ src, alt, size = "md", className }: CoverProps) {
     const [failed, setFailed] = useState(false)
     // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
     const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
     const resolvedSrc = useCachedCoverUrl(src, kind)
-    // src 切换时必须重置，否则上一张失败会永远挡住后续封面
+    // src 或 resolvedSrc 变化时必须重置，否则上一张失败会永远挡住后续封面；
+    // 自愈链路（invalidate→重下→事件切回本地）改的是 resolvedSrc，也依赖这里复位
     useEffect(() => {
         setFailed(false)
-    }, [src])
+    }, [src, resolvedSrc])
     const showImage = Boolean(src) && !failed
     const px = SIZE_PX[size]
+
+    // 本地缓存文件被清理后索引残留失效路径会在这里炸出 404：
+    // 远程封面剔除索引条目并回源重下；本地封面（asset 路径）触发
+    // 曲库重解析原音频提取封面（带冷却，多图同时 404 只重扫一次）
+    function handleImageError() {
+        setFailed(true)
+        if (isRemoteUrl(src)) {
+            if (resolvedSrc !== src) {
+                void invalidateRemoteCover(src)
+            }
+            return
+        }
+        if (src.startsWith("asset") || src.includes("/covers/")) {
+            void reextractLocalCovers().catch(() => {})
+        }
+    }
 
     return (
         <div
@@ -57,7 +77,7 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
                     loading="lazy"
                     decoding="async"
                     className="size-full object-cover"
-                    onError={() => setFailed(true)}
+                    onError={handleImageError}
                 />
             ) : (
                 <div
@@ -69,6 +89,6 @@ function Cover({ src, alt, size = "md", className }: CoverProps) {
             )}
         </div>
     )
-}
+})
 
 export { Cover }

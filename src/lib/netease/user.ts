@@ -132,34 +132,83 @@ async function fetchUserPlaylistsDetailed(uid: number): Promise<UserPlaylistsRes
     }
 }
 
-type SigninResult = {
-    ok: boolean
-    message: string
-}
+type SigninOutcome = "success" | "already" | "failed"
 
 // 每日签到：type=0 安卓端（3 经验），type=1 网页端（2 经验）
-async function dailySignin(type: 0 | 1 = 0): Promise<SigninResult> {
+// 已签渠道的回应按 outcome 分类：success 才算有效签到，already 幂等，failed 可重试
+async function dailySignin(
+    type: 0 | 1 = 0,
+): Promise<{ outcome: SigninOutcome; message: string }> {
+    let point = 0
+    try {
+        const data = await neteaseRequest<{
+            code?: number
+            point?: number
+            msg?: string
+        }>({
+            path: NETEASE_PATHS.dailySignin,
+            method: "POST",
+            params: { type, timestamp: Date.now() },
+            skipCache: true,
+        })
+        if (data.code === 200) {
+            point = data.point ?? 0
+            // +0 经验没有信息量，不展示
+            return {
+                outcome: "success",
+                message:
+                    point > 0 ? `签到成功，+${point} 经验` : "签到成功",
+            }
+        }
+        const text = data.msg ?? "签到失败"
+        return /重复|已签/.test(text)
+            ? { outcome: "already", message: "今日已签到" }
+            : { outcome: "failed", message: text }
+    } catch (error) {
+        const text = error instanceof Error ? error.message : String(error)
+        // 外部源对重复签到返回 HTTP 403，官方结构返回 code -2 / 重复操作
+        if (/403|重复|已签/.test(text)) {
+            return { outcome: "already", message: "今日已签到" }
+        }
+        return { outcome: "failed", message: text }
+    }
+}
+
+type DailySigninStatus = {
+    mobileSign: boolean
+    pcSign: boolean
+}
+
+// 签到状态查询（dailySummary）：签到前先查，避免对已签渠道重复提交报错
+async function fetchDailySigninStatus(): Promise<DailySigninStatus> {
     const data = await neteaseRequest<{
         code?: number
-        point?: number
-        msg?: string
+        data?: { mobileSign?: boolean; pcSign?: boolean }
+        mobileSign?: boolean
+        pcSign?: boolean
     }>({
-        path: NETEASE_PATHS.dailySignin,
-        method: "POST",
-        params: { type, timestamp: Date.now() },
+        path: NETEASE_PATHS.dailySigninStatus,
+        params: { timestamp: Date.now() },
         skipCache: true,
     })
-    if (data.code === 200) {
-        return { ok: true, message: `签到成功，+${data.point ?? 0} 经验` }
+    const summary = data.data ?? data
+    return {
+        mobileSign: summary.mobileSign === true,
+        pcSign: summary.pcSign === true,
     }
-    return { ok: false, message: data.msg ?? "签到失败" }
 }
 
 export {
     dailySignin,
+    fetchDailySigninStatus,
     fetchUserAccount,
     fetchUserPlaylists,
     fetchUserPlaylistsDetailed,
     resolveVipTier,
 }
-export type { NeteaseProfile, SigninResult, UserPlaylistsResult, VipTier }
+export type {
+    DailySigninStatus,
+    NeteaseProfile,
+    UserPlaylistsResult,
+    VipTier,
+}

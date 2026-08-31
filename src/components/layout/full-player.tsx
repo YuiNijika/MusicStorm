@@ -15,7 +15,7 @@ import {
     Volume2,
     VolumeX,
 } from "lucide-react"
-import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { EqEditor } from "@/components/music/eq-editor"
@@ -118,7 +118,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         cyclePlayMode,
         reloadCurrent,
     } = usePlayer()
-    const { positionMs, durationMs } = usePlaybackTick()
     const { startDragging } = useWindowControls()
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
@@ -131,6 +130,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     // 动画结束后移除标记，下一次切换才能重新播放淡入
     const [layoutFade, setLayoutFade] = useState(false)
     const [phase, setPhase] = useState<Phase>("closed")
+    // 关闭态冻结 tick 订阅：避免整棵全屏播放器树每 200ms 白渲一次；打开时恢复
+    const { positionMs, durationMs } = usePlaybackTick(phase !== "closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
     const [likeCount, setLikeCount] = useState<number | null>(null)
     // 移动端只保留 封面/歌词 两种布局；classic 是桌面分栏，窄屏降级到封面
@@ -151,6 +152,43 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [dragDy, setDragDy] = useState(0)
     const [pageOffset, setPageOffset] = useState(0)
     const [lyricsMounted, setLyricsMounted] = useState(false)
+
+    const displayTrack = mountedTrack ?? currentTrack
+    const canLike = Boolean(
+        loggedIn && displayTrack?.source === "netease" && displayTrack?.id,
+    )
+
+    const handleToggleLike = useCallback(async () => {
+        if (!canLike || !displayTrack) {
+            return
+        }
+        try {
+            await toggleTrackLiked(displayTrack.id)
+        } catch {
+            // store 已回滚
+        }
+    }, [canLike, displayTrack, toggleTrackLiked])
+
+    const handleQualityChange = useCallback(
+        (next: QualityBr) => {
+            setNeteaseQualityBr(next)
+            setQualityBr(next)
+            reloadCurrent()
+        },
+        [reloadCurrent],
+    )
+
+    const handleOpenComments = useCallback(() => {
+        if (!displayTrack) {
+            return
+        }
+        openComments({
+            id: displayTrack.id,
+            title: displayTrack.title,
+            subtitle: displayTrack.artist,
+        })
+        onClose()
+    }, [displayTrack, onClose, openComments])
     const dragStartRef = useRef<{
         x: number
         y: number
@@ -284,7 +322,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         }
     }, [currentTrack?.id, currentTrack?.source])
 
-    const displayTrack = mountedTrack ?? currentTrack
     if (phase === "closed" || !displayTrack) {
         return null
     }
@@ -295,8 +332,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     )
     const totalMs = durationMs > 0 ? durationMs : displayTrack.durationMs
     const showQuality = displayTrack.source === "netease"
-    const canLike =
-        loggedIn && displayTrack.source === "netease" && Boolean(displayTrack.id)
     const liked = isTrackLiked(displayTrack.id)
     const primaryArtist = displayTrack.artists?.find((item) => item.id)
     const canOpenArtist =
@@ -462,12 +497,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         onClose()
     }
 
-    function handleQualityChange(next: QualityBr) {
-        setNeteaseQualityBr(next)
-        setQualityBr(next)
-        reloadCurrent()
-    }
-
     function handleLayoutChange(next: FullPlayerLayout) {
         // 移动端翻页器自带滑动过渡，桌面菜单切换才需要淡入避免内容跳变
         if (next !== effectiveLayout && !isMobile) {
@@ -475,17 +504,6 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         }
         setFullPlayerLayout(next)
         setLayout(next)
-    }
-
-    async function handleToggleLike() {
-        if (!canLike || !displayTrack) {
-            return
-        }
-        try {
-            await toggleTrackLiked(displayTrack.id)
-        } catch {
-            // store 已回滚
-        }
     }
 
     const transport = (
@@ -506,18 +524,11 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             onNext={next}
             onCyclePlayMode={cyclePlayMode}
             onToggleMute={toggleMute}
-            onVolume={(v) => setVolume(v)}
+            onVolume={setVolume}
             onQuality={handleQualityChange}
-            onToggleLike={() => void handleToggleLike()}
+            onToggleLike={handleToggleLike}
             likeCount={likeCount}
-            onOpenComments={() => {
-                openComments({
-                    id: displayTrack.id,
-                    title: displayTrack.title,
-                    subtitle: displayTrack.artist,
-                })
-                onClose()
-            }}
+            onOpenComments={handleOpenComments}
             trackId={displayTrack.id}
         />
     )
@@ -844,7 +855,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     )
 }
 
-function TransportBar({
+// memo：除 canLike/liked/likeCount/trackId 等低频值外全部为稳定回调，
+// 全屏播放器 200ms tick 重渲时跳过整条控制栏（含音量/EQ/音质弹层）
+const TransportBar = memo(function TransportBar({
     isPlaying,
     shuffle,
     repeat,
@@ -940,9 +953,6 @@ function TransportBar({
                 <IconBtn title="下一首" onClick={onNext}>
                     <SkipForward className="size-5 fill-current" />
                 </IconBtn>
-            </div>
-
-            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 <IconBtn
                     title={
                         shuffle
@@ -964,7 +974,9 @@ function TransportBar({
                         <Repeat className="size-4" />
                     )}
                 </IconBtn>
+            </div>
 
+            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 <Popover>
                     <PopoverTrigger
                         className={cn(
@@ -1055,7 +1067,7 @@ function TransportBar({
             </div>
         </div>
     )
-}
+})
 
 function IconBtn({
     children,

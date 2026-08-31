@@ -1,7 +1,7 @@
 ---
 title: 开发指南
 description: 开发系列总览：架构分层、目录结构、阅读路线与启动链路。
-order: 4
+order: 7
 ---
 
 # MusicStorm 开发指南
@@ -43,7 +43,7 @@ order: 4
 | 状态层 | 播放、登录、点赞、导航的 React Context | `src/hooks/use-player.tsx` 等 |
 | API 层 | 网易云请求入口、本地曲库模型、偏好存储 | `src/lib/netease/client.ts`、`src/lib/local/library-store.ts` |
 | 引擎层 | HTML5 音频、原生音频、ffmpeg、封面缓存 | `src/lib/player/`、`src-tauri/src/audio/` |
-| Rust 层 | 无 CORS 代理、文件扫描、SQLite、托盘、快捷键 | `src-tauri/src/` |
+| Rust 层 | 无 CORS 代理、文件扫描、SQLite、托盘、快捷键、桌面歌词 / 小播放器第二窗口 | `src-tauri/src/` |
 
 数据流约定：**界面层不直接碰 localStorage 与 SQLite**，一律经 `src/lib/` 下的模块读写；Rust 侧能力一律经 `invoke` 封装成 `src/lib/` 下的桥接函数，组件只调桥接函数。
 
@@ -78,6 +78,8 @@ src-tauri/src/
 ├─ cover_cache.rs    # 封面磁盘缓存
 ├─ ffmpeg.rs         # ffmpeg 检测与校验
 ├─ tray.rs           # 托盘与全局快捷键
+├─ desktop_lyric.rs  # 桌面歌词第二窗口
+├─ mini_player.rs    # 桌面小播放器第二窗口
 ├─ local_meta.rs     # 本地文件标签读取
 └─ macos_now_playing.rs # macOS Now Playing 集成
 

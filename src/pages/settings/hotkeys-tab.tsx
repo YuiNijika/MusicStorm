@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { Pencil } from "lucide-react"
 
-import { Section } from "@/components/music/section"
 import {
     DEFAULT_SHORTCUTS,
     SHORTCUT_ACTIONS,
@@ -25,6 +24,7 @@ import {
     notifyWarning,
 } from "@/lib/notify"
 import { isMacOS } from "@/lib/platform"
+import { SettingsGroup, TabHeader } from "@/pages/settings/settings-ui"
 import { cn } from "@/lib/utils"
 
 function HotkeysTab() {
@@ -149,15 +149,22 @@ function HotkeysTab() {
     }, [recording, globalShortcuts, inAppShortcuts])
 
     return (
-        <Section title="快捷键" description="全局与应用内快捷键均支持自定义">
-            <div className="space-y-4">
-                <div>
-                    <p className="mb-1.5 text-[12px] font-medium text-muted-foreground">
-                        {isMacOS()
-                            ? "全局快捷键（默认关闭，避免抢占系统按键；自定义时需含 ⌘/⌥/⌃）"
-                            : "全局快捷键（任何应用下生效，需含 Ctrl/Alt/Super 修饰或 F 键）"}
-                    </p>
-                    <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
+        <div className="space-y-3">
+            <TabHeader
+                title="快捷键"
+                description="全局与应用内快捷键均支持自定义"
+            />
+
+            <div className="space-y-3">
+                <SettingsGroup
+                    title="全局快捷键"
+                    description={
+                        isMacOS()
+                            ? "默认关闭，避免抢占系统按键；自定义时需含 ⌘/⌥/⌃"
+                            : "任何应用下生效，需含 Ctrl/Alt/Super 修饰或 F 键"
+                    }
+                >
+                    <div className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
                         {SHORTCUT_ACTIONS.map((item) => (
                             <ShortcutRow
                                 key={`global-${item.id}`}
@@ -176,13 +183,13 @@ function HotkeysTab() {
                             />
                         ))}
                     </div>
-                </div>
+                </SettingsGroup>
 
-                <div>
-                    <p className="mb-1.5 text-[12px] font-medium text-muted-foreground">
-                        应用内快捷键（窗口聚焦时生效）
-                    </p>
-                    <div className="material-panel divide-y divide-black/[0.05] rounded-[20px] dark:divide-white/[0.06]">
+                <SettingsGroup
+                    title="应用内快捷键"
+                    description="窗口聚焦时生效"
+                >
+                    <div className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
                         {IN_APP_ACTIONS.map((item) => (
                             <ShortcutRow
                                 key={`in-app-${item.id}`}
@@ -201,12 +208,12 @@ function HotkeysTab() {
                             />
                         ))}
                     </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                        提示：录制时按 Esc 取消、按退格清除；输入框聚焦时应用内快捷键不生效
+                    <p className="text-[13px] text-muted-foreground">
+                        录制时按 Esc 取消、按退格清除；输入框聚焦时应用内快捷键不生效
                     </p>
-                </div>
+                </SettingsGroup>
             </div>
-        </Section>
+        </div>
     )
 }
 
@@ -224,13 +231,13 @@ function ShortcutRow({
     return (
         <div
             className={cn(
-                "flex items-center justify-between gap-3 px-4 py-2.5",
+                "flex items-center justify-between gap-3 rounded-xl px-2 py-2.5",
                 active && "bg-[var(--surface-fill)]",
             )}
         >
-            <span className="text-[13px] text-foreground/90">{label}</span>
+            <span className="text-sm text-foreground/90">{label}</span>
             {active ? (
-                <span className="text-[12px] font-medium text-primary">
+                <span className="text-[13px] font-medium text-primary">
                     按下组合键…（Esc 取消，退格清除）
                 </span>
             ) : (
@@ -241,11 +248,11 @@ function ShortcutRow({
                     title="点击修改"
                 >
                     {value ? (
-                        <kbd className="glass-chip rounded-lg px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+                        <kbd className="glass-chip rounded-lg px-2 py-0.5 font-mono text-[13px] text-foreground/80">
                             {formatShortcut(value)}
                         </kbd>
                     ) : (
-                        <span className="text-[12px] text-muted-foreground">
+                        <span className="text-[13px] text-muted-foreground">
                             未设置
                         </span>
                     )}

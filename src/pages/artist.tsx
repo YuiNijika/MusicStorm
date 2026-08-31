@@ -77,6 +77,9 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [retry, setRetry] = useState(0)
+    // MV/相似 tab 各自的重试计数：error 后点重试要能重新拉请求，
+    // 单纯重置 state 只会让 effect 不重跑、永远卡在加载中
+    const [tabRetry, setTabRetry] = useState(0)
 
     // 歌曲分页，更多歌曲追加在热门 50 后，offset 从 hotTracks.length 起跳
     const [moreSongs, setMoreSongs] = useState<Track[]>([])
@@ -317,7 +320,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         return () => {
             cancelled = true
         }
-    }, [tab, artistId, profile?.id])
+    }, [tab, artistId, profile?.id, tabRetry])
 
     useEffect(() => {
         if (!profile || tab !== "detail") {
@@ -385,7 +388,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
         return () => {
             cancelled = true
         }
-    }, [tab, artistId, profile?.id])
+    }, [tab, artistId, profile?.id, tabRetry])
 
     return (
         <div className="space-y-5">
@@ -628,7 +631,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                     action={
                                         <HeroRetryButton
                                             onClick={() =>
-                                                setMvs(emptyLazy([]))
+                                                setTabRetry((n) => n + 1)
                                             }
                                         />
                                     }
@@ -732,7 +735,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                     action={
                                         <HeroRetryButton
                                             onClick={() =>
-                                                setSimilar(emptyLazy([]))
+                                                setTabRetry((n) => n + 1)
                                             }
                                         />
                                     }

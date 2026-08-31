@@ -1,5 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
-import { parseLrc, type LyricLine } from "@/lib/lyric/parse"
+import { parseLyricText, type LyricLine } from "@/lib/lyric/parse"
 
 type LyricApiData = {
     lrc?: { lyric?: string }
@@ -72,11 +72,30 @@ async function fetchLyricLines(
         params: { id: numericId },
     })
 
-    const lines = parseLrc(data.lrc?.lyric?.trim() ?? "")
-    if (!includeTranslation) {
+    const lrcText = data.lrc?.lyric?.trim() ?? ""
+    const tlyricText = data.tlyric?.lyric?.trim() ?? ""
+    const lines = parseLyricText(lrcText)
+    if (!includeTranslation || lines.length === 0) {
         return lines
     }
-    const translated = parseLrc(data.tlyric?.lyric?.trim() ?? "")
+    const translated = parseLyricText(tlyricText)
+
+    // 无时间戳歌词（纯文本）：无法按时间配对，退化为按行序配对
+    const untimed = lines.every((line) => line.timeMs <= 0)
+    if (untimed) {
+        if (
+            translated.length > 0 &&
+            translated.every((line) => line.timeMs <= 0) &&
+            translated.length === lines.length
+        ) {
+            return lines.map((line, index) => ({
+                ...line,
+                translation: translated[index].text,
+            }))
+        }
+        return lines
+    }
+
     return mergeTranslatedLyrics(lines, translated)
 }
 

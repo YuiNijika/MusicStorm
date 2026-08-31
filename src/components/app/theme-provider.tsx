@@ -80,9 +80,16 @@ function runThemeTransition(mutate: () => void) {
     root.style.setProperty("--theme-x", `${x}px`)
     root.style.setProperty("--theme-y", `${y}px`)
     root.style.setProperty("--theme-r", `${radius}px`)
-    document.startViewTransition(() => {
+    const transition = document.startViewTransition(() => {
         // flushSync 让 React 提交先行完成，截图才能捕捉到新主题
         flushSync(mutate)
+    })
+    // VT 期间压掉逐元素 transition 与玻璃 backdrop-filter：全树变量一次落地时，
+    // 每个带过渡的元素各跑一轮动画、每层毛玻璃全量重采样重绘，才是黑切白卡顿的
+    // 主源；视觉过渡完全交给 VT 圆扩散快照动画，结束后立即恢复原渲染路径
+    root.classList.add("theme-switching")
+    void transition.finished.finally(() => {
+        root.classList.remove("theme-switching")
     })
 }
 

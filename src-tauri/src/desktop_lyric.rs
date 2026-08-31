@@ -14,6 +14,7 @@ pub struct DesktopLyricState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LyricLine {
     pub time_ms: u64,
     pub text: String,
@@ -54,11 +55,16 @@ pub fn create_desktop_lyric_window(app: &AppHandle) -> Result<WebviewWindow, Str
         .build()
         .map_err(|e| format!("create desktop lyric window: {e}"))?;
 
+    // 无显式定位时默认居中，避免窗口落在屏幕外被误判为「不生效」
+    let _ = window.center();
+
     Ok(window)
 }
 
 #[tauri::command]
-pub fn show_desktop_lyric(app: AppHandle) -> Result<(), String> {
+pub async fn show_desktop_lyric(app: AppHandle) -> Result<(), String> {
+    // 必须为 async：同步命令在主线程执行，WebviewWindowBuilder::build()
+    // 会等事件循环泵消息，而事件循环正被 IPC 阻塞 → 整个应用死锁卡死
     let window = if let Some(window) = app.get_webview_window(DESKTOP_LYRIC_WINDOW_LABEL) {
         window
     } else {
@@ -76,7 +82,7 @@ pub fn show_desktop_lyric(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn hide_desktop_lyric(app: AppHandle) -> Result<(), String> {
+pub async fn hide_desktop_lyric(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(DESKTOP_LYRIC_WINDOW_LABEL) {
         window
             .hide()
@@ -86,7 +92,7 @@ pub fn hide_desktop_lyric(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn is_desktop_lyric_visible(app: AppHandle) -> Result<bool, String> {
+pub async fn is_desktop_lyric_visible(app: AppHandle) -> Result<bool, String> {
     Ok(app
         .get_webview_window(DESKTOP_LYRIC_WINDOW_LABEL)
         .map(|w| w.is_visible().unwrap_or(false))
@@ -94,7 +100,7 @@ pub fn is_desktop_lyric_visible(app: AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn update_desktop_lyric(
+pub async fn update_desktop_lyric(
     app: AppHandle,
     state: DesktopLyricState,
 ) -> Result<(), String> {

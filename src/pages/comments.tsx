@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
 import { SortSelect } from "@/components/music/sort-select"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import {
@@ -523,8 +524,8 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                 )}
 
                 {loadingMore ? (
-                    <p className="py-4 text-center text-[12px] text-muted-foreground">
-                        <LoaderCircle className="mx-auto size-4 animate-spin" />
+                    <p className="flex justify-center py-4 text-[12px] text-muted-foreground">
+                        <LoadingSpinner size={18} />
                     </p>
                 ) : null}
 

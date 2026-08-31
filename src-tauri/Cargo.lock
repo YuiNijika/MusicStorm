@@ -2515,7 +2515,7 @@ dependencies = [
 
 [[package]]
 name = "music-storm"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "apple-cf",
  "base64 0.22.1",

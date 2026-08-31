@@ -1,4 +1,5 @@
 import { GITHUB_REPO_URL } from "@/lib/open-external"
+import { resolveUpdateUrl } from "@/lib/app/update-source-prefs"
 import { isWebMode } from "@/lib/web-mode"
 
 const OWNER = "YuiNijika"
@@ -6,6 +7,37 @@ const REPO = "MusicStorm"
 const CACHE_TTL_MS = 5 * 60 * 60 * 1000
 const STATUS_EVENT = "musicstorm:update-status"
 const API_RELEASES = `https://api.github.com/repos/${OWNER}/${REPO}/releases`
+
+// GitHub 匿名 API 额度受限时会回 403（直连与镜像都可能出现），
+// 线性退避后重试，最多 5 次
+const MAX_403_RETRIES = 5
+
+async function fetchGithubReleases(currentVersion: string): Promise<Response> {
+    const target = resolveUpdateUrl(API_RELEASES)
+    const headers = {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        // GitHub 要求有意义的 UA
+        "User-Agent": `MusicStorm/${currentVersion}`,
+    }
+    let lastError: Error | null = null
+    for (let attempt = 0; attempt < MAX_403_RETRIES; attempt += 1) {
+        if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 800 * attempt))
+        }
+        try {
+            const response = await fetch(target, { method: "GET", headers })
+            if (response.status !== 403) {
+                return response
+            }
+            lastError = new Error(`GitHub API HTTP 403（已重试 ${attempt + 1} 次）`)
+        } catch (error) {
+            lastError =
+                error instanceof Error ? error : new Error("检查更新失败")
+        }
+    }
+    throw lastError ?? new Error("GitHub API 请求失败")
+}
 
 // Android 独立版本线：tag 带 -android 后缀，与桌面 vX.Y.Z 分开，
 // 避免 releases/latest 按时间排序导致跨平台串台
@@ -219,15 +251,7 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
     }
 
     try {
-        const response = await fetch(API_RELEASES, {
-            method: "GET",
-            headers: {
-                Accept: "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                // GitHub 要求有意义的 UA
-                "User-Agent": `MusicStorm/${currentVersion}`,
-            },
-        })
+        const response = await fetchGithubReleases(currentVersion)
 
         if (!response.ok) {
             throw new Error(`GitHub API HTTP ${response.status}`)
@@ -250,9 +274,10 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
             throw new Error(`无法解析版本号: ${latestTag || "(空)"}`)
         }
 
-        const htmlUrl =
+        const htmlUrl = resolveUpdateUrl(
             data.html_url?.trim() ||
-            `${GITHUB_REPO_URL}/releases/tag/${encodeURIComponent(latestTag)}`
+                `${GITHUB_REPO_URL}/releases/tag/${encodeURIComponent(latestTag)}`,
+        )
         const releaseName = (data.name ?? "").trim() || latestTag
         const releaseBody = (data.body ?? "").trim()
         const publishedAt = data.published_at ?? null
@@ -298,7 +323,7 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
             latestVersion: "",
             releaseName: "",
             releaseBody: "",
-            htmlUrl: `${GITHUB_REPO_URL}/releases/latest`,
+            htmlUrl: resolveUpdateUrl(`${GITHUB_REPO_URL}/releases/latest`),
             publishedAt: null,
             hasUpdate: false,
             fromCache: false,

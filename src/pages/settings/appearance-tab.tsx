@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { ImagePlus, Trash2 } from "lucide-react"
 
-import { Section } from "@/components/music/section"
 import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
@@ -20,6 +19,13 @@ import {
     accentSwatch,
     resolveAccentHue,
 } from "@/lib/appearance/appearance-prefs"
+import {
+    TOAST_PREFS_EVENT,
+    TOAST_POSITIONS,
+    readToastPrefs,
+    writeToastPrefs,
+    type ToastPrefs,
+} from "@/lib/appearance/toast-prefs"
 import {
     setPlaylistTracksView,
     setPlaylistView,
@@ -42,11 +48,14 @@ import {
 import { notifyFromError, notifySuccess } from "@/lib/notify"
 import { isNativeMacOS } from "@/lib/platform"
 import {
+    ActionButton,
     ChoiceChip,
-    SettingsCard,
+    ChoiceRow,
+    ChipRow,
     SettingsGroup,
     SliderField,
     SwitchRow,
+    TabHeader,
 } from "@/pages/settings/settings-ui"
 import { cn } from "@/lib/utils"
 
@@ -83,6 +92,9 @@ function AppearanceTab({
     const [sidebarStyle, setSidebarStyleState] = useState<SidebarStyle>(() =>
         readSidebarStyle(),
     )
+    const [toastPrefs, setToastPrefsState] = useState<ToastPrefs>(() =>
+        readToastPrefs(),
+    )
     const activeHue = resolveAccentHue(appearance)
     const customActive = appearance.accent === "custom"
     const nativeMacOS = isNativeMacOS()
@@ -108,6 +120,16 @@ function AppearanceTab({
             window.removeEventListener(SIDEBAR_STYLE_EVENT, onSidebarStyle)
     }, [])
 
+    // Toast 位置/边距跨组件即时同步
+    useEffect(() => {
+        function onToastPrefs() {
+            setToastPrefsState(readToastPrefs())
+        }
+        window.addEventListener(TOAST_PREFS_EVENT, onToastPrefs)
+        return () =>
+            window.removeEventListener(TOAST_PREFS_EVENT, onToastPrefs)
+    }, [])
+
     useEffect(() => {
         function onLayout() {
             setLayout(getFullPlayerLayout())
@@ -131,6 +153,12 @@ function AppearanceTab({
     function handleLyricsAlign(next: LyricsAlign) {
         setFullPlayerChrome({ lyricsAlign: next })
         setChrome(getFullPlayerChrome())
+    }
+
+    function handleToastPrefs(patch: Partial<ToastPrefs>) {
+        const next = { ...readToastPrefs(), ...patch }
+        writeToastPrefs(next)
+        setToastPrefsState(next)
     }
 
     async function handlePickBackground() {
@@ -164,10 +192,45 @@ function AppearanceTab({
     }
 
     return (
-        <Section title="外观" description="主题、色调、材质与全屏模板">
-            <div className="space-y-3">
-                <SettingsCard title="外观" description="跟随系统或固定明暗">
-                    <div className="flex flex-wrap gap-2">
+        <div className="space-y-3">
+            <TabHeader title="外观" description="主题、色调、材质与全屏播放模板" />
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <SettingsGroup
+                    className="lg:col-span-2"
+                    title="全屏播放模板"
+                    description={
+                        FULL_PLAYER_LAYOUTS.find(
+                            (item) => item.id === layout,
+                        )?.description ?? "播放样式"
+                    }
+                >
+                    <ChipRow>
+                        {FULL_PLAYER_LAYOUTS.map((item) => (
+                            <ChoiceChip
+                                key={item.id}
+                                active={layout === item.id}
+                                onClick={() => handleLayoutPick(item.id)}
+                                label={item.label}
+                            />
+                        ))}
+                    </ChipRow>
+                    {layout === "lyrics" ? (
+                        <ChoiceRow label="歌词对齐">
+                            {LYRICS_ALIGNS.map((item) => (
+                                <ChoiceChip
+                                    key={item.id}
+                                    active={chrome.lyricsAlign === item.id}
+                                    onClick={() => handleLyricsAlign(item.id)}
+                                    label={item.label}
+                                />
+                            ))}
+                        </ChoiceRow>
+                    ) : null}
+                </SettingsGroup>
+
+                <SettingsGroup title="主题与色调" description="明暗模式与强调色">
+                    <ChipRow>
                         <ChoiceChip
                             active={theme === "system"}
                             onClick={() => setTheme("system")}
@@ -183,41 +246,25 @@ function AppearanceTab({
                             onClick={() => setTheme("dark")}
                             label="深色"
                         />
-                    </div>
-                </SettingsCard>
-
-                <SettingsGroup
-                    title="色调"
-                    description="预设色点，或拖动自定义色相"
-                >
-                    <div
-                        className="apple-segmented flex w-full"
-                        role="group"
-                        aria-label="调色范围"
-                    >
-                        <button
-                            type="button"
-                            aria-pressed={appearance.tintScope === "accent"}
+                    </ChipRow>
+                    <ChoiceRow label="调色范围">
+                        <ChoiceChip
+                            active={appearance.tintScope === "accent"}
                             onClick={() => setTintScope("accent")}
-                            className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-3 text-[12px] font-medium text-muted-foreground aria-pressed:text-foreground"
-                        >
-                            强调色
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={appearance.tintScope === "global"}
+                            label="强调色"
+                        />
+                        <ChoiceChip
+                            active={appearance.tintScope === "global"}
                             onClick={() => setTintScope("global")}
-                            className="apple-segmented-item min-w-0 flex-1 cursor-pointer whitespace-nowrap px-3 text-[12px] font-medium text-muted-foreground aria-pressed:text-foreground"
-                        >
-                            全局色调
-                        </button>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            label="全局色调"
+                        />
+                    </ChoiceRow>
+                    <p className="text-[13px] text-muted-foreground">
                         {appearance.tintScope === "global"
                             ? "背景、卡片、侧栏与玻璃材质使用低彩度染色"
                             : "仅影响按钮、选中态、焦点与图表等强调元素"}
                     </p>
-                    <div className="flex flex-wrap gap-2.5">
+                    <ChipRow className="gap-2.5">
                         {ACCENT_OPTIONS.map((option) => {
                             const active = appearance.accent === option.id
                             return (
@@ -265,9 +312,9 @@ function AppearanceTab({
                                 )`,
                             }}
                         />
-                    </div>
+                    </ChipRow>
                     <label className="block space-y-2">
-                        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+                        <div className="flex items-center justify-between text-[13px] text-muted-foreground">
                             <span>自定义色相</span>
                             <span className="tabular-nums flex items-center gap-2">
                                 <span
@@ -309,93 +356,9 @@ function AppearanceTab({
                     </label>
                 </SettingsGroup>
 
-                <SettingsGroup
-                    title="材质"
-                    description="玻璃透明度与模糊强度"
-                >
-                    <SwitchRow
-                        title="常驻毛玻璃"
-                        description="侧栏、底栏与面板的毛玻璃质感，开启可能有额外性能开销"
-                        checked={appearance.materialGlass}
-                        disabled={performanceMode}
-                        onCheckedChange={setMaterialGlass}
-                    />
-                    <SliderField
-                        label="透明度"
-                        display={`${Math.round(
-                            appearance.glassOpacity * 100,
-                        )}%`}
-                        min={0.35}
-                        max={0.9}
-                        step={0.01}
-                        value={appearance.glassOpacity}
-                        onChange={setGlassOpacity}
-                    />
-                    <SliderField
-                        label="模糊"
-                        display={`${Math.round(appearance.glassBlur)}px`}
-                        min={8}
-                        max={48}
-                        step={1}
-                        value={appearance.glassBlur}
-                        onChange={setGlassBlur}
-                    />
-                </SettingsGroup>
-
-                <SettingsGroup
-                    title="自定义背景"
-                    description="为应用设置一张背景图，可调不透明度与模糊"
-                >
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={() => void handlePickBackground()}
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
-                        >
-                            <ImagePlus className="size-3.5" />
-                            {appearance.backgroundUrl
-                                ? "更换图片"
-                                : "选择图片"}
-                        </button>
-                        {appearance.backgroundUrl ? (
-                            <button
-                                type="button"
-                                onClick={handleClearBackground}
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
-                            >
-                                <Trash2 className="size-3.5" />
-                                清除
-                            </button>
-                        ) : null}
-                    </div>
-                    <SliderField
-                        label="不透明度"
-                        display={`${Math.round(
-                            appearance.backgroundOpacity * 100,
-                        )}%`}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={appearance.backgroundOpacity}
-                        onChange={setBackgroundOpacity}
-                    />
-                    <SliderField
-                        label="模糊"
-                        display={`${Math.round(appearance.backgroundBlur)}px`}
-                        min={0}
-                        max={40}
-                        step={1}
-                        value={appearance.backgroundBlur}
-                        onChange={setBackgroundBlur}
-                    />
-                </SettingsGroup>
-
-                {!nativeMacOS ? (
-                    <SettingsCard
-                        title="标题栏样式"
-                        description="无边框窗口控件布局"
-                    >
-                        <div className="flex flex-wrap gap-2">
+                <SettingsGroup title="界面布局" description="标题栏、侧栏、资料库与通知">
+                    {!nativeMacOS ? (
+                        <ChoiceRow label="标题栏样式">
                             <ChoiceChip
                                 active={titleBarStyle === "mac"}
                                 onClick={() => onTitleBarStyleChange("mac")}
@@ -403,20 +366,12 @@ function AppearanceTab({
                             />
                             <ChoiceChip
                                 active={titleBarStyle === "windows"}
-                                onClick={() =>
-                                    onTitleBarStyleChange("windows")
-                                }
+                                onClick={() => onTitleBarStyleChange("windows")}
                                 label="Windows"
                             />
-                        </div>
-                    </SettingsCard>
-                ) : null}
-
-                <SettingsCard
-                    title="侧栏样式"
-                    description="窄条紧凑或经典分组导航"
-                >
-                    <div className="flex flex-wrap gap-2">
+                        </ChoiceRow>
+                    ) : null}
+                    <ChoiceRow label="侧栏样式">
                         <ChoiceChip
                             active={sidebarStyle === "compact"}
                             onClick={() => {
@@ -433,14 +388,8 @@ function AppearanceTab({
                             }}
                             label="经典"
                         />
-                    </div>
-                </SettingsCard>
-
-                <SettingsCard
-                    title="歌单展示"
-                    description="资料库里歌单用卡片或列表"
-                >
-                    <div className="flex flex-wrap gap-2">
+                    </ChoiceRow>
+                    <ChoiceRow label="歌单展示">
                         <ChoiceChip
                             active={playlistView === "card"}
                             onClick={() =>
@@ -455,14 +404,8 @@ function AppearanceTab({
                             }
                             label="列表"
                         />
-                    </div>
-                </SettingsCard>
-
-                <SettingsCard
-                    title="歌单歌曲"
-                    description="打开歌单后歌曲用卡片或列表"
-                >
-                    <div className="flex flex-wrap gap-2">
+                    </ChoiceRow>
+                    <ChoiceRow label="歌单歌曲">
                         <ChoiceChip
                             active={playlistTracksView === "card"}
                             onClick={() =>
@@ -485,54 +428,103 @@ function AppearanceTab({
                             }
                             label="列表"
                         />
-                    </div>
-                </SettingsCard>
-
-                <SettingsGroup
-                    title="全屏播放模板"
-                    description={
-                        FULL_PLAYER_LAYOUTS.find(
-                            (item) => item.id === layout,
-                        )?.description ?? "播放样式"
-                    }
-                >
-                    <div className="flex flex-wrap gap-2">
-                        {FULL_PLAYER_LAYOUTS.map((item) => (
+                    </ChoiceRow>
+                    <ChoiceRow label="通知位置">
+                        {TOAST_POSITIONS.map((item) => (
                             <ChoiceChip
                                 key={item.id}
-                                active={layout === item.id}
-                                onClick={() => handleLayoutPick(item.id)}
                                 label={item.label}
+                                active={toastPrefs.position === item.id}
+                                onClick={() =>
+                                    handleToastPrefs({ position: item.id })
+                                }
                             />
                         ))}
-                    </div>
-                    {layout === "lyrics" ? (
-                        <div className="space-y-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
-                            <p className="text-[12px] text-muted-foreground">
-                                歌词对齐
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {LYRICS_ALIGNS.map((item) => (
-                                    <ChoiceChip
-                                        key={item.id}
-                                        active={
-                                            chrome.lyricsAlign === item.id
-                                        }
-                                        onClick={() =>
-                                            handleLyricsAlign(item.id)
-                                        }
-                                        label={item.label}
-                                    />
-                                ))}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                                仅「歌词」模板：纯歌词，无封面
-                            </p>
-                        </div>
-                    ) : null}
+                    </ChoiceRow>
+                    <SliderField
+                        label="通知边距"
+                        display={`${toastPrefs.margin}px`}
+                        min={0}
+                        max={48}
+                        step={2}
+                        value={toastPrefs.margin}
+                        onChange={(margin) => handleToastPrefs({ margin })}
+                    />
+                </SettingsGroup>
+
+                <SettingsGroup
+                    className="lg:col-span-2"
+                    title="材质与背景"
+                    description="性能模式下毛玻璃强制关闭"
+                >
+                    <SwitchRow
+                        title="常驻毛玻璃"
+                        checked={appearance.materialGlass}
+                        disabled={performanceMode}
+                        onCheckedChange={setMaterialGlass}
+                    />
+                    <SliderField
+                        label="玻璃透明度"
+                        display={`${Math.round(
+                            appearance.glassOpacity * 100,
+                        )}%`}
+                        min={0.35}
+                        max={0.9}
+                        step={0.01}
+                        value={appearance.glassOpacity}
+                        disabled={performanceMode}
+                        onChange={setGlassOpacity}
+                    />
+                    <SliderField
+                        label="玻璃模糊"
+                        display={`${Math.round(appearance.glassBlur)}px`}
+                        min={8}
+                        max={48}
+                        step={1}
+                        value={appearance.glassBlur}
+                        disabled={performanceMode}
+                        onChange={setGlassBlur}
+                    />
+                    <ChoiceRow label="背景图">
+                        <ActionButton
+                            icon={<ImagePlus className="size-3.5" />}
+                            onClick={() => void handlePickBackground()}
+                        >
+                            {appearance.backgroundUrl ? "更换图片" : "选择图片"}
+                        </ActionButton>
+                        {appearance.backgroundUrl ? (
+                            <ActionButton
+                                icon={<Trash2 className="size-3.5" />}
+                                className="text-destructive"
+                                onClick={handleClearBackground}
+                            >
+                                清除
+                            </ActionButton>
+                        ) : null}
+                    </ChoiceRow>
+                    <SliderField
+                        label="不透明度"
+                        display={`${Math.round(
+                            appearance.backgroundOpacity * 100,
+                        )}%`}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={appearance.backgroundOpacity}
+                        onChange={setBackgroundOpacity}
+                    />
+                    <SliderField
+                        label="模糊"
+                        display={`${Math.round(appearance.backgroundBlur)}px`}
+                        min={0}
+                        max={40}
+                        step={1}
+                        value={appearance.backgroundBlur}
+                        onChange={setBackgroundBlur}
+                    />
                 </SettingsGroup>
             </div>
-        </Section>
+        </div>
     )
 }
 

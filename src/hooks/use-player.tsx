@@ -204,6 +204,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [repeat, setRepeat] = useState<RepeatMode>(
         () => restored?.repeat ?? "off",
     )
+    // 随机开启时 advance 依此跳曲，ref 避免把 shuffle 拉进 advance deps
+    const shuffleRef = useRef(shuffle)
     const [engineStatus, setEngineStatus] = useState<EngineStatus>("html5")
     const [engineEpoch, setEngineEpoch] = useState(0)
     /** 引擎实例真正挂载后递增，驱动恢复会话重新 load） */
@@ -266,6 +268,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queueRef.current = queue
         indexRef.current = currentIndex
         repeatRef.current = repeat
+        shuffleRef.current = shuffle
         isPlayingRef.current = isPlaying
         volumeRef.current = volume
         mutedRef.current = isMuted
@@ -582,6 +585,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
 
         if (direction === 1) {
+            // 随机模式：列表内随机跳一曲（排除当前），循环兜底避免单曲队列卡死
+            if (shuffleRef.current && list.length > 1) {
+                let nextIdx = idx
+                while (nextIdx === idx) {
+                    nextIdx = Math.floor(Math.random() * list.length)
+                }
+                loadedTrackIdRef.current = null
+                mediaReadyRef.current = false
+                setCurrentIndex(nextIdx)
+                setPositionMs(0)
+                isPlayingRef.current = true
+                setIsPlaying(true)
+                return
+            }
             if (idx < list.length - 1) {
                 loadedTrackIdRef.current = null
                 mediaReadyRef.current = false
@@ -601,6 +618,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 return
             }
             isPlayingRef.current = false
+            // 手动跳到队列末尾不切曲：结算最后一段收听统计再停引擎
+            flushSession(true)
             hardStopEngines()
             setIsPlaying(false)
             return
@@ -617,7 +636,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
         setPositionMs(0)
         activeRef.current?.seek(0)
-    }, [hardStopEngines])
+    }, [flushSession, hardStopEngines])
 
     useEffect(() => {
         function onPrefChange() {
@@ -726,6 +745,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true
             flushSession(false)
+            // 换引擎重建不丢进度：把当前进度交给下次 load 恢复
+            if (lastTickPosRef.current > 0) {
+                pendingSeekMsRef.current = lastTickPosRef.current
+            }
             html5Ref.current?.destroy()
             nativeRef.current?.destroy()
             html5Ref.current = null
@@ -1337,7 +1360,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             list.splice(existing, 1)
         }
         const target =
-            existing >= 0 && existing <= insertAt ? insertAt - 1 : insertAt
+            existing >= 0 && existing < insertAt ? insertAt - 1 : insertAt
         list.splice(target, 0, track)
         loadedTrackIdRef.current = null
         mediaReadyRef.current = false

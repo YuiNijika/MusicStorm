@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { Check, Gauge } from "lucide-react"
+import { Check } from "lucide-react"
 
-import { Section } from "@/components/music/section"
-import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/app/theme-provider"
 import {
     CLOSE_ASK_EVENT,
@@ -15,8 +13,8 @@ import {
 } from "@/lib/app/close-to-tray-prefs"
 import {
     DEVTOOLS_EVENT,
+    applyDevtoolsEnabled,
     getDevToolsEnabled,
-    setDevToolsEnabled,
 } from "@/lib/app/devtools-prefs"
 import {
     MATERIAL_GLASS_MEMO_KEY,
@@ -40,47 +38,32 @@ import {
     getCoverCacheLimitBytes,
     setCoverCacheLimitBytes,
 } from "@/lib/music/cover-cache-prefs"
-import { collectCoverRefHashes } from "@/lib/music/cover-overrides"
-import { extractCoverHash } from "@/lib/local/cover"
-import { loadLocalLibrary } from "@/lib/local/library-store"
+import {
+    collectCoverKeepHashes,
+    pruneCoverOverrides,
+} from "@/lib/music/cover-overrides"
+import { reextractLocalCovers } from "@/lib/local/import-folder"
+import { pruneRemoteCoverIndex } from "@/lib/music/remote-cover-cache"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import { isMacOS, isNativeMacOS } from "@/lib/platform"
 import {
+    ActionButton,
     ChoiceChip,
+    ChipRow,
     SettingsGroup,
     SwitchRow,
+    TabHeader,
 } from "@/pages/settings/settings-ui"
 import { isWebMode } from "@/lib/web-mode"
-
-function collectCoverKeepHashes(): string[] {
-    const hashes = new Set<string>()
-    try {
-        const lib = loadLocalLibrary()
-        for (const album of lib.albums) {
-            const hash = extractCoverHash(album.coverDataUrl)
-            if (hash) {
-                hashes.add(hash)
-            }
-        }
-        for (const artist of lib.artists) {
-            const hash = extractCoverHash(artist.coverDataUrl)
-            if (hash) {
-                hashes.add(hash)
-            }
-        }
-    } catch {
-        // 库读取失败时不保留专辑封面
-    }
-    for (const hash of collectCoverRefHashes()) {
-        hashes.add(hash)
-    }
-    return [...hashes]
-}
 
 function OtherTab() {
     const { appearance, setMaterialGlass } = useTheme()
     const nativeMacOS = isNativeMacOS()
+    // 清理不可逆：首次点击进入确认态，3 秒内再点才执行，避免误触
+    const [confirmClear, setConfirmClear] = useState<"api" | "cover" | null>(
+        null,
+    )
     const [devtoolsEnabled, setDevtoolsEnabledState] = useState(() =>
         getDevToolsEnabled(),
     )
@@ -146,6 +129,23 @@ function OtherTab() {
         }
     }, [])
 
+    function requestClearCache(key: "api" | "cover") {
+        if (confirmClear === key) {
+            setConfirmClear(null)
+            if (key === "api") {
+                void handleClearApiCache()
+            } else {
+                void handleClearCoverCache()
+            }
+            return
+        }
+        setConfirmClear(key)
+        window.setTimeout(
+            () => setConfirmClear((cur) => (cur === key ? null : cur)),
+            3000,
+        )
+    }
+
     async function handleClearApiCache() {
         try {
             await apiCacheClear()
@@ -162,9 +162,15 @@ function OtherTab() {
 
     async function handleClearCoverCache() {
         try {
-            // 保留仍在引用的封面：本地库专辑/艺人封面 + 歌曲封面覆盖
+            // 保留仍在引用的封面：本地库专辑/艺人/曲目内嵌封面 + 歌曲封面覆盖
             const keep = collectCoverKeepHashes()
             await invoke("clear_cover_cache", { keepHashes: keep })
+            // 清理直接删文件，索引不随行失效：立即对账剪枝，
+            // 被清掉的封面回退远程 URL 并重新缓存，不再引用失效路径
+            void pruneRemoteCoverIndex().catch(() => {})
+            void pruneCoverOverrides().catch(() => {})
+            // 本地音乐封面若仍引用被删文件，重新解析音频文件提取（幂等写盘）
+            void reextractLocalCovers({ force: true }).catch(() => {})
             notifySuccess("已清空封面缓存", {
                 description: "未被引用的封面已清理，引用中的封面保留",
             })
@@ -179,10 +185,17 @@ function OtherTab() {
     function handleCoverCacheLimit(bytes: number) {
         setCoverCacheLimitBytes(bytes)
         setCoverCacheLimit(bytes)
-        // 立即按新阈值清理一次，超限的最旧文件即刻回收
-        void invoke("purge_cover_cache_cmd", { maxBytes: bytes }).catch(
-            () => {},
-        )
+        // 立即按新阈值清理一次，引用中的封面不回收；
+        // 清理完成后对账索引，失效条目回源重下而不是挂死链
+        void invoke("purge_cover_cache_cmd", {
+            maxBytes: bytes,
+            keepHashes: collectCoverKeepHashes(),
+        })
+            .then(() => {
+                void pruneRemoteCoverIndex().catch(() => {})
+                void pruneCoverOverrides().catch(() => {})
+            })
+            .catch(() => {})
     }
 
     async function handleTogglePerformance(enabled: boolean) {
@@ -223,13 +236,12 @@ function OtherTab() {
     ]
 
     return (
-        <div className="space-y-7">
-            {!isWebMode() ? (
-                <Section
-                    title="窗口与托盘"
-                    description="关闭窗口的行为与恢复方式"
-                >
-                    <SettingsGroup>
+        <div className="space-y-3">
+            <TabHeader title="其他" description="窗口行为、性能、缓存与开发者选项" />
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {!isWebMode() ? (
+                    <SettingsGroup title="窗口与托盘" description="关闭窗口时的行为">
                         <SwitchRow
                             title="关闭前询问"
                             description={
@@ -251,8 +263,8 @@ function OtherTab() {
                             }
                             description={
                                 isMacOS()
-                                    ? "关闭后音乐继续播放；点击 Dock 或菜单栏图标恢复，⌘Q 退出"
-                                    : "关闭后音乐继续播放，从系统托盘可恢复；退出请用托盘菜单"
+                                    ? "关闭后音乐继续播放；点 Dock 或菜单栏图标恢复"
+                                    : "关闭后音乐继续播放，从系统托盘可恢复"
                             }
                             checked={closeToTray}
                             onCheckedChange={(checked) => {
@@ -261,31 +273,21 @@ function OtherTab() {
                             }}
                         />
                     </SettingsGroup>
-                </Section>
-            ) : null}
+                ) : null}
 
-            <Section
-                title="性能模式"
-                description="牺牲视觉效果换更低的内存与 GPU 占用"
-            >
-                <div className="space-y-3">
-                    <SettingsGroup>
-                        <SwitchRow
-                            title="性能模式"
-                            description="一键关闭毛玻璃与动画，禁用 GPU 相关进程"
-                            checked={performanceMode}
-                            onCheckedChange={(checked) =>
-                                void handleTogglePerformance(checked)
-                            }
-                        />
-                    </SettingsGroup>
-                    <SettingsGroup>
-                        <div className="flex items-center gap-1.5">
-                            <Gauge className="size-4 text-muted-foreground" />
-                            <p className="text-[12px] font-medium text-muted-foreground">
-                                开启后将应用
-                            </p>
-                        </div>
+                <SettingsGroup
+                    title="性能模式"
+                    description="牺牲视觉效果换更低的内存与 GPU 占用"
+                >
+                    <SwitchRow
+                        title="性能模式"
+                        description="一键关闭毛玻璃与动画，禁用 GPU 相关进程"
+                        checked={performanceMode}
+                        onCheckedChange={(checked) =>
+                            void handleTogglePerformance(checked)
+                        }
+                    />
+                    <div className="space-y-2">
                         {perfItems.map((item) => (
                             <div
                                 key={item.label}
@@ -293,74 +295,26 @@ function OtherTab() {
                             >
                                 <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
                                 <div className="min-w-0">
-                                    <p className="text-[13px] font-medium">
+                                    <p className="text-sm font-medium">
                                         {item.label}
                                     </p>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-[13px] text-muted-foreground">
                                         {item.note}
                                     </p>
                                 </div>
                             </div>
                         ))}
-                    </SettingsGroup>
-                    <SettingsGroup>
-                        <SwitchRow
-                            title="常驻毛玻璃"
-                            description="与外观设置联动；性能模式下强制关闭"
-                            checked={appearance.materialGlass}
-                            disabled={performanceMode}
-                            onCheckedChange={setMaterialGlass}
-                        />
-                    </SettingsGroup>
-                </div>
-            </Section>
+                    </div>
+                </SettingsGroup>
 
-            {!isWebMode() ? (
-                <Section
-                    title="开发者工具"
-                    description="调试界面布局与网络请求"
+                <SettingsGroup
+                    className="lg:col-span-2"
+                    title="缓存管理"
+                    description="API 响应与封面缓存，超出上限自动清理"
                 >
-                    <SettingsGroup>
-                        <SwitchRow
-                            title="启用 DevTools"
-                            description="默认 F12 打开开发者工具"
-                            checked={devtoolsEnabled}
-                            onCheckedChange={(checked) => {
-                                setDevToolsEnabled(checked)
-                                setDevtoolsEnabledState(checked)
-                                if (checked && import.meta.env.DEV) {
-                                    void invoke("open_devtools")
-                                }
-                            }}
-                        />
-                    </SettingsGroup>
-                </Section>
-            ) : null}
-
-            <Section title="缓存" description="API 响应与本地封面缓存">
-                <div className="space-y-3">
-                    <SettingsGroup>
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                    API 响应缓存
-                                </p>
-                                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                    {nativeMacOS
-                                        ? "列表类接口写入用户数据库与系统缓存目录，默认 "
-                                        : "列表类接口写入 exe 旁数据库与 cache 目录，默认 "}
-                                    {Math.round(DEFAULT_TTL_MS / 60_000)} 分钟
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => void handleClearApiCache()}
-                                className="h-8 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
-                            >
-                                清空缓存
-                            </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2">
+                        <p className="text-[15px] font-medium">API 响应缓存</p>
+                        <ChipRow>
                             {TTL_PRESETS.map((preset) => (
                                 <ChoiceChip
                                     key={preset.id}
@@ -372,78 +326,40 @@ function OtherTab() {
                                     }}
                                 />
                             ))}
-                        </div>
-                        <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-fill)] px-3 py-2.5">
-                            <div className="min-w-0">
-                                <p className="text-[13px] font-medium">
-                                    自动清理过期缓存
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                    超过上方时长后删除数据库与 cache 目录中的过期项
-                                </p>
-                            </div>
-                            <Switch
-                                checked={autoPurge}
-                                disabled={cacheTtl <= 0}
-                                onCheckedChange={(checked) => {
-                                    setApiCacheAutoPurge(checked)
-                                    setAutoPurge(checked)
-                                }}
-                            />
-                        </div>
-                        {cacheHint ? (
-                            <p className="text-[12px] text-muted-foreground">
-                                {cacheHint}
-                            </p>
-                        ) : null}
-                        {storagePaths ? (
-                            <div className="space-y-1 rounded-xl bg-[var(--surface-fill)] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                                <p
-                                    className="truncate"
-                                    title={storagePaths.appDir}
-                                >
-                                    {nativeMacOS ? "应用数据" : "运行目录"} ·{" "}
-                                    {storagePaths.appDir}
-                                </p>
-                                <p
-                                    className="truncate"
-                                    title={storagePaths.databasePath}
-                                >
-                                    数据库 · {storagePaths.databasePath}
-                                </p>
-                                <p
-                                    className="truncate"
-                                    title={storagePaths.cacheDir}
-                                >
-                                    缓存 · {storagePaths.cacheDir}
-                                </p>
-                            </div>
-                        ) : (
-                            <p className="text-[11px] text-muted-foreground">
-                                浏览器预览无本地路径；桌面端由 Tauri 解析 exe 目录
-                            </p>
-                        )}
-                    </SettingsGroup>
-
-                    <SettingsGroup>
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="min-w-0">
-                                <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                    封面缓存
-                                </p>
-                                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                    原图与缩略图缓存，超出上限自动清理最旧文件
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => void handleClearCoverCache()}
-                                className="h-8 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        </ChipRow>
+                        <SwitchRow
+                            title="自动清理过期缓存"
+                            description={`超过上方时长后删除过期项，默认保留 ${Math.round(DEFAULT_TTL_MS / 60_000)} 分钟`}
+                            checked={autoPurge}
+                            disabled={cacheTtl <= 0}
+                            onCheckedChange={(checked) => {
+                                setApiCacheAutoPurge(checked)
+                                setAutoPurge(checked)
+                            }}
+                        />
+                        <div className="flex min-h-11 flex-wrap items-center gap-2">
+                            <ActionButton
+                                variant={
+                                    confirmClear === "api"
+                                        ? "danger"
+                                        : "default"
+                                }
+                                onClick={() => requestClearCache("api")}
                             >
-                                清空
-                            </button>
+                                {confirmClear === "api"
+                                    ? "确认清空？"
+                                    : "清空缓存"}
+                            </ActionButton>
+                            {cacheHint ? (
+                                <span className="text-[13px] text-muted-foreground">
+                                    {cacheHint}
+                                </span>
+                            ) : null}
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[15px] font-medium">封面缓存</p>
+                        <ChipRow>
                             {LIMIT_PRESETS.map((preset) => (
                                 <ChoiceChip
                                     key={preset.id}
@@ -454,10 +370,70 @@ function OtherTab() {
                                     }
                                 />
                             ))}
+                        </ChipRow>
+                        <div className="flex min-h-11 flex-wrap items-center gap-2">
+                            <ActionButton
+                                variant={
+                                    confirmClear === "cover"
+                                        ? "danger"
+                                        : "default"
+                                }
+                                onClick={() => requestClearCache("cover")}
+                            >
+                                {confirmClear === "cover"
+                                    ? "确认清空？"
+                                    : "清空缓存"}
+                            </ActionButton>
                         </div>
+                    </div>
+                    {storagePaths ? (
+                        <div className="space-y-1 rounded-xl bg-[var(--surface-fill)] px-3 py-2 font-mono text-[13px] leading-relaxed text-muted-foreground">
+                            <p
+                                className="truncate"
+                                title={storagePaths.appDir}
+                            >
+                                {nativeMacOS ? "应用数据" : "运行目录"} ·{" "}
+                                {storagePaths.appDir}
+                            </p>
+                            <p
+                                className="truncate"
+                                title={storagePaths.databasePath}
+                            >
+                                数据库 · {storagePaths.databasePath}
+                            </p>
+                            <p
+                                className="truncate"
+                                title={storagePaths.cacheDir}
+                            >
+                                缓存 · {storagePaths.cacheDir}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-[13px] text-muted-foreground">
+                            浏览器预览无本地路径；桌面端由 Tauri 解析 exe 目录
+                        </p>
+                    )}
+                </SettingsGroup>
+
+                {/* DevTools 随 release 附带，非网页模式均可手动开关 */}
+                {!isWebMode() ? (
+                    <SettingsGroup
+                        className="lg:col-span-2"
+                        title="开发者工具"
+                        description="调试界面布局与网络请求"
+                    >
+                        <SwitchRow
+                            title="启用 DevTools"
+                            description="随 release 附带，开启后立即打开面板，可按 F12 开合"
+                            checked={devtoolsEnabled}
+                            onCheckedChange={(checked) => {
+                                applyDevtoolsEnabled(checked)
+                                setDevtoolsEnabledState(checked)
+                            }}
+                        />
                     </SettingsGroup>
-                </div>
-            </Section>
+                ) : null}
+            </div>
         </div>
     )
 }

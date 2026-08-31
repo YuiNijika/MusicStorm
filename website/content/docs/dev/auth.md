@@ -68,6 +68,23 @@ const { ready, loggedIn, profile, accounts, activeUserId } = useNeteaseSession()
 
 启动时 `reconcileNeteaseVaultOnBoot` 对账账号库；页面在 `ready` 前不要做依赖登录态的请求。
 
+## 每日自动签到
+
+签到逻辑收敛在 `src/lib/netease/daily-signin.ts`，调度在 `src/hooks/use-auto-signin.ts`，设置页开关在账号 Tab：
+
+| 模块 | 职责 |
+|---|---|
+| `daily-signin.ts` | `performDailySignin(userId)`：先 `dailySummary` 查 `pcSign` / `mobileSign` 状态，只补签缺失渠道；全渠道已签时记为已完成、不发签到请求 |
+| `use-auto-signin.ts` | 登录态就绪后立即检查一次；常驻期间每分钟检查，覆盖零点仍在应用内的跨天场景 |
+| 账号 Tab（`account-tab.tsx`） | 「自动签到」开关（`readAutoSigninEnabled` / `setAutoSigninEnabled`）与手动签到按钮（`notifyPromise` 状态 toast） |
+
+去重与幂等约定：
+
+- 结果按**自然日**（本地时区 `YYYY-MM-DD`）记入 localStorage `musicstorm-signin-log`，同日重复调用直接短路，不发任何请求
+- `signinInFlight` 单飞闸：进行中的签到共享同一 Promise，不并发重入
+- 记录变更广播 `musicstorm-signin-log`（不带冒号），账号页监听刷新
+- 开关存 `musicstorm-auto-signin`，默认开启；关闭后 `maybeAutoSignin` 直接 return
+
 ## 常见问题
 
 | 现象 | 原因与处理 |

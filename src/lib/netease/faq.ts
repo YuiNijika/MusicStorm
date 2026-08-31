@@ -1,5 +1,5 @@
-import { getApiSettings } from "@/lib/netease/api-settings"
-import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { DEFAULT_BASE_URL } from "@/lib/netease/api-settings"
+import { NETEASE_PATHS } from "@/lib/netease/paths"
 
 type FaqItem = {
     question: string
@@ -39,19 +39,25 @@ const BUILTIN_FAQ: FaqItem[] = [
 ]
 
 async function fetchFaqItems(): Promise<FaqItem[]> {
-    if (getApiSettings().mode === "integrated") {
+    // FAQ 是 MusicStorm 自己的内容，固定走官方部署（NeteaseProxy.php 同源），
+    // 不经 neteaseRequest——外置 API 模式下它会跟随用户选择的网易云源，
+    // 第三方源没有 /musicstorm/faq 路由，导致请求打错地方拿不到数据
+    try {
+        const response = await fetch(
+            `${DEFAULT_BASE_URL}${NETEASE_PATHS.faq}`,
+            { credentials: "omit" },
+        )
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+        const data = (await response.json()) as FaqItem[] | { data?: FaqItem[] }
+        // 官方源返回统一 envelope，data 为数组；兼容直接给数组的形式
+        const items = Array.isArray(data) ? data : data?.data
+        return Array.isArray(items) && items.length > 0 ? items : BUILTIN_FAQ
+    } catch {
+        // 官方部署不可达时回退内置文案，保证 FAQ 永远有内容
         return BUILTIN_FAQ
     }
-    const data = await neteaseRequest<FaqItem[] | { data?: FaqItem[] }>({
-        path: NETEASE_PATHS.faq,
-        method: "GET",
-    })
-    // 官方源返回统一 envelope，data 为数组；第三方源可能直接给数组
-    if (Array.isArray(data)) {
-        return data
-    }
-    const items = data?.data
-    return Array.isArray(items) ? items : []
 }
 
 export { BUILTIN_FAQ, fetchFaqItems }

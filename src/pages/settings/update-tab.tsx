@@ -1,7 +1,14 @@
-import { Section } from "@/components/music/section"
+import { useEffect, useState } from "react"
+
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { useContributors } from "@/hooks/use-contributors"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
+import {
+    UPDATE_SOURCE_EVENT,
+    readUpdateSource,
+    setUpdateSource,
+    type UpdateSource,
+} from "@/lib/app/update-source-prefs"
 import {
     GITHUB_REPO_URL,
     openExternalUrl,
@@ -11,8 +18,12 @@ import {
     notifyInfo,
     notifySuccess,
 } from "@/lib/notify"
-import { SettingsGroup } from "@/pages/settings/settings-ui"
-import { cn } from "@/lib/utils"
+import {
+    ActionButton,
+    ChoiceChip,
+    SettingsGroup,
+    TabHeader,
+} from "@/pages/settings/settings-ui"
 
 function formatCheckedAt(ts: number): string {
     try {
@@ -33,6 +44,21 @@ function formatCacheTtlLabel(): string {
 
 function UpdateTab() {
     const { status, checking, refresh } = useAppUpdate()
+    const [updateSource, setUpdateSourceState] = useState<UpdateSource>(() =>
+        readUpdateSource(),
+    )
+
+    // 切换更新源后立即用新源重查
+    useEffect(() => {
+        function onUpdateSource() {
+            setUpdateSourceState(readUpdateSource())
+            void refresh(true)
+        }
+        window.addEventListener(UPDATE_SOURCE_EVENT, onUpdateSource)
+        return () => {
+            window.removeEventListener(UPDATE_SOURCE_EVENT, onUpdateSource)
+        }
+    }, [refresh])
 
     async function handleRefresh() {
         try {
@@ -74,15 +100,37 @@ function UpdateTab() {
     const body = status?.releaseBody?.trim() || ""
 
     return (
-        <Section
-            title="版本更新"
-            description="通过 GitHub Releases 检测，不自动安装"
-        >
+        <div className="space-y-3">
+            <TabHeader title="更新" description="通过 GitHub Releases 检测，不自动安装" />
+
             <div className="space-y-3">
-                <SettingsGroup>
+                <SettingsGroup
+                    title="更新源"
+                    description="默认 GitHub 官方仓库；访问受限时可切换镜像加速"
+                >
+                    <div className="flex flex-wrap gap-2">
+                        <ChoiceChip
+                            label="官方仓库"
+                            active={updateSource === "github"}
+                            onClick={() => setUpdateSource("github")}
+                        />
+                        <ChoiceChip
+                            label="镜像加速"
+                            active={updateSource === "mirror"}
+                            onClick={() => setUpdateSource("mirror")}
+                        />
+                    </div>
+                    <p className="text-[13px] text-muted-foreground">
+                        {updateSource === "mirror"
+                            ? "当前走 https://gh-proxy.com/ 镜像，接口 403 时自动重试（最多 5 次）"
+                            : "当前直连 api.github.com，匿名额度受限时会自动重试（最多 5 次）"}
+                    </p>
+                </SettingsGroup>
+
+                <SettingsGroup title="版本状态">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="material-surface rounded-2xl px-3.5 py-3">
-                            <p className="text-[11px] font-medium text-muted-foreground">
+                            <p className="text-[13px] font-medium text-muted-foreground">
                                 当前版本
                             </p>
                             <p className="mt-1 font-mono text-[18px] font-semibold tracking-[-0.02em]">
@@ -90,7 +138,7 @@ function UpdateTab() {
                             </p>
                         </div>
                         <div className="material-surface rounded-2xl px-3.5 py-3">
-                            <p className="text-[11px] font-medium text-muted-foreground">
+                            <p className="text-[13px] font-medium text-muted-foreground">
                                 最新版本
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -98,11 +146,11 @@ function UpdateTab() {
                                     {latest}
                                 </p>
                                 {status?.hasUpdate ? (
-                                    <span className="rounded-full bg-rose-500/90 px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+                                    <span className="rounded-full bg-rose-500/90 px-1.5 py-px text-[13px] font-semibold uppercase tracking-[0.04em] text-white">
                                         new
                                     </span>
                                 ) : status?.latestVersion ? (
-                                    <span className="rounded-full bg-[var(--surface-fill)] px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                    <span className="rounded-full bg-[var(--surface-fill)] px-1.5 py-px text-[13px] font-medium text-muted-foreground">
                                         最新
                                     </span>
                                 ) : null}
@@ -110,7 +158,7 @@ function UpdateTab() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
                         {status?.checkedAt ? (
                             <span>
                                 上次检测 {formatCheckedAt(status.checkedAt)}
@@ -137,7 +185,7 @@ function UpdateTab() {
                     </div>
 
                     {status?.error ? (
-                        <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-200">
+                        <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
                             {status.error}
                             {status.latestVersion
                                 ? "（已展示缓存结果）"
@@ -146,42 +194,33 @@ function UpdateTab() {
                     ) : null}
 
                     <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
+                        <ActionButton
                             onClick={() => void handleRefresh()}
                             disabled={checking}
-                            className={cn(
-                                "h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[12px] font-medium",
-                                "transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-45",
-                            )}
                         >
                             {checking ? "检测中…" : "刷新检测"}
-                        </button>
-                        <button
-                            type="button"
+                        </ActionButton>
+                        <ActionButton
+                            variant="primary"
                             onClick={() => void handleOpenRelease()}
-                            className={cn(
-                                "h-9 cursor-pointer rounded-full bg-foreground px-4 text-[12px] font-medium text-background",
-                                "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)]",
-                            )}
                         >
                             前往更新
-                        </button>
+                        </ActionButton>
                     </div>
                 </SettingsGroup>
 
                 <SettingsGroup title={releaseTitle}>
                     {status?.latestTag ? (
-                        <p className="-mt-2 font-mono text-[11px] text-muted-foreground">
+                        <p className="font-mono text-[13px] text-muted-foreground">
                             tag {status.latestTag}
                         </p>
                     ) : null}
                     {body ? (
-                        <pre className="material-surface max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl px-3.5 py-3 text-[12.5px] leading-relaxed text-foreground/90">
+                        <pre className="material-surface max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl px-3.5 py-3 text-sm leading-relaxed text-foreground/90">
                             {body}
                         </pre>
                     ) : (
-                        <p className="text-[13px] text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                             暂无 Release 说明。可点「刷新检测」从 GitHub
                             拉取最新信息。
                         </p>
@@ -190,7 +229,7 @@ function UpdateTab() {
 
                 <ContributorsPanel />
             </div>
-        </Section>
+        </div>
     )
 }
 
@@ -200,14 +239,14 @@ function ContributorsPanel() {
 
     return (
         <SettingsGroup title="贡献者">
-            <div className="-mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[12px] text-muted-foreground">
+            <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+                <p className="text-[13px] text-muted-foreground">
                     感谢每一位贡献者
                 </p>
                 <button
                     type="button"
                     onClick={() => void openExternalUrl(GITHUB_REPO_URL)}
-                    className="cursor-pointer text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                    className="cursor-pointer text-[13px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                     在 GitHub 上参与共建 →
                 </button>
@@ -239,14 +278,14 @@ function ContributorsPanel() {
                                 loading="lazy"
                                 className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform group-hover:scale-105 dark:ring-white/[0.12]"
                             />
-                            <span className="w-full truncate text-center text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
+                            <span className="w-full truncate text-center text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
                                 {contributor.login}
                             </span>
                         </button>
                     ))}
                 </div>
             ) : (
-                <p className="text-[12px] text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                     暂时拉取不到贡献者列表，可稍后再试。
                 </p>
             )}

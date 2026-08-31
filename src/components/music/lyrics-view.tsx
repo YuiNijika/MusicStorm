@@ -157,7 +157,8 @@ function LyricsView({
     listClassName,
 }: LyricsViewProps) {
     const { currentTrack, seek } = usePlayer()
-    const { positionMs } = usePlaybackTick()
+    // inactive（面板未开/封面页）时冻结 tick，避免每 200ms 白渲
+    const { positionMs } = usePlaybackTick(active)
     const [lines, setLines] = useState<LyricLine[]>([])
     const [status, setStatus] = useState<"idle" | "loading" | "empty" | "error" | "ready">(
         "idle",
@@ -165,12 +166,16 @@ function LyricsView({
     const [overrideTick, setOverrideTick] = useState(0)
     const [prefsTick, setPrefsTick] = useState(0)
     const listRef = useRef<HTMLDivElement>(null)
-    const activeIndex = useMemo(
-        () => findActiveLyricIndex(lines, positionMs),
-        [lines, positionMs],
-    )
     const isFull = variant === "full"
-    const timedLyrics = lines.some((line) => line.timeMs > 0)
+    const timedLyrics = useMemo(
+        () => lines.some((line) => line.timeMs > 0),
+        [lines],
+    )
+    const activeIndex = useMemo(
+        // 未计时歌词直接免算；timed 判定只在 lines 变化时重算，避免每 tick 全量遍历
+        () => (timedLyrics ? findActiveLyricIndex(lines, positionMs) : -1),
+        [lines, positionMs, timedLyrics],
+    )
     const textAlignClass =
         align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"
 

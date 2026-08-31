@@ -20,6 +20,18 @@ function setDevToolsEnabled(enabled: boolean): void {
 // 避免重复按 F12 累积出多个 DevTools 进程（面板进程 + 远程调试进程约 270MB）
 let devtoolsOpen = false
 
+// 统一开关入口：偏好持久化 + 模块级 open 标志同步 + 实际开合面板。
+// 设置页与 F12 共用，避免设置开过面板后 F12 标志仍为关导致首按被吞
+function applyDevtoolsEnabled(enabled: boolean): void {
+    setDevToolsEnabled(enabled)
+    devtoolsOpen = enabled
+    if (enabled) {
+        void invoke("open_devtools").catch(() => {})
+    } else {
+        void invoke("close_devtools").catch(() => {})
+    }
+}
+
 // 仅开发构建生效
 function useDevtoolsShortcut(): void {
     useEffect(() => {
@@ -43,4 +55,10 @@ function useDevtoolsShortcut(): void {
     }, [])
 }
 
-export { DEVTOOLS_EVENT, getDevToolsEnabled, setDevToolsEnabled, useDevtoolsShortcut }
+export {
+    DEVTOOLS_EVENT,
+    applyDevtoolsEnabled,
+    getDevToolsEnabled,
+    setDevToolsEnabled,
+    useDevtoolsShortcut
+}

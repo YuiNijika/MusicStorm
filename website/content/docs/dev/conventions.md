@@ -52,6 +52,16 @@ await fetchSongUrl(id)
 - `prefers-reduced-motion` 下非全灭：App.css 强制 transition-property 白名单 150ms cross-fade；组件 JS 侧判 reduce 时 timer 用 150ms 不是 0
 - 弹性滑块 `elastic-slider` 的过冲弹簧 `cubic-bezier(0.34, 1.56, 0.64, 1)` 是有意保留的物理回弹，勿"修正"
 
+## 路由切换载入动画
+
+`src/lib/app/route-transition.ts` 的 `runRouteTransition(mutate)` 包一层 View Transitions，主内容区独立快照、固定淡入（CSS 在 `Style.css` 的 `vt-route-*` 规则）：
+
+- 回调内用 `flushSync` 让新页面在截帧前提交，否则快照捕到的还是旧页
+- 三种情况直接切换不建快照：不支持 `startViewTransition`、`prefers-reduced-motion`、性能模式（`html.performance-mode`）
+- 切换期间挂 `vt-route-fade` class，`transition.finished` 后移除
+
+与主题切换的圆扩散（见 [主题与外观](#/docs/dev/appearance)）是两套独立 VT：主题切换挂 `theme-switching`，路由切换挂 `vt-route-fade`，互不污染。
+
 ## 懒加载约定
 
 - 页面一律 `lazy()` + 页面专属骨架屏（`src/components/music/loading-skeletons.tsx`）
@@ -73,11 +83,31 @@ const SettingsPage = lazy(() =>
 - UI 文案只描述用户真实所见，不写技术栈、不描述实现方式
 - 移除组件 = 删除整个目录
 
+## 通知与 Toast
+
+统一走 `src/lib/notify.ts`，不要直接操作 toast manager：
+
+| 函数 | 类型 | 默认停留 |
+|---|---|---|
+| `notifySuccess` / `notifyInfo` | success / info | 3.2s |
+| `notifyWarning` | warning | 3.8s |
+| `notifyError` | error | 4.8s（高优先级） |
+| `notifyLoading` | loading | 不自动关，需手动更新或关闭 |
+| `notifyPromise(promise, { loading, success, error })` | 三态 | loading → 成功/失败就地变换类型与文案 |
+
+使用约定：
+
+- `notifyPromise` 适合签到、清理缓存等有明确终态的异步动作，一个 id 全程复用，不会另弹第二条
+- `notifyFromError(title, error)` 从 unknown error 提取 message（内部 `formatError`）
+- 同类重复通知传 `id` 去重（如「已是当前账号」）
+- viewport 默认右上角流式堆叠，上限 4 条；求 star 是独立 bottom-center 组件（`star-toast.tsx`），不走 notify.ts
+
 ## 构建约定
 
 | 约定 | 说明 |
 |---|---|
 | 主应用 `vite build` 在 PowerShell（大写盘符 `D:`）执行 | Git Bash 小写 `d:/` cwd 触发 vite html-inline-proxy 盘符大小写 bug |
+| 多页入口在 `vite.config.ts` 的 `rollupOptions.input` | 主窗口 / desktop-lyric / mini-player 三个入口必须齐全，缺项 dev 无感但打包后窗口 404 白屏（见 [Tauri 命令](#/docs/dev/tauri)） |
 | pnpm / node 命令加 `NODE_OPTIONS=` 前缀 | 去掉 safe-delete shim，否则 pnpm 临时目录删除被拦截、vite 清 dist 卡死 |
 | pnpm 装包后空目录 | junction 创建失败；`New-Item -ItemType Junction` 手工链接到根 `node_modules/.pnpm/<pkg>`，并验证 package.json 可读 |
 | website：`vite.config.ts` 需 `build.emptyOutDir=false` | 沙箱 safe-delete 拦截清空 dist |

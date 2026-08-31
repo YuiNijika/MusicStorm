@@ -6,7 +6,7 @@ const SETTINGS_KEY = "musicstorm-api-settings"
 const LEGACY_BASE_URL_KEY = "musicstorm-netease-base-url"
 const LEGACY_PRESET_KEY = "musicstorm-netease-base-preset"
 
-// 自定义空值与集成降级回落；官方源 = 自建 CloudMusicAPI_New（统一 envelope 格式）
+// 自定义空值与集成降级回落
 const DEFAULT_BASE_URL = "https://api.miomoe.cn/netease/music"
 
 const EXTERNAL_SOURCES = [
@@ -14,11 +14,6 @@ const EXTERNAL_SOURCES = [
         id: "official" as const,
         label: "MusicStorm 官方源",
         baseURL: DEFAULT_BASE_URL,
-    },
-    {
-        id: "qijieya" as const,
-        label: "锦木祈杰源",
-        baseURL: "https://musicapi.qijieya.cn",
     },
     {
         id: "custom" as const,
@@ -233,31 +228,75 @@ type SpeedTestResult =
     | { ok: true; ms: number }
     | { ok: false; message: string }
 
+// 各源的首选探测接口：官方源（miomoe 系 NeteaseCloudMusicApi）根路径没有路由会 404，
+// 用 login/status（只校验 cookie、不走重上游）这类轻接口测；其他源维持通用探测
+const SPEED_PROBES: Record<"official" | "custom", string[]> = {
+    official: ["/login/status", "/search?keywords=a&limit=1", "/"],
+    custom: ["/search?keywords=a&limit=1", "/"],
+}
+
+async function fetchWithTimeout(
+    target: string,
+): Promise<{ response: Response | null; ms: number; aborted: boolean }> {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), SPEED_TIMEOUT_MS)
+    const started = performance.now()
+    try {
+        const response = await fetch(target, {
+            method: "GET",
+            signal: controller.signal,
+            credentials: "omit",
+        })
+        return {
+            response,
+            ms: Math.round(performance.now() - started),
+            aborted: false,
+        }
+    } catch (error) {
+        return {
+            response: null,
+            ms: Math.round(performance.now() - started),
+            aborted:
+                error instanceof DOMException && error.name === "AbortError",
+        }
+    } finally {
+        window.clearTimeout(timer)
+    }
+}
+
 async function speedTestApi(baseURL: string): Promise<SpeedTestResult> {
     const base = normalizeUrl(baseURL)
-    const candidates = [`${base}/search?keywords=a&limit=1`, `${base}/`]
+    const settings = getApiSettings()
+    // 官方源用专属轻接口优先；自定义源可能任意实现，保持通用探测
+    const candidates =
+        settings.source === "official"
+            ? SPEED_PROBES.official
+            : SPEED_PROBES.custom
 
-    for (const target of candidates) {
-        const controller = new AbortController()
-        const timer = window.setTimeout(() => controller.abort(), SPEED_TIMEOUT_MS)
-        const started = performance.now()
-        try {
-            const response = await fetch(target, {
-                method: "GET",
-                signal: controller.signal,
-                credentials: "omit",
-            })
-            const ms = Math.round(performance.now() - started)
-            window.clearTimeout(timer)
-            if (!response.ok && response.status >= 500) {
-                continue
-            }
+    // 第一轮：找一个返回 200 的真实接口，延迟才有意义
+    let reachable = false
+    for (const path of candidates) {
+        const { response, ms, aborted } = await fetchWithTimeout(
+            `${base}${path}`,
+        )
+        if (aborted) {
+            return { ok: false, message: "超时" }
+        }
+        if (response && response.ok) {
             return { ok: true, ms }
-        } catch (error) {
-            window.clearTimeout(timer)
-            if (error instanceof DOMException && error.name === "AbortError") {
-                return { ok: false, message: "超时" }
-            }
+        }
+        if (response) {
+            // 4xx（如根路径 404）也算服务器可达，留作兜底
+            reachable = true
+        }
+    }
+
+    // 第二轮兜底：所有真实接口都不可用（如服务器上游故障），但 HTTP 有响应
+    // 说明服务本身在线，仍然给出可达结果，避免把「上游挂了」误报成「连不上」
+    if (reachable) {
+        const { response, ms } = await fetchWithTimeout(`${base}/`)
+        if (response) {
+            return { ok: true, ms }
         }
     }
 

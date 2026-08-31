@@ -6,7 +6,6 @@ import {
     Library,
     LogIn,
     LogOut,
-    Monitor,
     MoonStar,
     Podcast,
     Search,
@@ -115,11 +114,19 @@ function CompactSidebar({
     const [authOpen, setAuthOpen] = useState(false)
 
     // 底部功能图标：头像账号菜单、主题快切、设置
-    const ThemeIcon =
-        theme === "dark" ? MoonStar : theme === "light" ? SunMedium : Monitor
+    // 默认跟随系统：图标按解析后的实际明暗显示，不做第三态
+    const resolvedTheme =
+        theme === "system"
+            ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+            : theme
+    const ThemeIcon = resolvedTheme === "dark" ? MoonStar : SunMedium
 
     function cycleTheme() {
-        setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")
+        // 侧栏快切只在明暗间循环（移除跟随系统档）：
+        // 处于跟随系统时先解析出实际明暗，再切到另一侧，调色板不动
+        setTheme(resolvedTheme === "light" ? "dark" : "light")
     }
 
     return (

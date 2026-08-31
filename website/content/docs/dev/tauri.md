@@ -24,11 +24,12 @@ order: 8
 | 扫描 | `scan_music_folder`、`scan_music_files`、`scan_music_artist_folder` | 本地音乐扫描 |
 | SQLite | `db_upsert_folder`、`db_upsert_tracks`、`db_start_play_session`、`db_end_play_session`、`db_get_listen_stats`、`db_list_listen_stats`、`db_list_top_tracks`、`db_listen_source_breakdown`、`db_get_setting`、`db_set_setting` | 曲库 / 听歌统计 / 设置 |
 | API 缓存 | `api_cache_get`、`api_cache_set`、`api_cache_clear`、`api_cache_purge_expired` | 网易云响应磁盘缓存 |
-| 封面缓存 | `cache_cover_url`、`cache_cover_data_url`、`clear_cover_cache` | 封面磁盘缓存；下载走阻塞线程池，带连接/总超时，配合前端并发闸防止死链占满线程池 |
+| 封面缓存 | `cache_cover_url`、`cache_cover_data_url`、`clear_cover_cache`、`cover_paths_exist` | 封面磁盘缓存；下载走阻塞线程池，带连接/总超时，配合前端并发闸防止死链占满线程池；`cover_paths_exist` 供前端索引与磁盘对账（见 [封面与播放 URL](#/docs/dev/media)） |
 | 音频 | `audio_list_devices`、`audio_get_output_mode`、`audio_set_device`、`audio_set_exclusive`、`audio_probe`、`audio_load`、`audio_play`、`audio_pause`、`audio_seek`、`audio_set_volume`、`audio_stop` | 原生播放引擎 |
 | ffmpeg | `ffmpeg_detect`、`ffmpeg_validate`、`ffmpeg_set_path`、`pick_ffmpeg_executable` | 检测 / 校验 / 选路径 |
 | 网络代理 | `netease_http_post` | 无 CORS POST（仅放行 music.163.com 域）；`async fn` + `spawn_blocking`，慢/挂死的网易云接口不占 UI 主线程 |
 | 系统 | `get_storage_paths`、`update_global_shortcut` | 路径 / 全局快捷键 |
+| 桌面窗口 | `show_desktop_lyric`、`hide_desktop_lyric`、`is_desktop_lyric_visible`、`update_desktop_lyric`；`show_mini_player`、`hide_mini_player`、`is_mini_player_visible`、`update_mini_player`、`get_mini_player_state` | 桌面歌词 / 小播放器第二窗口（见下「新增窗口」） |
 | macOS | `macos_now_playing_update`、`macos_now_playing_clear` | Now Playing 集成 |
 
 ## 签名与返回约定
@@ -38,6 +39,22 @@ order: 8
 - 平台差异用 `#[cfg(not(target_os = "android"))]` 标注（文件选择、独占音频等桌面能力）
 
 前端调用统一封装在 `src/lib/` 下的桥接模块（如 `player/native-bridge.ts`、`local/import-folder.ts`），组件不直接 `invoke`。
+
+## 新增窗口
+
+桌面歌词与桌面小播放器是第二窗口（`desktop_lyric.rs` / `mini_player.rs`），新增一个窗口需要三处同步改动，缺一处就会出现打包后白屏 / 事件收不到：
+
+| 改动 | 位置 | 说明 |
+|---|---|---|
+| 多页入口 | `vite.config.ts` 的 `build.rollupOptions.input` | 加 `"xxx": path.resolve(__dirname, "xxx.html")`；打包产物缺入口会 404（dev 模式无感，容易漏） |
+| capabilities | `src-tauri/capabilities/default.json` 的 `windows` 数组 | 窗口 label 必须加入，否则该窗口的 `invoke` / `listen` 全部被 ACL 拒绝 |
+| 命令注册 | `src-tauri/src/lib.rs` 的 `invoke_handler` | 常规注册流程 |
+
+额外约定：
+
+- 状态结构体 `#[serde(rename_all = "camelCase")]`，字段名前后端一致（桌面歌词早期序列化不匹配导致字段全空，已修复）
+- 常驻窗口命令用 `async fn`：同步命令在主线程执行时，`WebviewWindowBuilder::build()` 会等事件循环泵消息而被 IPC 阻塞，整个应用死锁
+- 第二窗口 → 主窗口的控制复用 `musicstorm:player-command`（前端 `emit`），不要另建命令通道
 
 ## 新增命令流程
 

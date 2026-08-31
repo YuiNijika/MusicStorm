@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { useAndroidBack } from "@/hooks/use-android-back"
 import { useAndroidNowPlaying } from "@/hooks/use-android-now-playing"
 import { useCloseToTray } from "@/hooks/use-close-to-tray"
+import { useAutoSignin } from "@/hooks/use-auto-signin"
 import { useMacOSNowPlaying } from "@/hooks/use-macos-now-playing"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNowPlayingTitle } from "@/hooks/use-now-playing-title"
@@ -46,6 +47,7 @@ function AppShell({
     usePlayerHotkeys()
     const { askOpen, cancelClose, confirmClose } = useCloseToTray()
     useTrayCommands()
+    useAutoSignin()
     useMacOSNowPlaying()
     useAndroidNowPlaying()
     useNowPlayingTitle()
@@ -87,7 +89,7 @@ function AppShell({
 
                 <main
                     ref={mainRef}
-                    className="apple-scroll min-w-0 flex-1 overflow-y-auto"
+                    className="page-content-host apple-scroll min-w-0 flex-1 overflow-y-auto"
                 >
                     <div className="w-full px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-10 md:pb-10 xl:px-16">
                         {children}

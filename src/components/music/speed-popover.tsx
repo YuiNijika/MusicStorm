@@ -1,3 +1,5 @@
+import { memo } from "react"
+
 import {
     Popover,
     PopoverContent,
@@ -17,7 +19,8 @@ function formatRate(rate: number): string {
     return `${rate % 1 === 0 ? rate.toFixed(1) : rate}x`
 }
 
-function SpeedPopover({ rate, onSpeed, compact = false }: SpeedPopoverProps) {
+// memo：rate/onSpeed/compact 稳定 props，播放条 200ms tick 父重渲时跳过
+const SpeedPopover = memo(function SpeedPopover({ rate, onSpeed, compact = false }: SpeedPopoverProps) {
     return (
         <Popover>
             <PopoverTrigger
@@ -53,6 +56,6 @@ function SpeedPopover({ rate, onSpeed, compact = false }: SpeedPopoverProps) {
             </PopoverContent>
         </Popover>
     )
-}
+})
 
 export { SpeedPopover }

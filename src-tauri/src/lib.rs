@@ -8,6 +8,7 @@ mod db;
 mod desktop_lyric;
 mod ffmpeg;
 mod local_meta;
+mod mini_player;
 #[cfg(target_os = "macos")]
 mod macos_now_playing;
 mod netease_proxy;
@@ -22,8 +23,8 @@ use audio::{
     AudioState,
 };
 use cover_cache::{
-    cache_cover_data_url, cache_cover_url, clear_cover_cache, purge_cover_cache,
-    purge_cover_cache_cmd, DEFAULT_COVER_CACHE_LIMIT,
+cache_cover_data_url, cache_cover_url, clear_cover_cache, cover_paths_exist,
+purge_cover_cache_cmd,
 };
 #[cfg(not(target_os = "android"))]
 use cover_cache::pick_cover_image;
@@ -80,7 +81,7 @@ struct LocalScanTrack {
     content_hash: Option<String>,
 }
 
-// release 构建仅 debug 实际生效，避免 WebView2 原生 F12 绕过前端开关
+// DevTools 随 release 附带；开关控制主程序内主动开合（F12 由 WebView2 原生加速键处理）
 #[tauri::command]
 fn open_devtools(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
@@ -783,6 +784,8 @@ pub fn run() {
             app.manage(AudioState::default());
             #[cfg(not(target_os = "android"))]
             app.manage(desktop_lyric::DesktopLyricStateWrapper::new());
+            #[cfg(not(target_os = "android"))]
+            app.manage(mini_player::MiniPlayerStateWrapper::new());
 
             #[cfg(target_os = "macos")]
             app.manage(macos_now_playing::setup(app.handle()));
@@ -799,7 +802,7 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 let _ = purge_webview_caches_on_upgrade(&app_handle);
                 let _ = purge_expired_api_cache_in_background(&app_handle);
-                let _ = purge_cover_cache(&app_handle, DEFAULT_COVER_CACHE_LIMIT);
+                // 封面缓存容量清理由前端启动时执行（需带 keepHashes 保护引用中的封面），Rust 侧不再重复清理
             });
 
             // 系统托盘 + 全局媒体快捷键（桌面专属，失败不阻断启动）
@@ -829,6 +832,7 @@ pub fn run() {
             cache_cover_url,
             cache_cover_data_url,
             clear_cover_cache,
+            cover_paths_exist,
             purge_cover_cache_cmd,
             #[cfg(not(target_os = "android"))]
             pick_text_file,
@@ -899,6 +903,16 @@ pub fn run() {
             desktop_lyric::is_desktop_lyric_visible,
             #[cfg(not(target_os = "android"))]
             desktop_lyric::update_desktop_lyric,
+            #[cfg(not(target_os = "android"))]
+            mini_player::show_mini_player,
+            #[cfg(not(target_os = "android"))]
+            mini_player::hide_mini_player,
+            #[cfg(not(target_os = "android"))]
+            mini_player::is_mini_player_visible,
+            #[cfg(not(target_os = "android"))]
+            mini_player::update_mini_player,
+            #[cfg(not(target_os = "android"))]
+            mini_player::get_mini_player_state,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

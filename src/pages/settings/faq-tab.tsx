@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react"
 
-import { Section } from "@/components/music/section"
 import { fetchFaqItems, type FaqItem } from "@/lib/netease/faq"
-import { SettingsGroup } from "@/pages/settings/settings-ui"
+import { SettingsGroup, TabHeader } from "@/pages/settings/settings-ui"
 
 function FaqTab() {
     const [items, setItems] = useState<FaqItem[]>([])
@@ -32,41 +31,48 @@ function FaqTab() {
     }, [])
 
     return (
-        <Section
-            title="常见问题"
-            description="常见问题的解答，内容由音源接口提供"
-        >
+        <div className="space-y-3">
+            <TabHeader
+                title="常见问题"
+                description="内容由音源接口提供"
+            />
+
             {loading ? (
                 <SettingsGroup>
-                    <p className="text-[13px] text-muted-foreground">加载中…</p>
+                    <p className="text-sm text-muted-foreground">加载中…</p>
                 </SettingsGroup>
             ) : error ? (
                 <SettingsGroup>
-                    <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-200">
+                    <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
                         {error}
                     </p>
                 </SettingsGroup>
             ) : items.length === 0 ? (
                 <SettingsGroup>
-                    <p className="text-[13px] text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                         暂无常见问题。
                     </p>
                 </SettingsGroup>
             ) : (
-                <div className="space-y-2.5">
-                    {items.map((item, index) => (
-                        <SettingsGroup key={`${item.question}-${index}`}>
-                            <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                {item.question}
-                            </p>
-                            <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-                                {item.answer}
-                            </p>
-                        </SettingsGroup>
-                    ))}
-                </div>
+                <SettingsGroup>
+                    <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
+                        {items.map((item, index) => (
+                            <li
+                                key={`${item.question}-${index}`}
+                                className="space-y-1.5 py-3 first:pt-0 last:pb-0"
+                            >
+                                <p className="text-[14px] font-medium tracking-[-0.01em]">
+                                    {item.question}
+                                </p>
+                                <p className="text-sm leading-relaxed text-muted-foreground">
+                                    {item.answer}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                </SettingsGroup>
             )}
-        </Section>
+        </div>
     )
 }
 
