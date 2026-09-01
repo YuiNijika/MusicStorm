@@ -17,11 +17,11 @@ val tauriProperties = Properties().apply {
 val releaseStoreFile = file("keystore/musicstorm-release.jks")
 val releaseStorePassword = providers.gradleProperty("MUSICSTORM_STORE_PASSWORD")
     .orElse(providers.environmentVariable("MUSICSTORM_STORE_PASSWORD"))
-    .orElse("musicstorm123")
-val releaseKeyAlias = "musicstorm"
+    .orElse("lekAsQhDYXHxahrTpDHBAoiw")
+val releaseKeyAlias = "com.yuinijika.musicstorm"
 val releaseKeyPassword = providers.gradleProperty("MUSICSTORM_KEY_PASSWORD")
     .orElse(providers.environmentVariable("MUSICSTORM_KEY_PASSWORD"))
-    .orElse("musicstorm123")
+    .orElse("lekAsQhDYXHxahrTpDHBAoiw")
 
 android {
     compileSdk = 36
@@ -43,7 +43,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
-        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        versionName = System.getenv("ANDROID_VERSION_NAME") ?: tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
     buildTypes {
         getByName("debug") {

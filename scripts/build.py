@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 MusicStorm 一键构建。
 
@@ -21,6 +21,8 @@ os.chdir(str(PROJECT))
 # 这些是跨机器通用的安装约定，不属于用户特定路径
 _JDK_SEARCH_ROOTS = [
     Path("C:/Program Files/Eclipse Adoptium"),
+    Path("D:/SoftWare/Eclipse Adoptium"),
+    Path("D:/SoftWare/Java"),
     Path("C:/Program Files/Java"),
     Path("C:/Program Files/Microsoft"),
     Path("/usr/lib/jvm"),
@@ -60,6 +62,8 @@ def _load_apk_config() -> str:
             pass
     return '{"version":"0.0.1"}'
 _DEFAULT_ANDROID_TARGET = "aarch64"
+# Android APK 线上版本号：与桌面端 tauri.conf.json 的 version 完全独立
+_APK_DEFAULT_VERSION = "0.0.3"
 
 _ANDROID_ABI_MAP: dict[str, tuple[str, str]] = {
     "aarch64": ("aarch64-linux-android", "arm64-v8a"),
@@ -135,16 +139,26 @@ def _scan_jdk_roots() -> list[tuple[int, str]]:
 
 
 def _find_java_home() -> str:
-    explicit = os.getenv("JAVA_HOME", "")
-    if explicit and (Path(explicit) / "bin" / _java_exe_name()).is_file():
-        return explicit
+    """定位 JDK：系统已有 JAVA_HOME 时直接使用，未设置时回退扫描。
 
-    # PATH 里的 java 命令可反推根目录（bin/ 的父目录）
+    用户的命令行手动执行 `pnpm tauri android build` 能直接走通，
+    说明系统环境（含 JAVA_HOME 指向的 JDK）本身可工作；脚本不应猜测版本。
+    """
+    explicit = os.getenv("JAVA_HOME", "")
+    if explicit:
+        java_bin = Path(explicit) / "bin" / _java_exe_name()
+        if java_bin.is_file():
+            major = _java_major_version(str(java_bin))
+            if major is not None and major <= _JDK_MAX_MAJOR:
+                return explicit
+
     java_cmd = shutil.which("java")
     if java_cmd:
         inferred = Path(java_cmd).resolve().parent.parent
         if (inferred / "bin" / _java_exe_name()).is_file():
-            return str(inferred)
+            major = _java_major_version(str(inferred / "bin" / _java_exe_name()))
+            if major is not None and major <= _JDK_MAX_MAJOR:
+                return str(inferred)
 
     scanned = _scan_jdk_roots()
     if scanned:
@@ -379,6 +393,10 @@ def _env_for_android(java: str, sdk: str) -> dict[str, str]:
     env = os.environ.copy()
     if java:
         env["JAVA_HOME"] = java
+    elif "JAVA_HOME" in env:
+        # 没有兼容的 JDK：主动清掉继承的 JAVA_HOME（如 Adoptium 25），
+        # 避免它透传给 tauri 后触发 AGP/Gradle 兼容性失败
+        del env["JAVA_HOME"]
     if sdk:
         env["ANDROID_HOME"] = sdk
     return env
@@ -442,47 +460,52 @@ def _gradlew() -> str:
 
 
 def build_android(java: str, sdk: str) -> tuple[int, str]:
-    env = _env_for_android(java, sdk)
-    java_bin = Path(java) / "bin" / _java_exe_name()
-    major = _java_major_version(str(java_bin))
-    if major and major >= 25:
-        print(f"[WARNING] JDK {major} ≥ 25 可能不兼容 AGP/Gradle, 继续尝试 …")
+    """Android APK 构建：转发 `tauri android build`。
 
-    print(f"  JAVA_HOME = {java}")
-    print(f"  ANDROID_HOME = {sdk}")
-
+    脚本探测 SDK/JDK 路径并以环境变量注入 — CatPaw 宿主进程的
+    ANDROID_HOME 常误设为 JDK 路径，必须由探测结果覆盖。
+    """
     print("\n[1/2] 清理 dist …")
     _clean_dist()
     print(f"[2/2] 编译 + 打包 (target {_DEFAULT_ANDROID_TARGET}) …")
-    apk_config = _load_apk_config()
+    env = os.environ.copy()
+    # CatPaw 宿主环境的 ANDROID_HOME 常为误设值（如 JDK 路径），
+    # 必须用探测到的正确 SDK 路径覆盖，否则 tauri 传给 gradle 后会报 NDK 找不到
+    if sdk:
+        env["ANDROID_HOME"] = sdk
+        env["ANDROID_SDK_ROOT"] = sdk
+    if java:
+        env["JAVA_HOME"] = java
+    # NDK_HOME 由用户在 shell 里显式设置；脚本不猜测
+    # Android versionName 独立配置：通过环境变量注入 gradle 的.versionName，
+    # 让桌面端走 tauri.conf.json 的 version，移动端走 _APK_DEFAULT_VERSION
+    env["ANDROID_VERSION_NAME"] = _APK_DEFAULT_VERSION
+    # 全局 ~/.gradle/gradle.properties 的 systemProp 代理常被误配成镜像仓库 URL，
+    # 导致 Gradle 解析插件时经过非法 HTTP 代理失败；GRADLE_OPTS 覆盖即可清除
+    env["GRADLE_OPTS"] = "-Dhttp.proxyHost= -Dhttps.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyPort="
     rc = _run_pnpm(
         "tauri", "android", "build",
         "--apk",
         "--target", _DEFAULT_ANDROID_TARGET,
-        "--config", apk_config,
         env=env,
     )
 
-    # Windows 未开开发者模式时 tauri 的 symlink .so → jniLibs 会失败；
-    # Rust 编译产物仍完整，手动复制后直接跑 Gradle 打包。
-    if rc != 0 and os.name == "nt":
-        print("\n  Symlink 失败，使用文件复制兜底 …")
-        rc = _android_fallback_gradle(java, sdk, env)
-
-    apk = Path(
-        "src-tauri/gen/android/app/build/outputs/apk"
-        "/universal/release/app-universal-release.apk"
-    )
+    apk_dir = Path("src-tauri/gen/android/app/build/outputs/apk/universal/release")
+    # 有 keystore 时产物不带 -unsigned，缺失时产物带 -unsigned
+    apk = apk_dir / "app-universal-release.apk"
+    if not apk.is_file():
+        unsigned = apk_dir / "app-universal-release-unsigned.apk"
+        if unsigned.is_file():
+            apk = unsigned
     if rc == 0 and apk.is_file():
-        # 对齐 Windows 安装包命名（MusicStorm_<版本>-setup），便于发布区分
-        apk_version = json.loads(apk_config).get("version", "0.0.1")
-        renamed = apk.with_name(f"MusicStorm_{apk_version}-setup.apk")
+        # Android 版本独立于桌面端（桌面走 tauri.conf.json 的 0.1.3，移动端走 0.0.3）
+        renamed = apk.with_name(f"MusicStorm_{_APK_DEFAULT_VERSION}-aarch64.apk")
         try:
             shutil.copy2(apk, renamed)
             return rc, str(renamed)
         except OSError:
             return rc, str(apk)
-    return rc, str(apk) if rc == 0 else ""
+    return rc, ""
 
 
 def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:

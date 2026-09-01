@@ -43,9 +43,9 @@
         }
       }
     },
-    "android": {
-      "versionCode": 2
-    },
+"android": {
+"versionCode": 3
+},
     "windows": {
       "nsis": {
         "languages": ["SimpChinese"],

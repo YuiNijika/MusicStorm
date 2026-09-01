@@ -3,11 +3,12 @@ mod audio;
 #[cfg(test)]
 mod bundle_config;
 mod cover_cache;
-#[cfg(not(target_os = "android"))]
 mod db;
+#[cfg(not(target_os = "android"))]
 mod desktop_lyric;
 mod ffmpeg;
 mod local_meta;
+#[cfg(not(target_os = "android"))]
 mod mini_player;
 #[cfg(target_os = "macos")]
 mod macos_now_playing;
