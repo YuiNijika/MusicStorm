@@ -1,5 +1,7 @@
 mod eq;
 mod player;
+#[cfg(target_os = "windows")]
+mod wasapi_exclusive;
 
 use crate::db::DbState;
 use crate::ffmpeg::resolve_ffmpeg_path;
@@ -101,8 +103,14 @@ fn ensure_player(
 ) -> Result<Arc<PlayerHandle>, String> {
     let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
     if guard.is_none() {
+        // 输出流创建时决定独占/共享，创建前读取当前标志
+        let exclusive = state
+            .runtime
+            .lock()
+            .map(|runtime| runtime.exclusive)
+            .unwrap_or(false);
         let ffmpeg_path = resolve_ffmpeg_path(db).ok().flatten();
-        let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path)?);
+        let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path, exclusive)?);
         *guard = Some(Arc::clone(&handle));
         return Ok(handle);
     }
@@ -110,6 +118,29 @@ fn ensure_player(
         .as_ref()
         .cloned()
         .ok_or_else(|| "player missing".to_string())
+}
+
+/// 停掉旧播放器并按当前独占标志重建，让输出模式真正生效。
+/// 必须先释放旧播放器：独占模式下旧流仍占用 WASAPI 设备，
+/// 若先开新流会撞上 AUDCLNT_E_DEVICE_IN_USE 导致切换失败。
+fn restart_player(state: &AudioState, db: &DbState, app: &AppHandle) -> Result<(), String> {
+    let exclusive = state
+        .runtime
+        .lock()
+        .map(|runtime| runtime.exclusive)
+        .unwrap_or(false);
+    let ffmpeg_path = resolve_ffmpeg_path(db).ok().flatten();
+    // 释放旧播放器：worker 随 channel 关闭退出，独占流随之释放设备
+    {
+        let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
+        *guard = None;
+    }
+    // 旧 worker 退出并释放 WASAPI 独占设备需要时间，稍等避免新流打开竞争
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path, exclusive)?);
+    let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
+    *guard = Some(Arc::clone(&handle));
+    Ok(())
 }
 
 fn is_remote_url(source: &str) -> bool {
@@ -173,22 +204,44 @@ pub fn audio_set_device(state: State<'_, AudioState>, device_id: String) -> Resu
 }
 
 #[tauri::command]
-pub fn audio_set_exclusive(state: State<'_, AudioState>, exclusive: bool) -> Result<(), String> {
+pub fn audio_set_exclusive(
+    app: AppHandle,
+    state: State<'_, AudioState>,
+    db: State<'_, DbState>,
+    exclusive: bool,
+) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = state;
-        let _ = exclusive;
+        let _ = (state, db, app, exclusive);
         return Err("当前平台不支持 WASAPI 独占模式".into());
     }
 
     #[cfg(target_os = "windows")]
     {
-        let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
-        guard.exclusive = exclusive;
-        if exclusive {
-            guard.last_error = Some("独占模式将尽力启用；不支持时回退共享".into());
-        } else {
-            guard.last_error = None;
+        let same = {
+            let guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+            guard.exclusive == exclusive
+        };
+        if !same {
+            // 输出流创建时读取运行时标志，必须先落新标志再重建播放器，
+            // 否则重建时读到的仍是旧值，独占/共享切换永远不生效
+            {
+                let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+                guard.exclusive = exclusive;
+            }
+            // 重建失败时回滚标志，保证界面状态与真实输出一致
+            if let Err(error) = restart_player(&state, &db, &app) {
+                let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+                guard.exclusive = !exclusive;
+                guard.last_error = Some(error.clone());
+                return Err(error);
+            }
+            let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+            guard.last_error = if exclusive {
+                Some("独占模式将尽力启用；不支持时回退共享".into())
+            } else {
+                None
+            };
         }
         Ok(())
     }

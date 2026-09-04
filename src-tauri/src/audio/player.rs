@@ -136,7 +136,11 @@ impl PlayerHandle {
 pub struct PlayerInner;
 
 impl PlayerInner {
-    pub fn start(app: AppHandle, ffmpeg_path: Option<PathBuf>) -> Result<PlayerHandle, String> {
+    pub fn start(
+        app: AppHandle,
+        ffmpeg_path: Option<PathBuf>,
+        exclusive: bool,
+    ) -> Result<PlayerHandle, String> {
         let (tx, rx) = mpsc::channel::<PlayerCmd>();
         let volume = Arc::new(Mutex::new(0.8_f32));
         let volume_worker = Arc::clone(&volume);
@@ -166,6 +170,7 @@ impl PlayerInner {
                     shared_tick,
                     ffmpeg_path_worker,
                     eq_worker,
+                    exclusive,
                 ) {
                     eprintln!("[audio] worker exit: {error}");
                 }
@@ -199,10 +204,44 @@ fn run_worker(
     shared: Arc<SharedPlayback>,
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
     eq: Arc<EqState>,
+    exclusive: bool,
 ) -> Result<(), String> {
-    let (_stream, handle) =
-        OutputStream::try_default().map_err(|e| format!("无法打开音频输出: {e}"))?;
-    let sink = Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?;
+    // WASAPI 独占仅在 Windows 可用；独占打不开时自动回退共享模式。
+    // 独占流对象保持在本作用域内，直至 worker 退出才会释放。
+    #[cfg(target_os = "windows")]
+    let (sink, _exclusive_stream) = {
+        if exclusive {
+            match crate::audio::wasapi_exclusive::ExclusiveOutputStream::open_default() {
+                Ok((stream, handle)) => {
+                    let (sink, queue) = Sink::new_idle();
+                    handle
+                        .play_raw(queue)
+                        .map_err(|e| format!("无法启动独占输出: {e}"))?;
+                    (sink, Some(stream))
+                }
+                Err(error) => {
+                    eprintln!("[audio] WASAPI 独占打开失败，回退共享模式: {error}");
+                    let (_stream, handle) = OutputStream::try_default()
+                        .map_err(|e| format!("无法打开音频输出: {e}"))?;
+                    let sink = Sink::try_new(&handle)
+                        .map_err(|e| format!("无法创建播放器: {e}"))?;
+                    (sink, None)
+                }
+            }
+        } else {
+            let (_stream, handle) = OutputStream::try_default()
+                .map_err(|e| format!("无法打开音频输出: {e}"))?;
+            let sink = Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?;
+            (sink, None)
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let sink = {
+        let _ = exclusive;
+        let (_stream, handle) = OutputStream::try_default()
+            .map_err(|e| format!("无法打开音频输出: {e}"))?;
+        Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?
+    };
     sink.pause();
 
     let mut last_volume = -1.0_f32;

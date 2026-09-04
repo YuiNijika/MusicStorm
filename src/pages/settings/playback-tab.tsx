@@ -72,7 +72,7 @@ function formatSettingsError(error: unknown): string {
 }
 
 function PlaybackTab() {
-    const { engineStatus } = usePlayer()
+    const { currentTrack, engineStatus, reloadCurrent } = usePlayer()
     const [enginePref, setEnginePrefState] = useState<EnginePref>(() =>
         getEnginePref(),
     )
@@ -323,11 +323,16 @@ function PlaybackTab() {
                             onClick={() => {
                                 const next = !audioMode.exclusive
                                 void setAudioExclusive(next)
-                                    .then(() =>
-                                        getAudioOutputMode().then(
+                                    .then(() => {
+                                        // 切换独占会重建原生输出流，本地曲目续播当前，
+                                        // 避免播放中断但界面仍显示在播
+                                        if (currentTrack?.source === "local") {
+                                            reloadCurrent()
+                                        }
+                                        return getAudioOutputMode().then(
                                             setAudioMode,
-                                        ),
-                                    )
+                                        )
+                                    })
                                     .catch((error: unknown) => {
                                         notifyError(
                                             next

@@ -1,5 +1,5 @@
 ﻿import { Heart, Library, ListMinus, Pencil, Sparkles, Trash2 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
@@ -295,15 +295,18 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     }
 
     // 移除附加到本歌单的本地曲目（只删本地关联记录，不动文件）
-    async function handleRemoveLocalTrack(trackId: string) {
-        try {
-            await removeLocalTracksFromPlaylist(playlistId, [trackId])
-            setLocalRows((prev) => prev.filter((item) => item.id !== trackId))
-            notifySuccess("已从歌单移除")
-        } catch (error) {
-            notifyFromError("移除失败", error)
-        }
-    }
+    const handleRemoveLocalTrack = useCallback(
+        async (trackId: string) => {
+            try {
+                await removeLocalTracksFromPlaylist(playlistId, [trackId])
+                setLocalRows((prev) => prev.filter((item) => item.id !== trackId))
+                notifySuccess("已从歌单移除")
+            } catch (error) {
+                notifyFromError("移除失败", error)
+            }
+        },
+        [playlistId],
+    )
 
     async function handleDelete() {
         if (deleteBusy || !playlist) {
@@ -369,6 +372,18 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
             next.map((item) => item.id),
         )
     }
+
+    // 稳定回调供 TrackRow 复用：TrackRow 已 memo，引用稳定时窗口内
+    // 重叠行在滚动重渲时直接跳过，避免快速滚动每帧重建整窗
+    const handleRowPlay = useCallback(
+        (item: Track) => {
+            playOrToggle(item, sortedTracks)
+        },
+        [playOrToggle, sortedTracks],
+    )
+    const handleRowRemoved = useCallback((id: string) => {
+        setTracks((prev) => prev.filter((item) => item.id !== id))
+    }, [])
 
     return (
         <div className="space-y-6">
@@ -589,13 +604,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                         ? playlistId
                                                         : undefined
                                                 }
-                                                onRemoved={(id) =>
-                                                    setTracks((prev) =>
-                                                        prev.filter(
-                                                            (item) => item.id !== id,
-                                                        ),
-                                                    )
-                                                }
+                                                onRemoved={handleRowRemoved}
                                                 onLocalRemove={
                                                     track.source === "local"
                                                         ? () =>
@@ -604,9 +613,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                               )
                                                         : undefined
                                                 }
-                                                onPlay={(item) =>
-                                                    playOrToggle(item, sortedTracks)
-                                                }
+                                                onPlay={handleRowPlay}
                                             />
                                         )}
                                     />
@@ -634,13 +641,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                         ? playlistId
                                                         : undefined
                                                 }
-                                                onRemoved={(id) =>
-                                                    setTracks((prev) =>
-                                                        prev.filter(
-                                                            (item) => item.id !== id,
-                                                        ),
-                                                    )
-                                                }
+                                                onRemoved={handleRowRemoved}
                                                 onLocalRemove={
                                                     track.source === "local"
                                                         ? () =>
@@ -649,9 +650,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                               )
                                                         : undefined
                                                 }
-                                                onPlay={(item) =>
-                                                    playOrToggle(item, sortedTracks)
-                                                }
+                                                onPlay={handleRowPlay}
                                             />
                                         )}
                                     />

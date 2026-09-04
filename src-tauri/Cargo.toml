@@ -64,3 +64,18 @@ cpal = "0.15"
 # 自动选择已变更结构的 apple-cf 0.8+。
 apple-cf = { version = "=0.7.1", default-features = false, features = ["cg"] }
 mediaplayer = "=0.3.2"
+
+# Windows WASAPI 独占输出：cpal/rodio 无独占支持，直接使用 windows 绑定打开独占流。
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+    "Win32_System_SystemServices",
+    "Win32_Security",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
+    "Win32_Devices_Enumeration",
+] }

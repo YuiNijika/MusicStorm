@@ -683,13 +683,7 @@ function StatsPage() {
                                 }
                             />
                         ) : (
-                            <div
-                                className="apple-list-surface space-y-0.5 p-1.5"
-                                style={{
-                                    contentVisibility: "auto",
-                                    containIntrinsicSize: "auto 58px",
-                                }}
-                            >
+                            <div className="apple-list-surface space-y-0.5 p-1.5">
                                 {filteredTracks.map((cluster, index) => {
                                     const open = expanded.has(cluster.key)
                                     const canExpand = cluster.memberCount > 1

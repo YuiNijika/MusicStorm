@@ -20,6 +20,7 @@ import {
     Trash2,
 } from "lucide-react"
 import {
+    memo,
     useEffect,
     useState,
     type KeyboardEvent,
@@ -45,6 +46,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
@@ -100,7 +106,9 @@ type TrackRowProps = {
     onPlay: (track: Track) => void
 }
 
-function TrackRow({
+// memo：虚拟列表滚动时仅行级 props 变化才重渲，窗口内重叠行直接跳过，
+// 避免快速滚动时每帧重建整窗 TrackRow 导致的卡顿
+const TrackRow = memo(function TrackRow({
     track,
     index,
     leading,
@@ -402,15 +410,32 @@ function TrackRow({
                                 {index + 1}
                             </span>
                         ) : null}
-                        <p
-                            className={cn(
-                                "min-w-0 flex-1 truncate tracking-[-0.01em]",
-                                dense ? "text-[14px] md:text-[12px]" : "text-[15px] md:text-[13px]",
-                                isActive ? "font-semibold text-primary" : "font-medium text-foreground",
-                            )}
-                        >
-                            {track.title}
-                        </p>
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <p
+                                        className={cn(
+                                            "min-w-0 flex-1 truncate tracking-[-0.01em]",
+                                            dense
+                                                ? "text-[14px] md:text-[12px]"
+                                                : "text-[15px] md:text-[13px]",
+                                            isActive
+                                                ? "font-semibold text-primary"
+                                                : "font-medium text-foreground",
+                                        )}
+                                    >
+                                        {track.title}
+                                    </p>
+                                }
+                            />
+                            <TooltipContent
+                                side="top"
+                                align="start"
+                                className="max-w-[320px]"
+                            >
+                                <span className="line-clamp-3">{track.title}</span>
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                     <p
                         className={cn(
@@ -418,46 +443,85 @@ function TrackRow({
                             dense ? "text-[12px] md:text-[11px]" : "text-[13px] md:text-[12px]",
                         )}
                     >
-                        {artists.map((artist, i) => (
-                            <span key={`${artist.id || artist.name}-${i}`}>
-                                {i > 0 ? (
-                                    <span className="text-muted-foreground/50"> / </span>
-                                ) : null}
-                                {artist.id && isNetease ? (
-                                    <button
-                                        type="button"
-                                        onClick={(event) =>
-                                            handleMetaClick(event, () =>
-                                                openArtist(artist.id),
-                                            )
-                                        }
-                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                    >
-                                        {artist.name}
-                                    </button>
-                                ) : (
-                                    <span>{artist.name}</span>
-                                )}
-                            </span>
-                        ))}
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <span>
+                                        {artists.map((artist, i) => (
+                                            <span key={`${artist.id || artist.name}-${i}`}>
+                                                {i > 0 ? (
+                                                    <span className="text-muted-foreground/50">
+                                                        {" "}
+                                                        /{" "}
+                                                    </span>
+                                                ) : null}
+                                                {artist.id && isNetease ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) =>
+                                                            handleMetaClick(event, () =>
+                                                                openArtist(artist.id),
+                                                            )
+                                                        }
+                                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                                    >
+                                                        {artist.name}
+                                                    </button>
+                                                ) : (
+                                                    <span>{artist.name}</span>
+                                                )}
+                                            </span>
+                                        ))}
+                                    </span>
+                                }
+                            />
+                            <TooltipContent
+                                side="top"
+                                align="start"
+                                className="max-w-[320px]"
+                            >
+                                {artists.map((artist) => artist.name).join(" / ")}
+                            </TooltipContent>
+                        </Tooltip>
                         {inlineAlbum && track.album ? (
                             <>
-                                <span className="mx-1.5 text-muted-foreground/50">·</span>
-                                {track.albumId && isNetease ? (
-                                    <button
-                                        type="button"
-                                        onClick={(event) =>
-                                            handleMetaClick(event, () =>
-                                                openAlbum(track.albumId!),
+                                <span className="mx-1.5 text-muted-foreground/50">
+                                    ·
+                                </span>
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            track.albumId && isNetease ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) =>
+                                                        handleMetaClick(
+                                                            event,
+                                                            () =>
+                                                                openAlbum(
+                                                                    track.albumId!,
+                                                                ),
+                                                        )
+                                                    }
+                                                    className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                                >
+                                                    {track.album}
+                                                </button>
+                                            ) : (
+                                                <span>{track.album}</span>
                                             )
                                         }
-                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                    />
+                                    <TooltipContent
+                                        side="top"
+                                        align="start"
+                                        className="max-w-[260px]"
                                     >
-                                        {track.album}
-                                    </button>
-                                ) : (
-                                    <span>{track.album}</span>
-                                )}
+                                        <span className="line-clamp-3">
+                                            {track.album}
+                                        </span>
+                                    </TooltipContent>
+                                </Tooltip>
                             </>
                         ) : null}
                     </p>
@@ -470,22 +534,39 @@ function TrackRow({
             </div>
 
             {albumCol ? (
-                <div className="hidden min-w-0 sm:block">
-                    {track.albumId && isNetease ? (
-                        <button
-                            type="button"
-                            onClick={(event) =>
-                                handleMetaClick(event, () => openAlbum(track.albumId!))
+                <div className="hidden min-w-0 self-end sm:block">
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                track.albumId && isNetease ? (
+                                    <button
+                                        type="button"
+                                        onClick={(event) =>
+                                            handleMetaClick(event, () =>
+                                                openAlbum(track.albumId!),
+                                            )
+                                        }
+                                        className="inline-block max-w-full truncate py-1 text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                    >
+                                        {track.album || "未知专辑"}
+                                    </button>
+                                ) : (
+                                    <span className="inline-block max-w-full truncate py-1 text-[12px] text-muted-foreground">
+                                        {track.album || "未知专辑"}
+                                    </span>
+                                )
                             }
-                            className="truncate text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        />
+                        <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-[260px]"
                         >
-                            {track.album || "未知专辑"}
-                        </button>
-                    ) : (
-                        <span className="truncate text-[12px] text-muted-foreground">
-                            {track.album || "未知专辑"}
-                        </span>
-                    )}
+                            <span className="line-clamp-3">
+                                {track.album || "未知专辑"}
+                            </span>
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             ) : null}
 
@@ -799,6 +880,6 @@ function TrackRow({
         />
         </>
     )
-}
+})
 
 export { TrackRow }
