@@ -24,6 +24,20 @@ MAX_JDK_MAJOR = 24
 DEFAULT_ANDROID_TARGET = "aarch64"
 SDK_MARKERS = ("platform-tools/adb.exe", "platform-tools/adb", "platforms")
 
+# 跨机器可移植的通用安装目录，不写死个人路径
+JDK_COMMON_ROOTS = (
+    os.path.expandvars("%ProgramFiles%/Java"),
+    os.path.expandvars("%ProgramFiles%/Eclipse Adoptium"),
+    os.path.expandvars("%ProgramFiles%/Microsoft"),
+    os.path.expandvars("%ProgramFiles%/Android/Android Studio/jbr"),
+    os.path.expandvars("%ProgramFiles(x86)%/Java"),
+    os.path.expandvars("%LOCALAPPDATA%/Programs/Eclipse Adoptium"),
+)
+SDK_COMMON_ROOTS = (
+    os.path.expandvars("%LOCALAPPDATA%/Android/Sdk"),
+    os.path.expandvars("%ProgramFiles%/Android/Sdk"),
+)
+
 ANDROID_ABIS = {
     "aarch64": ("aarch64-linux-android", "arm64-v8a"),
     "armv7": ("armv7-linux-androideabi", "armeabi-v7a"),
@@ -161,6 +175,55 @@ def java_home() -> str:
     return ""
 
 
+def discover_java_homes() -> list[Path]:
+    """收集本机可用 JDK 根目录，按环境变量、PATH、搜索根、通用目录排序。"""
+    homes: list[Path] = []
+    seen: set[str] = set()
+
+    def add(path: Path) -> None:
+        if not (path / "bin" / java_executable_name()).is_file():
+            return
+        resolved = str(path.resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            homes.append(path)
+
+    def add_with_siblings(path: Path) -> None:
+        # 同一父目录常并列装多个 JDK 版本，扫描兄弟目录能顺带找到兼容版本
+        add(path)
+        parent = path.parent
+        if parent.is_dir():
+            for child in sorted(parent.iterdir()):
+                add(child)
+
+    env_home = java_home_from_env()
+    if env_home:
+        add_with_siblings(Path(env_home))
+    binary = shutil.which("java")
+    if binary:
+        add_with_siblings(Path(binary).resolve().parent.parent)
+    for root in path_list_from_env("JDK_SEARCH_ROOTS"):
+        add_with_siblings(root)
+    for root in JDK_COMMON_ROOTS:
+        root_path = Path(root)
+        if root_path.is_dir():
+            for child in sorted(root_path.iterdir()):
+                add(child)
+    return homes
+
+
+def compatible_java_home() -> str:
+    """返回主版本最高且不超出 Android 工具链上限的 JDK，找不到返回空串。"""
+    best: Path | None = None
+    best_major = 0
+    for home in discover_java_homes():
+        major = java_major(str(home / "bin" / java_executable_name()))
+        if major is not None and MAX_JDK_MAJOR >= major > best_major:
+            best = home
+            best_major = major
+    return str(best) if best else ""
+
+
 def looks_like_sdk(path: Path) -> bool:
     if not path.is_dir():
         return False
@@ -195,18 +258,42 @@ def sdk_from_path() -> str:
     return ""
 
 
-def android_sdk_home() -> str:
+def discover_android_sdk_homes() -> list[Path]:
+    """收集候选 Android SDK 根目录，按环境变量、PATH、搜索根、通用目录排序。"""
+    sdk_roots: list[Path] = []
+    seen: set[str] = set()
+
+    def add(path: Path) -> None:
+        if not looks_like_sdk(path):
+            return
+        resolved = str(path.resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            sdk_roots.append(path)
+
     for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
-        explicit = os.getenv(variable, "").strip()
-        if explicit and looks_like_sdk(Path(explicit)):
-            return explicit
+        value = os.getenv(variable, "").strip()
+        if value:
+            add(Path(value))
     inferred = sdk_from_path()
     if inferred:
-        return inferred
+        add(Path(inferred))
     for root in path_list_from_env("ANDROID_SEARCH_ROOTS"):
-        if looks_like_sdk(root):
-            return str(root.resolve())
-    return ""
+        add(root)
+        if root.is_dir():
+            for child in sorted(root.iterdir()):
+                add(child)
+    for root in SDK_COMMON_ROOTS:
+        root_path = Path(root)
+        if root_path.is_dir():
+            for child in sorted(root_path.iterdir()):
+                add(child)
+    return sdk_roots
+
+
+def android_sdk_home() -> str:
+    homes = discover_android_sdk_homes()
+    return str(homes[0]) if homes else ""
 
 
 def choose_target() -> str:
@@ -437,6 +524,28 @@ def print_environment(java: str, sdk: str) -> None:
     print(f"  版本        {app_version()}")
 
 
+def ensure_android_jdk(java: str) -> str:
+    """校验 JDK 不超出工具链上限，必要时切换兼容版本，缺省走交互输入。"""
+    if java:
+        major = java_major(str(Path(java) / "bin" / java_executable_name()))
+        if major is None:
+            raise BuildError(f"无法识别 {java} 的 JDK 版本")
+        if major <= MAX_JDK_MAJOR:
+            return java
+        compatible = compatible_java_home()
+        if compatible:
+            print(f"  提示  当前 JDK 主版本 {major} 超出上限，改用 {compatible}")
+            return compatible
+        raise BuildError(
+            f"JDK 主版本 {major} 超出 Android 工具链上限 {MAX_JDK_MAJOR}，"
+            "请设置 JDK_SEARCH_ROOTS 指向兼容 JDK，或使用 --java 指定 17 到 24 的版本"
+        )
+    compatible = compatible_java_home()
+    if compatible:
+        return compatible
+    return prompt_path("JDK")
+
+
 def main() -> int:
     try:
         target = choose_target()
@@ -454,7 +563,7 @@ def main() -> int:
         if target == "1":
             output = build_windows()
         elif target == "2":
-            java = java or prompt_path("JDK")
+            java = ensure_android_jdk(java)
             sdk = sdk or prompt_path("Android SDK")
             if not java or not sdk:
                 print("  错误  JDK 和 Android SDK 都是必需的")
