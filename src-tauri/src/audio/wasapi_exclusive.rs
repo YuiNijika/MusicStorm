@@ -153,11 +153,17 @@ impl ExclusiveOutputStream {
             client.GetDevicePeriod(Some(&mut default_period), Some(&mut min_period))
         }
         .map_err(|e| format!("获取设备周期失败: {e}"))?;
-        // 事件驱动独占要求周期与缓冲时长一致；缺省回退 20ms
-        let period = if default_period > 0 {
+        // 事件驱动独占要求周期与缓冲时长一致；缓冲时长就是端点的延迟，
+        // 低延迟优先用最小周期，太小容易爆音给 2ms 下限；缺省回退 20ms
+        let fallback_period = if default_period > 0 {
             default_period
         } else {
             200_000
+        };
+        let period = if min_period > 20_000 {
+            min_period
+        } else {
+            fallback_period
         };
 
         let result = unsafe {
@@ -184,8 +190,27 @@ impl ExclusiveOutputStream {
         let event: HANDLE = unsafe { CreateEventW(None, false, false, None) }
             .map_err(|e| format!("创建事件失败: {e}"))?;
 
-        let (controller, mixer) = dynamic_mixer::mixer::<f32>(channels, sample_rate);
+        // 事件驱动模式必须把事件关联到客户端：缺 SetEventHandle 时 Start 后
+        // 事件永远不会被触发，渲染线程只会超时空转，独占输出完全无声
+        unsafe { client.SetEventHandle(event) }
+            .map_err(|e| format!("关联事件句柄失败: {e}"))?;
+
+        let (controller, mut mixer) = dynamic_mixer::mixer::<f32>(channels, sample_rate);
         let stop = Arc::new(AtomicBool::new(false));
+        let ch = channels as usize;
+        let bytes_per_frame = sample_format.bytes_per_sample() * ch;
+
+        // 预填充整个缓冲再 Start：事件模式下 Start 后立即有数据可播，
+        // 否则要先等首个事件才往空缓冲写数据，产生启动延迟
+        {
+            let ptr = unsafe { render.GetBuffer(buffer_frames) }
+                .map_err(|e| format!("预填充获取缓冲失败: {e}"))?;
+            let len = buffer_frames as usize * bytes_per_frame;
+            let slice = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            fill_frames(slice, buffer_frames as usize, ch, sample_format, &mut mixer);
+            unsafe { render.ReleaseBuffer(buffer_frames, 0) }
+                .map_err(|e| format!("预填充释放缓冲失败: {e}"))?;
+        }
 
         let render_thread = {
             let stop = Arc::clone(&stop);
@@ -194,8 +219,6 @@ impl ExclusiveOutputStream {
             let client = AudioClientHandle(client.clone());
             let event = EventHandle(event);
             let format = sample_format;
-            let ch = channels as usize;
-            let bytes_per_frame = format.bytes_per_sample() * ch;
             thread::Builder::new()
                 .name("wasapi-exclusive".into())
                 .spawn(move || {
@@ -205,7 +228,7 @@ impl ExclusiveOutputStream {
                             break;
                         }
                         // 事件驱动：有可用缓冲时事件触发；超时轮询停止标志
-                        let wait = event.wait(100);
+                        let wait = event.wait(20);
                         if stop.load(Ordering::SeqCst) {
                             break;
                         }
