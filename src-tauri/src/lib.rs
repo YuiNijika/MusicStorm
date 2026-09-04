@@ -32,9 +32,10 @@ use cover_cache::pick_cover_image;
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
-    db_listen_source_breakdown, db_set_setting, db_start_play_session, db_upsert_folder,
-    db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db, purge_expired_api_cache,
-    DbState,
+    db_listen_source_breakdown, db_local_add_to_playlist, db_local_for_playlist,
+    db_local_playlist_covers, db_local_remove_from_playlist, db_set_setting, db_start_play_session,
+    db_upsert_folder, db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db,
+    purge_expired_api_cache, DbState,
 };
 use netease_proxy::netease_http_post;
 use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate};
@@ -695,12 +696,29 @@ fn purge_expired_api_cache_in_background(app: &AppHandle) -> Result<u64, String>
     purge_expired_api_cache(app, &conn)
 }
 
+// 桌面端 musicstorm:// 深链回调：回到前台并把 payload 转发给主窗口前端
+// （自定义事件 musicstorm:deep-link），由前端直达播放
+#[cfg(not(target_os = "android"))]
+fn forward_deep_link(app: &AppHandle, url: String) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        let payload = serde_json::json!({ "url": url }).to_string();
+        let script = format!(
+            "window.dispatchEvent(new CustomEvent('musicstorm:deep-link',{{detail:{payload}}}))"
+        );
+        let _ = window.eval(&script);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(not(target_os = "android"))]
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         // 单实例：二次启动唤起已有窗口，而不是再开一个进程
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_main_window(app);
@@ -711,6 +729,22 @@ pub fn run() {
 
     let app = builder
         .setup(|app| {
+            // 注册自定义协议 musicstorm://：浏览器点击分享深链可直接唤起应用
+            #[cfg(not(target_os = "android"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let app_handle = app.handle().clone();
+                let _ = app_handle.deep_link().register("musicstorm");
+                let handle_for_listener = app_handle.clone();
+                let _ = app_handle
+                    .deep_link()
+                    .on_open_url(move |event| {
+                        for url in event.urls() {
+                            forward_deep_link(&handle_for_listener, url.to_string());
+                        }
+                    });
+            }
+
             let conn = open_db(app.handle())?;
 
             #[cfg(target_os = "windows")]
@@ -846,6 +880,10 @@ pub fn run() {
             get_storage_paths,
             db_upsert_folder,
             db_upsert_tracks,
+            db_local_add_to_playlist,
+            db_local_for_playlist,
+            db_local_remove_from_playlist,
+            db_local_playlist_covers,
             db_start_play_session,
             db_end_play_session,
             db_get_listen_stats,

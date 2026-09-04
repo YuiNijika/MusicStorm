@@ -11,6 +11,10 @@ import {
 } from "@/lib/netease/api-settings"
 import { getNeteaseCookieParam } from "@/lib/netease/auth-cookie"
 import { getApiCacheTtlMs } from "@/lib/netease/cache-prefs"
+import {
+    handleLoginFailure,
+    isNeedLoginBody,
+} from "@/lib/netease/session-guard"
 import { resolveRealIp } from "@/lib/netease/native/real-ip"
 import { nativeNeteaseRequest } from "@/lib/netease/native/request"
 import { NETEASE_PATHS } from "@/lib/netease/paths"
@@ -85,6 +89,11 @@ function assertNeteasePayload(path: string, data: unknown): void {
     }
     if (path === NETEASE_PATHS.loginQrCheck) {
         return
+    }
+    // 收藏/统计等隐私接口在凭证真失效时回需要登录码，这里识别并触发重新登录，
+    // 因为资料接口常仍给 200，单看它会漏判
+    if (isNeedLoginBody(body)) {
+        handleLoginFailure()
     }
     const detail =
         body.msg?.trim() ||

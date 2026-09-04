@@ -27,6 +27,7 @@ import {
     fetchUserAccount,
     type NeteaseProfile,
 } from "@/lib/netease/user"
+import { NETEASE_LOGIN_REQUIRED_EVENT } from "@/lib/netease/session-guard"
 import { notifyError, notifySuccess } from "@/lib/notify"
 
 type SessionState = {
@@ -301,6 +302,14 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                 retryRef.current = null
             }
         }
+    }, [refresh])
+
+    // 播放侧发现登录态失效并清掉了 cookie：同步刷新，把 UI 登录态拉回游客
+    useEffect(() => {
+        const onLoginRequired = () => void refresh()
+        window.addEventListener(NETEASE_LOGIN_REQUIRED_EVENT, onLoginRequired)
+        return () =>
+            window.removeEventListener(NETEASE_LOGIN_REQUIRED_EVENT, onLoginRequired)
     }, [refresh])
 
     const value = useMemo<SessionContextValue>(

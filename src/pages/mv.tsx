@@ -215,6 +215,8 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                     <img
                                         src={profile.coverUrl}
                                         alt=""
+                                        loading="lazy"
+                                        decoding="async"
                                         className="size-full object-cover opacity-50"
                                     />
                                 ) : null}

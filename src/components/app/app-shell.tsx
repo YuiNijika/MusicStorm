@@ -14,9 +14,24 @@ import { useAutoSignin } from "@/hooks/use-auto-signin"
 import { useMacOSNowPlaying } from "@/hooks/use-macos-now-playing"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNowPlayingTitle } from "@/hooks/use-now-playing-title"
+import { usePlayer } from "@/hooks/use-player"
 import { usePlayerHotkeys } from "@/hooks/use-player-hotkeys"
+import { useDeepLinkPlayback } from "@/hooks/use-deep-link-playback"
 import { useTrayCommands } from "@/hooks/use-tray-commands"
 import { isNativeMacOS } from "@/lib/platform"
+import { isWebMode } from "@/lib/web-mode"
+import { buildAppLink } from "@/lib/share/share"
+import { probeMusicStormApp } from "@/lib/app/protocol-detect"
+import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import type { Track } from "@/lib/types"
 import type { AppRoute } from "@/lib/routes"
 
 type AppShellProps = {
@@ -52,6 +67,22 @@ function AppShell({
     useAndroidNowPlaying()
     useNowPlayingTitle()
     const nativeMacOS = isNativeMacOS()
+    // 分享深链：`#play?id=<id>` 打开即直达播放并呼出全屏播放器
+    const { playTrack } = usePlayer()
+    // 若本机已装 MusicStorm 应用，提示用应用打开（自定义协议 musicstorm://）
+    const [appOpenTrack, setAppOpenTrack] = useState<Track | null>(null)
+    useDeepLinkPlayback((track) => {
+        playTrack(track)
+        setFullPlayerOpen(true)
+        // 网页浏览器里才需要探测本地应用；桌面/移动客户端本身就是应用
+        if (isWebMode()) {
+            void probeMusicStormApp().then((installed) => {
+                if (installed) {
+                    setAppOpenTrack(track)
+                }
+            })
+        }
+    })
 
     // Android 返回手势：全屏播放器 → 详情页 → 顶层退出
     useAndroidBack({
@@ -105,6 +136,40 @@ function AppShell({
                 onConfirm={(action, noAsk) => void confirmClose(action, noAsk)}
                 onCancel={cancelClose}
             />
+
+            {/* 网页深层检测到已装 MusicStorm 应用：提示用应用直接打开 */}
+            {appOpenTrack ? (
+                <Dialog open onOpenChange={() => setAppOpenTrack(null)}>
+                    <DialogContent className="gap-4">
+                        <DialogHeader>
+                            <DialogTitle>用 MusicStorm 应用打开？</DialogTitle>
+                            <DialogDescription>
+                                检测到本机已安装 MusicStorm，可切换应用直接播放「
+                                {appOpenTrack.title}」
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="flex-row justify-end gap-2 sm:justify-end">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setAppOpenTrack(null)}
+                            >
+                                继续网页播放
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const link = buildAppLink(appOpenTrack)
+                                    if (link) {
+                                        window.location.href = link
+                                    }
+                                    setAppOpenTrack(null)
+                                }}
+                            >
+                                打开应用
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
         </div>
     )
 }

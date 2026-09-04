@@ -4,10 +4,12 @@ import {
     Heart,
     LayoutTemplate,
     MessageCircle,
+    MoreHorizontal,
     Pause,
     Play,
     Repeat,
     Repeat1,
+    Share2,
     Shuffle,
     SkipBack,
     SkipForward,
@@ -21,6 +23,7 @@ import { Cover } from "@/components/music/cover"
 import { EqEditor } from "@/components/music/eq-editor"
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
+import { ShareSheet } from "@/components/music/share-sheet"
 import { SourceBadge } from "@/components/music/source-badge"
 import { SpeedPopover } from "@/components/music/speed-popover"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
@@ -67,6 +70,7 @@ import {
     type FullPlayerLayout,
 } from "@/lib/player/full-player-prefs"
 import { usePlaybackTick } from "@/lib/player/playback-tick"
+import { isShareableTrack } from "@/lib/share/share"
 import { cn } from "@/lib/utils"
 
 type FullPlayerProps = {
@@ -127,6 +131,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [qualityBr, setQualityBr] = useState<QualityBr>(() => getNeteaseQualityBr())
     const [layout, setLayout] = useState<FullPlayerLayout>(() => getFullPlayerLayout())
     const [chrome, setChrome] = useState<FullPlayerChrome>(() => getFullPlayerChrome())
+    // 分享弹层（路由模式）：把当前曲目打包成可直达播放的链接分享到各平台
+    const [shareOpen, setShareOpen] = useState(false)
     // 动画结束后移除标记，下一次切换才能重新播放淡入
     const [layoutFade, setLayoutFade] = useState(false)
     const [phase, setPhase] = useState<Phase>("closed")
@@ -530,6 +536,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             likeCount={likeCount}
             onOpenComments={handleOpenComments}
             trackId={displayTrack.id}
+            onShare={() => setShareOpen(true)}
+            canShowShare={isShareableTrack(displayTrack)}
         />
     )
 
@@ -547,7 +555,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <h2 className="min-w-0 truncate text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">
                     {displayTrack.title}
                 </h2>
-                <span className="shrink-0">
+                <span className="flex shrink-0 items-center">
                     <SourceBadge source={displayTrack.source} />
                 </span>
             </div>
@@ -650,58 +658,62 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             startDragging(event)
                         }}
                     >
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        className={cn(
-                            "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
-                            "text-[13px] font-medium text-foreground/70",
-                            "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
-                            "active:scale-[0.97] active:duration-[var(--duration-press)]",
-                        )}
-                    >
-                        <ChevronDown className="size-4" />
-                        收起
-                    </button>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger
+                    <div className="flex flex-1 justify-start">
+                        <button
+                            type="button"
+                            onClick={onClose}
                             onPointerDown={(event) => event.stopPropagation()}
                             className={cn(
-                                "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
-                                "text-[12px] font-medium text-foreground/70 outline-none",
+                                "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
+                                "text-[13px] font-medium text-foreground/70",
                                 "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
                                 "active:scale-[0.97] active:duration-[var(--duration-press)]",
                             )}
-                            title="播放样式"
                         >
-                            <LayoutTemplate className="size-3.5" />
-                            {availableLayouts.find((item) => item.id === effectiveLayout)
-                                ?.label ?? "样式"}
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-60 p-3">
-                            <div className="space-y-0.5">
-                                {availableLayouts.map((item) => (
-                                    <DropdownMenuItem
-                                        key={item.id}
-                                        className="cursor-pointer flex-col items-start gap-0.5"
-                                        onClick={() => handleLayoutChange(item.id)}
-                                    >
-                                        <span className="text-[13px] font-medium">
-                                            {item.label}
-                                            {effectiveLayout === item.id ? " · 当前" : ""}
-                                        </span>
-                                        <span className="text-[11px] text-muted-foreground">
-                                            {item.description}
-                                        </span>
-                                    </DropdownMenuItem>
-                                ))}
-                            </div>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            <ChevronDown className="size-4" />
+                            收起
+                        </button>
+                    </div>
 
-                    <div className="w-[72px]" aria-hidden />
+                    <div className="flex flex-1 justify-center">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                onPointerDown={(event) => event.stopPropagation()}
+                                className={cn(
+                                    "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
+                                    "text-[12px] font-medium text-foreground/70 outline-none",
+                                    "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                    "active:scale-[0.97] active:duration-[var(--duration-press)]",
+                                )}
+                                title="播放样式"
+                            >
+                                <LayoutTemplate className="size-3.5" />
+                                {availableLayouts.find((item) => item.id === effectiveLayout)
+                                    ?.label ?? "样式"}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center" className="w-60 p-3">
+                                <div className="space-y-0.5">
+                                    {availableLayouts.map((item) => (
+                                        <DropdownMenuItem
+                                            key={item.id}
+                                            className="cursor-pointer flex-col items-start gap-0.5"
+                                            onClick={() => handleLayoutChange(item.id)}
+                                        >
+                                            <span className="text-[13px] font-medium">
+                                                {item.label}
+                                                {effectiveLayout === item.id ? " · 当前" : ""}
+                                            </span>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {item.description}
+                                            </span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+                    <div className="flex flex-1 justify-end" aria-hidden />
                 </div>
 
                 <div
@@ -764,25 +776,36 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                         : `transform ${DRAWER_MS}ms var(--ease-enter)`,
                             }}
                         >
-                            <div className="flex w-full min-h-0 shrink-0 flex-col items-center justify-center gap-6 px-6 pb-3">
-                                <div className="w-full max-w-[min(440px,82vw)]">
-                                    <Cover
-                                        src={displayCover}
-                                        alt={displayTrack.title}
-                                        size="xl"
-                                        className={cn(
-                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
-                                            "ring-1 ring-white/20 dark:ring-white/10",
-                                            isPlaying &&
-                                                "animate-[cover-breathe_6s_ease-in-out_infinite]",
-                                        )}
-                                    />
-                                </div>
-                                <div className="w-full max-w-[min(440px,82vw)] space-y-2">
-                                    {meta}
+                            <div className="flex w-full min-h-0 shrink-0 flex-col items-center overflow-hidden px-6 pb-4">
+                                <div className="my-auto flex min-h-0 w-full max-w-[min(440px,82vw)] flex-col items-center gap-5">
+                                    <div className="w-full">
+                                        <button
+                                            type="button"
+                                            aria-label="切换为歌词"
+                                            onClick={() =>
+                                                handleLayoutChange("lyrics")
+                                            }
+                                            className="block w-full cursor-pointer"
+                                        >
+                                        <Cover
+                                            src={displayCover}
+                                            alt={displayTrack.title}
+                                            size="xl"
+                                            className={cn(
+                                                "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                                "ring-1 ring-white/20 dark:ring-white/10",
+                                                isPlaying &&
+                                                    "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                            )}
+                                        />
+                                        </button>
+                                    </div>
+                                    <div className="w-full space-y-2">
+                                        {meta}
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex w-full min-h-0 shrink-0 flex-col px-4 pb-2 pt-1 sm:px-8">
+                            <div className="flex w-full min-h-0 shrink-0 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-8">
                                 {lyricsMounted ? (
                                     <Suspense fallback={<LyricsSkeleton />}>
                                         <LyricsView
@@ -850,6 +873,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                     </div>
                 </div>
             </div>
+
+            <ShareSheet
+                open={shareOpen}
+                onOpenChange={setShareOpen}
+                track={displayTrack}
+            />
         </div>
     </div>
     )
@@ -880,6 +909,8 @@ const TransportBar = memo(function TransportBar({
     likeCount,
     onOpenComments,
     trackId,
+    onShare,
+    canShowShare,
 }: {
     isPlaying: boolean
     shuffle: boolean
@@ -903,7 +934,11 @@ const TransportBar = memo(function TransportBar({
     likeCount: number | null
     onOpenComments: () => void
     trackId: string | null
+    /** 分享（路由模式）：打包可直达播放链接导出到各平台 */
+    onShare: () => void
+    canShowShare: boolean
 }) {
+    const isMobile = useIsMobile()
     return (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="flex items-center justify-start">
@@ -932,7 +967,9 @@ const TransportBar = memo(function TransportBar({
             </div>
 
             <div className="flex items-center justify-center gap-1 sm:gap-1.5">
-                <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
+                {!isMobile ? (
+                    <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
+                ) : null}
                 <IconBtn title="上一首" onClick={onPrevious}>
                     <SkipBack className="size-5 fill-current" />
                 </IconBtn>
@@ -977,6 +1014,93 @@ const TransportBar = memo(function TransportBar({
             </div>
 
             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                {isMobile ? (
+                    <Popover>
+                        <PopoverTrigger
+                            className={cn(
+                                "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                "text-muted-foreground transition-[color,background-color,transform]",
+                                "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                "active:duration-[var(--duration-press)]",
+                            )}
+                            title="更多"
+                            aria-label="更多"
+                        >
+                            <MoreHorizontal className="size-5" />
+                        </PopoverTrigger>
+                        <PopoverContent
+                            side="top"
+                            align="end"
+                            className="w-[min(88vw,340px)] max-h-[70dvh] gap-3 overflow-y-auto p-3.5"
+                        >
+                            <div className="space-y-4">
+                                <VolumeElasticSlider
+                                    volume={volume}
+                                    muted={isMuted}
+                                    onVolume={onVolume}
+                                    onToggleMute={onToggleMute}
+                                    showValue
+                                    showIcons
+                                    fluid
+                                />
+                                {showQuality ? (
+                                    <div>
+                                        <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                            音质
+                                        </p>
+                                        <div className="flex flex-col gap-1">
+                                            {QUALITY_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.br}
+                                                    type="button"
+                                                    onClick={() => onQuality(option.br)}
+                                                    className={cn(
+                                                        "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
+                                                        qualityBr === option.br
+                                                            ? "bg-foreground text-background"
+                                                            : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                    )}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                                <div>
+                                    <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                        播放速度
+                                    </p>
+                                    <div className="flex justify-start">
+                                        <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
+                                    </div>
+                                </div>
+                                <EqEditor compact trackId={trackId} />
+                                {showQuality ? (
+                                    <button
+                                        type="button"
+                                        onClick={onOpenComments}
+                                        className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
+                                    >
+                                        <MessageCircle className="size-4" />
+                                        评论
+                                    </button>
+                                ) : null}
+                                {canShowShare ? (
+                                    <button
+                                        type="button"
+                                        onClick={onShare}
+                                        className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
+                                    >
+                                        <Share2 className="size-4" />
+                                        分享
+                                    </button>
+                                ) : null}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                ) : (
+                    <>
                 <Popover>
                     <PopoverTrigger
                         className={cn(
@@ -1059,11 +1183,19 @@ const TransportBar = memo(function TransportBar({
                     </Popover>
                 ) : null}
 
+                {canShowShare ? (
+                    <IconBtn title="分享" onClick={onShare}>
+                        <Share2 className="size-4" />
+                    </IconBtn>
+                ) : null}
+
                 {showQuality ? (
                     <IconBtn title="评论" onClick={onOpenComments}>
                         <MessageCircle className="size-4" />
                     </IconBtn>
                 ) : null}
+                    </>
+                )}
             </div>
         </div>
     )
@@ -1102,7 +1234,15 @@ function IconBtn({
 // 远程 URL 透明升级为本地缓存，避免每次打开都拉 CDN
 function CachedBackdropImage({ src }: { src: string }) {
     const resolved = useCachedCoverUrl(src, "original")
-    return <img src={resolved} alt="" className="full-player-backdrop-image" />
+    return (
+        <img
+            src={resolved}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="full-player-backdrop-image"
+        />
+    )
 }
 
 export { FullPlayer }

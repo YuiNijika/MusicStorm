@@ -178,7 +178,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                 <DialogHeader>
                     <DialogTitle>登录网易云</DialogTitle>
                     <DialogDescription>
-                        {isMobile() ? "手机号登录" : "默认扫码登录到 MusicStorm"}
+                        登录状态存储在本地
                     </DialogDescription>
                 </DialogHeader>
 
@@ -272,6 +272,8 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                                 <img
                                     src={qrState.qrimg}
                                     alt="登录二维码"
+                                    loading="lazy"
+                                    decoding="async"
                                     className="size-full object-contain p-1"
                                 />
                             ) : (

@@ -394,77 +394,79 @@ function TrackRow({
                 </span>
             </div>
 
-            <div className="min-w-0 overflow-hidden">
-                <div className="flex min-w-0 items-center gap-1.5">
-                    {typeof index === "number" ? (
-                        <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                            {index + 1}
-                        </span>
-                    ) : null}
+            <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                        {typeof index === "number" ? (
+                            <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                                {index + 1}
+                            </span>
+                        ) : null}
+                        <p
+                            className={cn(
+                                "min-w-0 flex-1 truncate tracking-[-0.01em]",
+                                dense ? "text-[14px] md:text-[12px]" : "text-[15px] md:text-[13px]",
+                                isActive ? "font-semibold text-primary" : "font-medium text-foreground",
+                            )}
+                        >
+                            {track.title}
+                        </p>
+                    </div>
                     <p
                         className={cn(
-                            "min-w-0 flex-1 truncate tracking-[-0.01em]",
-                            dense ? "text-[14px] md:text-[12px]" : "text-[15px] md:text-[13px]",
-                            isActive ? "font-semibold text-primary" : "font-medium text-foreground",
+                            "mt-0.5 truncate text-muted-foreground",
+                            dense ? "text-[12px] md:text-[11px]" : "text-[13px] md:text-[12px]",
                         )}
                     >
-                        {track.title}
+                        {artists.map((artist, i) => (
+                            <span key={`${artist.id || artist.name}-${i}`}>
+                                {i > 0 ? (
+                                    <span className="text-muted-foreground/50"> / </span>
+                                ) : null}
+                                {artist.id && isNetease ? (
+                                    <button
+                                        type="button"
+                                        onClick={(event) =>
+                                            handleMetaClick(event, () =>
+                                                openArtist(artist.id),
+                                            )
+                                        }
+                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                    >
+                                        {artist.name}
+                                    </button>
+                                ) : (
+                                    <span>{artist.name}</span>
+                                )}
+                            </span>
+                        ))}
+                        {inlineAlbum && track.album ? (
+                            <>
+                                <span className="mx-1.5 text-muted-foreground/50">·</span>
+                                {track.albumId && isNetease ? (
+                                    <button
+                                        type="button"
+                                        onClick={(event) =>
+                                            handleMetaClick(event, () =>
+                                                openAlbum(track.albumId!),
+                                            )
+                                        }
+                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                    >
+                                        {track.album}
+                                    </button>
+                                ) : (
+                                    <span>{track.album}</span>
+                                )}
+                            </>
+                        ) : null}
                     </p>
-                    {showSource ? (
-                        <span className="shrink-0">
-                            <SourceBadge source={track.source} />
-                        </span>
-                    ) : null}
                 </div>
-                <p
-                    className={cn(
-                        "mt-0.5 truncate text-muted-foreground",
-                        dense ? "text-[12px] md:text-[11px]" : "text-[13px] md:text-[12px]",
-                    )}
-                >
-                    {artists.map((artist, i) => (
-                        <span key={`${artist.id || artist.name}-${i}`}>
-                            {i > 0 ? (
-                                <span className="text-muted-foreground/50"> / </span>
-                            ) : null}
-                            {artist.id && isNetease ? (
-                                <button
-                                    type="button"
-                                    onClick={(event) =>
-                                        handleMetaClick(event, () =>
-                                            openArtist(artist.id),
-                                        )
-                                    }
-                                    className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                >
-                                    {artist.name}
-                                </button>
-                            ) : (
-                                <span>{artist.name}</span>
-                            )}
-                        </span>
-                    ))}
-                    {inlineAlbum && track.album ? (
-                        <>
-                            <span className="mx-1.5 text-muted-foreground/50">·</span>
-                            {track.albumId && isNetease ? (
-                                <button
-                                    type="button"
-                                    onClick={(event) =>
-                                        handleMetaClick(event, () =>
-                                            openAlbum(track.albumId!),
-                                        )
-                                    }
-                                    className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                >
-                                    {track.album}
-                                </button>
-                            ) : (
-                                <span>{track.album}</span>
-                            )}
-                        </>
-                    ) : null}
-                </p>
+                {showSource ? (
+                    <span className="flex shrink-0 items-center">
+                        <SourceBadge source={track.source} />
+                    </span>
+                ) : null}
             </div>
 
             {albumCol ? (
@@ -521,7 +523,7 @@ function TrackRow({
                 <span className="text-[12px] tabular-nums text-muted-foreground">
                     {formatDuration(track.durationMs)}
                 </span>
-                {showAddToPlaylist && isNetease ? (
+                {showAddToPlaylist && (isNetease || isLocal) ? (
                     <button
                         type="button"
                         title="添加到歌单"
@@ -575,7 +577,7 @@ function TrackRow({
                             <ListPlus />
                             加入队列
                         </DropdownMenuItem>
-                        {isNetease ? (
+                        {isNetease || isLocal ? (
                             <DropdownMenuItem
                                 onClick={() => setAddToPlaylistOpen(true)}
                             >
@@ -698,7 +700,7 @@ function TrackRow({
                         {liked ? "取消喜欢" : "喜欢"}
                     </ContextMenuItem>
                 ) : null}
-                {isNetease ? (
+                {isNetease || isLocal ? (
                     <ContextMenuItem onClick={() => setAddToPlaylistOpen(true)}>
                         <Library />
                         添加到歌单

@@ -36,6 +36,8 @@ type AppearancePrefs = {
     backgroundOpacity: number
     /** 0 – 40 px，背景图模糊 */
     backgroundBlur: number
+    /** 是否启用必应每日壁纸作背景源（需无自定义背景图才触发请求） */
+    bingWallpaper: boolean
 }
 
 type AccentOption = {
@@ -73,6 +75,7 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
     backgroundUrl: "",
     backgroundOpacity: 0.5,
     backgroundBlur: 0,
+    bingWallpaper: false,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -136,6 +139,10 @@ function readAppearancePrefs(): AppearancePrefs {
                 typeof data.backgroundBlur === "number"
                     ? clamp(data.backgroundBlur, 0, 40)
                     : DEFAULT_APPEARANCE.backgroundBlur,
+            bingWallpaper:
+                typeof data.bingWallpaper === "boolean"
+                    ? data.bingWallpaper
+                    : DEFAULT_APPEARANCE.bingWallpaper,
         }
     } catch {
         return DEFAULT_APPEARANCE

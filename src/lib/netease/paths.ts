@@ -59,7 +59,6 @@ export const NETEASE_PATHS = {
     simiMv: "/simi/mv",
     playlistDelete: "/playlist/delete",
     dailySignin: "/daily_signin",
-    dailySigninStatus: "/daily_signin_status",
     loginEmail: "/login",
     faq: "/musicstorm/faq",
     commentReply: "/comment/reply",

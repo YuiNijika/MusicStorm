@@ -2,6 +2,7 @@ import * as React from "react"
 import { useEffect, useState, type CSSProperties } from "react"
 import { Toast as ToastPrimitive } from "@base-ui/react/toast"
 
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -62,8 +63,11 @@ function toastViewportStyle(prefs: ToastPrefs): CSSProperties {
 
 function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
     const prefs = useToastPrefs()
+    const isMobile = useIsMobile()
+    // 移动端固定顶部居中：底部为播放条与全屏播放器控区，通知更不易被遮挡
+    const position = isMobile ? "top-center" : prefs.position
     const centered =
-        prefs.position === "top-center" || prefs.position === "bottom-center"
+        position === "top-center" || position === "bottom-center"
 
     return (
         <ToastPrimitive.Viewport
@@ -75,7 +79,7 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
                 className,
             )}
             style={{
-                ...toastViewportStyle(prefs),
+                ...toastViewportStyle({ position, margin: prefs.margin }),
                 ...props.style,
             }}
             {...props}

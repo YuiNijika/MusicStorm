@@ -6,12 +6,18 @@ import tailwindcss from "@tailwindcss/vite"
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+const buildVersion =
+  process.env.VITE_APP_VERSION ?? "";
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
+  define: {
+    __APP_BUILD_VERSION__: JSON.stringify(buildVersion),
+  },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   build: {

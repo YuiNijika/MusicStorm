@@ -141,6 +141,8 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                 <img
                                     src={profile.avatarUrl}
                                     alt=""
+                                    loading="lazy"
+                                    decoding="async"
                                     className="size-12 rounded-full object-cover"
                                 />
                             ) : (
@@ -225,6 +227,8 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                             <img
                                                 src={account.avatarUrl}
                                                 alt=""
+                                                loading="lazy"
+                                                decoding="async"
                                                 className="size-9 rounded-full object-cover"
                                             />
                                         ) : (

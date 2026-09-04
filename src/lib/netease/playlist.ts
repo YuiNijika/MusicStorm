@@ -102,6 +102,38 @@ async function fetchPlaylistDetail(id: string): Promise<{
     return { playlist, tracks }
 }
 
+// 轻量取歌单排头信息：云端第一首曲目 id 与其封面，tracks 为空时用 trackIds 补齐
+async function fetchPlaylistHead(
+    id: string,
+): Promise<{ firstTrackId: string | null; firstCoverUrl: string | null }> {
+    const data = await neteaseRequest<PlaylistDetailData>({
+        path: NETEASE_PATHS.playlistDetail,
+        params: { id },
+    })
+    const raw = data.playlist
+    const firstTrack = raw?.tracks?.[0]
+    if (firstTrack?.id != null) {
+        return {
+            firstTrackId: String(firstTrack.id),
+            firstCoverUrl: firstTrack.al?.picUrl ?? null,
+        }
+    }
+    const firstId = raw?.trackIds?.[0]?.id
+    if (firstId == null) {
+        return { firstTrackId: null, firstCoverUrl: null }
+    }
+    try {
+        const detail = await fetchSongDetail(String(firstId))
+        const song = detail.songs?.[0]
+        return {
+            firstTrackId: String(firstId),
+            firstCoverUrl: song?.al?.picUrl ?? null,
+        }
+    } catch {
+        return { firstTrackId: String(firstId), firstCoverUrl: null }
+    }
+}
+
 
 async function subscribePlaylist(id: string, subscribe: boolean): Promise<void> {
     const data = await neteaseRequest<{ code?: number }>({
@@ -214,6 +246,7 @@ export {
     createPlaylist,
     deletePlaylist,
     fetchPlaylistDetail,
+    fetchPlaylistHead,
     fetchRecommendPlaylists,
     fetchTopPlaylists,
     subscribePlaylist,

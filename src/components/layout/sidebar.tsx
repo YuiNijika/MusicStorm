@@ -26,6 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { useOpenAuthOnExpiry } from "@/hooks/use-open-auth-on-expiry"
 import {
     SIDEBAR_STYLE_EVENT,
     readSidebarStyle,
@@ -112,6 +113,8 @@ function CompactSidebar({
     const { ready, loggedIn, profile, logout } = useNeteaseSession()
     const { theme, setTheme } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
+    // 登录失效时自动弹出网易云登录对话框
+    useOpenAuthOnExpiry(() => setAuthOpen(true))
 
     // 底部功能图标：头像账号菜单、主题快切、设置
     // 默认跟随系统：图标按解析后的实际明暗显示，不做第三态
@@ -203,6 +206,8 @@ function CompactSidebar({
                             <img
                                 src={profile.avatarUrl}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 className="size-7 rounded-full object-cover"
                             />
                         ) : (
@@ -349,6 +354,8 @@ function ClassicSidebar({
                             <img
                                 src={profile.avatarUrl}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 className="size-8 rounded-full object-cover"
                             />
                         ) : (

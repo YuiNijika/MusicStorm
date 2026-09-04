@@ -614,13 +614,6 @@ function resolveNativeModule(path: string, query: Query): NativeModuleSpec {
                 data: { type: qNum(query, "type", 0) },
                 crypto: "eapi",
             }
-        case NETEASE_PATHS.dailySigninStatus:
-            // 签到状态汇总：pcSign/mobileSign 标记两端当日是否已签
-            return {
-                uri: "/api/point/dailySummary",
-                data: {},
-                crypto: "weapi",
-            }
         case NETEASE_PATHS.loginEmail: {
             const md5Password = q(query, "md5_password")
             const password = q(query, "password")

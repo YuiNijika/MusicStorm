@@ -39,9 +39,9 @@ async function fetchGithubReleases(currentVersion: string): Promise<Response> {
     throw lastError ?? new Error("GitHub API 请求失败")
 }
 
-// Android 独立版本线：tag 带 -android 后缀，与桌面 vX.Y.Z 分开，
-// 避免 releases/latest 按时间排序导致跨平台串台
-const ANDROID_TAG_SUFFIX = "-android"
+// 桌面与 Android 共用同一版本线与 release tag（不再有 -android 独立 tag），
+// 参考 tauri-plugin-updater 的"单一语义版本跨平台匹配"思路一起发版。
+const RELEASE_CACHE_KEY = "musicstorm-github-release-cache"
 
 type GithubReleaseRaw = {
     tag_name?: string
@@ -96,25 +96,13 @@ function normalizeSemver(raw: string): string | null {
     return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`
 }
 
-// Android：tag 形如 v0.0.1-android；桌面：纯 vX.Y.Z
-function isAndroidPlatform(): boolean {
-    try {
-        return /android/i.test(navigator.userAgent)
-    } catch {
-        return false
-    }
-}
-
-function tagMatchesPlatform(tag: string): boolean {
-    const isAndroid = isAndroidPlatform()
-    const hasSuffix = tag.trim().endsWith(ANDROID_TAG_SUFFIX)
-    return isAndroid ? hasSuffix : !hasSuffix
-}
-
-function cacheKeyForPlatform(): string {
-    return isAndroidPlatform()
-        ? "musicstorm-github-release-cache-android"
-        : "musicstorm-github-release-cache"
+function readInjectedBuildVersion(): string | null {
+    const raw =
+        (typeof __APP_BUILD_VERSION__ === "string"
+            ? __APP_BUILD_VERSION__
+            : import.meta.env.VITE_APP_VERSION) ?? ""
+    const version = raw.trim()
+    return version ? version : null
 }
 
 function parseSemverTuple(raw: string): [number, number, number] | null {
@@ -147,14 +135,23 @@ function isNewerVersion(latest: string, current: string): boolean {
 }
 
 async function readAppVersion(): Promise<string> {
+    // 桌面与 Android 共用 tauri.conf.json 的版本：getVersion() 在桌面返回桌面版、
+    // 在 Android 返回 versionName（= 同一语义版本），跨平台一致。
+    const injected = readInjectedBuildVersion()
     try {
         const { getVersion } = await import("@tauri-apps/api/app")
         const v = await getVersion()
-        return normalizeSemver(v) ?? v.trim()
+        const normalized = normalizeSemver(v)
+        if (normalized) {
+            return normalized
+        }
     } catch {
-        // 浏览器预览：退回 package 占位，仅开发用
-        return "0.1.0"
+        // 浏览器预览：走注入版本或固定占位，仅开发用
     }
+    if (injected) {
+        return normalizeSemver(injected) ?? injected
+    }
+    return "0.1.0"
 }
 
 function readCache(): CachePayload | null {
@@ -162,7 +159,7 @@ function readCache(): CachePayload | null {
         return null
     }
     try {
-        const raw = window.localStorage.getItem(cacheKeyForPlatform())
+        const raw = window.localStorage.getItem(RELEASE_CACHE_KEY)
         if (!raw) {
             return null
         }
@@ -183,7 +180,7 @@ function readCache(): CachePayload | null {
 function writeCache(payload: CachePayload): void {
     try {
         window.localStorage.setItem(
-            cacheKeyForPlatform(),
+            RELEASE_CACHE_KEY,
             JSON.stringify(payload),
         )
     } catch {
@@ -258,11 +255,10 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
         }
 
         const all = (await response.json()) as GithubReleaseRaw[]
-        // 平台隔离：桌面只看 vX.Y.Z，Android 只看 vX.Y.Z-android
         const data = all.find(
             (r) =>
                 !r.draft &&
-                tagMatchesPlatform(r.tag_name ?? ""),
+                !!r.tag_name?.trim(),
         )
         if (!data) {
             throw new Error("当前平台暂无发布版本")

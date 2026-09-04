@@ -1,4 +1,4 @@
-import { Heart, Library, Pencil, Sparkles, Trash2 } from "lucide-react"
+﻿import { Heart, Library, ListMinus, Pencil, Sparkles, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
@@ -35,6 +35,11 @@ import {
 } from "@/lib/library/layout-prefs"
 import { sortTracks, TRACK_SORT_OPTIONS } from "@/lib/library/sort"
 import {
+    listLocalTracksForPlaylist,
+    removeLocalTracksFromPlaylist,
+    type LocalPlaylistTrackRow,
+} from "@/lib/local/local-playlist"
+import {
     ORDER_EVENT,
     getPlaylistTrackOrder,
     setPlaylistTrackOrder,
@@ -56,6 +61,73 @@ type PlaylistPageProps = {
     onBack: () => void
 }
 
+// 本地附加条目转可播 Track，供歌单详情合并展示
+function localRowToTrack(row: LocalPlaylistTrackRow): Track {
+    return {
+        id: row.id,
+        title: row.title,
+        artist: row.artist,
+        album: row.album,
+        durationMs: row.durationMs,
+        coverUrl: row.coverUrl ?? "",
+        filePath: row.filePath ?? undefined,
+        source: "local",
+    }
+}
+
+// 本地条目按锚点插回云端列表：锚点是添加时歌单最前的云端曲目，插到锚点前面即还原
+// 「新添加的排最前」的时间序（网易云云端列表最新在前，同一条逻辑）。
+// 没有锚点的条目（升级前的旧数据、添加时歌单为空、锚点曲目被删）不沉底，
+// 与锚定在首支云端曲目上的条目一起按添加时间混排，保持在列表头部
+function mergePlaylistTracks(
+    cloudTracks: Track[],
+    rows: LocalPlaylistTrackRow[],
+): Track[] {
+    if (rows.length === 0) {
+        return cloudTracks
+    }
+    const cloudIds = new Set(cloudTracks.map((item) => item.id))
+    const byAnchor = new Map<string, LocalPlaylistTrackRow[]>()
+    const frontRows: LocalPlaylistTrackRow[] = []
+    for (const row of rows) {
+        const anchor = row.anchorTrackId ?? null
+        if (anchor && cloudIds.has(anchor)) {
+            const list = byAnchor.get(anchor) ?? []
+            list.push(row)
+            byAnchor.set(anchor, list)
+        } else {
+            frontRows.push(row)
+        }
+    }
+    const byAddedDesc = (
+        a: LocalPlaylistTrackRow,
+        b: LocalPlaylistTrackRow,
+    ) => b.addedAt - a.addedAt
+    for (const list of byAnchor.values()) {
+        list.sort(byAddedDesc)
+    }
+    frontRows.sort(byAddedDesc)
+
+    const out: Track[] = []
+    // 列表头部：无锚点条目与锚定在首支云端曲目上的条目按添加时间混排，新添加的在最前
+    const firstCloud = cloudTracks[0]
+    const head = firstCloud
+        ? [...frontRows, ...(byAnchor.get(firstCloud.id) ?? [])].sort(byAddedDesc)
+        : frontRows
+    out.push(...head.map(localRowToTrack))
+    for (let i = 0; i < cloudTracks.length; i += 1) {
+        out.push(cloudTracks[i]!)
+        const next = cloudTracks[i + 1]
+        if (next) {
+            const group = byAnchor.get(next.id)
+            if (group) {
+                out.push(...group.map(localRowToTrack))
+            }
+        }
+    }
+    return out
+}
+
 function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
     const { loggedIn, profile } = useNeteaseSession()
@@ -68,6 +140,8 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     } = useLiked()
     const [playlist, setPlaylist] = useState<Playlist | null>(null)
     const [tracks, setTracks] = useState<Track[]>([])
+    // 合并进本歌单的本地条目（含锚点），独立于网易云歌单存储
+    const [localRows, setLocalRows] = useState<LocalPlaylistTrackRow[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [errorText, setErrorText] = useState<string | null>(null)
     const [subBusy, setSubBusy] = useState(false)
@@ -95,10 +169,29 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         return getPlaylistTrackOrder(playlistId)
     }, [playlistId, orderTick])
 
-    const sortedTracks = useMemo(
-        () => sortTracks(tracks, trackSort, customOrder),
-        [tracks, trackSort, customOrder],
+    // 云端曲目与本地附加曲目按锚点合并成同一份歌单列表，还原添加时间序
+    const displayTracks = useMemo(
+        () => mergePlaylistTracks(tracks, localRows),
+        [tracks, localRows],
     )
+
+    const sortedTracks = useMemo(
+        () => sortTracks(displayTracks, trackSort, customOrder),
+        [displayTracks, trackSort, customOrder],
+    )
+
+    // 封面与列表第一首歌保持一致：无论第一首是本地还是网易云都用它的封面，
+    // 取不到封面时回退云端歌单封面
+    const heroCover = useMemo(() => {
+        const first = displayTracks[0]
+        if (first) {
+            const url = resolveTrackCoverUrl(first.id, first.coverUrl)
+            if (url) {
+                return url
+            }
+        }
+        return playlist?.coverUrl ?? ""
+    }, [displayTracks, playlist])
 
     const dragEnabled =
         trackSort === "custom" && playlistTracksView === "list"
@@ -124,6 +217,18 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                 setPlaylist(result.playlist)
                 setTracks(result.tracks)
                 setIsLoading(false)
+                // 拉取手动附加到本歌单的本地条目并按锚点合并显示
+                void listLocalTracksForPlaylist(playlistId)
+                    .then((rows) => {
+                        if (!cancelled) {
+                            setLocalRows(rows)
+                        }
+                    })
+                    .catch(() => {
+                        if (!cancelled) {
+                            setLocalRows([])
+                        }
+                    })
             })
             .catch((error: unknown) => {
                 if (cancelled) {
@@ -157,26 +262,25 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         }
     }
 
-    // 心动模式：随机取一首做种子，生成智能推荐队列并接管播放
+    // 心动模式：随机取一首云端曲目做种子，生成智能推荐队列并接管播放
     async function handleIntelligence() {
-        if (sortedTracks.length === 0 || intelBusy) {
+        if (tracks.length === 0 || intelBusy) {
             return
         }
         setIntelBusy(true)
         try {
-            const seed =
-                sortedTracks[Math.floor(Math.random() * sortedTracks.length)]
+            const seed = tracks[Math.floor(Math.random() * tracks.length)]
             if (!seed) {
                 return
             }
-            const tracks = await fetchIntelligencePlaylist(seed.id, playlistId)
-            if (tracks.length === 0) {
+            const queue = await fetchIntelligencePlaylist(seed.id, playlistId)
+            if (queue.length === 0) {
                 notifySuccess("心动模式暂无可播歌曲", {
                     description: "稍后再试试",
                 })
                 return
             }
-            playTrack(tracks[0]!, tracks)
+            playTrack(queue[0]!, queue)
         } catch (error) {
             notifyFromError("心动模式失败", error)
         } finally {
@@ -188,6 +292,17 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         setEditName(playlist?.title ?? "")
         setEditDesc(playlist?.description ?? "")
         setEditOpen(true)
+    }
+
+    // 移除附加到本歌单的本地曲目（只删本地关联记录，不动文件）
+    async function handleRemoveLocalTrack(trackId: string) {
+        try {
+            await removeLocalTracksFromPlaylist(playlistId, [trackId])
+            setLocalRows((prev) => prev.filter((item) => item.id !== trackId))
+            notifySuccess("已从歌单移除")
+        } catch (error) {
+            notifyFromError("移除失败", error)
+        }
     }
 
     async function handleDelete() {
@@ -274,7 +389,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                 <>
                     <header className="flex flex-wrap items-end gap-5">
                         <Cover
-                            src={playlist.coverUrl}
+                            src={heroCover}
                             alt={playlist.title}
                             size="lg"
                             className="size-36 rounded-[24px]"
@@ -283,7 +398,11 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                             <div className="flex flex-wrap items-center gap-2">
                                 <SourceBadge source={playlist.source} />
                                 <span className="text-[12px] text-muted-foreground">
-                                    {playlist.trackCount ?? sortedTracks.length} 首
+                                    {playlist.trackCount != null
+                                        ? playlist.trackCount +
+                                          localRows.length
+                                        : sortedTracks.length}{" "}
+                                    首
                                 </span>
                                 {playlist.creator ? (
                                     <span className="text-[12px] text-muted-foreground">
@@ -410,7 +529,21 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                             playOrToggle(track, sortedTracks)
                                         }
                                         overlay={
-                                            track.source === "netease" ? (
+                                            track.source === "local" ? (
+                                                <div
+                                                    role="button"
+                                                    title="从歌单移除"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleRemoveLocalTrack(
+                                                            track.id,
+                                                        )
+                                                    }}
+                                                    className="absolute bottom-2 right-2 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/60 group-hover:opacity-100"
+                                                >
+                                                    <ListMinus className="size-4" />
+                                                </div>
+                                            ) : (
                                                 <div
                                                     role="button"
                                                     title="添加到歌单"
@@ -424,7 +557,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 >
                                                     <Library className="size-4" />
                                                 </div>
-                                            ) : null
+                                            )
                                         }
                                     />
                                 ))}
@@ -446,9 +579,15 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                     currentTrack?.id === track.id &&
                                                     isPlaying
                                                 }
-                                                showSource={false}
+                                                // 只给本地曲目标来源，网易云不加 tag
+                                                showSource={track.source === "local"}
+                                                // 本地曲目的专辑列与网易云对齐
+                                                showAlbumColumn
                                                 playlistId={
-                                                    isOwnLiked ? undefined : playlistId
+                                                    track.source === "netease" &&
+                                                    !isOwnLiked
+                                                        ? playlistId
+                                                        : undefined
                                                 }
                                                 onRemoved={(id) =>
                                                     setTracks((prev) =>
@@ -456,6 +595,14 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                             (item) => item.id !== id,
                                                         ),
                                                     )
+                                                }
+                                                onLocalRemove={
+                                                    track.source === "local"
+                                                        ? () =>
+                                                              void handleRemoveLocalTrack(
+                                                                  track.id,
+                                                              )
+                                                        : undefined
                                                 }
                                                 onPlay={(item) =>
                                                     playOrToggle(item, sortedTracks)
@@ -477,9 +624,15 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                     currentTrack?.id === track.id &&
                                                     isPlaying
                                                 }
-                                                showSource={false}
+                                                // 只给本地曲目标来源，网易云不加 tag
+                                                showSource={track.source === "local"}
+                                                // 本地曲目的专辑列与网易云对齐
+                                                showAlbumColumn
                                                 playlistId={
-                                                    isOwnLiked ? undefined : playlistId
+                                                    track.source === "netease" &&
+                                                    !isOwnLiked
+                                                        ? playlistId
+                                                        : undefined
                                                 }
                                                 onRemoved={(id) =>
                                                     setTracks((prev) =>
@@ -487,6 +640,14 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                             (item) => item.id !== id,
                                                         ),
                                                     )
+                                                }
+                                                onLocalRemove={
+                                                    track.source === "local"
+                                                        ? () =>
+                                                              void handleRemoveLocalTrack(
+                                                                  track.id,
+                                                              )
+                                                        : undefined
                                                 }
                                                 onPlay={(item) =>
                                                     playOrToggle(item, sortedTracks)

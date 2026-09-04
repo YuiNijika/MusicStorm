@@ -39,6 +39,7 @@ type ThemeContextValue = {
     setBackgroundUrl: (url: string) => void
     setBackgroundOpacity: (value: number) => void
     setBackgroundBlur: (value: number) => void
+    setBingWallpaper: (enabled: boolean) => void
 }
 
 const STORAGE_KEY = "musicstorm-theme"
@@ -267,6 +268,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const setBingWallpaper = useCallback((enabled: boolean) => {
+        setAppearance((prev) => {
+            const next = { ...prev, bingWallpaper: enabled }
+            writeAppearancePrefs(next)
+            return next
+        })
+    }, [])
+
     const value = useMemo(
         () => ({
             theme,
@@ -283,6 +292,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setBackgroundUrl,
             setBackgroundOpacity,
             setBackgroundBlur,
+            setBingWallpaper,
         }),
         [
             theme,
@@ -299,6 +309,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setBackgroundUrl,
             setBackgroundOpacity,
             setBackgroundBlur,
+            setBingWallpaper,
         ],
     )
 

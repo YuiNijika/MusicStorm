@@ -123,6 +123,27 @@ const SCHEMA_V5: &str = r#"
 ALTER TABLE play_session ADD COLUMN cover_url TEXT;
 "#;
 
+/// 本地音乐附加到歌单：记录哪个歌单插进了哪些本地曲目，纯本地持久化
+const SCHEMA_V6: &str = r#"
+CREATE TABLE IF NOT EXISTS local_playlist_entry (
+  playlist_id TEXT NOT NULL,
+  track_id TEXT NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (playlist_id, track_id)
+);
+CREATE INDEX IF NOT EXISTS idx_local_entry_track ON local_playlist_entry(track_id);
+"#;
+
+/// 本地附加条目锚点：记录添加那一刻歌单最前的云端曲目，合并展示时按锚点还原添加时间序
+const SCHEMA_V7: &str = r#"
+ALTER TABLE local_playlist_entry ADD COLUMN anchor_track_id TEXT;
+"#;
+
+/// 本地附加条目锚点封面：添加那一刻的云端歌单封面，列表页据此判断云端首曲是否已变
+const SCHEMA_V8: &str = r#"
+ALTER TABLE local_playlist_entry ADD COLUMN anchor_cover TEXT;
+"#;
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -443,6 +464,27 @@ fn migrate(conn: &Connection) -> Result<(), String> {
         conn.pragma_update(None, "user_version", 5)
             .map_err(|e| format!("set user_version: {e}"))?;
     }
+    let version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|e| format!("user_version: {e}"))?;
+    if version < 6 {
+        conn.execute_batch(SCHEMA_V6)
+            .map_err(|e| format!("schema v6: {e}"))?;
+        conn.pragma_update(None, "user_version", 6)
+            .map_err(|e| format!("set user_version: {e}"))?;
+    }
+    if version < 7 {
+        conn.execute_batch(SCHEMA_V7)
+            .map_err(|e| format!("schema v7: {e}"))?;
+        conn.pragma_update(None, "user_version", 7)
+            .map_err(|e| format!("set user_version: {e}"))?;
+    }
+    if version < 8 {
+        conn.execute_batch(SCHEMA_V8)
+            .map_err(|e| format!("schema v8: {e}"))?;
+        conn.pragma_update(None, "user_version", 8)
+            .map_err(|e| format!("set user_version: {e}"))?;
+    }
     Ok(())
 }
 
@@ -652,6 +694,169 @@ pub fn db_upsert_tracks(
 
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalPlaylistAddInput {
+    pub playlist_id: String,
+    pub track_ids: Vec<String>,
+    /// 添加时刻歌单最前的云端曲目 id，空歌单传 None
+    pub anchor_track_id: Option<String>,
+    /// 添加时刻的云端歌单封面，列表页据此判断云端首曲是否已变
+    pub anchor_cover: Option<String>,
+}
+
+/// 本地歌单条目：附加到歌单的本地曲目（本地 track 表联查回来的展示字段与锚点）
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalPlaylistTrackRow {
+    pub id: String,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub duration_ms: i64,
+    pub cover_url: Option<String>,
+    pub file_path: Option<String>,
+    pub added_at: i64,
+    pub anchor_track_id: Option<String>,
+}
+
+#[tauri::command]
+pub fn db_local_add_to_playlist(
+    state: State<'_, DbState>,
+    input: LocalPlaylistAddInput,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let ts = now_ms();
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for track_id in input.track_ids {
+        // 重复添加视作重新入队：刷新时间与锚点，把条目移回最前
+        tx.execute(
+            "INSERT INTO local_playlist_entry (playlist_id, track_id, added_at, anchor_track_id, anchor_cover)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(playlist_id, track_id) DO UPDATE SET
+               added_at = excluded.added_at,
+               anchor_track_id = excluded.anchor_track_id,
+               anchor_cover = excluded.anchor_cover",
+            params![
+                input.playlist_id,
+                track_id,
+                ts,
+                input.anchor_track_id,
+                input.anchor_cover
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn db_local_for_playlist(
+    state: State<'_, DbState>,
+    playlist_id: String,
+) -> Result<Vec<LocalPlaylistTrackRow>, String> {
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT t.id, t.title, t.artist, t.album, t.duration_ms, t.cover_url, t.file_path,
+                    e.added_at, e.anchor_track_id
+             FROM local_playlist_entry e
+             JOIN track t ON t.id = e.track_id
+             WHERE e.playlist_id = ?1
+             ORDER BY e.added_at, t.title",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![playlist_id], |row| {
+            Ok(LocalPlaylistTrackRow {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                artist: row.get(2)?,
+                album: row.get(3)?,
+                duration_ms: row.get(4)?,
+                cover_url: row.get(5)?,
+                file_path: row.get(6)?,
+                added_at: row.get(7)?,
+                anchor_track_id: row.get(8)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn db_local_remove_from_playlist(
+    state: State<'_, DbState>,
+    playlist_id: String,
+    track_ids: Vec<String>,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for track_id in track_ids {
+        tx.execute(
+            "DELETE FROM local_playlist_entry WHERE playlist_id = ?1 AND track_id = ?2",
+            params![playlist_id, track_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 列表页歌单封面接管信息：每个歌单取最新本地条目的本地封面与锚点信息
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalPlaylistCover {
+    pub playlist_id: String,
+    pub cover_url: Option<String>,
+    pub anchor_cover: Option<String>,
+    pub anchor_track_id: Option<String>,
+}
+
+#[tauri::command]
+pub fn db_local_playlist_covers(
+    state: State<'_, DbState>,
+    playlist_ids: Vec<String>,
+) -> Result<Vec<LocalPlaylistCover>, String> {
+    if playlist_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
+    let placeholders = playlist_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT e.playlist_id, t.cover_url, e.anchor_cover, e.anchor_track_id
+         FROM local_playlist_entry e
+         JOIN track t ON t.id = e.track_id
+         WHERE e.playlist_id IN ({placeholders})
+           AND e.added_at = (
+             SELECT MAX(e2.added_at) FROM local_playlist_entry e2
+             WHERE e2.playlist_id = e.playlist_id
+           )
+         ORDER BY e.playlist_id, t.title"
+    );
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(playlist_ids.iter()), |row| {
+            Ok(LocalPlaylistCover {
+                playlist_id: row.get(0)?,
+                cover_url: row.get(1)?,
+                anchor_cover: row.get(2)?,
+                anchor_track_id: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
 }
 
 #[tauri::command]

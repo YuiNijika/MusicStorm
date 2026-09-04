@@ -553,6 +553,8 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                         <img
                             src={profile.avatarUrl}
                             alt={profile.nickname ?? "我"}
+                            loading="lazy"
+                            decoding="async"
                             className="size-8 shrink-0 rounded-full object-cover"
                         />
                     ) : (

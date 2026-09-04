@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.OpenableColumns
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
@@ -52,6 +53,8 @@ import java.io.FileOutputStream
  */
 class MusicStormBridge(private val activity: MainActivity) {
     private var webView: WebView? = null
+    // 冷启动即带 musicstorm:// 深链时先在 webView 挂载前缓冲，attach 后补发
+    private var pendingDeepLink: String? = null
 
     private val folderPicker: ActivityResultLauncher<Uri?> =
         activity.registerForActivityResult(
@@ -90,7 +93,40 @@ class MusicStormBridge(private val activity: MainActivity) {
 
     fun attach(webView: WebView) {
         this.webView = webView
+        pendingDeepLink?.let { payload ->
+            pendingDeepLink = null
+            deliverDeepLink(webView, payload)
+        }
         scheduleWebViewCacheTrim()
+    }
+
+    /**
+     * 转发 musicstorm:// 深链 payload 到前端（自定义事件 musicstorm:deep-link）。
+     * 页面挂载后前端才监听，故统一延后投递；webView 未挂载时先缓冲，attach 后补发。
+     */
+    fun postDeepLink(payload: String) {
+        val wv = webView
+        if (wv == null) {
+            pendingDeepLink = payload
+            return
+        }
+        deliverDeepLink(wv, payload)
+    }
+
+    private fun deliverDeepLink(wv: WebView, payload: String) {
+        wv.postDelayed(
+            {
+                try {
+                    wv.evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('musicstorm:deep-link',{detail:$payload}))",
+                        null,
+                    )
+                } catch (_: Exception) {
+                    // webView 已销毁，丢弃事件
+                }
+            },
+            DEEP_LINK_DELAY_MS,
+        )
     }
 
     // ---- 媒体通知：转发前端元数据/状态到 MusicStormMediaService ----
@@ -200,6 +236,26 @@ class MusicStormBridge(private val activity: MainActivity) {
     private var mediaPrepared = false
     private var mediaPendingSeekMs: Int? = null
     private var mediaTicker: Runnable? = null
+    // 当前源是否为远程流（http/https）：流式 seek/时长上报依赖 MediaPlayer 内部缓冲，据此留分支
+    private var currentSourceIsRemote = false
+    // 锁屏/后台保活：播放期间持有 PARTIAL_WAKE_LOCK，避免 CPU 休眠导致音频断续
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) {
+            return
+        }
+        val pm = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            ?: return
+        wakeLock =
+            (pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MusicStormMedia"))
+                .apply { acquire() }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.takeIf { it.isHeld }?.release()
+        wakeLock = null
+    }
 
     @JavascriptInterface
     fun prepareFile(path: String) {
@@ -226,9 +282,11 @@ class MusicStormBridge(private val activity: MainActivity) {
             try {
                 mp.start()
             } catch (e: Exception) {
+                releaseWakeLock()
                 dispatchState(playing = false, error = e.message ?: "播放失败")
                 return@post
             }
+            acquireWakeLock()
             beginTick()
             dispatchState(playing = true)
         }
@@ -244,6 +302,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                 } catch (_: Exception) {
                 }
             }
+            releaseWakeLock()
             stopTick()
             dispatchState(playing = false)
         }
@@ -388,6 +447,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                     }
                     mediaPrepared = false
                     stopTick()
+                    releaseWakeLock()
                     abandonAudioFocus()
                     dispatchState(
                         playing = false,
@@ -404,6 +464,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                     }
                     mediaPrepared = false
                     stopTick()
+                    releaseWakeLock()
                     abandonAudioFocus()
                     dispatchState(playing = false, error = "MediaPlayer $what/$extra")
                 }
@@ -416,6 +477,8 @@ class MusicStormBridge(private val activity: MainActivity) {
             }
             mediaPlayer = mp
             mediaPrepared = true
+            currentSourceIsRemote =
+                path.startsWith("http://") || path.startsWith("https://")
             dispatchState(
                 playing = false,
                 prepared = true,
@@ -435,10 +498,12 @@ class MusicStormBridge(private val activity: MainActivity) {
 
     private fun stopMedia() {
         stopTick()
+        releaseWakeLock()
         val mp = mediaPlayer
         mediaPlayer = null
         mediaPrepared = false
         mediaPendingSeekMs = null
+        currentSourceIsRemote = false
         abandonAudioFocus()
         if (mp != null) {
             try {
@@ -471,6 +536,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                                 mp.pause()
                             } catch (_: Exception) {
                             }
+                            releaseWakeLock()
                             stopTick()
                             dispatchState(playing = false)
                         }
@@ -833,6 +899,8 @@ class MusicStormBridge(private val activity: MainActivity) {
     companion object {
         // 启动 15s 后（避开首屏关键路径）检查一次 WebView 缓存
         private const val WEBVIEW_CACHE_TRIM_DELAY_MS = 15_000L
+        // 深链转发延迟：确保前端已挂载并注册事件监听，冷启动给足装载时间
+        private const val DEEP_LINK_DELAY_MS = 1_200L
         // 超过 64MB 才清理，避免每次冷启动都清、封面重复下载
         private const val WEBVIEW_CACHE_TRIM_THRESHOLD = 64L * 1024 * 1024
 

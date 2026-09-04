@@ -3,6 +3,7 @@ import {
     Disc3,
     FilePlus2,
     FolderOpen,
+    Library,
     Loader2,
     MicVocal,
     MoreHorizontal,
@@ -15,6 +16,7 @@ import {
 import { useEffect, useMemo, useState } from "react"
 
 import { BackButton } from "@/components/music/back-button"
+import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
 import { LocalArtistDrawer } from "@/components/music/local-artist-drawer"
@@ -191,6 +193,8 @@ function LocalPage() {
     // —— 多选批量操作 ——
     const [selectionMode, setSelectionMode] = useState<"album" | "artist" | null>(null)
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set())
+    // 批量加入歌单的曲目集合，非空即弹出选择弹窗
+    const [playlistAddTracks, setPlaylistAddTracks] = useState<Track[]>([])
 
     function toggleSelection(id: string) {
         setSelection((prev) => {
@@ -257,6 +261,43 @@ function LocalPage() {
             folderPath: null,
         })
         setDrawerOpen(true)
+    }
+
+    // 把选中的专辑或艺人下所有本地曲目汇集，交给加入歌单弹窗批量写入
+    function handleAddSelectionToPlaylist() {
+        if (selection.size === 0) {
+            return
+        }
+        const gathered: Track[] = []
+        if (selectionMode === "album") {
+            const albums =
+                lib.nav.kind === "artist" ? lib.artistAlbums : sortedAlbums
+            for (const album of albums) {
+                if (selection.has(album.id)) {
+                    gathered.push(...listTracksByAlbum(lib.library, album.id))
+                }
+            }
+        } else if (selectionMode === "artist") {
+            const artists = sortedArtists.filter((item) =>
+                selection.has(item.id),
+            )
+            for (const artist of artists) {
+                for (const album of lib.library.albums) {
+                    if (album.artistId === artist.id) {
+                        gathered.push(...listTracksByAlbum(lib.library, album.id))
+                    }
+                }
+            }
+        }
+        const seen = new Set<string>()
+        const unique = gathered.filter((item) => {
+            if (seen.has(item.id)) {
+                return false
+            }
+            seen.add(item.id)
+            return true
+        })
+        setPlaylistAddTracks(unique)
     }
 
     function openEditDrawer(album: LocalAlbum) {
@@ -860,14 +901,25 @@ function LocalPage() {
                             </DropdownMenuContent>
                         </DropdownMenu>
                         {selectionMode ? (
-                            <button
-                                type="button"
-                                onClick={exitSelectionMode}
-                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97]"
-                            >
-                                <SquareCheck className="size-3.5" />
-                                完成
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={selection.size === 0}
+                                    onClick={handleAddSelectionToPlaylist}
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-3.5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-45"
+                                >
+                                    <Library className="size-3.5" />
+                                    加入歌单
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={exitSelectionMode}
+                                    className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.97]"
+                                >
+                                    <SquareCheck className="size-3.5" />
+                                    完成
+                                </button>
+                            </div>
                         ) : lib.library.tracks.length > 0 ||
                           lib.library.albums.length > 0 ? (
                             <DropdownMenu>
@@ -1215,6 +1267,17 @@ function LocalPage() {
                     }
                 }}
                 onConfirm={handleConfirmAction}
+            />
+
+            <AddToPlaylistDialog
+                track={null}
+                tracks={playlistAddTracks}
+                open={playlistAddTracks.length > 0}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPlaylistAddTracks([])
+                    }
+                }}
             />
 
             {lib.submitting ? <BusyPill /> : null}

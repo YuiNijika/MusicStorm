@@ -1,6 +1,7 @@
 import type { CSSProperties, Ref } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { PLAYLIST_GRID_CLASS } from "@/hooks/use-playlist-grid"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +16,7 @@ function PlaylistGridSkeleton({
     style?: CSSProperties
     gridRef?: Ref<HTMLDivElement>
 }) {
+    const isMobile = useIsMobile()
     return (
         <div
             ref={gridRef}
@@ -34,8 +36,8 @@ function PlaylistGridSkeleton({
                 >
                     <Skeleton className="aspect-square w-full rounded-2xl" />
                     <div className="space-y-2 px-0.5">
-                        <Skeleton className="h-3.5 w-[78%] rounded-full" />
-                        <Skeleton className="h-3 w-[42%] rounded-full" />
+                        <Skeleton className={cn("rounded-full", isMobile ? "h-4 w-[82%]" : "h-3.5 w-[78%]")} />
+                        <Skeleton className={cn("rounded-full", isMobile ? "h-3.5 w-[48%]" : "h-3 w-[42%]")} />
                     </div>
                 </div>
             ))}
@@ -50,6 +52,7 @@ function TrackListSkeleton({
     count?: number
     indexed?: boolean
 }) {
+    const isMobile = useIsMobile()
     return (
         <div
             className="apple-list-surface space-y-1 p-1.5"
@@ -60,7 +63,8 @@ function TrackListSkeleton({
                 <div
                     key={index}
                     className={cn(
-                        "grid items-center gap-3 rounded-2xl px-3 py-2",
+                        "grid items-center gap-3 rounded-2xl",
+                        isMobile ? "px-3 py-3" : "px-3 py-2",
                         indexed
                             ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
                             : "grid-cols-[auto_minmax(0,1fr)_auto]",
@@ -69,11 +73,12 @@ function TrackListSkeleton({
                     {indexed ? (
                         <Skeleton className="h-3 w-5 rounded-full" />
                     ) : null}
-                    <Skeleton className="size-11 shrink-0 rounded-xl" />
+                    <Skeleton className={cn("shrink-0 rounded-xl", isMobile ? "size-12" : "size-11")} />
                     <div className="min-w-0 space-y-2">
                         <Skeleton
                             className={cn(
-                                "h-3.5 rounded-full",
+                                isMobile ? "h-4" : "h-3.5",
+                                "rounded-full",
                                 index % 3 === 0
                                     ? "w-[72%]"
                                     : index % 3 === 1
@@ -83,7 +88,8 @@ function TrackListSkeleton({
                         />
                         <Skeleton
                             className={cn(
-                                "h-3 rounded-full",
+                                isMobile ? "h-3.5" : "h-3",
+                                "rounded-full",
                                 index % 2 === 0 ? "w-[40%]" : "w-[48%]",
                             )}
                         />
@@ -188,52 +194,50 @@ function SearchResultsSkeleton() {
 
 function StatsPageSkeleton() {
     return (
-        <div className="space-y-11" aria-busy aria-label="加载中">
-            <div className="space-y-2 px-0.5">
-                <Skeleton className="h-3.5 w-16 rounded-full" />
-                <div className="flex items-end gap-2">
-                    <Skeleton className="h-16 w-28 rounded-[18px] sm:h-[72px]" />
-                    <Skeleton className="mb-2 h-8 w-20 rounded-full" />
+        <div className="space-y-8" aria-busy aria-label="加载中">
+            {/* 总览主卡：眉标 + 大数字 + 底部数据带 */}
+            <div className="material-surface overflow-hidden rounded-[22px]">
+                <div className="p-6 sm:p-8">
+                    <Skeleton className="h-7 w-28 rounded-full" />
+                    <div className="mt-4 flex items-end gap-3">
+                        <Skeleton className="h-[56px] w-24 rounded-[16px] sm:h-[72px] sm:w-32" />
+                        <Skeleton className="mb-1 h-8 w-24 rounded-full" />
+                    </div>
                 </div>
-                <Skeleton className="mt-1 h-4 w-56 rounded-full" />
-            </div>
-
-            <div className="space-y-3">
-                <Skeleton className="h-3.5 w-10 rounded-full" />
-                <div className="material-panel grid grid-cols-3 overflow-hidden rounded-[22px]">
-                    {Array.from({ length: 3 }, (_, i) => (
+                <div className="grid grid-cols-2 border-t border-[var(--separator)] sm:grid-cols-4">
+                    {Array.from({ length: 4 }, (_, i) => (
                         <div
                             key={i}
                             className={cn(
-                                "flex flex-col items-center gap-2 px-2 py-5",
-                                i > 0 &&
-                                    "border-l border-black/[0.06] dark:border-white/[0.08]",
+                                "px-6 py-4 sm:px-8 sm:py-5",
+                                i === 1 &&
+                                    "border-l border-[var(--separator)]",
+                                i === 2 &&
+                                    "border-t border-[var(--separator)] sm:border-t-0 sm:border-l",
+                                i === 3 &&
+                                    "border-l border-t border-[var(--separator)] sm:border-t-0",
                             )}
                         >
-                            <Skeleton className="h-3 w-8 rounded-full" />
-                            <Skeleton className="h-6 w-12 rounded-full" />
+                            <Skeleton className="h-3 w-11 rounded-full" />
+                            <Skeleton className="mt-2.5 h-4 w-14 rounded-full" />
                         </div>
                     ))}
                 </div>
             </div>
 
-            <div className="space-y-3">
-                <Skeleton className="h-6 w-12 rounded-full" />
-                <div className="grid gap-3 lg:grid-cols-2">
-                    <Skeleton className="h-[210px] w-full rounded-[22px]" />
-                    <Skeleton className="h-[210px] w-full rounded-[22px]" />
-                </div>
+            {/* 概览 bento：7 比 5 两行 */}
+            <div className="grid gap-4 lg:grid-cols-12">
+                <Skeleton className="h-[252px] w-full rounded-[22px] lg:col-span-7" />
+                <Skeleton className="h-[252px] w-full rounded-[22px] lg:col-span-5" />
+                <Skeleton className="h-[252px] w-full rounded-[22px] lg:col-span-7" />
+                <Skeleton className="h-[252px] w-full rounded-[22px] lg:col-span-5" />
             </div>
 
-            <div className="space-y-3">
-                <Skeleton className="h-6 w-12 rounded-full" />
-                <Skeleton className="h-[168px] w-full rounded-[22px]" />
-            </div>
-
-            <div className="space-y-3.5">
-                <Skeleton className="h-6 w-12 rounded-full" />
+            {/* 常听列表 */}
+            <div className="space-y-4">
+                <Skeleton className="h-6 w-14 rounded-full" />
                 <Skeleton className="h-10 w-full rounded-full" />
-                <TrackListSkeleton count={6} />
+                <TrackListSkeleton count={6} indexed />
             </div>
         </div>
     )

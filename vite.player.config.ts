@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   // 相对路径资源：产物可部署在域名根或仓库子路径，均可用
@@ -20,7 +20,7 @@ export default defineConfig({
     // 与主构建共存于 dist/，不互相清空
     emptyOutDir: false,
     rollupOptions: {
-      input: path.resolve(__dirname, "player.html"),
+      input: path.resolve(import.meta.dirname, "player.html"),
     },
     // 网页版静态资源独立目录：/assets/player/*
     assetsDir: "assets/player",

@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useTheme } from "@/components/app/theme-provider"
 import { useNeteaseSessionSafe } from "@/hooks/use-netease-session"
+import { useOpenAuthOnExpiry } from "@/hooks/use-open-auth-on-expiry"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import {
     ACCENT_OPTIONS,
@@ -98,6 +99,8 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
         setGlassBlur,
     } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
+    // 登录失效时自动弹出网易云登录对话框
+    useOpenAuthOnExpiry(() => setAuthOpen(true))
     const customActive = appearance.accent === "custom"
     const customHue = resolveAccentHue(appearance)
 
@@ -371,6 +374,8 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                             <img
                                 src={profile.avatarUrl}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 className="size-6 rounded-full object-cover"
                             />
                         ) : (
@@ -440,7 +445,9 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true
     const indicatorRef = useRef<HTMLButtonElement>(null)
 
     return (
-        <div className="material-segmented relative flex rounded-full p-0.5">
+        <div
+            className="material-segmented relative flex rounded-full p-0.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
             {tabs.map((id) => {
                 const Icon = icons[id]
                 const item = NAV_ITEMS.find((n) => n.id === id)
@@ -452,7 +459,7 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true
                         ref={isActive ? indicatorRef : undefined}
                         onClick={() => onNavigate(id)}
                         className={cn(
-                            "relative z-[1] flex min-h-9 cursor-pointer items-center gap-1 rounded-full px-2.5 sm:gap-1.5 sm:px-3",
+                            "relative z-[1] flex min-h-9 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 sm:gap-1.5 sm:px-3",
                             "text-[12px] font-medium transition-colors duration-200 sm:text-[13px]",
                             isActive
                                 ? "text-foreground"

@@ -15,6 +15,7 @@ import { fileStemFromPath, stripExtension } from "@/lib/local/audio-formats"
 import { LOCAL_LIBRARY_EVENT } from "@/lib/local/library-store"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
+import { guardNetEaseSession } from "@/lib/netease/session-guard"
 import { notifyError, notifyWarning } from "@/lib/notify"
 import { isAndroid } from "@/lib/platform"
 import {
@@ -873,6 +874,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 return
             }
             const url = resolved.url
+
+            // 拿到的若是试听链接：本地若认为已登录、实则是 cookie 失效导致
+            // 网易云按游客返回 30s 试听，则核对登录态并提示重新登录
+            if (track.source === "netease" && resolved.trial) {
+                void guardNetEaseSession()
+            }
 
             try {
                 await Promise.resolve(engine.load(url))

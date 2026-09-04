@@ -503,6 +503,33 @@
     box-shadow: inset 0 0 0 0.5px var(--separator);
 }
 
+/* 统计总览主卡的右上柔光：给大数字一点 Apple Fitness 式纵深，只装饰不参与交互 */
+.stats-hero-glow {
+    position: absolute;
+    top: -45%;
+    right: -6%;
+    width: min(420px, 70%);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: radial-gradient(
+        circle at center,
+        color-mix(in oklab, var(--primary) 22%, transparent),
+        transparent 68%
+    );
+    filter: blur(36px);
+}
+
+/* 浅色下白底吃色，柔光浓度略提一档保持可感知 */
+html:not(.dark) .stats-hero-glow {
+    background: radial-gradient(
+        circle at center,
+        color-mix(in oklab, var(--primary) 45%, transparent),
+        transparent 68%
+    );
+    filter: blur(48px);
+}
+
 @keyframes cover-breathe {
     0%,
     100% {
@@ -1081,4 +1108,54 @@ html.glass-disabled .apple-list-surface {
 }
 html.glass-disabled .material-segmented {
     background: var(--surface-fill, rgba(0, 0, 0, 0.05)) !important;
+}
+
+/* —— 移动端排版收敛（<768px）——
+   基于现有 token 的细节收敛，不另立圆角/材质体系。
+   页面级横向溢出兜底，移动端滚动保持原生惯性。 */
+@media (max-width: 767px) {
+    .app-root {
+        /* 移动端浏览器动态 UI 下 100vh 偏高溢出；用 dvh 贴合视口 */
+        height: 100dvh;
+        overflow-x: hidden;
+    }
+
+    .page-content-host {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* 网页版下载提示条：移动端长文案走马灯单行滚动，避免与下载/关闭挤行错位 */
+.download-marquee {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    will-change: transform;
+    animation: download-marquee-scroll 16s linear infinite;
+}
+.download-marquee-seg {
+    color: var(--foreground, rgba(0, 0, 0, 0.8));
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 36px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .download-marquee {
+        display: block;
+        overflow: hidden;
+        animation: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .download-marquee-seg[aria-hidden] {
+        display: none;
+    }
+}
+@keyframes download-marquee-scroll {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
 }

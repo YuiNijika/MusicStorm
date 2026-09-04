@@ -45,8 +45,10 @@ import {
     type FullPlayerLayout,
     type LyricsAlign,
 } from "@/lib/player/full-player-prefs"
-import { notifyFromError, notifySuccess } from "@/lib/notify"
+import { notifyFromError, notifySuccess, notifyWarning } from "@/lib/notify"
 import { isNativeMacOS } from "@/lib/platform"
+import { fetchBingWallpaper } from "@/lib/bing/wallpaper"
+import { getNeteaseBaseUrl } from "@/lib/netease/client"
 import {
     ActionButton,
     ChoiceChip,
@@ -79,6 +81,7 @@ function AppearanceTab({
         setBackgroundUrl,
         setBackgroundOpacity,
         setBackgroundBlur,
+        setBingWallpaper,
     } = useTheme()
     const [layout, setLayout] = useState<FullPlayerLayout>(() =>
         getFullPlayerLayout(),
@@ -169,6 +172,7 @@ function AppearanceTab({
             }
             const url =
                 coverPathToUrl(cover.originalPath) || cover.originalPath
+            setBingWallpaper(false)
             setBackgroundUrl(url)
             notifySuccess("已设置背景")
         } catch (error) {
@@ -177,8 +181,38 @@ function AppearanceTab({
     }
 
     function handleClearBackground() {
+        setBingWallpaper(false)
         setBackgroundUrl("")
         notifySuccess("已清除背景")
+    }
+
+    // 必应每日壁纸：已有自定义背景图时不触发请求；否则拉取并应用（缓存一天）
+    async function handleToggleBing(enabled: boolean) {
+        if (enabled) {
+            if (appearance.backgroundUrl) {
+                setBingWallpaper(false)
+                notifyWarning("已使用自定义背景图", {
+                    description: "如需每日壁纸，请先清除背景",
+                })
+                return
+            }
+            setBingWallpaper(true)
+            try {
+                const hit = await fetchBingWallpaper(getNeteaseBaseUrl())
+                if (hit) {
+                    setBackgroundUrl(hit.url)
+                    notifySuccess("已应用必应每日壁纸")
+                } else {
+                    setBingWallpaper(false)
+                    notifyFromError("获取必应壁纸失败", new Error("无可用壁纸"))
+                }
+            } catch (error) {
+                setBingWallpaper(false)
+                notifyFromError("获取必应壁纸失败", error)
+            }
+            return
+        }
+        setBingWallpaper(false)
     }
 
     function pickView(
@@ -502,6 +536,20 @@ function AppearanceTab({
                             </ActionButton>
                         ) : null}
                     </ChoiceRow>
+                    <SwitchRow
+                        title="必应每日壁纸"
+                        description={
+                            appearance.backgroundUrl
+                                ? "已使用自定义背景图，不会请求必应"
+                                : "每日自动更新必应官方壁纸（本地缓存一天）"
+                        }
+                        checked={appearance.bingWallpaper}
+                        disabled={
+                            !appearance.bingWallpaper &&
+                            Boolean(appearance.backgroundUrl)
+                        }
+                        onCheckedChange={(value) => void handleToggleBing(value)}
+                    />
                     <SliderField
                         label="不透明度"
                         display={`${Math.round(

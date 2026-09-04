@@ -174,41 +174,11 @@ async function dailySignin(
     }
 }
 
-type DailySigninStatus = {
-    mobileSign: boolean
-    pcSign: boolean
-}
-
-// 签到状态查询（dailySummary）：签到前先查，避免对已签渠道重复提交报错
-async function fetchDailySigninStatus(): Promise<DailySigninStatus> {
-    const data = await neteaseRequest<{
-        code?: number
-        data?: { mobileSign?: boolean; pcSign?: boolean }
-        mobileSign?: boolean
-        pcSign?: boolean
-    }>({
-        path: NETEASE_PATHS.dailySigninStatus,
-        params: { timestamp: Date.now() },
-        skipCache: true,
-    })
-    const summary = data.data ?? data
-    return {
-        mobileSign: summary.mobileSign === true,
-        pcSign: summary.pcSign === true,
-    }
-}
-
 export {
     dailySignin,
-    fetchDailySigninStatus,
     fetchUserAccount,
     fetchUserPlaylists,
     fetchUserPlaylistsDetailed,
     resolveVipTier,
 }
-export type {
-    DailySigninStatus,
-    NeteaseProfile,
-    UserPlaylistsResult,
-    VipTier,
-}
+export type { NeteaseProfile, UserPlaylistsResult, VipTier }

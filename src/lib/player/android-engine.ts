@@ -31,6 +31,46 @@ function createAndroidEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
     let lastPlaying: boolean | null = null
     let unlistenAudioState: (() => void) | null = null
     let destroyed = false
+    // 后台保活：回到前台且此前在播 → 重新 start，避免系统暂停后不回播
+    let resumeAfterVisible = false
+    let unlistenBackground: (() => void) | null = null
+
+    function scheduleResume() {
+        setTimeout(() => {
+            if (destroyed) {
+                return
+            }
+            if (currentSource && lastPlaying === true) {
+                startAndroidPlayback()
+            }
+            resumeAfterVisible = false
+        }, 150)
+    }
+
+    unlistenBackground = (() => {
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                resumeAfterVisible = lastPlaying === true
+            } else if (resumeAfterVisible) {
+                resumeAfterVisible = false
+                scheduleResume()
+            }
+        }
+        const onResume = () => {
+            if (resumeAfterVisible) {
+                resumeAfterVisible = false
+                scheduleResume()
+            }
+        }
+        document.addEventListener("visibilitychange", onVisibilityChange)
+        window.addEventListener("focus", onResume)
+        window.addEventListener("resume", onResume as EventListener)
+        return () => {
+            document.removeEventListener("visibilitychange", onVisibilityChange)
+            window.removeEventListener("focus", onResume)
+            window.removeEventListener("resume", onResume as EventListener)
+        }
+    })()
 
     const applyVolume = () => {
         setAndroidPlaybackVolume(volume)
@@ -114,6 +154,8 @@ function createAndroidEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
         getDurationMs: () => durationMs,
         destroy() {
             destroyed = true
+            unlistenBackground?.()
+            unlistenBackground = null
             stopAndroidPlayback()
             unlistenAudioState?.()
             unlistenAudioState = null

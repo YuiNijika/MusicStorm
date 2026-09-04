@@ -11,21 +11,28 @@ import {
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { addTrackToPlaylist } from "@/lib/netease/track-actions"
 import { fetchUserPlaylists } from "@/lib/netease/user"
+import { fetchPlaylistHead } from "@/lib/netease/playlist"
+import { addLocalTracksToPlaylist } from "@/lib/local/local-playlist"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
 
 type AddToPlaylistDialogProps = {
     track: Track | null
+    /** 批量加入时传曲目数组，优先级高于单曲 track */
+    tracks?: Track[]
     open: boolean
     onOpenChange: (open: boolean) => void
 }
 
 function AddToPlaylistDialog({
     track,
+    tracks,
     open,
     onOpenChange,
 }: AddToPlaylistDialogProps) {
     const { ready, loggedIn, profile } = useNeteaseSession()
+    const items =
+        tracks && tracks.length > 0 ? tracks : track ? [track] : []
     const [playlists, setPlaylists] = useState<Playlist[]>([])
     const [status, setStatus] = useState<"idle" | "loading" | "ready">("idle")
     const [busyId, setBusyId] = useState<string | null>(null)
@@ -57,13 +64,39 @@ function AddToPlaylistDialog({
     }, [open, ready, loggedIn, profile])
 
     async function handleAdd(playlist: Playlist) {
-        if (!track || busyId) {
+        if (items.length === 0 || busyId) {
             return
         }
         setBusyId(playlist.id)
         try {
-            await addTrackToPlaylist(playlist.id, [track.id])
-            notifySuccess("已添加到歌单", { description: playlist.title })
+            // 本地与网易云曲目分开投递：本地写本地 DB，网易云走网易云接口
+            const localIds = items
+                .filter((item) => item.source === "local")
+                .map((item) => item.id)
+            const neteaseIds = items
+                .filter((item) => item.source !== "local")
+                .map((item) => item.id)
+            if (localIds.length > 0) {
+                // 取目标歌单当前的排头云端曲目做锚点，本地条目按添加时间插队而非永远置顶
+                let anchorTrackId: string | null = null
+                try {
+                    const head = await fetchPlaylistHead(playlist.id)
+                    anchorTrackId = head.firstTrackId
+                } catch {
+                    anchorTrackId = null
+                }
+                await addLocalTracksToPlaylist(
+                    playlist.id,
+                    localIds,
+                    anchorTrackId,
+                )
+            }
+            if (neteaseIds.length > 0) {
+                await addTrackToPlaylist(playlist.id, neteaseIds)
+            }
+            notifySuccess("已添加到歌单", {
+                description: `${playlist.title} · ${items.length} 首`,
+            })
             onOpenChange(false)
         } catch (error) {
             notifyError("添加失败", {

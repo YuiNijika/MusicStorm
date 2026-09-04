@@ -1,7 +1,4 @@
-import {
-    dailySignin,
-    fetchDailySigninStatus,
-} from "@/lib/netease/user"
+import { dailySignin } from "@/lib/netease/user"
 
 const AUTO_KEY = "musicstorm-auto-signin"
 const LOG_KEY = "musicstorm-signin-log"
@@ -95,45 +92,31 @@ async function performDailySignin(userId: number): Promise<SigninLogEntry> {
             }
         }
 
-        let status: {
-            mobileSign: boolean
-            pcSign: boolean
-        } | null = null
-        try {
-            // 状态接口优先：已签渠道不再重复提交
-            status = await fetchDailySigninStatus()
-        } catch {
-            // 对接 API 模式下部分外部源没有 dailySummary（报「接口未找到」等），
-            // 退化为直接双端签到：重复签到会返回 403/重复操作，按 already 处理
-            status = null
-        }
-
+        // 对齐内置 API：直接双端签到并解释回执（success/already/failed）。
+        // 不依赖签到状态接口 —— server-api 无 dailySummary，内置 API 才可能有；
+        // 重复签到按 already 幂等处理，无需事前查状态。
         const parts: string[] = []
         let success = false
         let already = true
         let failed = false
         try {
-            if (!status || !status.pcSign) {
-                const result = await dailySignin(1)
-                parts.push(`网页端：${result.message}`)
-                if (result.outcome === "success") {
-                    success = true
-                    already = false
-                } else if (result.outcome === "failed") {
-                    failed = true
-                    already = false
-                }
+            const pc = await dailySignin(1)
+            parts.push(`网页端：${pc.message}`)
+            if (pc.outcome === "success") {
+                success = true
+                already = false
+            } else if (pc.outcome === "failed") {
+                failed = true
+                already = false
             }
-            if (!status || !status.mobileSign) {
-                const result = await dailySignin(0)
-                parts.push(`安卓端：${result.message}`)
-                if (result.outcome === "success") {
-                    success = true
-                    already = false
-                } else if (result.outcome === "failed") {
-                    failed = true
-                    already = false
-                }
+            const mobile = await dailySignin(0)
+            parts.push(`安卓端：${mobile.message}`)
+            if (mobile.outcome === "success") {
+                success = true
+                already = false
+            } else if (mobile.outcome === "failed") {
+                failed = true
+                already = false
             }
         } catch (error) {
             failed = true

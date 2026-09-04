@@ -38,20 +38,21 @@ function isLocalHighQualityTrack(track: Track): boolean {
     return false
 }
 
-// 远程地址永不进 native；auto 仅高音质
+// 远程地址永不进 native（桌面用 H5）；auto 仅高音质
 function shouldUseNativeForTrack(track: Track, pref: EnginePref): boolean {
     if (pref === "html5" || !isTauriRuntime()) {
         return false
+    }
+    // Android：本地文件路径 + 网易云云端 URL 统吃——系统 MediaPlayer 可本地解码与 http 流式，
+    // 后台/锁屏可靠（配合 Wake lock + 前台服务），不再退回 WebView H5
+    if (isAndroid() && hasAndroidAudio()) {
+        return true
     }
     if (!track.filePath || track.source === "netease") {
         return false
     }
     if (/^https?:\/\//i.test(track.filePath)) {
         return false
-    }
-    // Android：本地一律走系统 MediaPlayer——WebView 的 asset/audio 在移动端不可靠
-    if (isAndroid() && hasAndroidAudio()) {
-        return true
     }
     if (pref === "native") {
         return true

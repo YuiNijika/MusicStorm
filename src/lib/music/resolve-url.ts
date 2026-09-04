@@ -1,5 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core"
 
+import { isAndroid } from "@/lib/platform"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import {
     describeSongUrlFailure,
@@ -48,6 +49,10 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
     if (track.filePath && track.source === "local") {
         // 网页版导入的本地歌 filePath 即 blob URL，可直接播放，无需 Tauri 转换
         if (isWebMode()) {
+            return { ok: true, url: track.filePath }
+        }
+        // Android 原生 MediaPlayer 直接吃原始绝对路径；asset:// 协议它不识别
+        if (isAndroid()) {
             return { ok: true, url: track.filePath }
         }
         try {

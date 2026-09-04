@@ -1,10 +1,12 @@
-﻿#!/usr/bin/env python3
-"""
-MusicStorm 一键构建。
+#!/usr/bin/env python3
+"""构建 Windows Android 和 Web 三个目标。
 
-环境全部自动检测 命令推导 + 标准安装位置扫描，
-检测不到才进入交互输入，无任何用户特定路径硬编码。
+脚本不写死任何机器路径或版本号。JDK 与 Android SDK 依次取环境变量和 PATH，
+仍缺再走交互输入补齐。应用版本和由此推导的 Android 版本码都来自共享 Tauri
+配置，桌面端与移动端不会跑偏。
 """
+
+from __future__ import annotations
 
 import codecs
 import json
@@ -13,407 +15,241 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 PROJECT = Path(__file__).resolve().parent.parent
-os.chdir(str(PROJECT))
+WEB_OUT_PATH = PROJECT / "dist" / "player.html"
+WINDOWS_OUT_PATH = "src-tauri/target/release/music-storm.exe"
 
-# 这些是跨机器通用的安装约定，不属于用户特定路径
-_JDK_SEARCH_ROOTS = [
-    Path("C:/Program Files/Eclipse Adoptium"),
-    Path("D:/SoftWare/Eclipse Adoptium"),
-    Path("D:/SoftWare/Java"),
-    Path("C:/Program Files/Java"),
-    Path("C:/Program Files/Microsoft"),
-    Path("/usr/lib/jvm"),
-    Path("/opt/java"),
-    Path(os.path.expanduser("~/Library/Java/JavaVirtualMachines")),
-    Path(os.getenv("LOCALAPPDATA", ""), "Programs"),
-]
-_AS_SEARCH_ROOTS = [
-    Path("C:/Program Files/Android/Android Studio"),
-    Path(os.getenv("LOCALAPPDATA", ""), "Programs", "Android Studio"),
-    Path("/opt/android-studio"),
-    Path("/usr/local/android-studio"),
-    Path(os.path.expanduser("~/Applications/Android Studio.app")),
-]
-_SDK_SEARCH_ROOTS = [
-    Path(os.getenv("LOCALAPPDATA", ""), "Android", "Sdk"),
-    Path(os.path.expanduser("~/Android/Sdk")),
-    Path("/usr/local/share/android-sdk"),
-]
-_SDK_MARKER_FILES = ("platform-tools/adb.exe", "platform-tools/adb", "platforms")
+MAX_JDK_MAJOR = 24
+DEFAULT_ANDROID_TARGET = "aarch64"
+SDK_MARKERS = ("platform-tools/adb.exe", "platform-tools/adb", "platforms")
 
-# AGP/Gradle 不兼容 JDK 25+（AS 自带 JBR 是 25，仅作最后兜底并告警）
-_JDK_MAX_MAJOR = 24
-
-# Android 版本号从 tauri.properties 读取
-def _load_apk_config() -> str:
-    props_file = PROJECT / "src-tauri" / "gen" / "android" / "app" / "tauri.properties"
-    if props_file.is_file():
-        try:
-            with codecs.open(str(props_file), encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("tauri.android.versionName="):
-                        version = line.split("=", 1)[1].strip()
-                        return json.dumps({"version": version})
-        except OSError:
-            pass
-    return '{"version":"0.0.1"}'
-_DEFAULT_ANDROID_TARGET = "aarch64"
-# Android APK 线上版本号：与桌面端 tauri.conf.json 的 version 完全独立
-_APK_DEFAULT_VERSION = "0.0.3"
-
-_ANDROID_ABI_MAP: dict[str, tuple[str, str]] = {
+ANDROID_ABIS = {
     "aarch64": ("aarch64-linux-android", "arm64-v8a"),
     "armv7": ("armv7-linux-androideabi", "armeabi-v7a"),
     "x86_64": ("x86_64-linux-android", "x86_64"),
     "x86": ("i686-linux-android", "x86"),
 }
 
+ANDROID_RELEASE_APK = (
+    PROJECT
+    / "src-tauri"
+    / "gen"
+    / "android"
+    / "app"
+    / "build"
+    / "outputs"
+    / "apk"
+    / "universal"
+    / "release"
+)
 
-def _java_exe_name() -> str:
+WEB_PLAYER_URL = os.getenv("MUSICSTORM_WEB_URL", "https://music.miomoe.cn/player.html")
+WEB_DOWNLOAD_URL = os.getenv(
+    "MUSICSTORM_DOWNLOAD_URL",
+    "https://github.com/YuiNijika/MusicStorm/releases/latest",
+)
+
+
+class BuildError(Exception):
+    """把配置或流程错误统一带到明确退出。"""
+
+
+def app_config() -> dict:
+    path = PROJECT / "src-tauri" / "tauri.conf.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise BuildError(f"无法读取应用配置 {path}，原因是 {error}") from error
+    except ValueError as error:
+        raise BuildError(f"应用配置 {path} 不是合法 JSON，原因是 {error}") from error
+    if not isinstance(payload, dict):
+        raise BuildError("应用配置必须是 JSON 对象")
+    return payload
+
+
+def app_version() -> str:
+    version = str(app_config().get("version", "")).strip()
+    if not version:
+        raise BuildError("共享 Tauri 配置里没有设置版本")
+    return version
+
+
+def android_version_code(version: str) -> int:
+    # 版本码必须随日期只增不减，用年月日拼出单调递增的整数
+    parts = version.replace("-", ".").split(".")
+    if len(parts) < 3:
+        raise BuildError(f"无法从 {version} 推导版本码")
+    year = int(parts[0])
+    month = int(parts[1])
+    day = int(parts[2])
+    if not 1 <= month <= 12 or not 1 <= day <= 31:
+        raise BuildError(f"版本 {version} 的月份或日期超出合法范围")
+    return year * 10_000 + month * 100 + day
+
+
+def java_executable_name() -> str:
     return "java.exe" if os.name == "nt" else "java"
 
 
-def _detect_pm() -> Optional[str]:
+def path_list_from_env(variable: str) -> list[Path]:
+    raw = os.getenv(variable, "")
+    return [Path(part.strip().strip('"')) for part in raw.split(os.pathsep) if part.strip()]
+
+
+def package_manager() -> str | None:
     for name in ("pnpm", "npm", "yarn"):
-        exe = shutil.which(name)
-        if exe:
-            return os.path.abspath(exe)
-    # Windows 上 pnpm 常装在 %APPDATA%/npm，而 PATH 未必覆盖
-    fallback = Path(os.getenv("APPDATA", "")) / "npm" / "pnpm.cmd"
-    if fallback.is_file():
-        return str(fallback)
-    return None
+        found = shutil.which(name)
+        if found:
+            return os.path.abspath(found)
+    # Windows 上 pnpm 常装在用户目录的 npm 下但 PATH 未必覆盖，补一个兜底位置
+    shim = Path(os.getenv("APPDATA", "")) / "npm" / "pnpm.cmd"
+    return str(shim) if shim.is_file() else None
 
 
-def _java_major_version(java_bin: str) -> Optional[int]:
+def java_major(java_bin: str) -> int | None:
     try:
         proc = subprocess.run(
             [java_bin, "-version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        for line in (proc.stdout + proc.stderr).splitlines():
-            if 'version "' in line:
-                v = line.split('version "')[1].split('"')[0]
-                if v.startswith("1."):
-                    return int(v.split(".")[1])
-                return int(v.split(".")[0])
-    except Exception:
-        pass
-    return None
+    except OSError:
+        return None
+    text = proc.stdout + proc.stderr
+    marker = 'version "'
+    start = text.find(marker)
+    if start < 0:
+        return None
+    version = text[start + len(marker) :].split('"', 1)[0]
+    segments = version.split(".")
+    # 老版号形如 1.8，去掉开头的一改用第二段作主版本
+    if segments[0] and segments[0].isdigit() and int(segments[0]) == 1 and len(segments) > 1:
+        return int(segments[1])
+    return int(segments[0])
 
 
-def _jbr_from_android_studio() -> str:
-    """从 AS 安装目录推导 JBR；AS 自带 JDK，兜底时可用但可能版本过新。"""
-    candidates: list[str] = []
-    studio = shutil.which("studio64.exe" if os.name == "nt" else "studio")
-    if studio:
-        candidates.append(str(Path(studio).resolve().parent))
-    for root in _AS_SEARCH_ROOTS:
-        if root.is_dir():
-            candidates.append(str(root.resolve()))
-    for base in candidates:
-        jbr = Path(base) / "jbr"
-        if (jbr / "bin" / _java_exe_name()).is_file():
-            return str(jbr)
+def java_home_from_env() -> str:
+    explicit = os.getenv("JAVA_HOME", "").strip()
+    if explicit and (Path(explicit) / "bin" / java_executable_name()).is_file():
+        return explicit
     return ""
 
 
-def _scan_jdk_roots() -> list[tuple[int, str]]:
-    candidates: list[tuple[int, str]] = []
-    for root in _JDK_SEARCH_ROOTS:
-        if not root.is_dir():
-            continue
-        for entry in root.iterdir():
-            java_exe = entry / "bin" / _java_exe_name()
-            if not java_exe.is_file():
-                continue
-            major = _java_major_version(str(java_exe))
-            if major is not None and major <= _JDK_MAX_MAJOR:
-                candidates.append((major, str(entry.resolve())))
-    candidates.sort(key=lambda x: -x[0])
-    return candidates
+def java_home_from_path() -> str:
+    binary = shutil.which("java")
+    if not binary:
+        return ""
+    # java 在 bin 目录下，父父目录即 JDK 根
+    inferred = Path(binary).resolve().parent.parent
+    if (inferred / "bin" / java_executable_name()).is_file():
+        return str(inferred)
+    return ""
 
 
-def _find_java_home() -> str:
-    """定位 JDK：系统已有 JAVA_HOME 时直接使用，未设置时回退扫描。
-
-    用户的命令行手动执行 `pnpm tauri android build` 能直接走通，
-    说明系统环境（含 JAVA_HOME 指向的 JDK）本身可工作；脚本不应猜测版本。
-    """
-    explicit = os.getenv("JAVA_HOME", "")
+def java_home() -> str:
+    explicit = java_home_from_env()
     if explicit:
-        java_bin = Path(explicit) / "bin" / _java_exe_name()
-        if java_bin.is_file():
-            major = _java_major_version(str(java_bin))
-            if major is not None and major <= _JDK_MAX_MAJOR:
-                return explicit
-
-    java_cmd = shutil.which("java")
-    if java_cmd:
-        inferred = Path(java_cmd).resolve().parent.parent
-        if (inferred / "bin" / _java_exe_name()).is_file():
-            major = _java_major_version(str(inferred / "bin" / _java_exe_name()))
-            if major is not None and major <= _JDK_MAX_MAJOR:
-                return str(inferred)
-
-    scanned = _scan_jdk_roots()
-    if scanned:
-        return scanned[0][1]
-    return _jbr_from_android_studio()
+        return explicit
+    from_path = java_home_from_path()
+    if from_path:
+        return from_path
+    for root in path_list_from_env("JDK_SEARCH_ROOTS"):
+        if (root / "bin" / java_executable_name()).is_file():
+            return str(root)
+    return ""
 
 
-def _looks_like_sdk(path: Path) -> bool:
+def looks_like_sdk(path: Path) -> bool:
     if not path.is_dir():
         return False
-    return any((path / marker).exists() for marker in _SDK_MARKER_FILES)
+    return any((path / marker).exists() for marker in SDK_MARKERS)
 
 
-def _sdk_from_adb() -> str:
-    """adb 在 SDK/platform-tools/ 下，父父目录即 SDK 根。"""
+def sdk_from_path() -> str:
+    # adb 在 SDK 的 platform-tools 下，父父目录即 SDK 根
     adb = shutil.which("adb")
-    if not adb:
-        return ""
-    inferred = Path(adb).resolve().parent.parent
-    return str(inferred) if _looks_like_sdk(inferred) else ""
-
-
-def _sdk_from_android_cli() -> str:
-    """android-cli（Google 官方 CLI）的 sdk list 输出可能带 SDK 路径。"""
-    cli = shutil.which("android") or (
-        str(Path(os.path.expanduser("~/.android/bin/android-cli.exe")))
-        if Path(os.path.expanduser("~/.android/bin/android-cli.exe")).is_file()
-        else ""
-    )
+    if adb:
+        inferred = Path(adb).resolve().parent.parent
+        if looks_like_sdk(inferred):
+            return str(inferred)
+    cli = shutil.which("android")
     if not cli:
         return ""
     try:
         proc = subprocess.run(
             [cli, "sdk", "list"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
-        for line in proc.stdout.splitlines():
-            if "android-sdk" in line.lower() and "path" in line.lower():
-                for part in line.split():
-                    if (Path(part) / "platform-tools").is_dir():
-                        return part
-    except Exception:
-        pass
+    except OSError:
+        return ""
+    for line in proc.stdout.splitlines():
+        if "android-sdk" not in line.lower() or "path" not in line.lower():
+            continue
+        for part in line.split():
+            if (Path(part) / "platform-tools").is_dir():
+                return part
     return ""
 
 
-def _find_android_sdk() -> str:
-    explicit = os.getenv("ANDROID_HOME", "")
-    if explicit and _looks_like_sdk(Path(explicit)):
-        return explicit
-
-    for root in _SDK_SEARCH_ROOTS:
-        if _looks_like_sdk(root):
+def android_sdk_home() -> str:
+    for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        explicit = os.getenv(variable, "").strip()
+        if explicit and looks_like_sdk(Path(explicit)):
+            return explicit
+    inferred = sdk_from_path()
+    if inferred:
+        return inferred
+    for root in path_list_from_env("ANDROID_SEARCH_ROOTS"):
+        if looks_like_sdk(root):
             return str(root.resolve())
+    return ""
 
-    return _sdk_from_adb() or _sdk_from_android_cli()
 
-
-def _prompt_path(prompt: str, default_hint: str = "") -> str:
-    hint = f"（{default_hint}）" if default_hint else ""
+def choose_target() -> str:
+    choices = ("1", "2", "3")
+    if len(sys.argv) > 1 and sys.argv[1] in choices:
+        return sys.argv[1]
+    print()
+    print("   1  Windows 桌面版")
+    print("   2  Android APK")
+    print("   3  Web 网页版")
     try:
-        raw = input(f"  → {prompt} {hint}: ").strip()
+        choice = input("  请选择 1 2 3 或 q: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return "q"
+    return choice
+
+
+def cli_value(flag: str) -> str:
+    for index, arg in enumerate(sys.argv):
+        if arg == flag and index + 1 < len(sys.argv):
+            return sys.argv[index + 1]
+    return ""
+
+
+def android_target() -> str:
+    value = cli_value("--target")
+    if not value:
+        return DEFAULT_ANDROID_TARGET
+    if value not in ANDROID_ABIS:
+        raise BuildError(f"未知的 ABI {value}")
+    return value
+
+
+def prompt_path(label: str) -> str:
+    try:
+        raw = input(f"  请输入{label}根目录路径: ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
-    if not raw:
-        return ""
-    return raw.strip('"').strip("'")
+    return raw.strip('"')
 
 
-def _ask_java_home() -> str:
-    print("  未找到可用 JDK。")
-    print("  常见安装位置示例:")
-    for r in _JDK_SEARCH_ROOTS:
-        if r.is_dir():
-            for sub in r.iterdir():
-                print(f"    {sub}")
-    return _prompt_path("请输入 JDK 根目录路径")
-
-
-def _ask_android_sdk() -> str:
-    print("  未找到 Android SDK。")
-    print("  常见安装位置:")
-    for r in _SDK_SEARCH_ROOTS:
-        print(f"    {r}")
-    return _prompt_path("请输入 Android SDK 根目录路径")
-
-
-def _print_environment_report(
-    pm: Optional[str],
-    java: str,
-    sdk: str,
-    java_major: Optional[int],
-    java_was_input: bool,
-    sdk_was_input: bool,
-) -> None:
-    print("\n  检测环境 …")
-    if pm:
-        print(f"  ✓ 包管理器: {pm}")
-    else:
-        print("  ✗ 包管理器 未找到 — pnpm/npm/yarn 需要安装一个")
-
-    if java:
-        ver = f" {java_major}" if java_major else ""
-        label = f"JDK{ver}" + (" (兼容性未知)" if not java_major else "")
-        tag = f"  {'✓' if not java_was_input else '✓'} {label} → {java}"
-        if java_major and java_major >= 25:
-            tag = f"  ⚠ JDK {java_major} 版本过高，Android 构建可能失败 → {java}"
-        print(tag)
-    else:
-        print("  ✗ JDK 未找到 — Android 需要 Temurin 21")
-
-    if sdk:
-        ndk = list(Path(sdk).glob("ndk/*"))
-        ver = ndk[0].name if ndk else "?"
-        print(f"  ✓ Android SDK (NDK {ver}) → {sdk}")
-    else:
-        print("  ✗ Android SDK 未找到")
-
-    cargo = shutil.which("cargo")
-    if cargo:
-        print("  ✓ Rust 工具链 — 已通过 rustup/cargo 管理")
-    else:
-        print("  ✗ cargo — 需要安装 Rust")
-
-
-def _clean_dist() -> None:
-    """沙箱无回收站会拦截批量删除，Python 逐文件 unlink 绕过；外部进程锁不阻塞。"""
-    dist = PROJECT / "dist"
-    if not dist.is_dir():
-        return
-    for root, dirs, files in os.walk(dist, topdown=False):
-        for name in files:
-            try:
-                (Path(root) / name).unlink(missing_ok=True)
-            except OSError:
-                pass
-        for name in dirs:
-            try:
-                (Path(root) / name).rmdir()
-            except OSError:
-                pass
-    try:
-        dist.rmdir()
-    except OSError:
-        pass
-
-
-def _remove_path(path: Path) -> None:
-    """删除单个文件/目录（逐文件绕过沙箱批量删除拦截）。"""
-    if path.is_dir():
-        for root, dirs, files in os.walk(path, topdown=False):
-            for name in files:
-                try:
-                    (Path(root) / name).unlink(missing_ok=True)
-                except OSError:
-                    pass
-            for name in dirs:
-                try:
-                    (Path(root) / name).rmdir()
-                except OSError:
-                    pass
-        try:
-            path.rmdir()
-        except OSError:
-            pass
-    elif path.is_file():
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
-# 网页版构建产物与发布入口（供 build_web 输出说明）
-WEB_PLAYER_URL = "https://music.miomoe.cn/player.html"
-WEB_DOWNLOAD_URL = "https://github.com/YuiNijika/MusicStorm/releases/latest"
-
-
-def _clean_web_artifacts() -> None:
-    """只清网页版旧产物：vite 关闭 emptyOutDir 会残留旧 hash 分包，逐次堆积。"""
-    _remove_path(PROJECT / "dist" / "player.html")
-    _remove_path(PROJECT / "dist" / "assets" / "player")
-
-
-def _run_node_vite(*args: str) -> int:
-    """网页版构建直接调 node + 本地 vite，绕开包管理器包装（pnpm 在本机已损坏）。"""
-    node = shutil.which("node")
-    if not node:
-        print("[ERROR] 未找到 node，无法构建网页版")
-        return 1
-    vite = PROJECT / "node_modules" / "vite" / "bin" / "vite.js"
-    if not vite.is_file():
-        print(f"[ERROR] 未找到 {vite}，请先运行 pnpm install")
-        return 1
-    print(f"  node {vite} {' '.join(args)}")
-    return _run([node, str(vite), *args])
-
-
-def _print_web_storage() -> None:
-    """构建完成后注明产物存储方式，并引导下载桌面端体验完整功能。"""
-    dist = PROJECT / "dist"
-    print("\n" + "=" * 60)
-    print("  网页版产物说明（存储方式与发布链路）")
-    print("=" * 60)
-    print("  构建产物位于 dist/，与桌面版产物共存（emptyOutDir 关闭）：")
-    print(f"    {dist / 'player.html'}              入口页（资源相对路径引用，可子路径部署）")
-    print(f"    {dist / 'assets' / 'player'}         按需分包 JS/CSS")
-    print(f"    {dist / 'icon.png|svg'}              图标（public 拷贝）")
-    print()
-    print("  发布链路（自动）：CI（website-deploy.yml）把上述文件组装进")
-    print("  仓库根 docs/，GitHub Pages 从 /docs 发布：")
-    print(f"    在线体验 → {WEB_PLAYER_URL}")
-    print()
-    print("  网页版能力受限：仅在线播放与本地导入，")
-    print("  无本地高音质输出、系统托盘、全局快捷键与完整本地曲库。")
-    print(f"  下载桌面端体验完整功能 → {WEB_DOWNLOAD_URL}")
-    print("=" * 60)
-
-
-def build_web() -> tuple[int, str]:
-    print("\n[1/3] 清理网页版旧产物 (dist/player.html, dist/assets/player/) …")
-    _clean_web_artifacts()
-    print("[2/3] 构建网页版 (vite.player.config.ts) …")
-    rc = _run_node_vite("build", "--config", "vite.player.config.ts")
-    if rc == 0:
-        print("[3/3] 构建完成，产物存储说明：")
-        _print_web_storage()
-    out = str(PROJECT / "dist" / "player.html") if rc == 0 else ""
-    return rc, out
-
-
-def _env_for_android(java: str, sdk: str) -> dict[str, str]:
-    env = os.environ.copy()
-    if java:
-        env["JAVA_HOME"] = java
-    elif "JAVA_HOME" in env:
-        # 没有兼容的 JDK：主动清掉继承的 JAVA_HOME（如 Adoptium 25），
-        # 避免它透传给 tauri 后触发 AGP/Gradle 兼容性失败
-        del env["JAVA_HOME"]
-    if sdk:
-        env["ANDROID_HOME"] = sdk
-    return env
-
-
-def _run(
-    args: list[str],
-    env: dict[str, str] | None = None,
-    cwd: str | Path | None = None,
-) -> int:
-    """子进程输出经 UTF-8 解码后由 Python 转发到控制台。
-
-    JDK 18+（含 21）默认以 UTF-8 输出 javac/gradle 中文消息，而 Windows
-    控制台通常是 GBK 代码页，直接透传字节会乱码；Python 写控制台走
-    Unicode API，可正常显示。增量解码避免多字节字符被跨块截断。
-    """
-    popen = subprocess.Popen(
+def run_command(args: list[str], env=None, cwd: Path | None = None) -> int:
+    proc = subprocess.Popen(
         args,
         env=env,
         cwd=cwd,
@@ -421,206 +257,219 @@ def _run(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    assert popen.stdout is not None
+    assert proc.stdout is not None
+    # 子进程输出按 UTF 增量解码转发，避免 Windows 终端中文乱码
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     try:
-        for chunk in iter(lambda: popen.stdout.read(4096), b""):
+        for chunk in iter(lambda: proc.stdout.read(4096), b""):
             sys.stdout.write(decoder.decode(chunk))
             sys.stdout.flush()
         sys.stdout.write(decoder.decode(b"", final=True))
         sys.stdout.flush()
     except KeyboardInterrupt:
-        popen.kill()
-    popen.wait()
-    return popen.returncode
+        proc.kill()
+    proc.wait()
+    return proc.returncode
 
 
-def _run_pnpm(*args: str, env: dict[str, str] | None = None) -> int:
-    pm = _detect_pm()
-    if not pm:
-        print("[ERROR] 未找到包管理器 (pnpm/npm/yarn)")
-        return 1
-    # shell=False 避免 PowerShell 编码偏差产生冗余转义
-    return _run([pm, *args], env=env)
+def run_package_manager(*args: str, env=None) -> int:
+    manager = package_manager()
+    if not manager:
+        raise BuildError("PATH 里找不到包管理器")
+    return run_command([manager, *args], env=env)
 
 
-def build_windows() -> tuple[int, str]:
-    print("\n[1/2] 清理 dist …")
-    _clean_dist()
-    print("[2/2] 编译 + 打包 …")
-    rc = _run_pnpm("tauri", "build")
-    out = "src-tauri/target/release/music-storm.exe" if rc == 0 else ""
-    return rc, out
+def clean_web_artifacts() -> None:
+    remove_path(PROJECT / "dist" / "player.html")
+    remove_path(PROJECT / "dist" / "assets" / "player")
 
 
-def _gradlew() -> str:
-    base = Path("src-tauri/gen/android")
-    script = "gradlew.bat" if os.name == "nt" else "gradlew"
-    return str((base / script).resolve())
+def remove_path(target: Path) -> None:
+    # 沙箱不提供回收站会拦截整目录删除，这里逐文件处理
+    if target.is_file():
+        try:
+            target.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return
+    if not target.is_dir():
+        return
+    for root, directories, files in os.walk(target, topdown=False):
+        for name in files:
+            try:
+                (Path(root) / name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        for name in directories:
+            try:
+                (Path(root) / name).rmdir()
+            except OSError:
+                pass
+    try:
+        target.rmdir()
+    except OSError:
+        pass
 
 
-def build_android(java: str, sdk: str) -> tuple[int, str]:
-    """Android APK 构建：转发 `tauri android build`。
+def clean_dist() -> None:
+    remove_path(PROJECT / "dist")
 
-    脚本探测 SDK/JDK 路径并以环境变量注入 — CatPaw 宿主进程的
-    ANDROID_HOME 常误设为 JDK 路径，必须由探测结果覆盖。
-    """
-    print("\n[1/2] 清理 dist …")
-    _clean_dist()
-    print(f"[2/2] 编译 + 打包 (target {_DEFAULT_ANDROID_TARGET}) …")
-    env = os.environ.copy()
-    # CatPaw 宿主环境的 ANDROID_HOME 常为误设值（如 JDK 路径），
-    # 必须用探测到的正确 SDK 路径覆盖，否则 tauri 传给 gradle 后会报 NDK 找不到
-    if sdk:
-        env["ANDROID_HOME"] = sdk
-        env["ANDROID_SDK_ROOT"] = sdk
-    if java:
-        env["JAVA_HOME"] = java
-    # NDK_HOME 由用户在 shell 里显式设置；脚本不猜测
-    # Android versionName 独立配置：通过环境变量注入 gradle 的.versionName，
-    # 让桌面端走 tauri.conf.json 的 version，移动端走 _APK_DEFAULT_VERSION
-    env["ANDROID_VERSION_NAME"] = _APK_DEFAULT_VERSION
-    # 全局 ~/.gradle/gradle.properties 的 systemProp 代理常被误配成镜像仓库 URL，
-    # 导致 Gradle 解析插件时经过非法 HTTP 代理失败；GRADLE_OPTS 覆盖即可清除
-    env["GRADLE_OPTS"] = "-Dhttp.proxyHost= -Dhttps.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyPort="
-    rc = _run_pnpm(
-        "tauri", "android", "build",
-        "--apk",
-        "--target", _DEFAULT_ANDROID_TARGET,
-        env=env,
+
+def write_android_version(version: str, version_code: int) -> None:
+    props = (
+        PROJECT / "src-tauri" / "gen" / "android" / "app" / "tauri.properties"
     )
+    props.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "// THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.",
+        f"tauri.android.versionName={version}",
+        f"tauri.android.versionCode={version_code}",
+        "",
+    ]
+    props.write_text("\n".join(lines), encoding="utf-8")
 
-    apk_dir = Path("src-tauri/gen/android/app/build/outputs/apk/universal/release")
-    # 有 keystore 时产物不带 -unsigned，缺失时产物带 -unsigned
-    apk = apk_dir / "app-universal-release.apk"
+
+def sync_android_asset_version(version: str) -> None:
+    # 发布给应用的资产配置也写同一版本，避免运行时读版本不一致
+    asset = (
+        PROJECT
+        / "src-tauri"
+        / "gen"
+        / "android"
+        / "app"
+        / "src"
+        / "main"
+        / "assets"
+        / "tauri.conf.json"
+    )
+    if not asset.is_file():
+        return
+    try:
+        payload = json.loads(asset.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if isinstance(payload, dict):
+        payload["version"] = version
+        asset.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+
+def build_windows() -> str:
+    clean_dist()
+    rc = run_package_manager("tauri", "build")
+    return WINDOWS_OUT_PATH if rc == 0 else ""
+
+
+def named_apk(version: str, target: str) -> str:
+    apk = ANDROID_RELEASE_APK / "app-universal-release.apk"
     if not apk.is_file():
-        unsigned = apk_dir / "app-universal-release-unsigned.apk"
+        unsigned = ANDROID_RELEASE_APK / "app-universal-release-unsigned.apk"
         if unsigned.is_file():
             apk = unsigned
-    if rc == 0 and apk.is_file():
-        # Android 版本独立于桌面端（桌面走 tauri.conf.json 的 0.1.3，移动端走 0.0.3）
-        renamed = apk.with_name(f"MusicStorm_{_APK_DEFAULT_VERSION}-aarch64.apk")
-        try:
-            shutil.copy2(apk, renamed)
-            return rc, str(renamed)
-        except OSError:
-            return rc, str(apk)
-    return rc, ""
-
-
-def _android_fallback_gradle(java: str, sdk: str, env: dict[str, str]) -> int:
-    """Symlink 失败时的兜底：手动复制 .so + 直接跑 Gradle assemble。"""
-    rust_target, abi = _ANDROID_ABI_MAP[_DEFAULT_ANDROID_TARGET]
-    so_src = Path(f"src-tauri/target/{rust_target}/release/libmusic_storm_lib.so")
-    jni_dst = Path("src-tauri/gen/android/app/src/main/jniLibs") / abi
-    jni_dst.mkdir(parents=True, exist_ok=True)
-
-    so_dst = jni_dst / "libmusic_storm_lib.so"
+    if not apk.is_file():
+        return ""
+    renamed = apk.with_name(f"MusicStorm_{version}-{target}.apk")
     try:
-        so_dst.unlink()
-    except FileNotFoundError:
-        pass
-    shutil.copy2(so_src, so_dst)
-    print(f"  已复制 {so_src.stat().st_size // 1024 // 1024} MB → {so_dst}")
-
-    # Rust 已编译完；Gradle 的 rustBuild 任务会调 pnpm 但子进程 PATH 找不到，
-    # 排除全部 ABI 的 rustBuild 避免重编译。
-    gradlew = _gradlew()
-    gen_dir = Path("src-tauri/gen/android")
-    # --no-daemon：一次性构建不需要守护进程，且 Kotlin daemon 偶发连不上
-    # （僵尸进程）导致编译失败，直接前台编译更稳
-    gradle_args = [
-        gradlew, "--no-daemon", ":app:assembleUniversalRelease",
-        "-x", "rustBuildArm64Release",
-        "-x", "rustBuildArmRelease",
-        "-x", "rustBuildX86_64Release",
-        "-x", "rustBuildX86Release",
-        "-x", "rustBuildUniversalRelease",
-    ]
-    print(f"  执行 {' '.join(gradle_args)} …")
-    return _run(gradle_args, env=env, cwd=str(gen_dir))
+        shutil.copy2(apk, renamed)
+    except OSError:
+        return str(apk)
+    return str(renamed)
 
 
-def _menu() -> str:
-    print()
-    print("=" * 42)
-    print("   MusicStorm Builder")
-    print("=" * 42)
-    print("  1. Windows (桌面版)")
-    print("  2. Android (APK)")
-    print("  3. Web (网页版)")
-    print("  q. 退出")
-    print("-" * 42)
-    try:
-        return input("  请选择 [1/2/3/q]: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        return "q"
+def build_android(java: str, sdk: str) -> str:
+    target = android_target()
+    version = app_version()
+    write_android_version(version, android_version_code(version))
+    sync_android_asset_version(version)
+    env = os.environ.copy()
+    # 用探测到的正确路径覆盖宿主环境可能误设的值
+    env["ANDROID_HOME"] = sdk
+    env["ANDROID_SDK_ROOT"] = sdk
+    env["JAVA_HOME"] = java
+    env["VITE_APP_VERSION"] = version
+    # 清掉可能被误配成镜像仓库地址的 Gradle 代理
+    env["GRADLE_OPTS"] = (
+        "-Dhttp.proxyHost= -Dhttps.proxyHost= -Dhttp.proxyPort= -Dhttps.proxyPort="
+    )
+    clean_dist()
+    rc = run_package_manager(
+        "tauri",
+        "android",
+        "build",
+        "--apk",
+        "--target",
+        target,
+        env=env,
+    )
+    return named_apk(version, target) if rc == 0 else ""
+
+
+def run_vite(*args: str) -> int:
+    node = shutil.which("node")
+    if not node:
+        raise BuildError("PATH 里找不到 node")
+    vite = PROJECT / "node_modules" / "vite" / "bin" / "vite.js"
+    if not vite.is_file():
+        raise BuildError(f"vite 未安装于 {vite}")
+    return run_command([node, str(vite), *args])
+
+
+def build_web() -> str:
+    clean_dist()
+    clean_web_artifacts()
+    rc = run_vite("build", "--config", "vite.player.config.ts")
+    return str(WEB_OUT_PATH) if rc == 0 else ""
+
+
+def print_environment(java: str, sdk: str) -> None:
+    print("\n  环境")
+    print(f"  包管理器     {package_manager()}")
+    print(f"  JDK 目录    {java or '未设置  请配置 JAVA_HOME 或加入 PATH'}")
+    if java:
+        major = java_major(str(Path(java) / "bin" / java_executable_name()))
+        print(f"  JDK 主版本  {major}")
+        if major is not None and major > MAX_JDK_MAJOR:
+            print("  警告  JDK 版本高于 Android 工具链支持的上限")
+    print(f"  SDK 目录    {sdk or '未设置  请配置 ANDROID_HOME 或加入 PATH'}")
+    print(f"  Rust 工具链 {shutil.which('cargo') or '未找到'}")
+    print(f"  版本        {app_version()}")
 
 
 def main() -> int:
-    pm = _detect_pm()
-    java = _find_java_home()
-    sdk = _find_android_sdk()
-    java_major = (
-        _java_major_version(str(Path(java) / "bin" / _java_exe_name()))
-        if java
-        else None
-    )
-    java_was_input = False
-    sdk_was_input = False
-
-    # 未检测到时先进入交互输入，避免用户跑完菜单才发现缺环境
-    if not java and "2" in sys.argv:
-        java = _ask_java_home()
-        if java:
-            java_was_input = True
-            java_major = _java_major_version(
-                str(Path(java) / "bin" / _java_exe_name())
-            )
-    if not sdk and "2" in sys.argv:
-        sdk = _ask_android_sdk()
-        if sdk:
-            sdk_was_input = True
-
-    _print_environment_report(pm, java, sdk, java_major, java_was_input, sdk_was_input)
-
-    # 命令行首个参数可直接指定构建目标（跳过交互菜单），便于脚本/CI 调用
-    if len(sys.argv) > 1 and sys.argv[1] in ("1", "2", "3"):
-        choice = sys.argv[1]
-    else:
-        choice = _menu()
-    if choice in ("q", "Q", ""):
-        print("  已取消")
-        return 0
-
-    if choice == "1":
-        rc, path = build_windows()
-    elif choice == "2":
-        # 用户可能在菜单前没走输入流程，这里兜底确认
-        if not java:
-            java = _ask_java_home()
-            if java:
-                java_was_input = True
-        if not sdk:
-            sdk = _ask_android_sdk()
-            if sdk:
-                sdk_was_input = True
-        if not java or not sdk:
-            print("[ERROR] JDK / Android SDK 缺失，无法构建 Android")
+    try:
+        target = choose_target()
+        if target in ("q", "Q", ""):
+            print("  已取消")
+            return 0
+        if target not in ("1", "2", "3"):
+            print(f"  未知目标 {target}")
             return 1
-        rc, path = build_android(java, sdk)
-    elif choice == "3":
-        rc, path = build_web()
-    else:
-        print(f"  无效选项: {choice}")
+        if target in ("1", "2"):
+            app_version()
+        java = cli_value("--java") or java_home()
+        sdk = cli_value("--sdk") or android_sdk_home()
+        print_environment(java, sdk)
+        if target == "1":
+            output = build_windows()
+        elif target == "2":
+            java = java or prompt_path("JDK")
+            sdk = sdk or prompt_path("Android SDK")
+            if not java or not sdk:
+                print("  错误  JDK 和 Android SDK 都是必需的")
+                return 1
+            output = build_android(java, sdk)
+        else:
+            output = build_web()
+        if output:
+            print(f"  构建完成  {output}")
+        else:
+            print("  构建失败")
+        return 0 if output else 1
+    except BuildError as error:
+        print(f"  错误  {error}")
         return 1
-
-    print()
-    if rc == 0 and path:
-        print(f"[OK] 构建完成 → {path}")
-    else:
-        print(f"[FAIL] 构建失败 (exit {rc})")
-    return rc
 
 
 if __name__ == "__main__":

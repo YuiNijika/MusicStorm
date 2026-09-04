@@ -41,6 +41,12 @@ import {
     setPlaylistListOrder,
 } from "@/lib/library/track-order"
 import {
+    fetchLocalPlaylistCovers,
+    resolvePlaylistCover,
+    type LocalPlaylistCover,
+    type PlaylistHeadInfo,
+} from "@/lib/local/local-playlist"
+import {
     fetchArtistSublist,
     type SimiArtistCard,
 } from "@/lib/netease/artist"
@@ -49,7 +55,7 @@ import {
     fetchCloudTracks,
 } from "@/lib/netease/cloud"
 import { fetchMvSublist, type MvCard } from "@/lib/netease/mv"
-import { createPlaylist } from "@/lib/netease/playlist"
+import { createPlaylist, fetchPlaylistHead } from "@/lib/netease/playlist"
 import { fetchUserPlaylists } from "@/lib/netease/user"
 import { notifyError, notifyFromError, notifySuccess } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
@@ -84,6 +90,14 @@ function LibraryPage() {
     const [tab, setTab] = useState<LibraryTab>("playlists")
 
     const [playlists, setPlaylists] = useState<Playlist[]>([])
+    // 有本地附加条目的歌单封面接管信息，列表封面跟随排头
+    const [localCovers, setLocalCovers] = useState<Map<string, LocalPlaylistCover>>(
+        () => new Map(),
+    )
+    // 云端排头信息：有本地条目的歌单当前第一首云端曲目的 id 与封面
+    const [headInfo, setHeadInfo] = useState<Map<string, PlaylistHeadInfo>>(
+        () => new Map(),
+    )
     const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
         "idle",
     )
@@ -191,6 +205,56 @@ function LibraryPage() {
             cancelled = true
         }
     }, [ready, loggedIn, profile, retry])
+
+    // 歌单列表封面跟随本地附加条目：批量查每个歌单最新本地条目的封面接管信息
+    useEffect(() => {
+        if (playlists.length === 0) {
+            setLocalCovers((prev) => (prev.size === 0 ? prev : new Map()))
+            return
+        }
+        let cancelled = false
+        void fetchLocalPlaylistCovers(playlists.map((item) => item.id)).then(
+            (map) => {
+                if (!cancelled) {
+                    setLocalCovers(map)
+                }
+            },
+        )
+        return () => {
+            cancelled = true
+        }
+    }, [playlists])
+
+    // 对有本地条目的歌单拉取云端排头信息，与详情页合并逻辑对齐判定封面
+    useEffect(() => {
+        if (localCovers.size === 0) {
+            setHeadInfo((prev) => (prev.size === 0 ? prev : new Map()))
+            return
+        }
+        let cancelled = false
+        const targets = playlists.filter((item) => localCovers.has(item.id))
+        void Promise.all(
+            targets.map(async (playlist) => {
+                const info = await fetchPlaylistHead(playlist.id).catch(() => null)
+                return [playlist.id, info] as const
+            }),
+        ).then((entries) => {
+            if (cancelled) {
+                return
+            }
+            setHeadInfo(
+                new Map(
+                    entries.filter(
+                        (entry): entry is [string, PlaylistHeadInfo] =>
+                            entry[1] !== null,
+                    ),
+                ),
+            )
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [localCovers, playlists])
 
     useEffect(() => {
         if (!ready || !loggedIn || !profile || tab !== "artists") {
@@ -427,7 +491,11 @@ function LibraryPage() {
                                 >
                                     {handle}
                                     <Cover
-                                        src={playlist.coverUrl}
+                                        src={resolvePlaylistCover(
+                                            playlist.coverUrl,
+                                            localCovers.get(playlist.id),
+                                            headInfo.get(playlist.id),
+                                        )}
                                         alt={playlist.title}
                                         size="sm"
                                         className="size-12 rounded-xl"
@@ -456,7 +524,11 @@ function LibraryPage() {
                             return (
                                 <MediaCard
                                     key={playlist.id}
-                                    coverUrl={playlist.coverUrl}
+                                    coverUrl={resolvePlaylistCover(
+                                        playlist.coverUrl,
+                                        localCovers.get(playlist.id),
+                                        headInfo.get(playlist.id),
+                                    )}
                                     title={playlist.title}
                                     subtitle={
                                         isLikedFolder

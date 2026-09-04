@@ -303,10 +303,10 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                     className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 text-left active:opacity-80"
                                     title="全屏播放"
                                 >
-                                    <p className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
+                                    <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
                                         {currentTrack.title}
                                     </p>
-                                    <span className="shrink-0">
+                                    <span className="flex shrink-0 items-center">
                                         <SourceBadge source={currentTrack.source} />
                                     </span>
                                 </button>
