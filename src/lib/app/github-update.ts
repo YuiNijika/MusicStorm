@@ -255,9 +255,11 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
         }
 
         const all = (await response.json()) as GithubReleaseRaw[]
+        // 只认正式版：跳过 draft 与 prerelease，取第一个正式 release 的 tag
         const data = all.find(
             (r) =>
                 !r.draft &&
+                !r.prerelease &&
                 !!r.tag_name?.trim(),
         )
         if (!data) {
