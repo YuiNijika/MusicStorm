@@ -1,0 +1,1 @@
+import{Sr as e}from"./App-CYkiOtoe.js";export{e as getCurrentWindow};

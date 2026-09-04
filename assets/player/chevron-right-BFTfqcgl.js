@@ -1,0 +1,1 @@
+import{xr as e}from"./client-CvvcnMvS.js";var t=e(`chevron-right`,[[`path`,{d:`m9 18 6-6-6-6`,key:`mthhwq`}]]);export{t};
