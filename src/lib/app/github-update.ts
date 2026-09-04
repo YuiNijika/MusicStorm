@@ -1,5 +1,6 @@
 import { GITHUB_REPO_URL } from "@/lib/open-external"
 import { resolveUpdateUrl } from "@/lib/app/update-source-prefs"
+import { isAndroid } from "@/lib/platform"
 import { isWebMode } from "@/lib/web-mode"
 
 const OWNER = "YuiNijika"
@@ -39,8 +40,7 @@ async function fetchGithubReleases(currentVersion: string): Promise<Response> {
     throw lastError ?? new Error("GitHub API 请求失败")
 }
 
-// 桌面与 Android 共用同一版本线与 release tag（不再有 -android 独立 tag），
-// 参考 tauri-plugin-updater 的"单一语义版本跨平台匹配"思路一起发版。
+// 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag（如 26.9.5-android）
 const RELEASE_CACHE_KEY = "musicstorm-github-release-cache"
 
 type GithubReleaseRaw = {
@@ -255,13 +255,19 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
         }
 
         const all = (await response.json()) as GithubReleaseRaw[]
-        // 只认正式版：跳过 draft 与 prerelease，取第一个正式 release 的 tag
-        const data = all.find(
-            (r) =>
-                !r.draft &&
-                !r.prerelease &&
-                !!r.tag_name?.trim(),
-        )
+        // 按平台匹配 tag，不排除 prerelease：同版本桌面与安卓常同时发布，
+        // 其中一方可能标为预发布，过滤掉会找不到本平台版本而回退老版本
+        const androidPlatform = isAndroid()
+        const data = all.find((r) => {
+            if (r.draft) {
+                return false
+            }
+            const tag = (r.tag_name ?? "").trim()
+            if (!tag) {
+                return false
+            }
+            return androidPlatform ? /-android$/i.test(tag) : true
+        })
         if (!data) {
             throw new Error("当前平台暂无发布版本")
         }
