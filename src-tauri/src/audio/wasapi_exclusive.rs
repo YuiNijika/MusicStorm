@@ -12,10 +12,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use std::thread::{self, JoinHandle};
 
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_EVENT, WAIT_OBJECT_0};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_EVENT};
 use windows::Win32::Media::Audio::{
-    AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, IAudioClient,
-    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
+    AUDCLNT_E_DEVICE_IN_USE, AUDCLNT_E_UNSUPPORTED_FORMAT, AUDCLNT_SHAREMODE_EXCLUSIVE,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, DEVICE_STATE_ACTIVE, IAudioClient, IAudioRenderClient,
+    IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
     WAVE_FORMAT_PCM, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE};
@@ -124,8 +125,10 @@ impl ExclusiveOutputStreamHandle {
 }
 
 impl ExclusiveOutputStream {
-    /// 打开默认输出设备的 WASAPI 独占渲染流。
-    pub fn open_default() -> Result<(Self, ExclusiveOutputStreamHandle), String> {
+    /// 打开指定输出设备的 WASAPI 独占渲染流，设备编号与前端列表接口一致。
+    pub fn open_device(
+        device_id: &str,
+    ) -> Result<(Self, ExclusiveOutputStreamHandle), String> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
@@ -134,8 +137,7 @@ impl ExclusiveOutputStream {
             CoCreateInstance(&CLSID_MMDEVICE_ENUMERATOR, None, CLSCTX_ALL)
                 .map_err(|e| format!("创建设备枚举器失败: {e}"))?
         };
-        let device: IMMDevice = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
-            .map_err(|e| format!("获取默认输出设备失败: {e}"))?;
+        let device: IMMDevice = resolve_endpoint(&enumerator, device_id)?;
         let client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }
             .map_err(|e| format!("激活 IAudioClient 失败: {e}"))?;
 
@@ -165,19 +167,32 @@ impl ExclusiveOutputStream {
         } else {
             fallback_period
         };
+        // 独占模式缓冲必须与周期一致（设备粒度对齐）；改成 3 倍会导致
+        // Initialize 报 AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED/UNSUPPORTED_FORMAT
+        let buffer_hns = period;
 
         let result = unsafe {
             client.Initialize(
                 AUDCLNT_SHAREMODE_EXCLUSIVE,
                 AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                period,
+                buffer_hns,
                 period,
                 format_ptr,
                 None,
             )
         };
         unsafe { CoTaskMemFree(Some(format_ptr.cast())) };
-        result.map_err(|e| format!("初始化独占流失败: {e}"))?;
+        // 常见失败映射为用户可读文案（前端直接展示给用户）
+        result.map_err(|e| {
+            let code = e.code();
+            if code == AUDCLNT_E_UNSUPPORTED_FORMAT {
+                "当前输出设备不支持 WASAPI 独占模式".to_string()
+            } else if code == AUDCLNT_E_DEVICE_IN_USE {
+                "输出设备正被其他程序占用，无法开启独占".to_string()
+            } else {
+                format!("初始化独占流失败: {e}")
+            }
+        })?;
 
         let render: IAudioRenderClient = unsafe { client.GetService() }
             .map_err(|e| format!("获取渲染客户端失败: {e}"))?;
@@ -186,6 +201,9 @@ impl ExclusiveOutputStream {
         if buffer_frames == 0 {
             return Err("独占流缓冲为空".into());
         }
+        eprintln!(
+            "[audio] exclusive init period_hns={period} buffer_hns={buffer_hns} buf_frames={buffer_frames} rate={sample_rate} ch={channels}"
+        );
 
         let event: HANDLE = unsafe { CreateEventW(None, false, false, None) }
             .map_err(|e| format!("创建事件失败: {e}"))?;
@@ -223,19 +241,30 @@ impl ExclusiveOutputStream {
                 .name("wasapi-exclusive".into())
                 .spawn(move || {
                     let mut mixer = mixer;
+                    let mut last_heartbeat = std::time::Instant::now();
+                    let mut fills: u64 = 0;
                     loop {
                         if stop.load(Ordering::SeqCst) {
                             break;
                         }
-                        // 事件驱动：有可用缓冲时事件触发；超时轮询停止标志
-                        let wait = event.wait(20);
+                        // 事件驱动为主（设备每周期触发、低延迟补数据）；
+                        // 事件超时也照常按缓冲空位拉取混音器：事件丢失/缓冲满时
+                        // 渲染线程不得停摆，否则 rodio 源链（stop/position/play 恢复）
+                        // 不再被推进，表现为点击播放无声、切歌卡死
+                        let _ = event.wait(20);
                         if stop.load(Ordering::SeqCst) {
                             break;
                         }
-                        if wait != WAIT_OBJECT_0 {
-                            continue;
+                        // 无条件心跳：每 5s 上报缓冲状态，padding 恒等于 buf 说明设备未消费
+                        if last_heartbeat.elapsed().as_secs() >= 5 {
+                            let p = client.current_padding().unwrap_or(u32::MAX);
+                            eprintln!(
+                                "[audio] exclusive render heartbeat t={:.0}s padding={p} buf={buffer_frames} fills={fills}",
+                                last_heartbeat.elapsed().as_secs_f64()
+                            );
+                            last_heartbeat = std::time::Instant::now();
                         }
-                        let padding: u32 = client.current_padding().unwrap_or(u32::MAX);
+                        let padding: u32 = client.current_padding().unwrap_or(0);
                         if padding >= buffer_frames {
                             continue;
                         }
@@ -250,7 +279,9 @@ impl ExclusiveOutputStream {
                         if render.release_buffer(avail, 0).is_err() {
                             break;
                         }
+                        fills += 1;
                     }
+                    eprintln!("[audio] exclusive render thread exit");
                     let _ = client.stop();
                 })
                 .map_err(|e| format!("启动独占渲染线程失败: {e}"))?
@@ -276,6 +307,32 @@ impl ExclusiveOutputStream {
             },
         ))
     }
+}
+
+/// 解析设备标识为输出端点，default 走系统默认，out-N 按活跃端点集合取序号
+fn resolve_endpoint(
+    enumerator: &IMMDeviceEnumerator,
+    device_id: &str,
+) -> Result<IMMDevice, String> {
+    if device_id.is_empty() || device_id == "default" {
+        return unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
+            .map_err(|e| format!("获取默认输出设备失败: {e}"));
+    }
+    let index = device_id
+        .strip_prefix("out-")
+        .ok_or_else(|| format!("无效的输出设备标识 {device_id}"))?
+        .parse::<u32>()
+        .map_err(|_| format!("无效的输出设备编号 {device_id}"))?;
+    let collection: IMMDeviceCollection = unsafe {
+        enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+    }
+    .map_err(|e| format!("枚举输出设备失败: {e}"))?;
+    let count: u32 = unsafe { collection.GetCount() }
+        .map_err(|e| format!("读取设备数量失败: {e}"))?;
+    if index >= count {
+        return Err("输出设备已不存在，请重新选择".into());
+    }
+    unsafe { collection.Item(index) }.map_err(|e| format!("获取输出设备失败: {e}"))
 }
 
 impl Drop for ExclusiveOutputStream {

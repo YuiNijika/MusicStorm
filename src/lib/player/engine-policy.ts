@@ -7,7 +7,7 @@ type EnginePref = "auto" | "native" | "html5"
 type EngineStatus = "native" | "html5" | "degraded"
 
 const ENGINE_PREF_OPTIONS = [
-    { id: "auto" as const, label: "自动（本地高音质原生输出）" },
+    { id: "auto" as const, label: "自动" },
     { id: "native" as const, label: "本地优先原生输出" },
     { id: "html5" as const, label: "强制 H5" },
 ]

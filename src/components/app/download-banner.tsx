@@ -81,7 +81,7 @@ function DownloadBanner() {
                         type="button"
                         onClick={dismiss}
                         aria-label="关闭提示"
-                        className="grid size-7 shrink-0 place-items-center rounded-full text-foreground/60 transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-95 active:duration-[var(--duration-press)]"
+                        className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-[var(--surface-fill)] text-foreground/70 transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] hover:text-foreground active:scale-95 active:duration-[var(--duration-press)]"
                     >
                         <CloseIcon />
                     </button>

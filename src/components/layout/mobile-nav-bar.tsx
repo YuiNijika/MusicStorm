@@ -49,6 +49,8 @@ import {
 } from "@/lib/appearance/appearance-prefs"
 import type { AppRoute } from "@/lib/routes"
 import { NAV_ITEMS } from "@/lib/routes"
+import { isAndroid } from "@/lib/platform"
+import { isWebMode } from "@/lib/web-mode"
 import { cn } from "@/lib/utils"
 
 // 仅 <md 显示的核心 tab；≥md 侧边栏接管
@@ -108,7 +110,12 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
         <nav
             aria-label="主导航"
             className="mobile-nav-bar md:hidden"
-            style={{ paddingTop: "env(safe-area-inset-top)" }}
+            // 状态栏安全区边距只在原生 Android 需要；网页版浏览器不需要额外留白
+            style={
+                isAndroid() && !isWebMode()
+                    ? { paddingTop: "env(safe-area-inset-top)" }
+                    : undefined
+            }
         >
             <div className="flex items-center justify-between gap-1 px-2 py-2">
                 {/* Segmented tabs — Apple Music 风格滑动指示器 */}
@@ -206,7 +213,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                                         全局色调
                                     </button>
                                 </div>
-                                <div className="flex flex-wrap gap-2.5">
+                                <div className="flex flex-wrap gap-3">
                                     {ACCENT_OPTIONS.map((option) => {
                                         const active = appearance.accent === option.id
                                         return (
@@ -216,7 +223,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                                                 aria-label={option.label}
                                                 onClick={() => setAccent(option.id)}
                                                 className={cn(
-                                                    "size-7 cursor-pointer rounded-full transition-transform",
+                                                    "size-8 cursor-pointer rounded-full transition-transform",
                                                     "ring-offset-2 ring-offset-popover active:scale-95",
                                                     active
                                                         ? "ring-2 ring-foreground/80"
@@ -236,7 +243,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                                         aria-label="自定义色相"
                                         onClick={() => setCustomHue(customHue)}
                                         className={cn(
-                                            "size-7 cursor-pointer overflow-hidden rounded-full transition-transform",
+                                            "size-8 cursor-pointer overflow-hidden rounded-full transition-transform",
                                             "ring-offset-2 ring-offset-popover active:scale-95",
                                             customActive
                                                 ? "ring-2 ring-foreground/80"
@@ -362,6 +369,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     {/* 账号入口 */}
                     <DropdownMenu>
                     <DropdownMenuTrigger
+                        aria-label="账号菜单"
                         className={cn(
                             "ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full",
                             "transition-[color,background-color,transform] active:scale-[0.95] active:duration-[var(--duration-press)]",
@@ -459,7 +467,8 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true
                         ref={isActive ? indicatorRef : undefined}
                         onClick={() => onNavigate(id)}
                         className={cn(
-                            "relative z-[1] flex min-h-9 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 sm:gap-1.5 sm:px-3",
+                            // min-h-10 保证触控热区 ≥40px
+                            "relative z-[1] flex min-h-10 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 sm:gap-1.5 sm:px-3",
                             "text-[12px] font-medium transition-colors duration-200 sm:text-[13px]",
                             isActive
                                 ? "text-foreground"

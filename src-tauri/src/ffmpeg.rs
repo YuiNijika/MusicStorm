@@ -1,3 +1,6 @@
+// audio 模块仅桌面端存在（Android 用系统播放器），引用需同步门控
+#[cfg(not(target_os = "android"))]
+use crate::audio::{invalidate_ffmpeg_cache, AudioState};
 use crate::db::DbState;
 use rusqlite::params;
 use serde::Serialize;
@@ -195,6 +198,26 @@ pub fn ffmpeg_validate(path: String) -> Result<FfmpegStatus, String> {
     Ok(status_for(PathBuf::from(path.trim()), "manual"))
 }
 
+// 桌面端：配置变更后清空播放器缓存，下次播放按新配置重新解析
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+pub fn ffmpeg_set_path(
+    state: State<'_, DbState>,
+    audio: State<'_, AudioState>,
+    path: Option<String>,
+) -> Result<FfmpegStatus, String> {
+    let selected = path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    let status = save_ffmpeg_path(state, selected.as_deref())?;
+    invalidate_ffmpeg_cache(&audio);
+    Ok(status)
+}
+
+// Android：无 audio 模块，仅保存配置并回传检测结果
+#[cfg(target_os = "android")]
 #[tauri::command]
 pub fn ffmpeg_set_path(
     state: State<'_, DbState>,
@@ -205,10 +228,14 @@ pub fn ffmpeg_set_path(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from);
-    if let Some(path) = selected.as_deref() {
+    save_ffmpeg_path(state, selected.as_deref())
+}
+
+fn save_ffmpeg_path(state: State<'_, DbState>, path: Option<&Path>) -> Result<FfmpegStatus, String> {
+    if let Some(path) = path {
         version_line(path)?;
     }
-    save_configured_path(&state, selected.as_deref())?;
+    save_configured_path(&state, path)?;
     ffmpeg_detect(state)
 }
 

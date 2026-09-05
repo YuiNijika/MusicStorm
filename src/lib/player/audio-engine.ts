@@ -49,6 +49,9 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     // 后台恢复：记录播放状态，visibilitychange 时恢复
     let wasPlayingBeforeHidden = false
     let hiddenByVisibilityChange = false
+    // 元数据未就绪时 currentTime 赋值会被浏览器丢弃/钳制（恢复进度丢到从头播）：
+    // 挂起待 loadedmetadata 后再落地
+    let pendingSeekMs: number | null = null
 
     function ensureEqGraph(): void {
         if (eqContext) {
@@ -92,6 +95,22 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     const onCanPlay = () => {
         readyPromise = null
     }
+    // 元数据就绪后落地挂起的 seek：恢复播放等场景先 seek 后 play，
+    // 元数据未加载时 currentTime 赋值无效，进度会丢回开头
+    const onLoadedMetadata = () => {
+        const positionMs = pendingSeekMs
+        if (positionMs == null) {
+            return
+        }
+        pendingSeekMs = null
+        const duration = safeDurationMs(audio)
+        const nextSec =
+            duration > 0
+                ? Math.min(Math.max(0, positionMs), duration) / 1000
+                : Math.max(0, positionMs) / 1000
+        audio.currentTime = nextSec
+        handlers.onTimeUpdate?.(audio.currentTime * 1000, duration)
+    }
     const onTimeUpdate = () => {
         handlers.onTimeUpdate?.(audio.currentTime * 1000, safeDurationMs(audio))
     }
@@ -105,6 +124,7 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
 
     audio.addEventListener("canplay", onCanPlay)
     audio.addEventListener("canplaythrough", onCanPlay)
+    audio.addEventListener("loadedmetadata", onLoadedMetadata)
     audio.addEventListener("timeupdate", onTimeUpdate)
     audio.addEventListener("durationchange", onTimeUpdate)
     audio.addEventListener("ended", onEnded)
@@ -152,6 +172,8 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             if (audio.src === url) {
                 return
             }
+            // 换源后旧的挂起 seek 作废
+            pendingSeekMs = null
             readyCancel = true
             readyPromise = null
             audio.src = url
@@ -212,6 +234,13 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
             if (!Number.isFinite(positionMs)) {
                 return
             }
+            // 元数据未就绪时时间轴还不存在，设置 currentTime 会被浏览器忽略，
+            // 恢复进度会从头播放；挂起到 loadedmetadata 后再落地
+            if (audio.readyState < HTMLMediaElement.HAVE_METADATA) {
+                pendingSeekMs = Math.max(0, positionMs)
+                return
+            }
+            pendingSeekMs = null
             const duration = safeDurationMs(audio)
             const nextSec =
                 duration > 0
@@ -258,6 +287,7 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
 
             audio.pause()
             audio.removeEventListener("timeupdate", onTimeUpdate)
+            audio.removeEventListener("loadedmetadata", onLoadedMetadata)
             audio.removeEventListener("durationchange", onTimeUpdate)
             audio.removeEventListener("ended", onEnded)
             audio.removeEventListener("play", onPlay)

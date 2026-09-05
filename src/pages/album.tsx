@@ -114,21 +114,21 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                 />
             ) : profile ? (
                 <>
-                    <header className="flex flex-col gap-5 sm:flex-row sm:items-end">
+                    <header className="flex items-start gap-4 sm:flex-row sm:items-end sm:gap-5">
                         <Cover
                             src={profile.coverUrl}
                             alt={profile.title}
                             size="lg"
-                            className="size-40 shrink-0 rounded-[26px] shadow-[0_16px_40px_rgba(15,23,42,0.18)] ring-1 ring-black/[0.04] sm:size-44 dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] dark:ring-white/[0.08]"
+                            className="size-28 shrink-0 rounded-[20px] shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] sm:size-40 sm:rounded-[26px] sm:shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)] dark:ring-white/[0.08]"
                         />
-                        <div className="min-w-0 flex-1 space-y-2.5 pb-0.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        <div className="min-w-0 flex-1 space-y-1.5 pb-0.5 sm:space-y-2.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                                 专辑
                             </p>
-                            <h1 className="line-clamp-2 break-words text-[28px] font-bold leading-tight tracking-[-0.04em] sm:text-[32px] md:font-semibold">
+                            <h1 className="line-clamp-2 break-words text-[20px] font-bold leading-tight tracking-[-0.03em] sm:text-[32px] sm:leading-tight sm:tracking-[-0.04em] md:font-semibold">
                                 {profile.title}
                             </h1>
-                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground sm:text-[13px]">
                                 {profile.artistId ? (
                                     <button
                                         type="button"
@@ -148,7 +148,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                 </span>
                             </div>
                             {profile.description ? (
-                                <p className="line-clamp-3 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+                                <p className="line-clamp-2 max-w-2xl text-[12px] leading-relaxed text-muted-foreground sm:line-clamp-3 sm:text-[13px]">
                                     {profile.description}
                                 </p>
                             ) : null}

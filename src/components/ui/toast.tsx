@@ -3,6 +3,8 @@ import { useEffect, useState, type CSSProperties } from "react"
 import { Toast as ToastPrimitive } from "@base-ui/react/toast"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { isAndroid } from "@/lib/platform"
+import { isWebMode } from "@/lib/web-mode"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -47,13 +49,18 @@ function useToastPrefs(): ToastPrefs {
     return prefs
 }
 
-function toastViewportStyle(prefs: ToastPrefs): CSSProperties {
+function toastViewportStyle(
+    prefs: ToastPrefs,
+    topInset?: string,
+): CSSProperties {
     const m = prefs.margin
+    // Android 状态栏下沿：顶部位置额外让出安全区高度，避免通知顶进状态栏
+    const top = topInset ? `calc(${m}px + ${topInset})` : m
     switch (prefs.position) {
         case "top-right":
-            return { top: m, right: m }
+            return { top, right: m }
         case "top-center":
-            return { top: m, left: "50%", transform: "translateX(-50%)" }
+            return { top, left: "50%", transform: "translateX(-50%)" }
         case "bottom-center":
             return { bottom: m, left: "50%", transform: "translateX(-50%)" }
         default:
@@ -68,6 +75,9 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
     const position = isMobile ? "top-center" : prefs.position
     const centered =
         position === "top-center" || position === "bottom-center"
+    // 仅原生 Android 需要状态栏安全区边距；网页版浏览器顶部无遮挡
+    const topInset =
+        isAndroid() && !isWebMode() ? "env(safe-area-inset-top)" : undefined
 
     return (
         <ToastPrimitive.Viewport
@@ -79,7 +89,10 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
                 className,
             )}
             style={{
-                ...toastViewportStyle({ position, margin: prefs.margin }),
+                ...toastViewportStyle(
+                    { position, margin: prefs.margin },
+                    topInset,
+                ),
                 ...props.style,
             }}
             {...props}

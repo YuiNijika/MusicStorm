@@ -40,7 +40,7 @@ async function fetchGithubReleases(currentVersion: string): Promise<Response> {
     throw lastError ?? new Error("GitHub API 请求失败")
 }
 
-// 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag（如 26.9.5-android）
+// 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag（如 26.9.6-android）
 const RELEASE_CACHE_KEY = "musicstorm-github-release-cache"
 
 type GithubReleaseRaw = {

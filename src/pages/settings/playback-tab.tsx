@@ -288,11 +288,18 @@ function PlaybackTab() {
                                 }
                                 onClick={() => {
                                     void setAudioDevice(device.id)
-                                        .then(() =>
-                                            getAudioOutputMode().then(
+                                        .then(() => {
+                                            // 切换设备会重建原生输出流，本地曲目续播当前，
+                                            // 避免播放中断但界面仍显示在播
+                                            if (
+                                                currentTrack?.source === "local"
+                                            ) {
+                                                reloadCurrent()
+                                            }
+                                            return getAudioOutputMode().then(
                                                 setAudioMode,
-                                            ),
-                                        )
+                                            )
+                                        })
                                         .catch((error: unknown) => {
                                             notifyError("切换输出设备失败", {
                                                 description:
@@ -310,9 +317,11 @@ function PlaybackTab() {
                     <ChoiceRow
                         label="WASAPI 独占"
                         description={
-                            audioMode.exclusive
-                                ? "已开启（设备支持时生效）"
-                                : "共享模式（当前）"
+                            audioMode.lastError
+                                ? `共享模式（当前）· ${audioMode.lastError}`
+                                : audioMode.exclusive
+                                  ? "已开启（设备支持时生效）"
+                                  : "共享模式（当前）"
                         }
                     >
                         <ChoiceChip

@@ -9,6 +9,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { usePlayer } from "@/hooks/use-player"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import type { Track } from "@/lib/types"
@@ -32,6 +33,7 @@ const QueuePanel = memo(function QueuePanel() {
         null,
     )
     const scrollRef = useRef<HTMLDivElement>(null)
+    const isMobile = useIsMobile()
 
     const count = queue.length
 
@@ -79,6 +81,8 @@ const QueuePanel = memo(function QueuePanel() {
                 aria-label="播放队列"
                 className={cn(
                     "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
+                    // 移动端（全屏播放器内）触控目标放大
+                    "max-md:size-10",
                     "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                     "disabled:pointer-events-none disabled:opacity-40",
                 )}
@@ -89,7 +93,8 @@ const QueuePanel = memo(function QueuePanel() {
                 align="end"
                 side="top"
                 sideOffset={12}
-                className="w-[340px] overflow-hidden p-0"
+                // 小屏宽度自适应，避免固定 340px 溢出 360px 屏幕
+                className="w-[min(92vw,340px)] overflow-hidden p-0"
             >
                 <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
                     <div className="flex items-baseline gap-2">
@@ -118,7 +123,7 @@ const QueuePanel = memo(function QueuePanel() {
                             <ListMusic className="size-4 text-muted-foreground" />
                         </div>
                         <p className="text-[12px] text-muted-foreground">
-                            队列为空，右键歌曲选择「加入队列」
+                            队列为空，从歌曲菜单选择「加入队列」
                         </p>
                     </div>
                 ) : (
@@ -208,7 +213,13 @@ const QueuePanel = memo(function QueuePanel() {
                                                             track,
                                                         )
                                                     }
-                                                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground group-hover:opacity-100"
+                                                    className={cn(
+                                                        "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                        // 触控端没有 hover：操作常显，否则按钮永远不可见
+                                                        isMobile
+                                                            ? "opacity-100"
+                                                            : "opacity-0 group-hover:opacity-100",
+                                                    )}
                                                 >
                                                     <Library className="size-3.5" />
                                                 </button>
@@ -226,7 +237,12 @@ const QueuePanel = memo(function QueuePanel() {
                                                         }
                                                         title="下一首播放"
                                                         aria-label={`将 ${track.title} 移到下一首播放`}
-                                                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground group-hover:opacity-100"
+                                                        className={cn(
+                                                            "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                            isMobile
+                                                                ? "opacity-100"
+                                                                : "opacity-0 group-hover:opacity-100",
+                                                        )}
                                                     >
                                                         <ListStart className="size-3.5" />
                                                     </button>
@@ -237,7 +253,12 @@ const QueuePanel = memo(function QueuePanel() {
                                                         }
                                                         title="从队列移除"
                                                         aria-label={`移除 ${track.title}`}
-                                                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive group-hover:opacity-100"
+                                                        className={cn(
+                                                            "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive",
+                                                            isMobile
+                                                                ? "opacity-100"
+                                                                : "opacity-0 group-hover:opacity-100",
+                                                        )}
                                                     >
                                                         <X className="size-3.5" />
                                                     </button>

@@ -140,6 +140,8 @@ impl PlayerInner {
         app: AppHandle,
         ffmpeg_path: Option<PathBuf>,
         exclusive: bool,
+        device_id: String,
+        error_sink: Arc<Mutex<Option<String>>>,
     ) -> Result<PlayerHandle, String> {
         let (tx, rx) = mpsc::channel::<PlayerCmd>();
         let volume = Arc::new(Mutex::new(0.8_f32));
@@ -158,6 +160,7 @@ impl PlayerInner {
             seeking: AtomicBool::new(false),
         });
         let shared_tick = Arc::clone(&shared);
+        let error_sink_worker = Arc::clone(&error_sink);
 
         thread::Builder::new()
             .name("audio-player".into())
@@ -171,8 +174,13 @@ impl PlayerInner {
                     ffmpeg_path_worker,
                     eq_worker,
                     exclusive,
+                    device_id,
+                    error_sink_worker,
                 ) {
                     eprintln!("[audio] worker exit: {error}");
+                    if let Ok(mut sink) = error_sink.lock() {
+                        *sink = Some(error);
+                    }
                 }
             })
             .map_err(|e| e.to_string())?;
@@ -192,8 +200,53 @@ fn is_remote_source(source: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://")
 }
 
+/// 按前端设备编号解析 cpal 输出设备，default 与 out-N 和列表接口保持一致
+fn resolve_cpal_output_device(device_id: &str) -> Result<cpal::Device, String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    if device_id.is_empty() || device_id == "default" {
+        return host
+            .default_output_device()
+            .ok_or_else(|| "没有可用的默认输出设备".to_string());
+    }
+    if let Some(index) = device_id.strip_prefix("out-") {
+        let index: usize = index
+            .parse()
+            .map_err(|_| format!("无效的输出设备编号 {device_id}"))?;
+        let devices = host
+            .output_devices()
+            .map_err(|e| format!("枚举输出设备失败: {e}"))?
+            .enumerate()
+            .collect::<Vec<_>>();
+        return devices
+            .get(index)
+            .map(|(_, device)| device.clone())
+            .ok_or_else(|| "输出设备已不存在，请重新选择".to_string());
+    }
+    // 按名称匹配兜底，覆盖将来列表改用名称作标识的情况
+    for device in host
+        .output_devices()
+        .map_err(|e| format!("枚举输出设备失败: {e}"))?
+    {
+        if device.name().map(|name| name == device_id).unwrap_or(false) {
+            return Ok(device);
+        }
+    }
+    Err("未找到指定的输出设备".into())
+}
+
 fn current_ffmpeg_path(path: &Arc<Mutex<Option<PathBuf>>>) -> Option<PathBuf> {
     path.lock().ok().and_then(|value| value.clone())
+}
+
+/// Windows 输出流持有者：独占流与共享流二选一，统一在 worker 生命周期内存活，
+/// 避免共享模式的 OutputStream 在分支内被 Drop 导致无声。
+/// 字段仅用于在 Drop 时释放输出，故允许 dead_code。
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
+enum OutputHolder {
+    Exclusive(crate::audio::wasapi_exclusive::ExclusiveOutputStream),
+    Shared(OutputStream),
 }
 
 fn run_worker(
@@ -205,42 +258,59 @@ fn run_worker(
     ffmpeg_path: Arc<Mutex<Option<PathBuf>>>,
     eq: Arc<EqState>,
     exclusive: bool,
+    device_id: String,
+    error_sink: Arc<Mutex<Option<String>>>,
 ) -> Result<(), String> {
     // WASAPI 独占仅在 Windows 可用；独占打不开时自动回退共享模式。
-    // 独占流对象保持在本作用域内，直至 worker 退出才会释放。
+    // 无论独占/共享，输出流对象都必须持有到 worker 退出：
+    // 一旦 Drop 输出即停止（共享模式曾在分支内立即丢弃 OutputStream 导致无声、
+    // append 的 sleep_until_end 等不到输出回调而卡死）。
+    eprintln!("[audio] worker start exclusive={exclusive} device_id={device_id:?}");
     #[cfg(target_os = "windows")]
-    let (sink, _exclusive_stream) = {
+    let (sink, _output_holder) = {
         if exclusive {
-            match crate::audio::wasapi_exclusive::ExclusiveOutputStream::open_default() {
+            match crate::audio::wasapi_exclusive::ExclusiveOutputStream::open_device(&device_id) {
                 Ok((stream, handle)) => {
+                    eprintln!("[audio] exclusive stream opened");
+                    if let Ok(mut sink) = error_sink.lock() {
+                        *sink = None;
+                    }
                     let (sink, queue) = Sink::new_idle();
                     handle
                         .play_raw(queue)
                         .map_err(|e| format!("无法启动独占输出: {e}"))?;
-                    (sink, Some(stream))
+                    (sink, OutputHolder::Exclusive(stream))
                 }
                 Err(error) => {
                     eprintln!("[audio] WASAPI 独占打开失败，回退共享模式: {error}");
-                    let (_stream, handle) = OutputStream::try_default()
+                    // 运行期回退原因上报前端设置页展示
+                    if let Ok(mut sink) = error_sink.lock() {
+                        *sink = Some(error);
+                    }
+                    let device = resolve_cpal_output_device(&device_id)?;
+                    let (stream, handle) = OutputStream::try_from_device(&device)
                         .map_err(|e| format!("无法打开音频输出: {e}"))?;
                     let sink = Sink::try_new(&handle)
                         .map_err(|e| format!("无法创建播放器: {e}"))?;
-                    (sink, None)
+                    (sink, OutputHolder::Shared(stream))
                 }
             }
         } else {
-            let (_stream, handle) = OutputStream::try_default()
+            let device = resolve_cpal_output_device(&device_id)?;
+            let (stream, handle) = OutputStream::try_from_device(&device)
                 .map_err(|e| format!("无法打开音频输出: {e}"))?;
             let sink = Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?;
-            (sink, None)
+            (sink, OutputHolder::Shared(stream))
         }
     };
     #[cfg(not(target_os = "windows"))]
-    let sink = {
+    let (sink, _output_holder) = {
         let _ = exclusive;
-        let (_stream, handle) = OutputStream::try_default()
+        let device = resolve_cpal_output_device(&device_id)?;
+        let (stream, handle) = OutputStream::try_from_device(&device)
             .map_err(|e| format!("无法打开音频输出: {e}"))?;
-        Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?
+        let sink = Sink::try_new(&handle).map_err(|e| format!("无法创建播放器: {e}"))?;
+        (sink, stream)
     };
     sink.pause();
 
@@ -251,11 +321,17 @@ fn run_worker(
     let mut has_buffer = false;
     // 上一轮 sink.get_pos() 读数：按真实输出样本累进，替代固定 50ms 计数器
     let mut last_real_pos = 0.0f64;
+    // 新源加载后 sink.get_pos() 可能残留上一曲的旧读数，冷却期内不读进度，
+    // 否则首轮读数把旧基准算进新曲，歌词/进度会系统性滞后
+    let mut pos_ready_after = std::time::Instant::now();
+    let started_at = std::time::Instant::now();
 
     let app_tick = app.clone();
     let shared_tick = Arc::clone(&shared);
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(200));
+        // 50ms 发布一次：进度/歌词跟随更跟手（实际滞后 ≤ 采样 30ms + 发射 50ms），
+        // 20Hz 的 IPC 与前端重渲开销可忽略
+        thread::sleep(Duration::from_millis(50));
         let position_ms = f64::from_bits(shared_tick.position_ms.load(Ordering::Relaxed));
         let duration_ms = f64::from_bits(shared_tick.duration_ms.load(Ordering::Relaxed));
         let ended = shared_tick.ended.swap(false, Ordering::Relaxed);
@@ -272,8 +348,11 @@ fn run_worker(
     });
 
     loop {
-        match rx.recv_timeout(Duration::from_millis(50)) {
+        // 30ms 轮询：命令响应更快，进度采样更密（发射侧 50ms），降低进度/歌词滞后
+        let t = || format!("{:.0}ms", started_at.elapsed().as_secs_f64() * 1000.0);
+        match rx.recv_timeout(Duration::from_millis(30)) {
             Ok(PlayerCmd::Load { source, reply }) => {
+                eprintln!("[audio] {} cmd=load source={source:?}", t());
                 // Load 换源必须丢掉旧缓冲，否则 play 同 path 会误走 resume
                 sink.stop();
                 has_buffer = false;
@@ -288,9 +367,11 @@ fn run_worker(
                 } else {
                     current_source = None;
                 }
+                eprintln!("[audio] {} cmd=load done", t());
                 let _ = reply.send(result);
             }
             Ok(PlayerCmd::Play { source, reply }) => {
+                eprintln!("[audio] {} cmd=play source={source:?}", t());
                 let result = apply_play(
                     &sink,
                     &shared,
@@ -302,8 +383,21 @@ fn run_worker(
                     current_ffmpeg_path(&ffmpeg_path).as_deref(),
                     &eq,
                 );
-                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
-                let _ = reply.send(result);
+                let fresh = result.as_ref().map(|fresh| *fresh).unwrap_or(false);
+                if fresh {
+                    // 新源从 0 开始，抛弃可能残留的旧读数作为新基准
+                    last_real_pos = 0.0;
+                    pos_ready_after = std::time::Instant::now()
+                        + std::time::Duration::from_millis(100);
+                } else {
+                    last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                }
+                eprintln!(
+                    "[audio] {} cmd=play done fresh={fresh} err={}",
+                    t(),
+                    result.is_err()
+                );
+                let _ = reply.send(result.map(|_| ()));
             }
             Ok(PlayerCmd::Pause) => {
                 sink.pause();
@@ -314,6 +408,7 @@ fn run_worker(
                 resume,
                 reply,
             }) => {
+                eprintln!("[audio] {} cmd=seek pos={position_ms:.0} resume={resume}", t());
                 // 合并连续 Seek，只落地最后一次；任一次 resume=true 则 seek 后继续播
                 let mut target = position_ms.max(0.0);
                 let mut want_resume = resume;
@@ -336,7 +431,7 @@ fn run_worker(
 
                 shared.seeking.store(true, Ordering::Relaxed);
                 shared.ended.store(false, Ordering::Relaxed);
-                apply_seek(
+                let fresh = apply_seek(
                     &sink,
                     &shared,
                     &volume,
@@ -349,7 +444,20 @@ fn run_worker(
                     &eq,
                 );
                 shared.seeking.store(false, Ordering::Relaxed);
-                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                let applied_pos = f64::from_bits(shared.position_ms.load(Ordering::Relaxed));
+                eprintln!(
+                    "[audio] {} cmd=seek done fresh={} applied_pos={applied_pos:.0} sink_empty={}",
+                    t(),
+                    fresh,
+                    sink.empty()
+                );
+                if fresh {
+                    last_real_pos = 0.0;
+                    pos_ready_after = std::time::Instant::now()
+                        + std::time::Duration::from_millis(100);
+                } else {
+                    last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                }
                 for r in replies {
                     let _ = r.send(Ok(()));
                 }
@@ -384,8 +492,18 @@ fn run_worker(
                                 current_ffmpeg_path(&ffmpeg_path).as_deref(),
                                 &eq,
                             );
-                            last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
-                            let _ = reply.send(result);
+                            let fresh = result
+                                .as_ref()
+                                .map(|fresh| *fresh)
+                                .unwrap_or(false);
+                            if fresh {
+                                last_real_pos = 0.0;
+                                pos_ready_after = std::time::Instant::now()
+                                    + std::time::Duration::from_millis(100);
+                            } else {
+                                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                            }
+                            let _ = reply.send(result.map(|_| ()));
                         }
                         PlayerCmd::Pause => {
                             sink.pause();
@@ -405,7 +523,7 @@ fn run_worker(
                             reply: next_reply,
                         } => {
                             shared.seeking.store(true, Ordering::Relaxed);
-                            apply_seek(
+                            let fresh = apply_seek(
                                 &sink,
                                 &shared,
                                 &volume,
@@ -418,13 +536,20 @@ fn run_worker(
                                 &eq,
                             );
                             shared.seeking.store(false, Ordering::Relaxed);
-                            last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                            if fresh {
+                                last_real_pos = 0.0;
+                                pos_ready_after = std::time::Instant::now()
+                                    + std::time::Duration::from_millis(100);
+                            } else {
+                                last_real_pos = sink.get_pos().as_secs_f64() * 1000.0;
+                            }
                             let _ = next_reply.send(Ok(()));
                         }
                     }
                 }
             }
             Ok(PlayerCmd::Stop) => {
+                eprintln!("[audio] {} cmd=stop", t());
                 sink.stop();
                 has_buffer = false;
                 shared.playing.store(false, Ordering::Relaxed);
@@ -450,6 +575,10 @@ fn run_worker(
 
         // seek 中 sink 可能短暂 empty，禁止误 ended；也不虚增进度
         if shared.seeking.load(Ordering::Relaxed) {
+            continue;
+        }
+        // 新源刚加载时 get_pos 可能残留上一曲旧读数，冷却期内不推进进度
+        if std::time::Instant::now() < pos_ready_after {
             continue;
         }
 
@@ -495,7 +624,7 @@ fn apply_play(
     source: String,
     ffmpeg_path: Option<&Path>,
     eq: &Arc<EqState>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let same = current_source.as_ref() == Some(&source);
     // 仅同曲且 sink 仍有该曲缓冲时 resume；否则一律重开，避免切源后误续播
     if same && *has_buffer && !sink.empty() {
@@ -506,7 +635,7 @@ fn apply_play(
         sink.play();
         shared.playing.store(true, Ordering::Relaxed);
         shared.ended.store(false, Ordering::Relaxed);
-        return Ok(());
+        return Ok(false);
     }
 
     match start_playback_from(sink, &source, shared, 0.0, ffmpeg_path, eq) {
@@ -520,7 +649,7 @@ fn apply_play(
             sink.play();
             shared.playing.store(true, Ordering::Relaxed);
             shared.ended.store(false, Ordering::Relaxed);
-            Ok(())
+            Ok(true)
         }
         Err(error) => {
             eprintln!("[audio] play error: {error}");
@@ -543,12 +672,12 @@ fn apply_seek(
     resume: bool,
     ffmpeg_path: Option<&Path>,
     eq: &Arc<EqState>,
-) {
+) -> bool {
     let Some(source) = current_source.clone() else {
         shared
             .position_ms
             .store(target.to_bits(), Ordering::Relaxed);
-        return;
+        return false;
     };
     // 原生 playing 或前端要求 resume
     let was_playing = shared.playing.load(Ordering::Relaxed) || resume;
@@ -569,7 +698,7 @@ fn apply_seek(
             sink.play();
             shared.playing.store(true, Ordering::Relaxed);
         }
-        return;
+        return false;
     }
 
     // 回退：重开播放源（内部用 symphonia 做容器 seek，PotPlayer 风格）
@@ -592,6 +721,7 @@ fn apply_seek(
                 shared.playing.store(false, Ordering::Relaxed);
             }
             shared.ended.store(false, Ordering::Relaxed);
+            true
         }
         Err(error) => {
             eprintln!("[audio] seek error: {error}");
@@ -606,6 +736,7 @@ fn apply_seek(
                         sink.play();
                         shared.playing.store(true, Ordering::Relaxed);
                         shared.ended.store(false, Ordering::Relaxed);
+                        true
                     }
                     Err(recover_err) => {
                         eprintln!("[audio] seek recover error: {recover_err}");
@@ -615,6 +746,7 @@ fn apply_seek(
                         shared
                             .position_ms
                             .store(target.to_bits(), Ordering::Relaxed);
+                        false
                     }
                 }
             } else {
@@ -624,6 +756,7 @@ fn apply_seek(
                 shared
                     .position_ms
                     .store(target.to_bits(), Ordering::Relaxed);
+                false
             }
         }
     }
@@ -1012,10 +1145,16 @@ fn start_playback_from(
     ffmpeg_path: Option<&Path>,
     eq: &Arc<EqState>,
 ) -> Result<(), String> {
+    let t0 = std::time::Instant::now();
     sink.stop();
 
     let path_buf = validate_local_path(source)?;
     let duration_hint = compute_duration_hint(&path_buf);
+    eprintln!(
+        "[audio] play: stop+probe {:.0}ms hint={}",
+        t0.elapsed().as_secs_f64() * 1000.0,
+        duration_hint.is_some()
+    );
     let clamped = if let Some(dur) = duration_hint {
         shared
             .duration_ms
@@ -1028,6 +1167,7 @@ fn start_playback_from(
 
     let offset = Duration::from_millis(clamped as u64);
     if requires_external_decoder(&path_buf) {
+        eprintln!("[audio] play: external ffmpeg, opening...");
         let executable = ffmpeg_path.ok_or_else(|| {
             "FFMPEG_REQUIRED: 此格式需要外部 FFmpeg，请前往设置 > 播放配置 FFmpeg".to_string()
         })?;
@@ -1056,6 +1196,10 @@ fn start_playback_from(
             Err(error) => return Err(error),
         }
     }
+    eprintln!(
+        "[audio] play: append {:.0}ms (open+append 合计，含 sleep_until_end 等待旧源结束)",
+        t0.elapsed().as_secs_f64() * 1000.0
+    );
     shared
         .position_ms
         .store(clamped.to_bits(), Ordering::Relaxed);

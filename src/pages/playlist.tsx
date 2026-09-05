@@ -1,4 +1,4 @@
-﻿import { Heart, Library, ListMinus, Pencil, Sparkles, Trash2 } from "lucide-react"
+import { Heart, Library, ListMinus, Pencil, Sparkles, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
@@ -402,14 +402,14 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                 />
             ) : playlist ? (
                 <>
-                    <header className="flex flex-wrap items-end gap-5">
+                    <header className="flex items-start gap-4 sm:flex-row sm:items-end sm:gap-5">
                         <Cover
                             src={heroCover}
                             alt={playlist.title}
                             size="lg"
-                            className="size-36 rounded-[24px]"
+                            className="size-28 shrink-0 rounded-[20px] shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] sm:size-36 sm:rounded-[24px] dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)] dark:ring-white/[0.08]"
                         />
-                        <div className="min-w-0 flex-1 space-y-2 pb-1">
+                        <div className="min-w-0 flex-1 space-y-1.5 pb-1 sm:space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <SourceBadge source={playlist.source} />
                                 <span className="text-[12px] text-muted-foreground">
@@ -425,11 +425,11 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                     </span>
                                 ) : null}
                             </div>
-                            <h1 className="text-[28px] leading-[1.15] font-bold tracking-[-0.04em] md:font-semibold">
+                            <h1 className="line-clamp-2 break-words text-[20px] font-bold leading-tight tracking-[-0.03em] sm:text-[28px] sm:leading-[1.15] sm:tracking-[-0.04em] md:font-semibold">
                                 {playlist.title}
                             </h1>
                             {playlist.description ? (
-                                <p className="line-clamp-3 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+                                <p className="line-clamp-2 max-w-2xl text-[12px] leading-relaxed text-muted-foreground sm:line-clamp-3 sm:text-[13px]">
                                     {playlist.description}
                                 </p>
                             ) : null}

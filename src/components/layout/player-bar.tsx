@@ -377,11 +377,14 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
 
                 <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
                     <div className="flex items-center gap-1">
-                        <SpeedPopover
-                            rate={playbackRate}
-                            onSpeed={setPlaybackRate}
-                            compact
-                        />
+                        {/* 速度按钮窄屏价值低（全屏播放器已有），隐藏给核心控制让空间 */}
+                        <span className="hidden md:inline-flex">
+                            <SpeedPopover
+                                rate={playbackRate}
+                                onSpeed={setPlaybackRate}
+                                compact
+                            />
+                        </span>
                         <ControlButton
                             title="上一首"
                             onClick={previous}
@@ -392,7 +395,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                         <Button
                             type="button"
                             size="icon"
-                            className="size-9 cursor-pointer rounded-full active:scale-[0.96]"
+                            className="size-9 max-md:size-11 cursor-pointer rounded-full active:scale-[0.96]"
                             onClick={togglePlay}
                             disabled={!currentTrack}
                             title={isPlaying ? "暂停" : "播放"}
@@ -522,7 +525,9 @@ function ControlButton({
             disabled={disabled}
             onClick={onClick}
             className={cn(
+                // 移动端触控目标放大到 40px，桌面保持紧凑 32px
                 "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
+                "max-md:size-10",
                 "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                 "disabled:pointer-events-none disabled:opacity-40",
                 active && "text-rose-600 dark:text-rose-300",

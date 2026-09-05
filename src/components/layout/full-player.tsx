@@ -22,6 +22,7 @@ import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState, type Po
 import { Cover } from "@/components/music/cover"
 import { EqEditor } from "@/components/music/eq-editor"
 import { LyricsSkeleton } from "@/components/music/loading-skeletons"
+import { QueuePanel } from "@/components/layout/queue-panel"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
 import { ShareSheet } from "@/components/music/share-sheet"
 import { SourceBadge } from "@/components/music/source-badge"
@@ -664,7 +665,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             onClick={onClose}
                             onPointerDown={(event) => event.stopPropagation()}
                             className={cn(
+                                // 移动端触控目标放大到 40px
                                 "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
+                                "max-md:h-10",
                                 "text-[13px] font-medium text-foreground/70",
                                 "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
                                 "active:scale-[0.97] active:duration-[var(--duration-press)]",
@@ -1015,6 +1018,9 @@ const TransportBar = memo(function TransportBar({
 
             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 {isMobile ? (
+                    <>
+                    {/* 移动端队列管理入口：放在「更多」左侧 */}
+                    <QueuePanel />
                     <Popover>
                         <PopoverTrigger
                             className={cn(
@@ -1099,6 +1105,7 @@ const TransportBar = memo(function TransportBar({
                             </div>
                         </PopoverContent>
                     </Popover>
+                    </>
                 ) : (
                     <>
                 <Popover>

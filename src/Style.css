@@ -75,6 +75,8 @@
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
         overscroll-behavior: none;
+        /* 触控优化：允许捏合缩放但禁用双击缩放延迟（配合移除 user-scalable=no） */
+        touch-action: manipulation;
     }
 
     .dark body {
@@ -672,23 +674,11 @@ html.theme-switching .page-content-host {
     view-transition-name: none;
 }
 
-html.theme-switching::view-transition-old(root) {
-    z-index: 1;
-}
-
+/* 圆扩散动画由 JS 经 Web Animations API 驱动（pseudoElement），
+   这里只关掉根快照默认动画，避免与 JS 动画叠加 */
+html.theme-switching::view-transition-old(root),
 html.theme-switching::view-transition-new(root) {
-    animation: theme-clip-reveal 500ms var(--ease-enter);
-    z-index: 9999;
-}
-
-html.dark.theme-switching::view-transition-old(root) {
-    animation: theme-clip-reveal 500ms var(--ease-enter) reverse;
-    z-index: 9999;
-}
-
-html.dark.theme-switching::view-transition-new(root) {
     animation: none;
-    z-index: 1;
 }
 
 /* 主题切换期间压掉逐元素过渡/动画，玻璃层暂停重采样：
@@ -708,15 +698,6 @@ html.theme-switching .material-panel,
 html.theme-switching [class*="material-"],
 html.theme-switching [class*="backdrop-blur"] {
     backdrop-filter: none !important;
-}
-
-@keyframes theme-clip-reveal {
-    from {
-        clip-path: circle(0 at var(--theme-x) var(--theme-y));
-    }
-    to {
-        clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y));
-    }
 }
 
 /* 路由切换载入动画（六套变体），由外观设置「载入动画」开关与样式控制；

@@ -107,6 +107,7 @@ function createNativeEngine(handlers: AudioEngineHandlers = {}): AudioEngine {
             if (!Number.isFinite(nextMs)) {
                 return
             }
+            console.log("[native] seek", Math.round(nextMs), "resume=", Boolean(opts?.resume))
             positionMs = Math.max(0, nextMs)
             handlers.onTimeUpdate?.(positionMs, durationMs)
             const resume = Boolean(opts?.resume)

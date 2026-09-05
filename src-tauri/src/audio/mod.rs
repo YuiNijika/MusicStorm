@@ -29,6 +29,12 @@ pub struct AudioRuntime {
 pub struct AudioState {
     pub runtime: Mutex<AudioRuntime>,
     pub player: Mutex<Option<Arc<PlayerHandle>>>,
+    /// 已解析的 FFmpeg 路径缓存：None=未解析，Some(None)=无可用 ffmpeg。
+    /// 每次 load/play 都重新 spawn `ffmpeg -version`（每候选最多等 3s）会让
+    /// 切歌慢数秒，这里解析一次缓存，ffmpeg 配置变更时清空。
+    pub ffmpeg: Mutex<Option<Option<std::path::PathBuf>>>,
+    /// worker 运行期输出回退原因（如独占打不开回退共享），设置页展示给用户。
+    pub error_sink: Arc<Mutex<Option<String>>>,
 }
 
 impl Default for AudioState {
@@ -36,7 +42,25 @@ impl Default for AudioState {
         Self {
             runtime: Mutex::new(AudioRuntime::default()),
             player: Mutex::new(None),
+            ffmpeg: Mutex::new(None),
+            error_sink: Arc::new(Mutex::new(None)),
         }
+    }
+}
+
+/// 解析 FFmpeg 路径并缓存；仅首次解析触发进程探测。
+pub fn resolve_ffmpeg_cached(state: &AudioState, db: &DbState) -> Option<std::path::PathBuf> {
+    let mut guard = state.ffmpeg.lock().ok()?;
+    if guard.is_none() {
+        *guard = Some(resolve_ffmpeg_path(db).ok().flatten());
+    }
+    guard.clone().flatten()
+}
+
+/// FFmpeg 配置变更后清空缓存，下次播放重新解析。
+pub fn invalidate_ffmpeg_cache(state: &AudioState) {
+    if let Ok(mut guard) = state.ffmpeg.lock() {
+        *guard = None;
     }
 }
 
@@ -103,14 +127,20 @@ fn ensure_player(
 ) -> Result<Arc<PlayerHandle>, String> {
     let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
     if guard.is_none() {
-        // 输出流创建时决定独占/共享，创建前读取当前标志
-        let exclusive = state
+        // 输出流创建时决定独占/共享与目标设备，创建前读取当前设置
+        let (exclusive, device_id) = state
             .runtime
             .lock()
-            .map(|runtime| runtime.exclusive)
-            .unwrap_or(false);
-        let ffmpeg_path = resolve_ffmpeg_path(db).ok().flatten();
-        let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path, exclusive)?);
+            .map(|runtime| (runtime.exclusive, runtime.device_id.clone().unwrap_or_default()))
+            .unwrap_or((false, String::new()));
+        let ffmpeg_path = resolve_ffmpeg_cached(state, db);
+        let handle = Arc::new(PlayerInner::start(
+            app.clone(),
+            ffmpeg_path,
+            exclusive,
+            device_id,
+            Arc::clone(&state.error_sink),
+        )?);
         *guard = Some(Arc::clone(&handle));
         return Ok(handle);
     }
@@ -120,16 +150,16 @@ fn ensure_player(
         .ok_or_else(|| "player missing".to_string())
 }
 
-/// 停掉旧播放器并按当前独占标志重建，让输出模式真正生效。
+/// 停掉旧播放器并按当前独占标志与输出设备重建，让设置真正生效。
 /// 必须先释放旧播放器：独占模式下旧流仍占用 WASAPI 设备，
 /// 若先开新流会撞上 AUDCLNT_E_DEVICE_IN_USE 导致切换失败。
 fn restart_player(state: &AudioState, db: &DbState, app: &AppHandle) -> Result<(), String> {
-    let exclusive = state
+    let (exclusive, device_id) = state
         .runtime
         .lock()
-        .map(|runtime| runtime.exclusive)
-        .unwrap_or(false);
-    let ffmpeg_path = resolve_ffmpeg_path(db).ok().flatten();
+        .map(|runtime| (runtime.exclusive, runtime.device_id.clone().unwrap_or_default()))
+        .unwrap_or((false, String::new()));
+    let ffmpeg_path = resolve_ffmpeg_cached(state, db);
     // 释放旧播放器：worker 随 channel 关闭退出，独占流随之释放设备
     {
         let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
@@ -137,7 +167,13 @@ fn restart_player(state: &AudioState, db: &DbState, app: &AppHandle) -> Result<(
     }
     // 旧 worker 退出并释放 WASAPI 独占设备需要时间，稍等避免新流打开竞争
     std::thread::sleep(std::time::Duration::from_millis(150));
-    let handle = Arc::new(PlayerInner::start(app.clone(), ffmpeg_path, exclusive)?);
+    let handle = Arc::new(PlayerInner::start(
+        app.clone(),
+        ffmpeg_path,
+        exclusive,
+        device_id,
+        Arc::clone(&state.error_sink),
+    )?);
     let mut guard = state.player.lock().map_err(|_| "audio lock".to_string())?;
     *guard = Some(Arc::clone(&handle));
     Ok(())
@@ -185,21 +221,50 @@ fn list_output_devices() -> Result<Vec<AudioDeviceInfo>, String> {
 
 #[tauri::command]
 pub fn audio_get_output_mode(state: State<'_, AudioState>) -> Result<AudioRuntimeDto, String> {
+    // 运行期回退原因优先展示；无回退时才回落运行时 last_error
+    let fallback_error = state
+        .error_sink
+        .lock()
+        .ok()
+        .and_then(|sink| sink.clone());
     let guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
     Ok(AudioRuntimeDto {
         exclusive: cfg!(target_os = "windows") && guard.exclusive,
         supports_exclusive: cfg!(target_os = "windows"),
         device_id: guard.device_id.clone().unwrap_or_else(|| "default".into()),
-        last_error: guard.last_error.clone(),
+        last_error: fallback_error.or(guard.last_error.clone()),
         backend: AUDIO_BACKEND.into(),
         note: AUDIO_BACKEND_NOTE.into(),
     })
 }
 
 #[tauri::command]
-pub fn audio_set_device(state: State<'_, AudioState>, device_id: String) -> Result<(), String> {
-    let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
-    guard.device_id = Some(device_id);
+pub fn audio_set_device(
+    app: AppHandle,
+    state: State<'_, AudioState>,
+    db: State<'_, DbState>,
+    device_id: String,
+) -> Result<(), String> {
+    let changed = {
+        let mut guard = state.runtime.lock().map_err(|_| "audio lock".to_string())?;
+        if guard.device_id.as_deref() == Some(device_id.as_str()) {
+            false
+        } else {
+            guard.device_id = Some(device_id);
+            true
+        }
+    };
+    // 输出流在创建时按目标设备打开，换设备必须重建播放器才会生效
+    if changed {
+        let has_player = state
+            .player
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false);
+        if has_player {
+            restart_player(&state, &db, &app)?;
+        }
+    }
     Ok(())
 }
 
@@ -223,6 +288,19 @@ pub fn audio_set_exclusive(
             guard.exclusive == exclusive
         };
         if !same {
+            // 开启独占前先探测设备是否接受独占流：拒绝时直接返回用户可读错误，
+            // 由前端提示，避免开关显示「已开启」实际却静默回退共享误导用户。
+            // 探测流立即释放，不干扰后续 restart_player 重新打开。
+            if exclusive {
+                let device_id = state
+                    .runtime
+                    .lock()
+                    .map_err(|_| "audio lock".to_string())?
+                    .device_id
+                    .clone()
+                    .unwrap_or_default();
+                crate::audio::wasapi_exclusive::ExclusiveOutputStream::open_device(&device_id)?;
+            }
             // 输出流创建时读取运行时标志，必须先落新标志再重建播放器，
             // 否则重建时读到的仍是旧值，独占/共享切换永远不生效
             {
@@ -279,7 +357,7 @@ pub async fn audio_load(
         return Err("原生引擎仅支持本地文件".into());
     }
     let player = ensure_player(&state, &db, &app)?;
-    player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
+    player.set_ffmpeg_path(resolve_ffmpeg_cached(&state, &db));
     // 等待 worker 打开解码源可能耗时（慢盘/大文件），移到阻塞线程池，避免卡主线程冻结 UI
     tauri::async_runtime::spawn_blocking(move || player.load(url_or_path, false))
         .await
@@ -298,7 +376,7 @@ pub async fn audio_play(
         return Err("原生引擎仅支持本地文件".into());
     }
     let player = ensure_player(&state, &db, &app)?;
-    player.set_ffmpeg_path(resolve_ffmpeg_path(&db).ok().flatten());
+    player.set_ffmpeg_path(resolve_ffmpeg_cached(&state, &db));
     // 等待 worker 解码打开可能耗时（probe + 预建索引），阻塞线程池执行，UI 保持响应
     tauri::async_runtime::spawn_blocking(move || player.play(url_or_path, false))
         .await

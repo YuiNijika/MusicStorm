@@ -7,6 +7,19 @@ type LyricApiData = {
     code?: number
 }
 
+// 网易云无歌词/纯音乐时返回的占位文案，命中即视为无歌词而非真实歌词
+const NO_LYRIC_PATTERNS = ["暂无歌词", "无歌词", "没有填词", "纯音乐"]
+
+function isNoLyricPlaceholder(lines: LyricLine[]): boolean {
+    if (lines.length === 0) {
+        return false
+    }
+    return lines.every((line) => {
+        const text = line.text.trim()
+        return !text || NO_LYRIC_PATTERNS.some((pattern) => text.includes(pattern))
+    })
+}
+
 function toNeteaseSongId(songId: string): string | null {
     // 网易云曲目 id 为纯数字
     return /^\d+$/.test(songId) ? songId : null
@@ -23,7 +36,9 @@ async function fetchLyricText(songId: string): Promise<string> {
         params: { id: numericId },
     })
 
-    return data.lrc?.lyric?.trim() ?? ""
+    const text = data.lrc?.lyric?.trim() ?? ""
+    // 占位文案当空处理，避免把「暂无歌词」当成歌词文本
+    return isNoLyricPlaceholder(parseLyricText(text)) ? "" : text
 }
 
 /** 原文行与翻译行按时间戳就近配对（容差内），每行最多配一句翻译 */
@@ -75,6 +90,10 @@ async function fetchLyricLines(
     const lrcText = data.lrc?.lyric?.trim() ?? ""
     const tlyricText = data.tlyric?.lyric?.trim() ?? ""
     const lines = parseLyricText(lrcText)
+    // 网易云无歌词/纯音乐返回的是占位文案，当空处理，前端展示自己的空态
+    if (isNoLyricPlaceholder(lines)) {
+        return []
+    }
     if (!includeTranslation || lines.length === 0) {
         return lines
     }

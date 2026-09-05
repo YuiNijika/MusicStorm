@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react"
+import { LocateFixed, Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { Cover } from "@/components/music/cover"
@@ -128,6 +128,49 @@ function LibraryPage() {
         null,
     )
     const [cloudDeleteBusy, setCloudDeleteBusy] = useState(false)
+    // 云盘 tab 的「定位当前播放」悬浮按钮：当前曲目滚出视口时显示
+    const [jumpVisible, setJumpVisible] = useState(false)
+
+    useEffect(() => {
+        if (tab !== "cloud" || !currentTrack) {
+            setJumpVisible(false)
+            return
+        }
+        const container = document.querySelector<HTMLElement>(
+            ".page-content-host",
+        )
+        if (!container) {
+            return
+        }
+        const update = () => {
+            const index = cloud.findIndex(
+                (track) => track.id === currentTrack?.id,
+            )
+            if (index < 0) {
+                setJumpVisible(false)
+                return
+            }
+            const row = document.querySelector<HTMLElement>(
+                `[data-cloud-row="${index}"]`,
+            )
+            if (!row) {
+                setJumpVisible(false)
+                return
+            }
+            const rowRect = row.getBoundingClientRect()
+            const viewRect = container.getBoundingClientRect()
+            setJumpVisible(
+                rowRect.bottom < viewRect.top || rowRect.top > viewRect.bottom,
+            )
+        }
+        update()
+        container.addEventListener("scroll", update, { passive: true })
+        window.addEventListener("resize", update, { passive: true })
+        return () => {
+            container.removeEventListener("scroll", update)
+            window.removeEventListener("resize", update)
+        }
+    }, [tab, currentTrack, cloud])
 
     async function handleCreatePlaylist() {
         const name = createName.trim()
@@ -662,23 +705,53 @@ function LibraryPage() {
                     ) : (
                         <div className="apple-list-surface space-y-0.5 p-1.5">
                             {cloud.map((track, index) => (
-                                <TrackRow
-                                    key={track.id}
-                                    track={track}
-                                    index={index}
-                                    isActive={currentTrack?.id === track.id}
-                                    isPlaying={
-                                        currentTrack?.id === track.id && isPlaying
-                                    }
-                                    showSource={false}
-                                    showAlbumColumn
-                                    onCloudDelete={() => setCloudDeleteTarget(track)}
-                                    onPlay={(item) => playOrToggle(item, cloud)}
-                                />
+                                <div key={track.id} data-cloud-row={index}>
+                                    <TrackRow
+                                        track={track}
+                                        index={index}
+                                        isActive={currentTrack?.id === track.id}
+                                        isPlaying={
+                                            currentTrack?.id === track.id &&
+                                            isPlaying
+                                        }
+                                        showSource={false}
+                                        showAlbumColumn
+                                        onCloudDelete={() =>
+                                            setCloudDeleteTarget(track)
+                                        }
+                                        onPlay={(item) =>
+                                            playOrToggle(item, cloud)
+                                        }
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}
                 </Section>
+            ) : null}
+
+            {jumpVisible ? (
+                <button
+                    type="button"
+                    title="定位当前播放"
+                    aria-label="定位当前播放"
+                    onClick={() => {
+                        const index = cloud.findIndex(
+                            (track) => track.id === currentTrack?.id,
+                        )
+                        document
+                            .querySelector<HTMLElement>(
+                                `[data-cloud-row="${index}"]`,
+                            )
+                            ?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "center",
+                            })
+                    }}
+                    className="fixed right-5 bottom-24 z-40 flex size-11 cursor-pointer items-center justify-center rounded-full bg-foreground text-background shadow-lg shadow-black/20 transition-transform duration-[var(--duration-press)] active:scale-90"
+                >
+                    <LocateFixed className="size-5" />
+                </button>
             ) : null}
 
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>

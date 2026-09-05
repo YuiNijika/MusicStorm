@@ -53,11 +53,53 @@ function AppShell({
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     const { detail, back } = useMusicNavigation()
     const mainRef = useRef<HTMLElement>(null)
-    // 页面容器常驻，切页/详情变化时滚动位置会残留（表现为新页面居中），
-    // 每次路由变化统一回到顶部
+    // 滚动位置按「路由 + 详情」分别记忆：离开时保存，返回时恢复，
+    // 否则从歌单详情返回资料库时列表会跳回顶部
+    const scrollMemoryRef = useRef<Map<string, number>>(new Map())
+    const lastScrollKeyRef = useRef<string>("")
+    // 懒加载/异步数据会让页面高度逐步撑开，恢复可能被骨架屏高度钳制，
+    // 等容器长高到能容纳目标位置后再补一次恢复
+    const pendingRestoreRef = useRef<{ top: number } | null>(null)
     useEffect(() => {
-        mainRef.current?.scrollTo({ top: 0, left: 0 })
+        const main = mainRef.current
+        if (!main) {
+            return
+        }
+        const key = detail
+            ? `detail:${detail.type}:${detail.id}`
+            : `route:${activeRoute}`
+        if (lastScrollKeyRef.current && lastScrollKeyRef.current !== key) {
+            scrollMemoryRef.current.set(lastScrollKeyRef.current, main.scrollTop)
+        }
+        const saved = scrollMemoryRef.current.get(key) ?? 0
+        lastScrollKeyRef.current = key
+        pendingRestoreRef.current = { top: saved }
+        main.scrollTo({ top: saved, left: 0 })
+        // 目标位置当前就能容纳说明恢复已生效，无需补恢复
+        if (main.scrollTop === saved) {
+            pendingRestoreRef.current = null
+        }
     }, [activeRoute, detail])
+
+    useEffect(() => {
+        const main = mainRef.current
+        if (!main) {
+            return
+        }
+        const observer = new ResizeObserver(() => {
+            const pending = pendingRestoreRef.current
+            if (!pending) {
+                return
+            }
+            if (main.scrollHeight - main.clientHeight < pending.top) {
+                return
+            }
+            main.scrollTo({ top: pending.top, left: 0 })
+            pendingRestoreRef.current = null
+        })
+        observer.observe(main)
+        return () => observer.disconnect()
+    }, [])
     // 网页版无窗口/托盘/系统媒体集成；桌面 hooks 内部自带 web 守卫
     usePlayerHotkeys()
     const { askOpen, cancelClose, confirmClose } = useCloseToTray()

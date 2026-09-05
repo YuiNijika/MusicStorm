@@ -74,13 +74,6 @@ function runThemeTransition(mutate: () => void) {
     }
     const x = themeOriginX >= 0 ? themeOriginX : window.innerWidth / 2
     const y = themeOriginY >= 0 ? themeOriginY : window.innerHeight / 2
-    const radius = Math.hypot(
-        Math.max(x, window.innerWidth - x),
-        Math.max(y, window.innerHeight - y),
-    )
-    root.style.setProperty("--theme-x", `${x}px`)
-    root.style.setProperty("--theme-y", `${y}px`)
-    root.style.setProperty("--theme-r", `${radius}px`)
     const transition = document.startViewTransition(() => {
         // flushSync 让 React 提交先行完成，截图才能捕捉到新主题
         flushSync(mutate)
@@ -89,6 +82,25 @@ function runThemeTransition(mutate: () => void) {
     // 每个带过渡的元素各跑一轮动画、每层毛玻璃全量重采样重绘，才是黑切白卡顿的
     // 主源；视觉过渡完全交给 VT 圆扩散快照动画，结束后立即恢复原渲染路径
     root.classList.add("theme-switching")
+    void transition.ready.then(() => {
+        // 始终以点击位置为圆心扩散（键盘/程序触发回退视口中心），深浅色一致
+        const radius = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y),
+        )
+        root.animate(
+            {
+                clipPath: [
+                    `circle(0% at ${x}px ${y}px)`,
+                    `circle(${radius}px at ${x}px ${y}px)`,
+                ],
+            },
+            {
+                duration: 300,
+                pseudoElement: "::view-transition-new(root)",
+            },
+        )
+    })
     void transition.finished.finally(() => {
         root.classList.remove("theme-switching")
     })

@@ -526,7 +526,7 @@ const TrackRow = memo(function TrackRow({
                         ) : null}
                     </p>
                 </div>
-                {showSource ? (
+                {showSource && !(actions && isLocal) ? (
                     <span className="flex shrink-0 items-center">
                         <SourceBadge source={track.source} />
                     </span>
@@ -534,7 +534,7 @@ const TrackRow = memo(function TrackRow({
             </div>
 
             {albumCol ? (
-                <div className="hidden min-w-0 self-end sm:block">
+                <div className="inline-block max-w-full truncate py-1 text-[12px] text-muted-foreground">
                     <Tooltip>
                         <TooltipTrigger
                             render={
@@ -551,7 +551,7 @@ const TrackRow = memo(function TrackRow({
                                         {track.album || "未知专辑"}
                                     </button>
                                 ) : (
-                                    <span className="inline-block max-w-full truncate py-1 text-[12px] text-muted-foreground">
+                                    <span>
                                         {track.album || "未知专辑"}
                                     </span>
                                 )
@@ -587,7 +587,14 @@ const TrackRow = memo(function TrackRow({
                     />
                 </button>
             ) : actions && isLocal ? (
-                <span className="size-8 shrink-0" aria-hidden />
+                showSource ? (
+                    // 本地曲目无云端爱心，用「本地」标识填充该列，与云端爱心位对齐
+                    <span className="flex size-8 shrink-0 items-center justify-center">
+                        <SourceBadge source="local" />
+                    </span>
+                ) : (
+                    <span className="size-8 shrink-0" aria-hidden />
+                )
             ) : null}
 
             {hasTrailing ? (

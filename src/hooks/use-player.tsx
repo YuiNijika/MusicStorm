@@ -659,6 +659,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                         return
                     }
                 }
+                // 切曲装载期间（mediaReady=false）旧引擎仍在渐出/尚未停，
+                // 其 tick 会拿旧曲进度覆盖新曲位置，进度条来回跳动（抽搐）；
+                // 装载完成前的权威进度由 load 流程（0 或恢复位置）直接写入
+                if (!mediaReadyRef.current) {
+                    return
+                }
                 if (isPlayingRef.current && position > lastTickPosRef.current) {
                     sessionListenedRef.current += position - lastTickPosRef.current
                 }
@@ -949,8 +955,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             const restoreMs = pendingSeekMsRef.current
             if (restoreMs != null && restoreMs > 0) {
                 pendingSeekMsRef.current = null
+                console.log("[player] restore seek", Math.round(restoreMs), "resume=", isPlayingRef.current)
                 try {
-                    await Promise.resolve(engine.seek(restoreMs, { resume: false }))
+                    // 启动恢复：resume 跟随 isPlaying——自动续播时 seek 落地即出声，
+                    // 不再等后续 play 指令造成「没声没进度」的静音窗口；恢复为暂停则保持停住
+                    await Promise.resolve(
+                        engine.seek(restoreMs, {
+                            resume: isPlayingRef.current,
+                        }),
+                    )
                 } catch {
                     // 恢复失败仍从 0 可播
                 }
