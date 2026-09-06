@@ -9,10 +9,11 @@
 
 ## 前端 UI / 交互规范
 
-涉及前端 UI、界面、交互的改动，强制调用 web-design-guidelines 与 web-artifacts-builder skill：
+涉及前端 UI、界面、交互的改动，强制调用 web-design-guidelines、web-artifacts-builder、apple-design skill：
 
 - 改动前端组件 / 页面 / 交互逻辑前，先调用 web-design-guidelines（WebFetch 拉取 vercel-labs/web-interface-guidelines 最新规范），实现完成后按规范逐条自检并输出 findings
 - 构建页面 / 组件 / 交互时遵循 web-artifacts-builder 设计指南：避免模板化 AI 风格，保持 Apple 设计语言、玻璃拟态、克制排版，移动端遵循触控与安全区规范
+- 手势驱动 UI、弹簧动画、拖拽 / 滑动 / sheet 交互、动量与可中断过渡、半透明材质 → 先调用 apple-design，按 Apple 动效与材质规范实现
 
 ## GitHub Releases 发布规范
 
