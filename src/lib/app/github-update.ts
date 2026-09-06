@@ -1,5 +1,8 @@
 import { GITHUB_REPO_URL } from "@/lib/open-external"
-import { resolveUpdateUrl } from "@/lib/app/update-source-prefs"
+import {
+    resolveUpdateUrl,
+    updateSourceCandidates,
+} from "@/lib/app/update-source-prefs"
 import { isAndroid } from "@/lib/platform"
 import { isWebMode } from "@/lib/web-mode"
 
@@ -10,34 +13,47 @@ const STATUS_EVENT = "musicstorm:update-status"
 const API_RELEASES = `https://api.github.com/repos/${OWNER}/${REPO}/releases`
 
 // GitHub 匿名 API 额度受限时会回 403（直连与镜像都可能出现），
-// 线性退避后重试，最多 5 次
+// 每个源线性退避重试后，失败自动切另一个源兜底
 const MAX_403_RETRIES = 5
 
-async function fetchGithubReleases(currentVersion: string): Promise<Response> {
-    const target = resolveUpdateUrl(API_RELEASES)
+// 按候选源顺序请求：当前源失败自动切兜底源（直连 ⇄ gh-proxy 镜像），
+// 每个源内 403/网络错误线性退避重试
+async function fetchGithubJson(
+    targets: string[],
+    userAgent: string,
+): Promise<Response> {
     const headers = {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         // GitHub 要求有意义的 UA
-        "User-Agent": `MusicStorm/${currentVersion}`,
+        "User-Agent": userAgent,
     }
     let lastError: Error | null = null
-    for (let attempt = 0; attempt < MAX_403_RETRIES; attempt += 1) {
-        if (attempt > 0) {
-            await new Promise((resolve) => setTimeout(resolve, 800 * attempt))
-        }
-        try {
-            const response = await fetch(target, { method: "GET", headers })
-            if (response.status !== 403) {
-                return response
+    for (const target of targets) {
+        for (let attempt = 0; attempt < MAX_403_RETRIES; attempt += 1) {
+            if (attempt > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 800 * attempt))
             }
-            lastError = new Error(`GitHub API HTTP 403（已重试 ${attempt + 1} 次）`)
-        } catch (error) {
-            lastError =
-                error instanceof Error ? error : new Error("检查更新失败")
+            try {
+                const response = await fetch(target, { method: "GET", headers })
+                if (response.status !== 403) {
+                    return response
+                }
+                lastError = new Error(`GitHub API HTTP 403（已重试 ${attempt + 1} 次）`)
+            } catch (error) {
+                lastError =
+                    error instanceof Error ? error : new Error("网络请求失败")
+            }
         }
     }
-    throw lastError ?? new Error("GitHub API 请求失败")
+    throw lastError ?? new Error("网络请求失败")
+}
+
+async function fetchGithubReleases(currentVersion: string): Promise<Response> {
+    return fetchGithubJson(
+        updateSourceCandidates(API_RELEASES),
+        `MusicStorm/${currentVersion}`,
+    )
 }
 
 // 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag（如 26.9.6-android）
@@ -347,6 +363,42 @@ function peekCachedUpdate(): UpdateCheckResult | null {
     return cacheToResult(cached, true)
 }
 
+type GithubAssetRaw = {
+    name?: string
+    browser_download_url?: string
+    size?: number
+    digest?: string | null
+}
+
+type GithubReleaseAsset = {
+    name: string
+    url: string
+    size: number
+    /** GitHub asset 的 sha256（digest 剥掉 "sha256:" 前缀） */
+    sha256?: string
+}
+
+// 拉取指定 tag 的 Release assets（下载安装包用），当前源失败自动切兜底源。
+// 即时动作，不落缓存。
+async function fetchReleaseAssets(tag: string): Promise<GithubReleaseAsset[]> {
+    const targets = updateSourceCandidates(
+        `https://api.github.com/repos/${OWNER}/${REPO}/releases/tags/${encodeURIComponent(tag)}`,
+    )
+    const response = await fetchGithubJson(targets, `MusicStorm/${tag}`)
+    if (!response.ok) {
+        throw new Error(`GitHub API HTTP ${response.status}`)
+    }
+    const data = (await response.json()) as { assets?: GithubAssetRaw[] }
+    return (data.assets ?? [])
+        .map((asset) => ({
+            name: (asset.name ?? "").trim(),
+            url: (asset.browser_download_url ?? "").trim(),
+            size: asset.size ?? 0,
+            sha256: asset.digest?.replace(/^sha256:/i, "").trim(),
+        }))
+        .filter((asset) => asset.name && asset.url)
+}
+
 function subscribeUpdateStatus(
     listener: (result: UpdateCheckResult) => void,
 ): () => void {
@@ -363,10 +415,11 @@ function subscribeUpdateStatus(
 export {
     CACHE_TTL_MS,
     checkAppUpdate,
+    fetchReleaseAssets,
     isNewerVersion,
     normalizeSemver,
     peekCachedUpdate,
     STATUS_EVENT,
     subscribeUpdateStatus,
 }
-export type { UpdateCheckResult }
+export type { GithubReleaseAsset, UpdateCheckResult }

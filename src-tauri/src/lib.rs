@@ -15,6 +15,8 @@ mod macos_now_playing;
 mod netease_proxy;
 #[cfg(not(target_os = "android"))]
 mod tray;
+#[cfg(not(target_os = "android"))]
+mod updater;
 
 #[cfg(not(target_os = "android"))]
 use audio::{
@@ -714,6 +716,21 @@ fn forward_deep_link(app: &AppHandle, url: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 启动横幅：与前端 main.tsx 的 consoleLog 一致，pnpm tauri dev 时终端直接可见
+    println!(
+        r#"
+                                                                                                    
+/$$      /$$                     /$$            /$$$$$$   /$$                                      
+| $$$    /$$$                    |__/           /$$__  $$ | $$                                      
+| $$$$  /$$$$ /$$   /$$  /$$$$$$$ /$$  /$$$$$$$| $$  \__//$$$$$$    /$$$$$$   /$$$$$$/$$$$ 
+| $$ $$/$$ $$| $$  | $$ /$$_____/| $$ /$$_____/|  $$$$$$|_  $$_/   /$$__  $$ /$$__  $$| $$_  $$_  $$
+| $$  $$$| $$| $$  | $$|  $$$$$$ | $$| $$       \____  $$ | $$ /$$| $$  | $$| $$      | $$ | $$ | $$
+| $$\  $ | $$| $$  | $$ \____  $$| $$| $$       /$$  \ $$ | $$ /$$| $$  | $$| $$      | $$ | $$ | $$
+| $$ \/  | $$|  $$$$$$/ /$$$$$$$/| $$|  $$$$$$$|  $$$$$$/ |  $$$$/|  $$$$$$/| $$      | $$ | $$ | $$
+|__/     |__/ \______/ |_______/ |__/ \_______/ \______/   \___/   \______/ |__/      |__/ |__/ |__/
+                                                                                                    
+        "#
+    );
     #[cfg(not(target_os = "android"))]
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -873,6 +890,10 @@ pub fn run() {
             pick_text_file,
             #[cfg(not(target_os = "android"))]
             save_url_to_file,
+            #[cfg(not(target_os = "android"))]
+            updater::download_update,
+            #[cfg(not(target_os = "android"))]
+            updater::install_update,
             read_text_file,
             scan_music_folder,
             scan_music_files,

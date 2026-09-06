@@ -1,7 +1,24 @@
 import { useEffect, useState } from "react"
 
+import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { useContributors } from "@/hooks/use-contributors"
+import {
+    IDLE_STATE,
+    downloadAndInstall,
+    isUpdaterSupported,
+    subscribeUpdateProgress,
+    type UpdateDownloadState,
+} from "@/lib/app/auto-update"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
 import {
     UPDATE_SOURCE_EVENT,
@@ -42,11 +59,59 @@ function formatCacheTtlLabel(): string {
         : `${hours.toFixed(1)} 小时`
 }
 
+function formatSize(bytes: number): string {
+    if (bytes <= 0) {
+        return "—"
+    }
+    const mb = bytes / (1024 * 1024)
+    return mb >= 1
+        ? `${mb.toFixed(1)} MB`
+        : `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
 function UpdateTab() {
     const { status, checking, refresh } = useAppUpdate()
     const [updateSource, setUpdateSourceState] = useState<UpdateSource>(() =>
         readUpdateSource(),
     )
+    // Windows 桌面专属：应用内自动下载并静默安装
+    const updaterSupported = isUpdaterSupported()
+    const [updateState, setUpdateState] =
+        useState<UpdateDownloadState>(IDLE_STATE)
+    const [confirmOpen, setConfirmOpen] = useState(false)
+
+    // 订阅 Rust 下载进度事件：downloaded 达 total 后进入安装阶段
+    useEffect(() => {
+        let unlisten: (() => void) | undefined
+        let cancelled = false
+        void subscribeUpdateProgress(({ downloaded, total }) => {
+            if (cancelled) {
+                return
+            }
+            setUpdateState((prev) => {
+                const next: UpdateDownloadState = {
+                    ...prev,
+                    phase: "downloading",
+                    downloaded,
+                    total,
+                }
+                if (total > 0 && downloaded >= total) {
+                    next.phase = "installing"
+                }
+                return next
+            })
+        }).then((un) => {
+            if (cancelled) {
+                un()
+            } else {
+                unlisten = un
+            }
+        })
+        return () => {
+            cancelled = true
+            unlisten?.()
+        }
+    }, [])
 
     // 切换更新源后立即用新源重查
     useEffect(() => {
@@ -93,6 +158,24 @@ function UpdateTab() {
         await openExternalUrl(url)
     }
 
+    async function handleUpdate() {
+        if (!status?.latestTag) {
+            return
+        }
+        setConfirmOpen(false)
+        setUpdateState({ phase: "downloading", downloaded: 0, total: 0 })
+        try {
+            await downloadAndInstall(status.latestTag)
+            // 安装启动后进程退出，此处仅兜底复位
+            setUpdateState(IDLE_STATE)
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : "更新失败"
+            setUpdateState({ ...IDLE_STATE, phase: "error", error: message })
+            notifyError("自动更新失败", { description: message })
+        }
+    }
+
     const current = status?.currentVersion || "—"
     const latest = status?.latestVersion || "—"
     const releaseTitle =
@@ -101,7 +184,10 @@ function UpdateTab() {
 
     return (
         <div className="space-y-3">
-            <TabHeader title="更新" description="通过 GitHub Releases 检测，不自动安装" />
+            <TabHeader
+                title="更新"
+                description="通过 GitHub Releases 检测；Windows 桌面支持一键自动更新"
+            />
 
             <div className="space-y-3">
                 <SettingsGroup
@@ -200,13 +286,62 @@ function UpdateTab() {
                         >
                             {checking ? "检测中…" : "刷新检测"}
                         </ActionButton>
+                        {status?.hasUpdate && updaterSupported ? (
+                            <ActionButton
+                                variant="primary"
+                                onClick={() => setConfirmOpen(true)}
+                                disabled={
+                                    updateState.phase === "downloading" ||
+                                    updateState.phase === "installing"
+                                }
+                            >
+                                {updateState.phase === "downloading"
+                                    ? "下载中…"
+                                    : updateState.phase === "installing"
+                                      ? "安装中…"
+                                      : "立即更新"}
+                            </ActionButton>
+                        ) : null}
                         <ActionButton
-                            variant="primary"
+                            variant={
+                                status?.hasUpdate && updaterSupported
+                                    ? "default"
+                                    : "primary"
+                            }
                             onClick={() => void handleOpenRelease()}
                         >
                             前往更新
                         </ActionButton>
                     </div>
+
+                    {updateState.phase === "downloading" ? (
+                        <div className="space-y-1">
+                            <Progress
+                                value={
+                                    updateState.total > 0
+                                        ? Math.min(
+                                              100,
+                                              Math.round(
+                                                  (updateState.downloaded /
+                                                      updateState.total) *
+                                                      100,
+                                              ),
+                                          )
+                                        : 0
+                                }
+                            >
+                                <span className="text-[12px] tabular-nums text-muted-foreground">
+                                    下载中…{" "}
+                                    {formatSize(updateState.downloaded)} /{" "}
+                                    {formatSize(updateState.total)}
+                                </span>
+                            </Progress>
+                        </div>
+                    ) : updateState.phase === "installing" ? (
+                        <p className="text-sm text-muted-foreground">
+                            正在安装，应用即将重启…
+                        </p>
+                    ) : null}
                 </SettingsGroup>
 
                 <SettingsGroup title={releaseTitle}>
@@ -229,6 +364,28 @@ function UpdateTab() {
 
                 <ContributorsPanel />
             </div>
+
+            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <DialogContent className="gap-4">
+                    <DialogHeader>
+                        <DialogTitle>更新到 v{latest}</DialogTitle>
+                        <DialogDescription>
+                            将下载并静默安装新版本，安装完成后应用自动重启。请保持网络连接。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex-row justify-end gap-2 sm:justify-end">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setConfirmOpen(false)}
+                        >
+                            取消
+                        </Button>
+                        <Button onClick={() => void handleUpdate()}>
+                            立即更新
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

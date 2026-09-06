@@ -14,7 +14,9 @@
     "tauri": "tauri",
     "website:dev": "pnpm --filter website dev",
     "website:build": "pnpm --filter website build",
-    "website:preview": "pnpm --filter website preview"
+    "website:preview": "pnpm --filter website preview",
+    "ms:dev": "tauri dev",
+    "ms:build": "tauri build"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

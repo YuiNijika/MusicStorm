@@ -29,11 +29,26 @@ function resolveUpdateUrl(url: string): string {
     return readUpdateSource() === "mirror" ? `${MIRROR_PREFIX}${url}` : url
 }
 
+/**
+ * 返回候选源列表：首选当前配置的源，第二个为另一个源（兜底）。
+ * 直连限流 / 镜像不可达时自动切换，覆盖两侧故障。
+ */
+function updateSourceCandidates(url: string): string[] {
+    if (!url) {
+        return []
+    }
+    const primary = resolveUpdateUrl(url)
+    const fallback =
+        readUpdateSource() === "mirror" ? url : `${MIRROR_PREFIX}${url}`
+    return fallback === primary ? [primary] : [primary, fallback]
+}
+
 export {
     MIRROR_PREFIX,
     UPDATE_SOURCE_EVENT,
     readUpdateSource,
     resolveUpdateUrl,
     setUpdateSource,
+    updateSourceCandidates,
 }
 export type { UpdateSource }

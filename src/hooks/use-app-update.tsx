@@ -76,7 +76,7 @@ function AppUpdateProvider({ children }: { children: ReactNode }) {
                 }
                 notifyInfo("发现新版本", {
                     id: BOOT_TOAST_ID,
-                    description: `${result.currentVersion} → ${result.latestVersion}`,
+                    description: `${result.currentVersion} → ${result.latestVersion}，可在 设置 → 更新 一键安装`,
                     timeout: 5200,
                 })
             })()

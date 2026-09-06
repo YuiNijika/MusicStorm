@@ -28,6 +28,7 @@ tempfile = "3"
 base64 = "0.22"
 lofty = "0.22"
 md-5 = "0.10"
+sha2 = "0.10"
 encoding_rs = "0.8"
 rayon = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
