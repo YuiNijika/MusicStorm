@@ -1,0 +1,1 @@
+import{a as e}from"./core-DQXjEiBM.js";async function t(t,n){await e(`plugin:opener|open_url`,{url:t,with:n})}async function n(t){return e(`plugin:opener|reveal_item_in_dir`,{paths:typeof t==`string`?[t]:t})}export{t as openUrl,n as revealItemInDir};
