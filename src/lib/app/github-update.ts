@@ -56,7 +56,7 @@ async function fetchGithubReleases(currentVersion: string): Promise<Response> {
     )
 }
 
-// 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag（如 26.9.6-android）
+// 桌面与安卓各自发版：桌面用正式 tag，安卓用「版本号-android」独立 tag
 const RELEASE_CACHE_KEY = "musicstorm-github-release-cache"
 
 type GithubReleaseRaw = {
@@ -151,9 +151,13 @@ function isNewerVersion(latest: string, current: string): boolean {
 }
 
 async function readAppVersion(): Promise<string> {
-    // 桌面与 Android 共用 tauri.conf.json 的版本：getVersion() 在桌面返回桌面版、
-    // 在 Android 返回 versionName（= 同一语义版本），跨平台一致。
+    // 注入版本优先（VITE_APP_VERSION / __APP_BUILD_VERSION__）：
+    // 仅开发/测试用，如 `VITE_APP_VERSION=26.9.4 pnpm tauri dev` 可模拟老版本测试自动更新；
+    // 正常构建无注入时回落到 tauri.conf.json 版本（桌面 getVersion / Android versionName）。
     const injected = readInjectedBuildVersion()
+    if (injected) {
+        return normalizeSemver(injected) ?? injected
+    }
     try {
         const { getVersion } = await import("@tauri-apps/api/app")
         const v = await getVersion()
@@ -162,10 +166,7 @@ async function readAppVersion(): Promise<string> {
             return normalized
         }
     } catch {
-        // 浏览器预览：走注入版本或固定占位，仅开发用
-    }
-    if (injected) {
-        return normalizeSemver(injected) ?? injected
+        // 浏览器预览：无注入且无 Tauri 运行时，回退固定占位
     }
     return "0.1.0"
 }
@@ -251,8 +252,17 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
     const currentVersion = await readAppVersion()
     const cached = readCache()
     const now = Date.now()
+    const androidPlatform = isAndroid()
 
-    if (!force && cached && isCacheFresh(cached)) {
+    // 缓存命中前按平台校正：缓存里的 latestTag 平台若与当前平台不一致
+    // （如历史缓存存了 -android 的 tag），视为失效走实时请求，
+    // 避免桌面端误用 Android 版的占位日志与下载源
+    if (
+        !force &&
+        cached &&
+        isCacheFresh(cached) &&
+        /-android$/i.test(cached.latestTag) === androidPlatform
+    ) {
         // 本地版本可能已升级：按当前版本重算 hasUpdate
         const hasUpdate = isNewerVersion(cached.latestVersion, currentVersion)
         const result = cacheToResult(
@@ -272,7 +282,9 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
 
         const all = (await response.json()) as GithubReleaseRaw[]
         // 按平台匹配 tag，不排除 prerelease：同版本桌面与安卓常同时发布，
-        // 其中一方可能标为预发布，过滤掉会找不到本平台版本而回退老版本
+        // 其中一方可能标为预发布，过滤掉会找不到本平台版本而回退老版本。
+        // 桌面匹配正式 tag，安卓匹配「版本号-android」独立 tag，二者互斥，
+        // 避免桌面取到 -android 的占位更新日志。
         const androidPlatform = isAndroid()
         const data = all.find((r) => {
             if (r.draft) {
@@ -282,7 +294,8 @@ async function checkAppUpdate(force = false): Promise<UpdateCheckResult> {
             if (!tag) {
                 return false
             }
-            return androidPlatform ? /-android$/i.test(tag) : true
+            const isAndroidTag = /-android$/i.test(tag)
+            return androidPlatform ? isAndroidTag : !isAndroidTag
         })
         if (!data) {
             throw new Error("当前平台暂无发布版本")

@@ -746,6 +746,10 @@ pub fn run() {
 
     let app = builder
         .setup(|app| {
+            // 启动即清理历史更新安装包：安装完成后新实例启动时回收已用过的 setup
+            #[cfg(not(target_os = "android"))]
+            updater::cleanup_stale_updates();
+
             // 注册自定义协议 musicstorm://：浏览器点击分享深链可直接唤起应用
             #[cfg(not(target_os = "android"))]
             {
@@ -892,6 +896,8 @@ pub fn run() {
             save_url_to_file,
             #[cfg(not(target_os = "android"))]
             updater::download_update,
+            #[cfg(not(target_os = "android"))]
+            updater::find_local_setup,
             #[cfg(not(target_os = "android"))]
             updater::install_update,
             read_text_file,

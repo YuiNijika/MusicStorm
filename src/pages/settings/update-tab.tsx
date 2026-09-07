@@ -21,9 +21,12 @@ import {
 } from "@/lib/app/auto-update"
 import { CACHE_TTL_MS } from "@/lib/app/github-update"
 import {
+    DOWNLOAD_SOURCE_EVENT,
     UPDATE_SOURCE_EVENT,
-    readUpdateSource,
-    setUpdateSource,
+    readDetectSource,
+    readDownloadSource,
+    setDetectSource,
+    setDownloadSource,
     type UpdateSource,
 } from "@/lib/app/update-source-prefs"
 import {
@@ -38,6 +41,7 @@ import {
 import {
     ActionButton,
     ChoiceChip,
+    ChoiceRow,
     SettingsGroup,
     TabHeader,
 } from "@/pages/settings/settings-ui"
@@ -71,9 +75,11 @@ function formatSize(bytes: number): string {
 
 function UpdateTab() {
     const { status, checking, refresh } = useAppUpdate()
-    const [updateSource, setUpdateSourceState] = useState<UpdateSource>(() =>
-        readUpdateSource(),
+    const [detectSource, setDetectSourceState] = useState<UpdateSource>(() =>
+        readDetectSource(),
     )
+    const [downloadSource, setDownloadSourceState] =
+        useState<UpdateSource>(() => readDownloadSource())
     // Windows 桌面专属：应用内自动下载并静默安装
     const updaterSupported = isUpdaterSupported()
     const [updateState, setUpdateState] =
@@ -113,15 +119,28 @@ function UpdateTab() {
         }
     }, [])
 
-    // 切换更新源后立即用新源重查
+    // 打开设置页时若尚未检测（或上次检测失败无数据），自动拉取一次，
+    // 保证版本相等时也能看到最新 release 内容，而不是空态
+    useEffect(() => {
+        if (!status && !checking) {
+            void refresh(false)
+        }
+    }, [status, checking, refresh])
+
+    // 切换更新源后立即用新源重查（检测源）；下载源仅同步状态
     useEffect(() => {
         function onUpdateSource() {
-            setUpdateSourceState(readUpdateSource())
+            setDetectSourceState(readDetectSource())
             void refresh(true)
         }
+        function onDownloadSource() {
+            setDownloadSourceState(readDownloadSource())
+        }
         window.addEventListener(UPDATE_SOURCE_EVENT, onUpdateSource)
+        window.addEventListener(DOWNLOAD_SOURCE_EVENT, onDownloadSource)
         return () => {
             window.removeEventListener(UPDATE_SOURCE_EVENT, onUpdateSource)
+            window.removeEventListener(DOWNLOAD_SOURCE_EVENT, onDownloadSource)
         }
     }, [refresh])
 
@@ -159,13 +178,18 @@ function UpdateTab() {
     }
 
     async function handleUpdate() {
-        if (!status?.latestTag) {
+        // 下载一律用「版本号构造的正式 tag」
+        // 不直接用 latestTag：后者可能带 -android / -wsapi-fix 等后缀或来自旧缓存
+        const tag = status?.latestVersion
+            ? `v${status.latestVersion}`
+            : status?.latestTag
+        if (!tag) {
             return
         }
         setConfirmOpen(false)
         setUpdateState({ phase: "downloading", downloaded: 0, total: 0 })
         try {
-            await downloadAndInstall(status.latestTag)
+            await downloadAndInstall(tag)
             // 安装启动后进程退出，此处仅兜底复位
             setUpdateState(IDLE_STATE)
         } catch (error) {
@@ -192,25 +216,40 @@ function UpdateTab() {
             <div className="space-y-3">
                 <SettingsGroup
                     title="更新源"
-                    description="默认 GitHub 官方仓库；访问受限时可切换镜像加速"
+                    description="检测与下载可分别选择镜像，访问受限时切换加速"
                 >
-                    <div className="flex flex-wrap gap-2">
-                        <ChoiceChip
-                            label="官方仓库"
-                            active={updateSource === "github"}
-                            onClick={() => setUpdateSource("github")}
-                        />
-                        <ChoiceChip
-                            label="镜像加速"
-                            active={updateSource === "mirror"}
-                            onClick={() => setUpdateSource("mirror")}
-                        />
+                    <div className="space-y-3">
+                        <ChoiceRow
+                            label="检测源"
+                            description="版本检测与更新日志拉取（随系统网络）"
+                        >
+                            <ChoiceChip
+                                label="官方仓库"
+                                active={detectSource === "github"}
+                                onClick={() => setDetectSource("github")}
+                            />
+                            <ChoiceChip
+                                label="镜像加速"
+                                active={detectSource === "mirror"}
+                                onClick={() => setDetectSource("mirror")}
+                            />
+                        </ChoiceRow>
+                        <ChoiceRow
+                            label="下载源"
+                            description="安装包下载（直连失败自动切另一个源）"
+                        >
+                            <ChoiceChip
+                                label="官方仓库"
+                                active={downloadSource === "github"}
+                                onClick={() => setDownloadSource("github")}
+                            />
+                            <ChoiceChip
+                                label="镜像加速"
+                                active={downloadSource === "mirror"}
+                                onClick={() => setDownloadSource("mirror")}
+                            />
+                        </ChoiceRow>
                     </div>
-                    <p className="text-[13px] text-muted-foreground">
-                        {updateSource === "mirror"
-                            ? "当前走 https://gh-proxy.com/ 镜像，接口 403 时自动重试（最多 5 次）"
-                            : "当前直连 api.github.com，匿名额度受限时会自动重试（最多 5 次）"}
-                    </p>
                 </SettingsGroup>
 
                 <SettingsGroup title="版本状态">
@@ -302,16 +341,6 @@ function UpdateTab() {
                                       : "立即更新"}
                             </ActionButton>
                         ) : null}
-                        <ActionButton
-                            variant={
-                                status?.hasUpdate && updaterSupported
-                                    ? "default"
-                                    : "primary"
-                            }
-                            onClick={() => void handleOpenRelease()}
-                        >
-                            前往更新
-                        </ActionButton>
                     </div>
 
                     {updateState.phase === "downloading" ? (
@@ -339,17 +368,25 @@ function UpdateTab() {
                         </div>
                     ) : updateState.phase === "installing" ? (
                         <p className="text-sm text-muted-foreground">
-                            正在安装，应用即将重启…
+                            正在打开安装程序，请按向导完成安装…
                         </p>
                     ) : null}
                 </SettingsGroup>
 
                 <SettingsGroup title={releaseTitle}>
-                    {status?.latestTag ? (
-                        <p className="font-mono text-[13px] text-muted-foreground">
-                            tag {status.latestTag}
-                        </p>
-                    ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        {status?.latestTag ? (
+                            <p className="font-mono text-[13px] text-muted-foreground">
+                                tag {status.latestTag}
+                            </p>
+                        ) : null}
+                        <ActionButton
+                            variant="ghost"
+                            onClick={() => void handleOpenRelease()}
+                        >
+                            在 GitHub 查看 Release
+                        </ActionButton>
+                    </div>
                     {body ? (
                         <pre className="material-surface max-h-[min(420px,50vh)] overflow-auto whitespace-pre-wrap break-words rounded-2xl px-3.5 py-3 text-sm leading-relaxed text-foreground/90">
                             {body}
@@ -370,7 +407,8 @@ function UpdateTab() {
                     <DialogHeader>
                         <DialogTitle>更新到 v{latest}</DialogTitle>
                         <DialogDescription>
-                            将下载并静默安装新版本，安装完成后应用自动重启。请保持网络连接。
+                            将下载安装包并打开安装程序，请按向导选择安装目录完成更新。
+                            请保持网络连接。
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="flex-row justify-end gap-2 sm:justify-end">
