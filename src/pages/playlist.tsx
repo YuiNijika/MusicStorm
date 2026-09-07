@@ -44,7 +44,10 @@ import {
     getPlaylistTrackOrder,
     setPlaylistTrackOrder,
 } from "@/lib/library/track-order"
-import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
+import {
+    getCoverOverride,
+    resolveTrackCoverUrl,
+} from "@/lib/music/cover-overrides"
 import { fetchIntelligencePlaylist } from "@/lib/netease/fm"
 import {
     deletePlaylist,
@@ -142,6 +145,8 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const [tracks, setTracks] = useState<Track[]>([])
     // 合并进本歌单的本地条目（含锚点），独立于网易云歌单存储
     const [localRows, setLocalRows] = useState<LocalPlaylistTrackRow[]>([])
+    // 本地条目查询完成标记：未完成前封面保持占位，避免云端封面抢跑再被本地替换（无缝）
+    const [localRowsReady, setLocalRowsReady] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [errorText, setErrorText] = useState<string | null>(null)
     const [subBusy, setSubBusy] = useState(false)
@@ -180,9 +185,38 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         [displayTracks, trackSort, customOrder],
     )
 
-    // 封面与列表第一首歌保持一致：无论第一首是本地还是网易云都用它的封面，
-    // 取不到封面时回退云端歌单封面
+    // 歌单封面优先级：曲目封面覆盖（用户设置）> 最新本地条目封面 > 云端第一首 > 官方封面。
+    // 本地音乐是用户主动加的，内页/列表页都稳定跟随本地封面（列表页 resolvePlaylistCover
+    // 同一规则），不随云端首曲变化或官方封面抢走
     const heroCover = useMemo(() => {
+        // 1. 歌单内任一曲目设置过自定义封面：以它为准，用户设置意图最强
+        const overridden = displayTracks.find((track) => getCoverOverride(track.id))
+        if (overridden) {
+            return resolveTrackCoverUrl(overridden.id, overridden.coverUrl)
+        }
+        // 本地条目未查完前保持占位：不让云端封面先显示再被本地替换（无缝切换）
+        if (!localRowsReady) {
+            return ""
+        }
+        // 2. 最新本地条目封面优先（与列表页一致）
+        const latestLocal = [...localRows].sort(
+            (a, b) => b.addedAt - a.addedAt,
+        )[0]
+        if (latestLocal?.coverUrl) {
+            return latestLocal.coverUrl
+        }
+        // 3. 云端第一首曲目封面
+        if (tracks[0]) {
+            const url = resolveTrackCoverUrl(tracks[0].id, tracks[0].coverUrl)
+            if (url) {
+                return url
+            }
+        }
+        // 4. 网易云官方歌单封面兜底
+        if (playlist?.coverUrl) {
+            return playlist.coverUrl
+        }
+        // 5. 合并列表第一首兜底（纯本地歌单场景），仍取不到回退空
         const first = displayTracks[0]
         if (first) {
             const url = resolveTrackCoverUrl(first.id, first.coverUrl)
@@ -190,8 +224,8 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                 return url
             }
         }
-        return playlist?.coverUrl ?? ""
-    }, [displayTracks, playlist])
+        return ""
+    }, [displayTracks, tracks, localRows, localRowsReady, playlist])
 
     const dragEnabled =
         trackSort === "custom" && playlistTracksView === "list"
@@ -208,6 +242,25 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         let cancelled = false
         setIsLoading(true)
         setErrorText(null)
+        // 本地条目查询与云端详情并行：本地 DB 通常更快，先就绪时封面直接是本地，
+        // 不会被云端封面临时占位（合并展示仍等两者都到）
+        setLocalRowsReady(false)
+        void listLocalTracksForPlaylist(playlistId)
+            .then((rows) => {
+                if (!cancelled) {
+                    setLocalRows(rows)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setLocalRows([])
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLocalRowsReady(true)
+                }
+            })
 
         void fetchPlaylistDetail(playlistId)
             .then((result) => {
@@ -217,18 +270,6 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                 setPlaylist(result.playlist)
                 setTracks(result.tracks)
                 setIsLoading(false)
-                // 拉取手动附加到本歌单的本地条目并按锚点合并显示
-                void listLocalTracksForPlaylist(playlistId)
-                    .then((rows) => {
-                        if (!cancelled) {
-                            setLocalRows(rows)
-                        }
-                    })
-                    .catch(() => {
-                        if (!cancelled) {
-                            setLocalRows([])
-                        }
-                    })
             })
             .catch((error: unknown) => {
                 if (cancelled) {

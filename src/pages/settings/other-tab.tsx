@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { Check } from "lucide-react"
 
 import { useTheme } from "@/components/app/theme-provider"
+import { Switch } from "@/components/ui/switch"
 import {
     CLOSE_ASK_EVENT,
     CLOSE_TO_TRAY_EVENT,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/netease/cache-prefs"
 import { apiCacheClear } from "@/lib/netease/api-cache"
 import {
+    DEFAULT_LIMIT_BYTES,
     LIMIT_PRESETS,
     getCoverCacheLimitBytes,
     setCoverCacheLimitBytes,
@@ -47,6 +49,7 @@ import { pruneRemoteCoverIndex } from "@/lib/music/remote-cover-cache"
 import { getStoragePaths } from "@/lib/storage/paths"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import { isMacOS, isNativeMacOS } from "@/lib/platform"
+import { cn } from "@/lib/utils"
 import {
     ActionButton,
     ChoiceChip,
@@ -313,77 +316,125 @@ function OtherTab() {
                     description="API 响应与封面缓存，超出上限自动清理"
                 >
                     <div className="space-y-2">
-                        <p className="text-[15px] font-medium">API 响应缓存</p>
-                        <ChipRow>
-                            {TTL_PRESETS.map((preset) => (
-                                <ChoiceChip
-                                    key={preset.id}
-                                    label={preset.label}
-                                    active={cacheTtl === preset.ms}
-                                    onClick={() => {
-                                        setApiCacheTtlMs(preset.ms)
-                                        setCacheTtl(preset.ms)
-                                    }}
-                                />
-                            ))}
-                        </ChipRow>
-                        <SwitchRow
-                            title="自动清理过期缓存"
-                            description={`超过上方时长后删除过期项，默认保留 ${Math.round(DEFAULT_TTL_MS / 60_000)} 分钟`}
-                            checked={autoPurge}
-                            disabled={cacheTtl <= 0}
-                            onCheckedChange={(checked) => {
-                                setApiCacheAutoPurge(checked)
-                                setAutoPurge(checked)
-                            }}
-                        />
-                        <div className="flex min-h-11 flex-wrap items-center gap-2">
-                            <ActionButton
-                                variant={
-                                    confirmClear === "api"
-                                        ? "danger"
-                                        : "default"
-                                }
-                                onClick={() => requestClearCache("api")}
-                            >
-                                {confirmClear === "api"
-                                    ? "确认清空？"
-                                    : "清空缓存"}
-                            </ActionButton>
-                            {cacheHint ? (
-                                <span className="text-[13px] text-muted-foreground">
-                                    {cacheHint}
-                                </span>
-                            ) : null}
+                        <div className="flex min-h-11 items-center justify-between gap-3">
+                            <p className="text-[15px] font-medium">
+                                API 响应缓存
+                            </p>
+                            {/* 关闭开关：关闭时区块灰置不可交互，TTL 记 0 停用缓存 */}
+                            <Switch
+                                checked={cacheTtl > 0}
+                                aria-label="启用 API 响应缓存"
+                                onCheckedChange={(checked) => {
+                                    const next = checked
+                                        ? DEFAULT_TTL_MS
+                                        : 0
+                                    setApiCacheTtlMs(next)
+                                    setCacheTtl(next)
+                                }}
+                            />
+                        </div>
+                        <div
+                            className={cn(
+                                "space-y-2",
+                                cacheTtl <= 0 &&
+                                    "pointer-events-none opacity-50",
+                            )}
+                        >
+                            <ChipRow>
+                                {TTL_PRESETS.map((preset) => (
+                                    <ChoiceChip
+                                        key={preset.id}
+                                        label={preset.label}
+                                        active={cacheTtl === preset.ms}
+                                        onClick={() => {
+                                            setApiCacheTtlMs(preset.ms)
+                                            setCacheTtl(preset.ms)
+                                        }}
+                                    />
+                                ))}
+                            </ChipRow>
+                            <SwitchRow
+                                title="自动清理过期缓存"
+                                description={`超过上方时长后删除过期项，默认保留 ${Math.round(DEFAULT_TTL_MS / 60_000)} 分钟`}
+                                checked={autoPurge}
+                                disabled={cacheTtl <= 0}
+                                onCheckedChange={(checked) => {
+                                    setApiCacheAutoPurge(checked)
+                                    setAutoPurge(checked)
+                                }}
+                            />
+                            <div className="flex min-h-11 flex-wrap items-center gap-2">
+                                <ActionButton
+                                    variant={
+                                        confirmClear === "api"
+                                            ? "danger"
+                                            : "default"
+                                    }
+                                    disabled={cacheTtl <= 0}
+                                    onClick={() => requestClearCache("api")}
+                                >
+                                    {confirmClear === "api"
+                                        ? "确认清空？"
+                                        : "清空缓存"}
+                                </ActionButton>
+                                {cacheHint ? (
+                                    <span className="text-[13px] text-muted-foreground">
+                                        {cacheHint}
+                                    </span>
+                                ) : null}
+                            </div>
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <p className="text-[15px] font-medium">封面缓存</p>
-                        <ChipRow>
-                            {LIMIT_PRESETS.map((preset) => (
-                                <ChoiceChip
-                                    key={preset.id}
-                                    label={preset.label}
-                                    active={coverCacheLimit === preset.bytes}
-                                    onClick={() =>
-                                        handleCoverCacheLimit(preset.bytes)
-                                    }
-                                />
-                            ))}
-                        </ChipRow>
-                        <div className="flex min-h-11 flex-wrap items-center gap-2">
-                            <ActionButton
-                                variant={
-                                    confirmClear === "cover"
-                                        ? "danger"
-                                        : "default"
+                        <div className="flex min-h-11 items-center justify-between gap-3">
+                            <p className="text-[15px] font-medium">
+                                封面缓存
+                            </p>
+                            {/* 关闭开关：关闭时区块灰置不可交互，0 即停用并清空非引用缓存 */}
+                            <Switch
+                                checked={coverCacheLimit > 0}
+                                aria-label="启用封面缓存"
+                                onCheckedChange={(checked) =>
+                                    handleCoverCacheLimit(
+                                        checked ? DEFAULT_LIMIT_BYTES : 0,
+                                    )
                                 }
-                                onClick={() => requestClearCache("cover")}
-                            >
-                                {confirmClear === "cover"
-                                    ? "确认清空？"
-                                    : "清空缓存"}
-                            </ActionButton>
+                            />
+                        </div>
+                        <div
+                            className={cn(
+                                "space-y-2",
+                                coverCacheLimit <= 0 &&
+                                    "pointer-events-none opacity-50",
+                            )}
+                        >
+                            <ChipRow>
+                                {LIMIT_PRESETS.map((preset) => (
+                                    <ChoiceChip
+                                        key={preset.id}
+                                        label={preset.label}
+                                        active={coverCacheLimit === preset.bytes}
+                                        onClick={() =>
+                                            handleCoverCacheLimit(preset.bytes)
+                                        }
+                                    />
+                                ))}
+                            </ChipRow>
+                            <div className="flex min-h-11 flex-wrap items-center gap-2">
+                                <ActionButton
+                                    variant={
+                                        confirmClear === "cover"
+                                            ? "danger"
+                                            : "default"
+                                    }
+                                    disabled={coverCacheLimit <= 0}
+                                    onClick={() => requestClearCache("cover")}
+                                >
+                                    {confirmClear === "cover"
+                                        ? "确认清空？"
+                                        : "清空缓存"}
+                                </ActionButton>
+                            </div>
                         </div>
                     </div>
                     {storagePaths ? (

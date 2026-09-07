@@ -114,12 +114,12 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                 />
             ) : profile ? (
                 <>
-                    <header className="flex items-start gap-4 sm:flex-row sm:items-end sm:gap-5">
+                    <header className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:gap-5 sm:text-left">
                         <Cover
                             src={profile.coverUrl}
                             alt={profile.title}
                             size="lg"
-                            className="size-28 shrink-0 rounded-[20px] shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] sm:size-40 sm:rounded-[26px] sm:shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)] dark:ring-white/[0.08]"
+                            className="size-32 shrink-0 rounded-[22px] shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] sm:size-40 sm:rounded-[26px] sm:shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)] dark:ring-white/[0.08]"
                         />
                         <div className="min-w-0 flex-1 space-y-1.5 pb-0.5 sm:space-y-2.5">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
@@ -128,7 +128,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                             <h1 className="line-clamp-2 break-words text-[20px] font-bold leading-tight tracking-[-0.03em] sm:text-[32px] sm:leading-tight sm:tracking-[-0.04em] md:font-semibold">
                                 {profile.title}
                             </h1>
-                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground sm:text-[13px]">
+                            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground sm:justify-start sm:text-[13px]">
                                 {profile.artistId ? (
                                     <button
                                         type="button"
@@ -152,7 +152,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                     {profile.description}
                                 </p>
                             ) : null}
-                            <div className="flex flex-wrap gap-2 pt-1">
+                            <div className="flex flex-wrap justify-center gap-2 pt-1 sm:justify-start">
                                 {sortedTracks[0] ? (
                                     <button
                                         type="button"

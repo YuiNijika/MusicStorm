@@ -72,6 +72,7 @@ import {
 } from "@/lib/player/full-player-prefs"
 import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { isShareableTrack } from "@/lib/share/share"
+import type { MusicSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type FullPlayerProps = {
@@ -523,6 +524,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
             showQuality={showQuality}
             canLike={canLike}
             liked={liked}
+            source={displayTrack.source}
             qualityBr={qualityBr}
             isMuted={isMuted}
             volume={volume}
@@ -552,14 +554,9 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     const meta = (
         <div className="space-y-1.5 text-center">
-            <div className="flex min-w-0 items-center justify-center gap-2">
-                <h2 className="min-w-0 truncate text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">
-                    {displayTrack.title}
-                </h2>
-                <span className="flex shrink-0 items-center">
-                    <SourceBadge source={displayTrack.source} />
-                </span>
-            </div>
+            <h2 className="min-w-0 truncate text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">
+                {displayTrack.title}
+            </h2>
             <p className="truncate text-[14px] text-muted-foreground sm:text-[15px]">
                 {canOpenArtist ? (
                     <button
@@ -898,6 +895,7 @@ const TransportBar = memo(function TransportBar({
     showQuality,
     canLike,
     liked,
+    source,
     qualityBr,
     isMuted,
     volume,
@@ -923,6 +921,7 @@ const TransportBar = memo(function TransportBar({
     showQuality: boolean
     canLike: boolean
     liked: boolean
+    source: MusicSource
     qualityBr: QualityBr
     isMuted: boolean
     volume: number
@@ -964,6 +963,11 @@ const TransportBar = memo(function TransportBar({
                             </span>
                         ) : null}
                     </>
+                ) : source === "local" ? (
+                    // 本地曲目无喜欢：来源徽章补到这个空位，保持布局平衡
+                    <span className="flex size-10 items-center">
+                        <SourceBadge source="local" />
+                    </span>
                 ) : (
                     <span className="size-10" aria-hidden />
                 )}

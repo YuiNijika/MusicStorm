@@ -4,6 +4,7 @@
 
 import { dbGetSetting, dbSetSetting } from "@/lib/db/play-stats"
 import { cacheCoverUrl, isTauriRuntime, type CachedCover } from "@/lib/local/cover"
+import { getCoverCacheLimitBytes } from "@/lib/music/cover-cache-prefs"
 
 const SETTING_KEY = "cover.remote.v1"
 const REMOTE_COVER_EVENT = "musicstorm-remote-cover-ready"
@@ -140,6 +141,10 @@ function getCachedRemoteCover(url: string): CachedCover | null {
 async function ensureRemoteCoverCached(url: string): Promise<CachedCover | null> {
     const trimmed = url.trim()
     if (!trimmed) {
+        return null
+    }
+    // 关闭封面缓存：停止下载写盘，直接走远程 URL
+    if (getCoverCacheLimitBytes() === 0) {
         return null
     }
     await ensureLoaded()

@@ -71,7 +71,7 @@ type PlayerContextValue = Omit<PlayerSnapshot, "positionMs" | "durationMs"> & {
     playTrack: (track: Track, queue?: Track[]) => void
     /** 同曲再点：播放中暂停 / 已暂停则继续；异曲：换队列并播 */
     playOrToggle: (track: Track, queue?: Track[]) => void
-    /** 插入当前播放之后并立即播放 */
+    /** 插入当前播放之后，不打断当前播放（当前曲播完自然轮到它） */
     playNext: (track: Track) => void
     /** 追加到队列末尾（不打断当前播放） */
     addToQueue: (track: Track) => void
@@ -1365,11 +1365,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setShuffle(true)
     }, [shuffle, repeat])
 
-    /** 将曲目插入当前播放之后并立即播放（"下一首播放"） */
+    /** 将曲目插入当前播放之后，不打断当前播放；当前曲播完自然轮到它（"下一首播放"） */
     const playNext = useCallback((track: Track) => {
         const list = [...queueRef.current]
         const idx = indexRef.current
         if (list.length === 0 || idx < 0) {
+            // 队列空/无当前曲：没有"下一首"位置可插，直接播
             playTrack(track)
             return
         }
@@ -1382,14 +1383,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const target =
             existing >= 0 && existing < insertAt ? insertAt - 1 : insertAt
         list.splice(target, 0, track)
-        loadedTrackIdRef.current = null
-        mediaReadyRef.current = false
+        // 只改队列：currentIndex 不变，当前曲继续播，播完 advance 自然落到新插入位
         setQueue(list)
-        setCurrentIndex(target)
-        setPositionMs(0)
-        setDurationMs(track.durationMs)
-        isPlayingRef.current = true
-        setIsPlaying(true)
     }, [playTrack])
 
     /** 追加到队列末尾（不打断当前播放） */

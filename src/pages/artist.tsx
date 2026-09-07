@@ -407,7 +407,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                 />
             ) : profile ? (
                 <>
-                    <header className="flex flex-col gap-5 sm:flex-row sm:items-end">
+                    <header className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-end sm:text-left">
                         <Cover
                             src={profile.coverUrl}
                             alt={profile.name}
@@ -434,7 +434,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                     .join(" · ") || "网易云艺人"}
                             </p>
                             {hotTracks[0] ? (
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                                     <button
                                         type="button"
                                         onClick={() =>

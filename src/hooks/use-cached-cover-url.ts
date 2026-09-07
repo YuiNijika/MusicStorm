@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { coverPathToUrl, isTauriRuntime } from "@/lib/local/cover"
+import { getCoverCacheLimitBytes } from "@/lib/music/cover-cache-prefs"
 import {
     REMOTE_COVER_EVENT,
     ensureRemoteCoverCached,
@@ -28,8 +29,10 @@ function useCachedCoverUrl(
     // 纯网页端无本地文件缓存：直接走原 URL，交给浏览器 HTTP 强缓存/协商缓存，
     // 不做 base64 假缓存（remote-cover-cache 的持久层被 Tauri 桥挡死，转了也存不下）
     const tauri = isTauriRuntime()
+    // 用户关闭封面缓存：不回读旧缓存也不触发下载，一律走远程
+    const disabled = tauri && getCoverCacheLimitBytes() === 0
     const [resolved, setResolved] = useState<string>(() => {
-        if (!tauri) {
+        if (!tauri || disabled) {
             return src
         }
         if (!isRemoteUrl(src)) {
@@ -42,7 +45,7 @@ function useCachedCoverUrl(
     })
 
     useEffect(() => {
-        if (!tauri) {
+        if (!tauri || disabled) {
             return
         }
         if (!isRemoteUrl(src)) {
@@ -85,9 +88,9 @@ function useCachedCoverUrl(
         }
         window.addEventListener(REMOTE_COVER_EVENT, onReady)
         return () => window.removeEventListener(REMOTE_COVER_EVENT, onReady)
-        // tauri：运行时判定恒定，纳入依赖仅为满足 exhaustive-deps；
-        // 纯网页端直接返回，不注册监听
-    }, [src, kind, tauri])
+        // tauri/disabled：运行时判定恒定，纳入依赖仅为满足 exhaustive-deps；
+        // 关闭/纯网页端直接返回，不注册监听
+    }, [src, kind, tauri, disabled])
 
     return resolved
 }

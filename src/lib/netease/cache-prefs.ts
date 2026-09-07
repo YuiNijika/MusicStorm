@@ -17,7 +17,6 @@ const TTL_PRESETS: { id: string; label: string; ms: number }[] = [
     { id: "5m", label: "5 分钟", ms: 5 * 60_000 },
     { id: "15m", label: "15 分钟", ms: 15 * 60_000 },
     { id: "1h", label: "1 小时", ms: 60 * 60_000 },
-    { id: "off", label: "关闭", ms: 0 },
 ]
 
 function clampTtl(ms: number): number {
