@@ -1,0 +1,1 @@
+import{Dr as e}from"./App-C6BYqjs2.js";export{e as getCurrentWindow};
