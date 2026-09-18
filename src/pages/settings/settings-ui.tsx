@@ -110,13 +110,14 @@ function ChoiceChip({
     return (
         <button
             type="button"
+            aria-pressed={active}
             onClick={onClick}
             className={cn(
-                "cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-[color,background-color,transform]",
-                "active:scale-[0.97] active:duration-[var(--duration-press)]",
+                "apple-segmented-item cursor-pointer whitespace-nowrap px-3.5 text-[13px] font-medium transition-[color,background-color,transform]",
+                "active:duration-[var(--duration-press)]",
                 active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
             )}
         >
             {label}
@@ -132,7 +133,7 @@ function ChipRow({
     children: ReactNode
 }) {
     return (
-        <div className={cn("flex flex-wrap items-center gap-2", className)}>
+        <div className={cn("apple-segmented", className)}>
             {children}
         </div>
     )

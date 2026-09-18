@@ -22,9 +22,18 @@ type LyricsViewProps = {
     /** false 时不拉接口，用于面板关闭 */
     active?: boolean
     align?: LyricsAlign
+    /** 全屏歌词缩放倍率，1 为原始字号，紧凑变体不受影响 */
+    scale?: number
     className?: string
     listClassName?: string
 }
+
+// 全屏歌词排版基准值，缩放时按倍率换算，行距与译文间距同步伸缩
+const FULL_LINE_FONT_PX = 18
+const FULL_TRANSLATION_FONT_PX = 14
+const FULL_LINE_PAD_Y_PX = 6
+const FULL_TRANSLATION_GAP_PX = 4
+const FULL_LINE_GAP_PX = 16
 
 function isTauriRuntime(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -90,6 +99,7 @@ type LyricLineButtonProps = {
     isFull: boolean
     timedLyrics: boolean
     align: LyricsAlign
+    scale: number
     onSeek: (ms: number) => void
 }
 
@@ -100,6 +110,7 @@ const LyricLineButton = memo(function LyricLineButton({
     isFull,
     timedLyrics,
     align,
+    scale,
     onSeek,
 }: LyricLineButtonProps) {
     const textAlignClass =
@@ -122,25 +133,40 @@ const LyricLineButton = memo(function LyricLineButton({
                 textAlignClass,
                 timedLyrics ? "cursor-pointer" : "cursor-default",
                 isFull
-                    ? "rounded-xl px-3 py-1.5 text-[18px] leading-snug tracking-[-0.01em]"
+                    ? "rounded-xl px-3 leading-snug tracking-[-0.01em]"
                     : "rounded-lg px-2 py-1 text-[13px] leading-snug",
                 isActive
                     ? "font-semibold text-foreground"
                     : "font-normal text-muted-foreground hover:text-foreground/80",
             )}
+            style={
+                isFull
+                    ? {
+                          fontSize: `${FULL_LINE_FONT_PX * scale}px`,
+                          paddingTop: `${FULL_LINE_PAD_Y_PX * scale}px`,
+                          paddingBottom: `${FULL_LINE_PAD_Y_PX * scale}px`,
+                      }
+                    : undefined
+            }
         >
             <span className="block w-full">{line.text}</span>
             {line.translation ? (
                 <span
                     className={cn(
                         "block w-full font-normal",
-                        isFull
-                            ? "mt-1 text-[14px] leading-snug"
-                            : "mt-0.5 text-[11px] leading-snug",
+                        isFull ? "leading-snug" : "mt-0.5 text-[11px] leading-snug",
                         isActive
                             ? "text-muted-foreground"
                             : "text-muted-foreground/60",
                     )}
+                    style={
+                        isFull
+                            ? {
+                                  fontSize: `${FULL_TRANSLATION_FONT_PX * scale}px`,
+                                  marginTop: `${FULL_TRANSLATION_GAP_PX * scale}px`,
+                              }
+                            : undefined
+                    }
                 >
                     {line.translation}
                 </span>
@@ -153,6 +179,7 @@ function LyricsView({
     variant = "compact",
     active = true,
     align = "left",
+    scale = 1,
     className,
     listClassName,
 }: LyricsViewProps) {
@@ -312,9 +339,14 @@ function LyricsView({
                     <div
                         className={cn(
                             "mx-auto w-full",
-                            isFull ? "max-w-2xl space-y-4" : "space-y-2",
+                            isFull ? "flex max-w-2xl flex-col" : "space-y-2",
                             textAlignClass,
                         )}
+                        style={
+                            isFull
+                                ? { gap: `${FULL_LINE_GAP_PX * scale}px` }
+                                : undefined
+                        }
                     >
                         {lines.map((line, index) => (
                             <LyricLineButton
@@ -325,6 +357,7 @@ function LyricsView({
                                 isFull={isFull}
                                 timedLyrics={timedLyrics}
                                 align={align}
+                                scale={scale}
                                 onSeek={seek}
                             />
                         ))}

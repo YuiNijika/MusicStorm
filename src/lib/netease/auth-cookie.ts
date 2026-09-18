@@ -86,6 +86,45 @@ function snapshotNeteaseCredentials(): NeteaseCredentials | null {
     }
 }
 
+// 手动粘贴的 Cookie 可能是整串、多行键值或只有 MUSIC_U 的值，
+// 统一解析出登录需要的两项，拿不到 MUSIC_U 就判为无效
+function parseNeteaseCookieInput(input: string): NeteaseCredentials | null {
+    const raw = input.trim()
+    if (!raw) {
+        return null
+    }
+    // 没有等号说明贴的是值本身，从开发者工具整行复制时会带出 MUSIC_U 名称
+    if (!raw.includes("=")) {
+        const tokens = raw.split(/\s+/).filter(Boolean)
+        const value =
+            tokens.length > 1 && tokens[0] === "MUSIC_U" ? tokens[1] : raw
+        return { musicU: value, csrf: null }
+    }
+    let musicU: string | null = null
+    let csrf: string | null = null
+    for (const segment of raw.split(/[;\n]+/)) {
+        const pair = segment.trim()
+        const eq = pair.indexOf("=")
+        if (eq <= 0) {
+            continue
+        }
+        const key = pair.slice(0, eq).trim()
+        const value = pair.slice(eq + 1).trim()
+        if (!value) {
+            continue
+        }
+        if (key === "MUSIC_U") {
+            musicU = value
+        } else if (key === "__csrf") {
+            csrf = value
+        }
+    }
+    if (!musicU) {
+        return null
+    }
+    return { musicU, csrf }
+}
+
 function applyNeteaseCredentials(credentials: NeteaseCredentials): void {
     try {
         document.cookie = `MUSIC_U=${credentials.musicU}`
@@ -169,6 +208,7 @@ export {
     getNeteaseCookieParam,
     getNeteaseDeviceId,
     isNeteaseLoggedIn,
+    parseNeteaseCookieInput,
     removeCookie,
     setCookiesFromApi,
     snapshotNeteaseCredentials,

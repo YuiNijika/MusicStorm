@@ -49,6 +49,8 @@ type NativeBridge = {
     setPlaybackVolume?: (volume: number) => void
     setPlaybackMuted?: (muted: boolean) => void
     stopPlayback?: () => void
+    /** WebView 内 H5 引擎的播放态，供原生侧决定后台是否保持 JS 可调度 */
+    setPlaybackActive?: (active: boolean) => void
     updateNowPlaying?: (
         title: string,
         artist: string,
@@ -163,6 +165,10 @@ function stopAndroidPlayback(): void {
     bridge().stopPlayback?.()
 }
 
+function setAndroidPlaybackActive(active: boolean): void {
+    bridge().setPlaybackActive?.(active)
+}
+
 function listenAndroidAudioState(
     handler: (payload: AudioStatePayload) => void,
 ): () => void {
@@ -219,6 +225,7 @@ export {
     pickSafFolder,
     prepareAndroidFile,
     seekAndroidPlayback,
+    setAndroidPlaybackActive,
     setAndroidPlaybackMuted,
     setAndroidPlaybackVolume,
     startAndroidPlayback,

@@ -1,5 +1,6 @@
 package com.yuinijika.musicstorm
 
+import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -35,6 +36,23 @@ class MainActivity : TauriActivity() {
     val wv = webView
     if (wv != null && bridge.isMediaPlaying()) {
       wv.post { wv.onResume() }
+    }
+  }
+
+  // 系统低内存与界面隐藏时主动回收 WebView 的内存缓存与图像内存。
+  // 长期驻留的渲染进程是应用内存大头；clearCache(false) 只清内存缓存不动磁盘，封面不会重复下载
+  override fun onTrimMemory(level: Int) {
+    super.onTrimMemory(level)
+    val wv = webView ?: return
+    when (level) {
+      ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
+      ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
+      ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
+        wv.clearCache(false)
+        wv.freeMemory()
+      }
+      ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> wv.freeMemory()
+      else -> Unit
     }
   }
 

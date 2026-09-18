@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ImagePlus, Trash2 } from "lucide-react"
+import { Image as ImageIcon, ImagePlus, Trash2 } from "lucide-react"
 
 import { useTheme } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
@@ -37,6 +37,9 @@ import {
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
     LYRICS_ALIGNS,
+    LYRICS_SCALE_MAX,
+    LYRICS_SCALE_MIN,
+    LYRICS_SCALE_STEP,
     getFullPlayerChrome,
     getFullPlayerLayout,
     setFullPlayerChrome,
@@ -158,6 +161,12 @@ function AppearanceTab({
         setChrome(getFullPlayerChrome())
     }
 
+    // 滑杆用百分比整数，存储层统一按倍率收敛到步进
+    function handleLyricsScalePercent(percent: number) {
+        setFullPlayerChrome({ lyricsScale: percent / 100 })
+        setChrome(getFullPlayerChrome())
+    }
+
     function handleToastPrefs(patch: Partial<ToastPrefs>) {
         const next = { ...readToastPrefs(), ...patch }
         writeToastPrefs(next)
@@ -261,6 +270,15 @@ function AppearanceTab({
                             ))}
                         </ChoiceRow>
                     ) : null}
+                    <SliderField
+                        label="歌词缩放"
+                        display={`${Math.round(chrome.lyricsScale * 100)}%`}
+                        min={Math.round(LYRICS_SCALE_MIN * 100)}
+                        max={Math.round(LYRICS_SCALE_MAX * 100)}
+                        step={Math.round(LYRICS_SCALE_STEP * 100)}
+                        value={Math.round(chrome.lyricsScale * 100)}
+                        onChange={handleLyricsScalePercent}
+                    />
                 </SettingsGroup>
 
                 <SettingsGroup title="主题与色调" description="明暗模式与强调色">
@@ -298,7 +316,8 @@ function AppearanceTab({
                             ? "背景、卡片、侧栏与玻璃材质使用低彩度染色"
                             : "仅影响按钮、选中态、焦点与图表等强调元素"}
                     </p>
-                    <ChipRow className="gap-2.5">
+                    {/* 色板自带颜色，不套分段控件的底色；数量多时必须换行，否则小屏横向溢出 */}
+                    <div className="flex flex-wrap items-center gap-2.5">
                         {ACCENT_OPTIONS.map((option) => {
                             const active = appearance.accent === option.id
                             return (
@@ -306,6 +325,8 @@ function AppearanceTab({
                                     key={option.id}
                                     type="button"
                                     title={option.label}
+                                    aria-label={option.label}
+                                    aria-pressed={active}
                                     onClick={() => setAccent(option.id)}
                                     className={cn(
                                         "size-8 cursor-pointer rounded-full transition-transform",
@@ -326,6 +347,8 @@ function AppearanceTab({
                         <button
                             type="button"
                             title="自定义"
+                            aria-label="自定义"
+                            aria-pressed={customActive}
                             onClick={() => setCustomHue(appearance.customHue)}
                             className={cn(
                                 "relative size-8 cursor-pointer overflow-hidden rounded-full transition-transform",
@@ -346,7 +369,7 @@ function AppearanceTab({
                                 )`,
                             }}
                         />
-                    </ChipRow>
+                    </div>
                     <label className="block space-y-2">
                         <div className="flex items-center justify-between text-[13px] text-muted-foreground">
                             <span>自定义色相</span>
@@ -519,23 +542,57 @@ function AppearanceTab({
                         disabled={performanceMode}
                         onChange={setGlassBlur}
                     />
-                    <ChoiceRow label="背景图">
-                        <ActionButton
-                            icon={<ImagePlus className="size-3.5" />}
-                            onClick={() => void handlePickBackground()}
-                        >
-                            {appearance.backgroundUrl ? "更换图片" : "选择图片"}
-                        </ActionButton>
-                        {appearance.backgroundUrl ? (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-[var(--surface-fill)] ring-1 ring-black/[0.06] dark:ring-white/[0.08]">
+                                {appearance.backgroundUrl ? (
+                                    <img
+                                        src={appearance.backgroundUrl}
+                                        alt=""
+                                        width={48}
+                                        height={48}
+                                        loading="lazy"
+                                        decoding="async"
+                                        draggable={false}
+                                        className="size-full object-cover"
+                                    />
+                                ) : (
+                                    <ImageIcon
+                                        aria-hidden
+                                        className="size-4 text-muted-foreground"
+                                    />
+                                )}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">背景图</p>
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {appearance.bingWallpaper
+                                        ? "必应每日壁纸"
+                                        : appearance.backgroundUrl
+                                          ? "自定义图片"
+                                          : "未设置，使用默认背景"}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                             <ActionButton
-                                icon={<Trash2 className="size-3.5" />}
-                                className="text-destructive"
-                                onClick={handleClearBackground}
+                                variant="primary"
+                                icon={<ImagePlus className="size-3.5" />}
+                                onClick={() => void handlePickBackground()}
                             >
-                                清除
+                                {appearance.backgroundUrl ? "更换图片" : "选择图片"}
                             </ActionButton>
-                        ) : null}
-                    </ChoiceRow>
+                            {appearance.backgroundUrl ? (
+                                <ActionButton
+                                    variant="danger"
+                                    icon={<Trash2 className="size-3.5" />}
+                                    onClick={handleClearBackground}
+                                >
+                                    清除
+                                </ActionButton>
+                            ) : null}
+                        </div>
+                    </div>
                     <SwitchRow
                         title="必应每日壁纸"
                         description={

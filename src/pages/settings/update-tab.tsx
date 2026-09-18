@@ -467,12 +467,16 @@ function ContributorsPanel() {
                             }
                             className="group flex w-16 cursor-pointer flex-col items-center gap-1.5"
                         >
-                            <img
-                                src={contributor.avatarUrl}
-                                alt={contributor.login}
-                                loading="lazy"
-                                className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform group-hover:scale-105 dark:ring-white/[0.12]"
-                            />
+                            {contributor.avatarUrl ? (
+                                <img
+                                    src={contributor.avatarUrl}
+                                    alt={contributor.login}
+                                    loading="lazy"
+                                    className="size-10 rounded-full ring-1 ring-black/[0.08] transition-transform group-hover:scale-105 dark:ring-white/[0.12]"
+                                />
+                            ) : (
+                                <span className="size-10 rounded-full bg-[var(--surface-fill)]" />
+                            )}
                             <span className="w-full truncate text-center text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
                                 {contributor.login}
                             </span>

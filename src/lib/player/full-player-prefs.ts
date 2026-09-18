@@ -8,10 +8,17 @@ type LyricsAlign = "left" | "center" | "right"
 
 type FullPlayerChrome = {
     lyricsAlign: LyricsAlign
+    /** 歌词缩放倍率，1 为原始字号 */
+    lyricsScale: number
 }
+
+const LYRICS_SCALE_MIN = 0.8
+const LYRICS_SCALE_MAX = 1.6
+const LYRICS_SCALE_STEP = 0.05
 
 const DEFAULT_CHROME: FullPlayerChrome = {
     lyricsAlign: "center",
+    lyricsScale: 1,
 }
 
 const LYRICS_ALIGNS: {
@@ -41,10 +48,23 @@ function isLyricsAlign(value: unknown): value is LyricsAlign {
     return value === "left" || value === "center" || value === "right"
 }
 
+// 缩放值来自滑杆与快捷键两条写入路径，统一夹取并对齐步进，
+// 避免浮点残留让滑杆选中值漂移
+function normalizeLyricsScale(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+        return DEFAULT_CHROME.lyricsScale
+    }
+    const clamped = Math.min(LYRICS_SCALE_MAX, Math.max(LYRICS_SCALE_MIN, value))
+    return Math.round(clamped / LYRICS_SCALE_STEP) * LYRICS_SCALE_STEP
+}
+
 function normalizeChrome(partial: Partial<FullPlayerChrome> | Record<string, unknown>): FullPlayerChrome {
     const raw = (partial as Partial<FullPlayerChrome>).lyricsAlign
     return {
         lyricsAlign: isLyricsAlign(raw) ? raw : DEFAULT_CHROME.lyricsAlign,
+        lyricsScale: normalizeLyricsScale(
+            (partial as Partial<FullPlayerChrome>).lyricsScale,
+        ),
     }
 }
 
@@ -99,6 +119,9 @@ export {
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
     LYRICS_ALIGNS,
+    LYRICS_SCALE_MAX,
+    LYRICS_SCALE_MIN,
+    LYRICS_SCALE_STEP,
     getFullPlayerChrome,
     getFullPlayerLayout,
     resetFullPlayerChrome,

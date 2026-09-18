@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 
 export type MvProfile = {
     id: string
@@ -72,7 +73,7 @@ async function fetchMvDetail(mvId: string): Promise<MvProfile> {
     return {
         id,
         title: raw.name?.trim() || "未知 MV",
-        coverUrl: cover ? `${cover}?param=720y405` : "",
+        coverUrl: neteaseCoverUrl(cover, 720, 405),
         artistName,
         artistId:
             primary?.id != null
@@ -176,7 +177,7 @@ async function fetchMvSublist(limit = 50): Promise<MvCard[]> {
             return {
                 id: String(id),
                 title: (item.name ?? item.title)?.trim() || "未知 MV",
-                coverUrl: cover ? `${cover}?param=720y405` : "",
+                coverUrl: neteaseCoverUrl(cover, 480, 270),
                 artistName,
             }
         })
@@ -213,7 +214,7 @@ async function fetchSimiMvs(mvid: string): Promise<MvCard[]> {
             return {
                 id: String(id),
                 title: (item.name ?? item.title)?.trim() || "未知 MV",
-                coverUrl: cover ? `${cover}?param=720y405` : "",
+                coverUrl: neteaseCoverUrl(cover, 480, 270),
                 artistName,
             }
         })

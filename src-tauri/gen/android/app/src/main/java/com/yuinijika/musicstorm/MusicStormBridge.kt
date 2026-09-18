@@ -233,11 +233,27 @@ class MusicStormBridge(private val activity: MainActivity) {
     private var mediaVolume = 1f
     private var mediaMuted = false
     private var mediaGen = 0
+    // 跨线程只读的字段走 volatile：JS 桥线程查询时不能去碰媒体线程持有的 MediaPlayer
+    @Volatile
     private var mediaPrepared = false
     private var mediaPendingSeekMs: Int? = null
     private var mediaTicker: Runnable? = null
     // 当前源是否为远程流（http/https）：流式 seek/时长上报依赖 MediaPlayer 内部缓冲，据此留分支
     private var currentSourceIsRemote = false
+    // 播放态缓存：isMediaPlaying 会在主线程 onPause 里读取，
+    // 直接读 MediaPlayer 会在其内部锁上等媒体线程，切曲/seek 时可能冻住主线程。
+    // 这里只由媒体线程写标记，读取方永远不碰 MediaPlayer
+    @Volatile
+    private var nativePlaying = false
+    // WebView 内 H5 引擎的播放态：由前端在播放开始/停止时同步，
+    // 在线歌曲也在后台保持 JS 可调度，通知栏切歌与自动切下一首才不会失效
+    @Volatile
+    private var webPlaybackActive = false
+    // 进度快照：由媒体线程每拍刷新，JS 桥线程查询只读缓存
+    @Volatile
+    private var nativePositionMs = 0.0
+    @Volatile
+    private var nativeDurationMs = 0.0
     // 锁屏/后台保活：播放期间持有 PARTIAL_WAKE_LOCK，避免 CPU 休眠导致音频断续
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -282,10 +298,12 @@ class MusicStormBridge(private val activity: MainActivity) {
             try {
                 mp.start()
             } catch (e: Exception) {
+                nativePlaying = false
                 releaseWakeLock()
                 dispatchState(playing = false, error = e.message ?: "播放失败")
                 return@post
             }
+            nativePlaying = true
             acquireWakeLock()
             beginTick()
             dispatchState(playing = true)
@@ -302,6 +320,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                 } catch (_: Exception) {
                 }
             }
+            nativePlaying = false
             releaseWakeLock()
             stopTick()
             dispatchState(playing = false)
@@ -322,6 +341,9 @@ class MusicStormBridge(private val activity: MainActivity) {
                 mp.seekTo(bounded)
             } catch (_: Exception) {
             }
+            nativePositionMs = bounded.toDouble()
+            nativeDurationMs = mp.duration.coerceAtLeast(0).toDouble()
+            nativePlaying = mp.isPlaying
             dispatchState(
                 playing = mp.isPlaying,
                 positionMs = bounded.toLong(),
@@ -329,12 +351,16 @@ class MusicStormBridge(private val activity: MainActivity) {
             )
             if (resume && !mp.isPlaying) {
                 requestAudioFocus()
-                try {
-                    mp.start()
-                } catch (_: Exception) {
-                }
+                val started =
+                    try {
+                        mp.start()
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                nativePlaying = started
                 beginTick()
-                dispatchState(playing = true)
+                dispatchState(playing = started)
             }
         }
     }
@@ -359,32 +385,23 @@ class MusicStormBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun isMediaPrepared(): Boolean = mediaPrepared
 
+    // 只读缓存标记：主线程 onPause 会调用它决定是否保持 JS 调度
     @JavascriptInterface
     fun isMediaPlaying(): Boolean {
-        return try {
-            mediaPlayer?.isPlaying ?: false
-        } catch (_: Exception) {
-            false
-        }
+        return webPlaybackActive || nativePlaying
+    }
+
+    // 前端每次播放开始/停止时同步，覆盖 H5 引擎；原生引擎自身也会置位
+    @JavascriptInterface
+    fun setPlaybackActive(active: Boolean) {
+        webPlaybackActive = active
     }
 
     @JavascriptInterface
-    fun getMediaPosition(): Double {
-        return try {
-            mediaPlayer?.currentPosition?.coerceAtLeast(0)?.toDouble() ?: 0.0
-        } catch (_: Exception) {
-            0.0
-        }
-    }
+    fun getMediaPosition(): Double = nativePositionMs
 
     @JavascriptInterface
-    fun getMediaDuration(): Double {
-        return try {
-            mediaPlayer?.duration?.coerceAtLeast(0)?.toDouble() ?: 0.0
-        } catch (_: Exception) {
-            0.0
-        }
-    }
+    fun getMediaDuration(): Double = nativeDurationMs
 
     // 前端 hook 每次曲目/状态变化时推送元数据，驱动系统通知与锁屏展示。
     // 未播放时浏览曲目不建前台服务/通知；播放中则推送暂停态也保留通知。
@@ -429,6 +446,7 @@ class MusicStormBridge(private val activity: MainActivity) {
         if (gen != mediaGen) {
             return
         }
+        nativePlaying = false
         mediaPrepared = false
         mediaPendingSeekMs = null
         val mp = MediaPlayer()
@@ -446,6 +464,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                         return@post
                     }
                     mediaPrepared = false
+                    nativePlaying = false
                     stopTick()
                     releaseWakeLock()
                     abandonAudioFocus()
@@ -463,6 +482,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                         return@post
                     }
                     mediaPrepared = false
+                    nativePlaying = false
                     stopTick()
                     releaseWakeLock()
                     abandonAudioFocus()
@@ -479,11 +499,13 @@ class MusicStormBridge(private val activity: MainActivity) {
             mediaPrepared = true
             currentSourceIsRemote =
                 path.startsWith("http://") || path.startsWith("https://")
+            nativePositionMs = 0.0
+            nativeDurationMs = mp.duration.coerceAtLeast(0).toDouble()
             dispatchState(
                 playing = false,
                 prepared = true,
                 positionMs = 0,
-                durationMs = mp.duration.coerceAtLeast(0).toLong(),
+                durationMs = nativeDurationMs.toLong(),
             )
         } catch (e: Exception) {
             if (gen == mediaGen) {
@@ -499,6 +521,9 @@ class MusicStormBridge(private val activity: MainActivity) {
     private fun stopMedia() {
         stopTick()
         releaseWakeLock()
+        nativePlaying = false
+        nativePositionMs = 0.0
+        nativeDurationMs = 0.0
         val mp = mediaPlayer
         mediaPlayer = null
         mediaPrepared = false
@@ -536,6 +561,7 @@ class MusicStormBridge(private val activity: MainActivity) {
                                 mp.pause()
                             } catch (_: Exception) {
                             }
+                            nativePlaying = false
                             releaseWakeLock()
                             stopTick()
                             dispatchState(playing = false)
@@ -581,13 +607,17 @@ class MusicStormBridge(private val activity: MainActivity) {
                         return
                     }
                     val mp = mediaPlayer ?: return
+                    // 播放态以媒体线程实际状态为准，缓存标记跟随刷新
+                    nativePlaying = mp.isPlaying
                     if (!mp.isPlaying) {
                         return
                     }
+                    nativePositionMs = mp.currentPosition.coerceAtLeast(0).toDouble()
+                    nativeDurationMs = mp.duration.coerceAtLeast(0).toDouble()
                     dispatchState(
                         playing = true,
-                        positionMs = mp.currentPosition.coerceAtLeast(0).toLong(),
-                        durationMs = mp.duration.coerceAtLeast(0).toLong(),
+                        positionMs = nativePositionMs.toLong(),
+                        durationMs = nativeDurationMs.toLong(),
                     )
                     mediaHandler.postDelayed(this, 500)
                 }
@@ -622,6 +652,7 @@ class MusicStormBridge(private val activity: MainActivity) {
     }
 
     fun destroy() {
+        webPlaybackActive = false
         mediaHandler.post {
             stopMedia()
             mediaThread.quitSafely()

@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import { fetchSongDetail } from "@/lib/netease/track"
 import type { Playlist, Track } from "@/lib/types"
@@ -40,7 +41,7 @@ function mapPlaylistCard(item: PersonalizedItem): Playlist {
     return {
         id: String(item.id),
         title: item.name,
-        coverUrl: item.picUrl ?? item.coverImgUrl ?? "",
+        coverUrl: neteaseCoverUrl(item.picUrl ?? item.coverImgUrl, 480),
         trackIds: [],
         source: "netease",
         description: item.copywriter,
@@ -85,7 +86,7 @@ async function fetchPlaylistDetail(id: string): Promise<{
     const playlist: Playlist = {
         id: String(raw.id),
         title: raw.name,
-        coverUrl: raw.coverImgUrl ?? "",
+        coverUrl: neteaseCoverUrl(raw.coverImgUrl, 480),
         trackIds: tracks.map((track) => track.id),
         source: "netease",
         description: raw.description ?? undefined,
@@ -115,7 +116,7 @@ async function fetchPlaylistHead(
     if (firstTrack?.id != null) {
         return {
             firstTrackId: String(firstTrack.id),
-            firstCoverUrl: firstTrack.al?.picUrl ?? null,
+            firstCoverUrl: neteaseCoverUrl(firstTrack.al?.picUrl, 480) || null,
         }
     }
     const firstId = raw?.trackIds?.[0]?.id
@@ -127,7 +128,7 @@ async function fetchPlaylistHead(
         const song = detail.songs?.[0]
         return {
             firstTrackId: String(firstId),
-            firstCoverUrl: song?.al?.picUrl ?? null,
+            firstCoverUrl: neteaseCoverUrl(song?.al?.picUrl, 480) || null,
         }
     } catch {
         return { firstTrackId: String(firstId), firstCoverUrl: null }
@@ -224,7 +225,7 @@ async function fetchTopPlaylists(
         .map((item) => ({
             id: String(item.id),
             title: item.name ?? "未知歌单",
-            coverUrl: item.coverImgUrl ?? "",
+            coverUrl: neteaseCoverUrl(item.coverImgUrl, 480),
             trackIds: [],
             source: "netease" as const,
             trackCount: item.trackCount,

@@ -14,6 +14,38 @@ type FadeGainOptions = {
     initialGain?: number
 }
 
+// 后台隐藏页面的定时器节流下限，足够推完一段几百毫秒的 ramp
+const HIDDEN_TICK_MS = 32
+
+type TickHandle = {
+    isRaf: boolean
+    id: number
+}
+
+// 后台页面的 rAF 不再触发：淡出用 await 等待 ramp 完成才切下一首，
+// 纯 rAF 会让这个 await 永远挂着，自动切歌就死锁在淡出一步。
+// 隐藏时退回定时器推进，可见时保持 rAF 逐帧顺滑
+function scheduleTick(tick: (now: number) => void): TickHandle {
+    if (typeof document !== "undefined" && document.hidden) {
+        return {
+            isRaf: false,
+            id: window.setTimeout(() => tick(performance.now()), HIDDEN_TICK_MS),
+        }
+    }
+    return { isRaf: true, id: requestAnimationFrame(tick) }
+}
+
+function cancelTick(handle: TickHandle | null): void {
+    if (!handle) {
+        return
+    }
+    if (handle.isRaf) {
+        cancelAnimationFrame(handle.id)
+        return
+    }
+    window.clearTimeout(handle.id)
+}
+
 function clamp01(value: number): number {
     return Math.min(1, Math.max(0, value))
 }
@@ -24,7 +56,7 @@ function easeInOut(t: number): number {
 
 function createFadeGainController(options: FadeGainOptions): FadeGainController {
     let gain = clamp01(options.initialGain ?? 1)
-    let rafId: number | null = null
+    let tickHandle: TickHandle | null = null
     let generation = 0
     let destroyed = false
 
@@ -37,10 +69,8 @@ function createFadeGainController(options: FadeGainOptions): FadeGainController 
 
     const cancel = () => {
         generation += 1
-        if (rafId !== null) {
-            cancelAnimationFrame(rafId)
-            rafId = null
-        }
+        cancelTick(tickHandle)
+        tickHandle = null
     }
 
     apply(gain)
@@ -77,14 +107,14 @@ function createFadeGainController(options: FadeGainOptions): FadeGainController 
                     const t = Math.min(1, (now - started) / ms)
                     apply(from + (to - from) * easeInOut(t))
                     if (t >= 1) {
-                        rafId = null
+                        tickHandle = null
                         apply(to)
                         resolve()
                         return
                     }
-                    rafId = requestAnimationFrame(tick)
+                    tickHandle = scheduleTick(tick)
                 }
-                rafId = requestAnimationFrame(tick)
+                tickHandle = scheduleTick(tick)
             })
         },
         cancel,

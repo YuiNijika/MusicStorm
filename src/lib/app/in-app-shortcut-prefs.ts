@@ -11,6 +11,8 @@ export const IN_APP_ACTIONS = [
     { id: "previous", label: "上一首" },
     { id: "next", label: "下一首" },
     { id: "closeFullPlayer", label: "关闭全屏播放" },
+    { id: "lyricsScaleUp", label: "歌词放大" },
+    { id: "lyricsScaleDown", label: "歌词缩小" },
 ] as const
 
 export type InAppShortcutAction = (typeof IN_APP_ACTIONS)[number]["id"]
@@ -19,7 +21,9 @@ const STORAGE_KEY = "musicstorm-in-app-shortcuts"
 
 export type InAppShortcutMap = Record<InAppShortcutAction, string>
 
-const LEGACY_IN_APP_SHORTCUTS: InAppShortcutMap = {
+// 迁移检测只覆盖历史键位，后续新增动作不参与判定，
+// 否则老用户的新键位永远拿不到平台默认值
+const LEGACY_IN_APP_SHORTCUTS: Partial<InAppShortcutMap> = {
     togglePlay: "Space",
     seekBackward: "Left",
     seekForward: "Right",
@@ -30,7 +34,7 @@ const LEGACY_IN_APP_SHORTCUTS: InAppShortcutMap = {
     closeFullPlayer: "Esc",
 }
 
-const MACOS_IN_APP_SHORTCUTS: InAppShortcutMap = {
+const MACOS_IN_APP_SHORTCUTS: Partial<InAppShortcutMap> = {
     togglePlay: "Space",
     seekBackward: "Alt+Super+Left",
     seekForward: "Alt+Super+Right",
@@ -41,9 +45,15 @@ const MACOS_IN_APP_SHORTCUTS: InAppShortcutMap = {
     closeFullPlayer: "Esc",
 }
 
-export const DEFAULT_IN_APP_SHORTCUTS: InAppShortcutMap = isMacOS()
-    ? MACOS_IN_APP_SHORTCUTS
-    : LEGACY_IN_APP_SHORTCUTS
+const LYRICS_SCALE_SHORTCUTS: Partial<InAppShortcutMap> = {
+    lyricsScaleUp: "Alt+Up",
+    lyricsScaleDown: "Alt+Down",
+}
+
+export const DEFAULT_IN_APP_SHORTCUTS: InAppShortcutMap = {
+    ...(isMacOS() ? MACOS_IN_APP_SHORTCUTS : LEGACY_IN_APP_SHORTCUTS),
+    ...LYRICS_SCALE_SHORTCUTS,
+} as InAppShortcutMap
 
 function isLegacyShortcutMap(value: Partial<InAppShortcutMap>): boolean {
     return Object.entries(LEGACY_IN_APP_SHORTCUTS).every(
@@ -64,9 +74,9 @@ export function getInAppShortcuts(): InAppShortcutMap {
         if (isMacOS() && isLegacyShortcutMap(parsed)) {
             window.localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify(MACOS_IN_APP_SHORTCUTS),
+                JSON.stringify(DEFAULT_IN_APP_SHORTCUTS),
             )
-            return { ...MACOS_IN_APP_SHORTCUTS }
+            return { ...DEFAULT_IN_APP_SHORTCUTS }
         }
         return {
             ...DEFAULT_IN_APP_SHORTCUTS,

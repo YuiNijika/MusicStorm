@@ -300,6 +300,12 @@
         opacity: 0.45;
     }
 
+    /* 滑杆去掉默认轮廓后必须补键盘可见焦点，否则 Tab 到滑块没有任何提示 */
+    .progress-range:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+
     .progress-range::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;

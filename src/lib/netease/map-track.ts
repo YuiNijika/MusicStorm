@@ -1,3 +1,4 @@
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import type { Track, TrackArtist } from "@/lib/types"
 
 type NeteaseArtist = { id?: number | string; name?: string }
@@ -39,7 +40,7 @@ function mapNeteaseSongToTrack(song: NeteaseSong): Track {
         title: song.name,
         artist: artists.map((item) => item.name).join(" / ") || "未知艺人",
         album: album?.name ?? "未知专辑",
-        coverUrl: album?.picUrl ? `${album.picUrl}?param=400y400` : "",
+        coverUrl: neteaseCoverUrl(album?.picUrl, 400),
         durationMs,
         source: "netease",
         artists: artists.length > 0 ? artists : undefined,

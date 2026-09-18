@@ -4,7 +4,9 @@ type LyricLine = {
     translation?: string
 }
 
-const LINE_RE = /^((?:\[[\d:.]+\])+)(\[[+-]\d+])?(.+)$/
+// 文本段必须允许为空。占位行只有一长串时间戳时，
+// 若要求至少一个字符，末尾的时间戳会被当作歌词文本显示出来
+const LINE_RE = /^((?:\[[\d:.]+\])+)(\[[+-]\d+])?(.*)$/
 const TIME_RE = /\[(\d+):(\d+)(?:[.:](\d+))?]/g
 const GLOBAL_OFFSET_RE = /^\[offset:([+-]?\d+)]/i
 const WORD_TIME_RE = /<\d+:\d+(?:[.:]\d+)?>/g
@@ -78,7 +80,8 @@ function plainTextToLyricLines(text: string): LyricLine[] {
         if (/^\[(ti|ar|al|by|offset|re|ve):/i.test(line)) {
             continue
         }
-        const textOnly = line.replace(/^(\[[\d:.]+\])+/, "").trim() || line
+        // 剥掉行首时间戳后为空说明整行只是时间轴，跳过而不是把时间戳当文本
+        const textOnly = line.replace(/^(\[[\d:.]+\])+/, "").trim()
         if (textOnly) {
             lines.push({ timeMs: 0, text: textOnly })
         }

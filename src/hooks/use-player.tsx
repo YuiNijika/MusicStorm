@@ -170,6 +170,28 @@ function sessionFileName(track: { fileName?: string; filePath?: string }): strin
     return fileStemFromPath(track.filePath ?? null)
 }
 
+// 队列在播放中被增删或排序后历史索引可能越界或指向当前曲，
+// 逐条弹出直到拿到可用索引，拿不到则回退顺序上一首
+function popShuffleHistory(
+    history: number[],
+    currentIndex: number,
+    queueLength: number,
+): number | null {
+    while (history.length > 0) {
+        const index = history.pop()
+        if (
+            index == null ||
+            index < 0 ||
+            index >= queueLength ||
+            index === currentIndex
+        ) {
+            continue
+        }
+        return index
+    }
+    return null
+}
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
     const restored = useMemo(() => readPlaybackSession(), [])
     const playerPrefs = useMemo(() => getPlayerPreferences(), [])
@@ -207,6 +229,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     )
     // 随机开启时 advance 依此跳曲，ref 避免把 shuffle 拉进 advance deps
     const shuffleRef = useRef(shuffle)
+    // 随机播放的来路索引栈：上一首要沿真实播放历史回退，
+    // 否则按下上一首是在队列里跳相邻项，听感上依旧是随机
+    const shuffleHistoryRef = useRef<number[]>([])
     const [engineStatus, setEngineStatus] = useState<EngineStatus>("html5")
     const [engineEpoch, setEngineEpoch] = useState(0)
     /** 引擎实例真正挂载后递增，驱动恢复会话重新 load） */
@@ -592,6 +617,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 while (nextIdx === idx) {
                     nextIdx = Math.floor(Math.random() * list.length)
                 }
+                // 先记下来路，上一首才能沿播放历史回退
+                if (idx >= 0) {
+                    shuffleHistoryRef.current.push(idx)
+                }
                 loadedTrackIdRef.current = null
                 mediaReadyRef.current = false
                 setCurrentIndex(nextIdx)
@@ -624,6 +653,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             hardStopEngines()
             setIsPlaying(false)
             return
+        }
+
+        // 随机模式先沿播放历史回退，历史耗尽才退回队列顺序
+        if (shuffleRef.current) {
+            const historyIndex = popShuffleHistory(
+                shuffleHistoryRef.current,
+                idx,
+                list.length,
+            )
+            if (historyIndex != null) {
+                loadedTrackIdRef.current = null
+                mediaReadyRef.current = false
+                setCurrentIndex(historyIndex)
+                setPositionMs(0)
+                isPlayingRef.current = true
+                setIsPlaying(true)
+                return
+            }
         }
 
         if (idx > 0) {
@@ -1198,6 +1245,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const playTrack = useCallback((track: Track, nextQueue?: Track[]) => {
         const list = nextQueue && nextQueue.length > 0 ? nextQueue : [track]
         const index = list.findIndex((item) => item.id === track.id)
+        shuffleHistoryRef.current = []
         loadedTrackIdRef.current = null
         mediaReadyRef.current = false
         setQueue(list)
@@ -1332,6 +1380,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const toggleShuffle = useCallback(() => {
+        shuffleHistoryRef.current = []
         setShuffle((value) => !value)
     }, [])
 
@@ -1349,6 +1398,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     // 播放模式单一入口，点击依序轮换并最终回到关闭，网易云同款单按钮交互
     const cyclePlayMode = useCallback(() => {
+        // 播放模式轮换即上下文变化，随机历史作废
+        shuffleHistoryRef.current = []
         if (shuffle) {
             setShuffle(false)
             return
@@ -1383,6 +1434,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const target =
             existing >= 0 && existing < insertAt ? insertAt - 1 : insertAt
         list.splice(target, 0, track)
+        // 移除旧位置/插入会让索引位移，随机历史作废
+        shuffleHistoryRef.current = []
         // 只改队列：currentIndex 不变，当前曲继续播，播完 advance 自然落到新插入位
         setQueue(list)
     }, [playTrack])
@@ -1406,6 +1459,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (index < 0 || index >= list.length) {
             return
         }
+        // 索引整体前移，历史里的旧索引不再可靠
+        shuffleHistoryRef.current = []
         const removingCurrent = index === indexRef.current
         list.splice(index, 1)
         if (list.length === 0) {
@@ -1442,6 +1497,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (index < 0 || index >= list.length) {
             return
         }
+        shuffleHistoryRef.current = []
         loadedTrackIdRef.current = null
         mediaReadyRef.current = false
         setCurrentIndex(index)
@@ -1465,6 +1521,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
         const [moved] = list.splice(from, 1)
         list.splice(to, 0, moved)
+        shuffleHistoryRef.current = []
         const idx = indexRef.current
         let newIndex = idx
         if (idx === from) {
@@ -1479,6 +1536,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const clearQueue = useCallback(() => {
+        shuffleHistoryRef.current = []
         loadedTrackIdRef.current = null
         mediaReadyRef.current = false
         setQueue([])
@@ -1499,6 +1557,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (index < 0 || index >= list.length) {
             return
         }
+        // 插入点后的索引整体后移，历史里的旧索引不再可靠
+        shuffleHistoryRef.current = []
         const [item] = list.splice(index, 1)
         const currentAfter = index < current ? current - 1 : current
         list.splice(currentAfter + 1, 0, item)

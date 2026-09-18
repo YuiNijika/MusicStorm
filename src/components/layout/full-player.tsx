@@ -57,6 +57,7 @@ import {
 import { fetchSongStats } from "@/lib/netease/comment"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import {
+    IN_APP_SHORTCUT_EVENT,
     getInAppShortcuts,
     keydownToInAppShortcut,
 } from "@/lib/app/in-app-shortcut-prefs"
@@ -64,13 +65,16 @@ import {
     CHROME_EVENT,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
+    LYRICS_SCALE_STEP,
     getFullPlayerChrome,
     getFullPlayerLayout,
+    setFullPlayerChrome,
     setFullPlayerLayout,
     type FullPlayerChrome,
     type FullPlayerLayout,
 } from "@/lib/player/full-player-prefs"
 import { usePlaybackTick } from "@/lib/player/playback-tick"
+import { isAndroid } from "@/lib/platform"
 import { isShareableTrack } from "@/lib/share/share"
 import type { MusicSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -209,6 +213,10 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const exitTimerRef = useRef<number | null>(null)
     const phaseRef = useRef<Phase>(phase)
     phaseRef.current = phase
+    // 快捷键监听闭包读 ref 里的最新值：连按放大时立即累加，不等重渲
+    const chromeRef = useRef(chrome)
+    chromeRef.current = chrome
+    const shortcutsRef = useRef(getInAppShortcuts())
 
     function clearEnterTimer() {
         if (enterTimerRef.current != null) {
@@ -231,11 +239,16 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         function onChrome() {
             setChrome(getFullPlayerChrome())
         }
+        function onShortcuts() {
+            shortcutsRef.current = getInAppShortcuts()
+        }
         window.addEventListener(LAYOUT_EVENT, onLayout)
         window.addEventListener(CHROME_EVENT, onChrome)
+        window.addEventListener(IN_APP_SHORTCUT_EVENT, onShortcuts)
         return () => {
             window.removeEventListener(LAYOUT_EVENT, onLayout)
             window.removeEventListener(CHROME_EVENT, onChrome)
+            window.removeEventListener(IN_APP_SHORTCUT_EVENT, onShortcuts)
             clearEnterTimer()
             clearExitTimer()
         }
@@ -292,15 +305,36 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         }
         // 打开播放器即预热歌词 chunk：切到歌词布局时不再等懒加载白屏
         void import("@/components/music/lyrics-view")
-        // 关闭全屏快捷键可自定义（in-app-shortcut-prefs）
-        const closeCombo =
-            getInAppShortcuts().closeFullPlayer || "Esc"
+        // 关闭全屏与歌词缩放快捷键均可自定义（in-app-shortcut-prefs）
         function onKey(event: KeyboardEvent) {
             const combo = keydownToInAppShortcut(event)
-            if (combo && combo === closeCombo) {
+            if (!combo) {
+                return
+            }
+            const shortcuts = shortcutsRef.current
+            if (combo === (shortcuts.closeFullPlayer || "Esc")) {
                 event.preventDefault()
                 onClose()
+                return
             }
+            const step =
+                combo === shortcuts.lyricsScaleUp
+                    ? LYRICS_SCALE_STEP
+                    : combo === shortcuts.lyricsScaleDown
+                      ? -LYRICS_SCALE_STEP
+                      : 0
+            if (step === 0) {
+                return
+            }
+            // 写回存储后经 CHROME_EVENT 同步本地 state；
+            // ref 先落值保证按住连发时逐次累加
+            event.preventDefault()
+            const nextScale = chromeRef.current.lyricsScale + step
+            chromeRef.current = {
+                ...chromeRef.current,
+                lyricsScale: nextScale,
+            }
+            setFullPlayerChrome({ lyricsScale: nextScale })
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
@@ -756,6 +790,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 <LyricsView
                                     variant="full"
                                     active={lyricsActive}
+                                    scale={chrome.lyricsScale}
                                     className="min-h-0 flex-1"
                                     listClassName="h-full"
                                 />
@@ -812,6 +847,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                             variant="full"
                                             active={lyricsActive && page === 1}
                                             align={chrome.lyricsAlign}
+                                            scale={chrome.lyricsScale}
                                             className="h-full min-h-0 flex-1"
                                             listClassName="h-full py-2"
                                         />
@@ -849,6 +885,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                             variant="full"
                                             active={lyricsActive}
                                             align={chrome.lyricsAlign}
+                                            scale={chrome.lyricsScale}
                                             className="h-full min-h-0 flex-1"
                                             listClassName="h-full py-2"
                                         />
@@ -1244,7 +1281,10 @@ function IconBtn({
 
 // 远程 URL 透明升级为本地缓存，避免每次打开都拉 CDN
 function CachedBackdropImage({ src }: { src: string }) {
-    const resolved = useCachedCoverUrl(src, "original")
+    // 背板自带大半径模糊，Android WebView 用缩略图即可保持观感，
+    // 解码位图与合成纹理都小一个量级
+    const kind = isAndroid() ? "thumbnail" : "original"
+    const resolved = useCachedCoverUrl(src, kind)
     return (
         <img
             src={resolved}

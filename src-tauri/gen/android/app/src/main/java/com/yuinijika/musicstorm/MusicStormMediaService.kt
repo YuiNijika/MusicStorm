@@ -83,22 +83,28 @@ class MusicStormMediaService : Service() {
     }
 
     override fun onDestroy() {
+        // 先清实例再回收封面：后台线程据此提前退出，不会再写入已回收的位图
         instance = null
+        artwork?.recycle()
+        artwork = null
         listener = null
         mediaSession.isActive = false
         mediaSession.release()
         super.onDestroy()
     }
 
-    // 通知栏控制只转达不执行：队列在前端，由前端驱动引擎，避免状态两头打架
+    // 通知栏控制只转达不执行：队列在前端，由前端驱动引擎，避免状态两头打架。
+    // 按钮先乐观更新 session，系统控件立即反馈，前端随后回推真实状态覆盖
     private val sessionCallback =
         object : MediaSessionCompat.Callback() {
             override fun onPlay() {
                 listener?.onTransportCommand("play", null)
+                setSessionPlaybackState(true, nowPositionMs, nowDurationMs)
             }
 
             override fun onPause() {
                 listener?.onTransportCommand("pause", null)
+                setSessionPlaybackState(false, nowPositionMs, nowDurationMs)
             }
 
             override fun onSkipToNext() {
@@ -111,6 +117,7 @@ class MusicStormMediaService : Service() {
 
             override fun onSeekTo(pos: Long) {
                 listener?.onTransportCommand("seek", pos)
+                setSessionPlaybackState(nowPlaying, pos, nowDurationMs)
             }
 
             override fun onStop() {
@@ -129,6 +136,14 @@ class MusicStormMediaService : Service() {
         playing: Boolean,
         positionMs: Long,
     ) {
+        // 播放中每秒都会回推位置，只有元数据/封面/播放态变化才重建通知，
+        // 纯位置更新只落在 session 上，系统进度条据此外推
+        val metaChanged =
+            title != nowTitle ||
+                artist != nowArtist ||
+                album != nowAlbum ||
+                playing != nowPlaying ||
+                coverUrl != nowCoverUrl
         nowTitle = title
         nowArtist = artist
         nowAlbum = album
@@ -140,10 +155,13 @@ class MusicStormMediaService : Service() {
         mediaSession.isActive = true
         setSessionMetadata()
         setSessionPlaybackState(playing, positionMs, durationMs)
-        showNotification()
+        if (metaChanged) {
+            showNotification()
+        }
         if (coverChanged && coverUrl.isNotBlank()) {
             loadArtworkAsync(coverUrl)
         } else if (coverChanged) {
+            artwork?.recycle()
             artwork = null
             showNotification()
         }
@@ -321,7 +339,12 @@ class MusicStormMediaService : Service() {
             if (instance !== this || bitmap == null) {
                 return@Thread
             }
+            // 新图接替后旧图不再被通知引用，立即回收避免多张全尺寸位图叠在堆里
+            val previous = artwork
             artwork = bitmap
+            if (previous !== null && previous !== bitmap) {
+                previous.recycle()
+            }
             try {
                 showNotification()
             } catch (_: Exception) {
@@ -369,19 +392,40 @@ class MusicStormMediaService : Service() {
             if (bytes == null || bytes.isEmpty()) {
                 null
             } else {
-                downscale(
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        ?: return null,
-                )
+                decodeDownscaled(bytes)
             }
         } catch (_: Exception) {
             null
         }
     }
 
-    // 通知大图标限 512px，避免系统降采样造成内存峰值
+    // 通知大图标限 512px：先读边界算采样率再解码，
+    // 原图整张展开后再缩会瞬间抬高内存峰值
+    private fun decodeDownscaled(data: ByteArray): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null
+        }
+        var sampleSize = 1
+        while (
+            bounds.outWidth / (sampleSize * 2) >= ARTWORK_MAX_PX &&
+                bounds.outHeight / (sampleSize * 2) >= ARTWORK_MAX_PX
+        ) {
+            sampleSize *= 2
+        }
+        val decoded = BitmapFactory.decodeByteArray(
+            data,
+            0,
+            data.size,
+            BitmapFactory.Options().apply { inSampleSize = sampleSize },
+        ) ?: return null
+        return downscale(decoded)
+    }
+
+    // 采样后仍超过上限时精确缩到 512px，等比缩放后回收源位图
     private fun downscale(src: Bitmap): Bitmap {
-        val max = 512
+        val max = ARTWORK_MAX_PX
         val w = src.width
         val h = src.height
         if (w <= max && h <= max) {
@@ -404,6 +448,7 @@ class MusicStormMediaService : Service() {
     companion object {
         const val CHANNEL_ID = "musicstorm-media"
         const val NOTIFICATION_ID = 1
+        const val ARTWORK_MAX_PX = 512
 
         // 进程内单例：桥直接转发命令，无需跨进程 Binder
         @Volatile

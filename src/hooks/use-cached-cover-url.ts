@@ -8,6 +8,12 @@ import {
     getCachedRemoteCover,
 } from "@/lib/music/remote-cover-cache"
 
+// coverPathToUrl 对无法转换的路径返回空串，直接塞进 img 会触发空 src 警告
+// 并让浏览器重新请求整个页面，这里统一回退到原始地址
+function resolveAssetUrl(path: string | null | undefined, fallback: string): string {
+    return coverPathToUrl(path) || fallback
+}
+
 function isRemoteUrl(url: string): boolean {
     if (!/^https?:\/\//i.test(url)) {
         return false
@@ -40,7 +46,10 @@ function useCachedCoverUrl(
         }
         const cached = getCachedRemoteCover(src)
         return cached
-            ? coverPathToUrl(kind === "thumbnail" ? cached.thumbnailPath : cached.originalPath)
+            ? resolveAssetUrl(
+                  kind === "thumbnail" ? cached.thumbnailPath : cached.originalPath,
+                  src,
+              )
             : src
     })
 
@@ -56,8 +65,9 @@ function useCachedCoverUrl(
         const cached = getCachedRemoteCover(src)
         if (cached) {
             setResolved(
-                coverPathToUrl(
+                resolveAssetUrl(
                     kind === "thumbnail" ? cached.thumbnailPath : cached.originalPath,
+                    src,
                 ),
             )
             return
@@ -74,10 +84,11 @@ function useCachedCoverUrl(
             const latest = getCachedRemoteCover(src)
             if (latest) {
                 setResolved(
-                    coverPathToUrl(
+                    resolveAssetUrl(
                         kind === "thumbnail"
                             ? latest.thumbnailPath
                             : latest.originalPath,
+                        src,
                     ),
                 )
                 return

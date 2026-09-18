@@ -5,6 +5,7 @@ import {
     clearAndroidNowPlaying,
     hasAndroidAudio,
     listenAndroidTransport,
+    setAndroidPlaybackActive,
     updateAndroidNowPlaying,
 } from "@/lib/android/native-bridge"
 import { getCoverOverride } from "@/lib/music/cover-overrides"
@@ -15,6 +16,11 @@ import {
 import { isAndroid } from "@/lib/platform"
 import { getPlaybackTickSnapshot } from "@/lib/player/playback-tick"
 import { isWebMode } from "@/lib/web-mode"
+
+// 进度回推节奏：系统按 session 状态外推位置，但部分 ROM 不外推，
+// 播放中每秒回推一次保证通知进度条跟得上；暂停时降频只补状态
+const PLAYING_PUSH_INTERVAL_MS = 1_000
+const PAUSED_PUSH_INTERVAL_MS = 5_000
 
 // Android 系统媒体通知（对齐 macOS now-playing hook 的角色）：
 // 1. 曲目/状态变化 → updateNowPlaying 推送系统通知（MediaStyle + 锁屏）
@@ -102,7 +108,7 @@ function useAndroidNowPlaying() {
         }
     }, [currentTrack])
 
-    // 推送元数据：身份变化立即发，否则 5s 节流；进度交给 session 自动外推
+    // 推送元数据：身份变化立即发，否则按播放/暂停分档节流回推位置
     const pushNowPlaying = useCallback(() => {
         if (isWebMode() || !isAndroid() || !hasAndroidAudio() || !currentTrack) {
             return
@@ -121,7 +127,10 @@ function useAndroidNowPlaying() {
         ].join("\u0000")
         const now = Date.now()
         const identityChanged = identity !== lastIdentityRef.current
-        if (!identityChanged && now - lastSentAtRef.current < 5_000) {
+        const minInterval = isPlaying
+            ? PLAYING_PUSH_INTERVAL_MS
+            : PAUSED_PUSH_INTERVAL_MS
+        if (!identityChanged && now - lastSentAtRef.current < minInterval) {
             return
         }
         lastIdentityRef.current = identity
@@ -155,9 +164,22 @@ function useAndroidNowPlaying() {
             return
         }
         // 系统通知进度周期刷新；改用定时器而非依赖 tick 重渲
-        const timer = window.setInterval(pushNowPlaying, 5_000)
+        const timer = window.setInterval(
+            pushNowPlaying,
+            isPlaying ? PLAYING_PUSH_INTERVAL_MS : PAUSED_PUSH_INTERVAL_MS,
+        )
         return () => window.clearInterval(timer)
-    }, [currentTrack, pushNowPlaying])
+    }, [currentTrack, isPlaying, pushNowPlaying])
+
+    // H5 引擎的音频跑在 WebView 里，原生侧看不到它的播放态。
+    // 不同步的话退后台时 WebView 会把 JS 一起冻结，通知栏切歌与自动切下一首都不会执行
+    useEffect(() => {
+        if (isWebMode() || !isAndroid() || !hasAndroidAudio()) {
+            return
+        }
+        setAndroidPlaybackActive(isPlaying && currentTrack != null)
+        return () => setAndroidPlaybackActive(false)
+    }, [isPlaying, currentTrack])
 }
 
 export { useAndroidNowPlaying }

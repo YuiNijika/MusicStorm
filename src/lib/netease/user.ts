@@ -1,5 +1,6 @@
 import { setCookiesFromApi } from "@/lib/netease/auth-cookie"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import type { Playlist } from "@/lib/types"
 
 type NeteaseProfile = {
@@ -95,7 +96,7 @@ function mapUserPlaylist(item: UserPlaylistItem): Playlist {
     return {
         id: String(item.id),
         title: item.name,
-        coverUrl: item.coverImgUrl ?? "",
+        coverUrl: neteaseCoverUrl(item.coverImgUrl, 480),
         trackIds: [],
         source: "netease",
         description: item.description ?? undefined,

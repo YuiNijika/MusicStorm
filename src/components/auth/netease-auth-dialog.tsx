@@ -4,6 +4,10 @@ import { useQrLogin } from "@/hooks/use-qr-login"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { loginWithEmail } from "@/lib/netease/auth-email"
 import { loginWithCellphone, sendCaptcha } from "@/lib/netease/auth-phone"
+import {
+    applyNeteaseCredentials,
+    parseNeteaseCookieInput,
+} from "@/lib/netease/auth-cookie"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import { formatError, notifyError, notifySuccess } from "@/lib/notify"
 import { cn } from "@/lib/utils"
@@ -23,12 +27,13 @@ function isMobile(): boolean {
     }
 }
 
-type AuthTab = "phone" | "qr" | "email"
+type AuthTab = "phone" | "qr" | "email" | "cookie"
 
 const DEFAULT_TAB: AuthTab = isMobile() ? "phone" : "qr"
+// Cookie 手动填写不依赖平台能力，移动端与网页版同样可用
 const TAB_ORDER: [AuthTab, string][] = isMobile()
-    ? [["phone", "手机号"], ["qr", "扫码"], ["email", "邮箱"]]
-    : [["qr", "扫码"], ["phone", "手机号"], ["email", "邮箱"]]
+    ? [["phone", "手机号"], ["qr", "扫码"], ["email", "邮箱"], ["cookie", "Cookie"]]
+    : [["qr", "扫码"], ["phone", "手机号"], ["email", "邮箱"], ["cookie", "Cookie"]]
 
 type NeteaseAuthDialogProps = {
     open: boolean
@@ -46,6 +51,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
     const [loggingIn, setLoggingIn] = useState(false)
     const [cooldown, setCooldown] = useState(0)
     const [error, setError] = useState<string | null>(null)
+    const [cookieInput, setCookieInput] = useState("")
     // 同步守卫 state 更新是异步的，移动端快速双击会读到旧值触发两次发送
     const sendingRef = useRef(false)
     const loggingInRef = useRef(false)
@@ -63,6 +69,8 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
             reset()
             setError(null)
             setTab(DEFAULT_TAB)
+            // 粘贴的凭证不留在内存里
+            setCookieInput("")
             return
         }
     }, [open, reset])
@@ -172,6 +180,43 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
         }
     }
 
+    async function handleCookieLogin() {
+        if (loggingInRef.current) {
+            return
+        }
+        setError(null)
+        const credentials = parseNeteaseCookieInput(cookieInput)
+        if (!credentials) {
+            const message = "没识别到 MUSIC_U，请检查粘贴内容"
+            setError(message)
+            notifyError("登录失败", { description: message })
+            return
+        }
+        loggingInRef.current = true
+        setLoggingIn(true)
+        try {
+            applyNeteaseCredentials(credentials)
+            const profile = await refresh()
+            if (!profile) {
+                const message = "Cookie 无效或已过期，请重新复制"
+                setError(message)
+                notifyError("登录失败", { description: message })
+                return
+            }
+            notifySuccess("登录成功", {
+                description: profile.nickname || undefined,
+            })
+            onOpenChange(false)
+        } catch (err) {
+            const message = formatError(err) || "登录失败"
+            setError(message)
+            notifyError("登录失败", { description: message })
+        } finally {
+            loggingInRef.current = false
+            setLoggingIn(false)
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md" showCloseButton>
@@ -260,6 +305,34 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             type="button"
                             disabled={loggingIn}
                             onClick={() => void handleEmailLogin()}
+                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {loggingIn ? "登录中…" : "登录"}
+                        </button>
+                    </div>
+                ) : tab === "cookie" ? (
+                    <div className="space-y-3">
+                        <textarea
+                            value={cookieInput}
+                            onChange={(event) =>
+                                setCookieInput(event.currentTarget.value)
+                            }
+                            disabled={loggingIn}
+                            spellCheck={false}
+                            autoComplete="off"
+                            aria-label="网易云 Cookie"
+                            placeholder={"MUSIC_U=…\n__csrf=…"}
+                            className="h-28 w-full resize-none rounded-xl bg-[var(--surface-fill)] p-3 font-mono text-[12.5px] leading-relaxed outline-none ring-1 ring-black/[0.06] focus:ring-2 focus:ring-primary/40 disabled:opacity-50 dark:ring-white/[0.08]"
+                        />
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            在浏览器登录网易云音乐，从开发者工具的 Application
+                            面板找到 music.163.com 的 Cookie，复制 MUSIC_U 与
+                            __csrf 两项填入；只填 MUSIC_U 也可以
+                        </p>
+                        <button
+                            type="button"
+                            disabled={loggingIn}
+                            onClick={() => void handleCookieLogin()}
                             className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {loggingIn ? "登录中…" : "登录"}
