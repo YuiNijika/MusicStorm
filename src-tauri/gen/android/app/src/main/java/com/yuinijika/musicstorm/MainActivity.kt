@@ -25,7 +25,7 @@ class MainActivity : TauriActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     // 已运行的实例收到 musicstorm:// 深链：转发给前端直达播放
-    forwardDeepLink(intent?.data)
+    forwardDeepLink(intent.data)
   }
 
   // 父类 WryActivity 在 onPause 里同步调用 mWebView.onPause 暂停 JS；
@@ -39,20 +39,14 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  // 系统低内存与界面隐藏时主动回收 WebView 的内存缓存与图像内存。
-  // 长期驻留的渲染进程是应用内存大头；clearCache(false) 只清内存缓存不动磁盘，封面不会重复下载
+  // 界面隐藏或系统内存吃紧时回收 WebView 的内存级资源缓存。
+  // 长期驻留的渲染进程是应用内存大头；clearCache(false) 只清内存缓存不动磁盘，封面不会重复下载。
+  // 低内存档位在 API 34 起不再下发，统一从 UI_HIDDEN 起算，旧档位数值更大同样命中
   override fun onTrimMemory(level: Int) {
     super.onTrimMemory(level)
     val wv = webView ?: return
-    when (level) {
-      ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-      ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
-      ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
-        wv.clearCache(false)
-        wv.freeMemory()
-      }
-      ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> wv.freeMemory()
-      else -> Unit
+    if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+      wv.clearCache(false)
     }
   }
 

@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 const buildVersion =
@@ -24,6 +23,9 @@ export default defineConfig(async () => ({
     // 跳过构建前清空 dist：沙箱安全层会拦截批量删除导致 vite 挂起。
     // 构建产物带 hash，新旧文件共存无害；彻底清理用 scripts/clean-dist.py 手动执行。
     emptyOutDir: false,
+    // 超过默认阈值的都是路由级懒加载块（MV 播放器、统计图表等），进页面才拉取，
+    // 首屏不受影响；这里放宽阈值避免无意义告警
+    chunkSizeWarningLimit: 800,
     // 多页入口：主窗口 + 桌面歌词窗口（打包版缺入口会 404，桌面歌词白屏）
     rollupOptions: {
       input: {

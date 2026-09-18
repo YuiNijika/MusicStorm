@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -546,6 +547,9 @@ class MusicStormBridge(private val activity: MainActivity) {
         }
     }
 
+    // 焦点请求复用一个实例，避免每次播放都重建
+    private var audioFocusRequest: AudioFocusRequest? = null
+
     private val audioFocusListener =
         AudioManager.OnAudioFocusChangeListener { change ->
             mediaHandler.post {
@@ -579,10 +583,29 @@ class MusicStormBridge(private val activity: MainActivity) {
             }
         }
 
+    // API 26 起用 AudioFocusRequest，24/25 只有废弃的单参重载，
+    // 因此整函数抑制弃用告警，现代分支仍优先执行
+    @Suppress("DEPRECATION")
     private fun requestAudioFocus() {
         val am =
             activity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request =
+                audioFocusRequest
+                    ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build(),
+                        )
+                        .setOnAudioFocusChangeListener(audioFocusListener)
+                        .build()
+                        .also { audioFocusRequest = it }
+            am.requestAudioFocus(request)
+            return
+        }
         am.requestAudioFocus(
             audioFocusListener,
             AudioManager.STREAM_MUSIC,
@@ -590,10 +613,15 @@ class MusicStormBridge(private val activity: MainActivity) {
         )
     }
 
+    @Suppress("DEPRECATION")
     private fun abandonAudioFocus() {
         val am =
             activity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+            return
+        }
         am.abandonAudioFocus(audioFocusListener)
     }
 

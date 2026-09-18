@@ -72,8 +72,14 @@ android {
             }
         }
     }
+    // 主模块跟 AGP 默认与 JDK 21 对齐到 17；仅 tauri-android 等自动生成模块仍是 1.8，
+    // 其告警在 gradle.properties 里统一抑制
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         buildConfig = true
