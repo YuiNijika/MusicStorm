@@ -74,7 +74,8 @@ function readVisibleRange(
     return { start, end }
 }
 
-// 感知外层页面滚动的固定行高虚拟列表；overscan 避免快速滚动空白
+// 感知外层页面滚动的固定行高虚拟列表；overscan 避免快速滚动空白。
+// 监听只在虚拟化时挂载，卸载即回收，避免重复渲染叠加监听器造成内存泄漏。
 function VirtualList<T>({
     items,
     itemHeight,
@@ -86,23 +87,20 @@ function VirtualList<T>({
 }: VirtualListProps<T>) {
     const listRef = useRef<HTMLDivElement>(null)
     const scrollParentRef = useRef<HTMLElement | Window | null>(null)
-    const [range, setRange] = useState<VisibleRange>({
-        start: 0,
-        end: Math.min(items.length, virtualizeAfter),
-    })
+    const [range, setRange] = useState<VisibleRange>({ start: 0, end: 0 })
     const virtualized = items.length > virtualizeAfter
 
     const updateRange = useCallback(() => {
-        if (!virtualized || !listRef.current) {
-            setRange({ start: 0, end: items.length })
+        const list = listRef.current
+        if (!list) {
             return
         }
         // 滚动容器只算一次：每次滚动事件都走 DOM 链取 getComputedStyle 开销大
         if (!scrollParentRef.current) {
-            scrollParentRef.current = findScrollParent(listRef.current)
+            scrollParentRef.current = findScrollParent(list)
         }
         const next = readVisibleRange(
-            listRef.current,
+            list,
             scrollParentRef.current,
             items.length,
             itemHeight,
@@ -110,25 +108,32 @@ function VirtualList<T>({
         )
         // 同一帧内多次 scroll 事件若窗口没变则直接返回当前引用，React 跳过重渲
         setRange((current) =>
-            current.start === next.start && current.end === next.end ? current : next,
+            current.start === next.start && current.end === next.end
+                ? current
+                : next,
         )
-    }, [itemHeight, items.length, overscanPx, virtualized])
+    }, [itemHeight, items.length, overscanPx])
 
+    // 挂载后、绘制前先算好首屏范围，避免先空白再跳帧
     useLayoutEffect(() => {
+        // 数据或虚拟化状态变化时滚动容器可能改变，重新探测一次
+        scrollParentRef.current = null
         updateRange()
-    }, [updateRange])
+    }, [updateRange, virtualized])
 
+    // 仅在虚拟化时挂载滚动与尺寸监听，卸载即回收，杜绝监听器泄漏
     useEffect(() => {
+        if (!virtualized) {
+            return
+        }
         const list = listRef.current
-        if (!list || !virtualized) {
+        if (!list) {
             return
         }
         const scrollParent = findScrollParent(list)
         const eventTarget = scrollParent === window ? window : scrollParent
-        const observer = new ResizeObserver(updateRange)
+        const observer = new ResizeObserver(() => updateRange())
 
-        // 滚动事件同步重算窗口：快速滚动时窗口始终贴着滚动位置，
-        // 不做 rAF 节流（一帧滞后在高速滚动时就是可见空白）
         eventTarget.addEventListener("scroll", updateRange, { passive: true })
         window.addEventListener("resize", updateRange, { passive: true })
         observer.observe(list)
@@ -141,11 +146,9 @@ function VirtualList<T>({
             window.removeEventListener("resize", updateRange)
             observer.disconnect()
         }
-    }, [updateRange, virtualized])
+    }, [virtualized, updateRange, items.length])
 
-    const visibleItems = virtualized
-        ? items.slice(range.start, range.end)
-        : items
+    const visibleItems = virtualized ? items.slice(range.start, range.end) : items
     const startIndex = virtualized ? range.start : 0
     const topSpacer = startIndex * itemHeight
     const bottomSpacer = virtualized
