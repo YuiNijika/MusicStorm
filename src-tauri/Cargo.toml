@@ -13,8 +13,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset", "devtools"] }
-tauri-plugin-opener = "2"
+tauri = { version = "~2.11.5", features = ["protocol-asset", "devtools"] }
+tauri-plugin-opener = "=2.5.4"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
@@ -46,7 +46,7 @@ symphonia = { version = "0.5", default-features = false, features = [
 # Android 无这些概念（文件选择走 SAF、播放走系统媒体通道），
 # 条件编译避免交叉编译失败，也让 Android 包更小。
 [target.'cfg(not(target_os = "android"))'.dependencies]
-tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+tauri = { version = "~2.11.5", features = ["protocol-asset", "tray-icon"] }
 rfd = "0.15"
 tauri-plugin-deep-link = "2"
 rodio = { version = "0.20", default-features = false, features = [
