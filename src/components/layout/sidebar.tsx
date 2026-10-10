@@ -46,6 +46,7 @@ const NeteaseAuthDialog = lazy(() =>
 )
 
 const ICONS: Record<AppRoute, LucideIcon> = {
+    feedback: Settings2,
     home: Home,
     discover: Compass,
     library: Library,

@@ -7,6 +7,7 @@ export type AppRoute =
     | "search"
     | "stats"
     | "settings"
+    | "feedback"
 
 // 侧栏三分区：发现音乐（被动推荐+主动找歌）/ 我的音乐（双来源收藏）/ 更多（运维与偏好）
 export type NavGroup = "browse" | "library-mine" | "system"

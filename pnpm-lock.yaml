@@ -56,6 +56,9 @@ importers:
       lucide-react:
         specifier: ^1.53.0
         version: 1.53.0(@types/react@19.3.0)(react@19.3.0)
+      marked:
+        specifier: 18.0.9
+        version: 18.0.9
       music-metadata:
         specifier: ^11.16.1
         version: 11.16.1

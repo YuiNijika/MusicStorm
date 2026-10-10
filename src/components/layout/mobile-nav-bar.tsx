@@ -66,6 +66,7 @@ const MOBILE_TABS: AppRoute[] = [
 ]
 
 const ICONS: Record<AppRoute, LucideIcon> = {
+    feedback: Settings2,
     home: Home,
     discover: Compass,
     library: Library,

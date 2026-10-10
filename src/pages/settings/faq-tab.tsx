@@ -1,77 +1,65 @@
 import { useEffect, useState } from "react"
+import { MessageSquare, RotateCw } from "lucide-react"
 
-import { fetchFaqItems, type FaqItem } from "@/lib/netease/faq"
-import { SettingsGroup, TabHeader } from "@/pages/settings/settings-ui"
+import { ArticleContent } from "@/components/article-content"
+import { fetchArticle } from "@/lib/feedback/api"
+import { isWebMode } from "@/lib/web-mode"
+import { ActionButton } from "@/pages/settings/settings-ui"
 
-function FaqTab() {
-    const [items, setItems] = useState<FaqItem[]>([])
+function FaqTab({ onOpenFeedback }: { onOpenFeedback: () => void }) {
+    const [content, setContent] = useState("")
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState("")
+    const [attempt, setAttempt] = useState(0)
 
     useEffect(() => {
-        let cancelled = false
-        fetchFaqItems()
-            .then((data) => {
-                if (cancelled) {
-                    return
-                }
-                setItems(data)
+        const controller = new AbortController()
+        setLoading(true)
+        setError("")
+        void fetchArticle(controller.signal).then((article) => {
+            if (!controller.signal.aborted) {
+                setContent(article.content)
+            }
+        }).catch((error: unknown) => {
+            if (!controller.signal.aborted) {
+                setError(error instanceof Error ? error.message : "加载失败，请重试。")
+            }
+        }).finally(() => {
+            if (!controller.signal.aborted) {
                 setLoading(false)
-            })
-            .catch((err: unknown) => {
-                if (cancelled) {
-                    return
-                }
-                setError(err instanceof Error ? err.message : "加载失败")
-                setLoading(false)
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [])
+            }
+        })
+        return () => controller.abort()
+    }, [attempt])
 
     return (
-        <div className="space-y-3">
-            <TabHeader
-                title="常见问题"
-                description="内容由音源接口提供"
-            />
-
-            {loading ? (
-                <SettingsGroup>
-                    <p className="text-sm text-muted-foreground">加载中…</p>
-                </SettingsGroup>
-            ) : error ? (
-                <SettingsGroup>
-                    <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-                        {error}
-                    </p>
-                </SettingsGroup>
-            ) : items.length === 0 ? (
-                <SettingsGroup>
-                    <p className="text-sm text-muted-foreground">
-                        暂无常见问题。
-                    </p>
-                </SettingsGroup>
-            ) : (
-                <SettingsGroup>
-                    <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
-                        {items.map((item, index) => (
-                            <li
-                                key={`${item.question}-${index}`}
-                                className="space-y-1.5 py-3 first:pt-0 last:pb-0"
-                            >
-                                <p className="text-[14px] font-medium tracking-[-0.01em]">
-                                    {item.question}
-                                </p>
-                                <p className="text-sm leading-relaxed text-muted-foreground">
-                                    {item.answer}
-                                </p>
-                            </li>
-                        ))}
-                    </ul>
-                </SettingsGroup>
-            )}
+        <div className="space-y-4">
+            <header className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-bold">常见问题</h2>
+                <a href="#/feedback"
+                    onClick={(event) => {
+                        if (isWebMode() && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
+                            return
+                        }
+                        event.preventDefault()
+                        onOpenFeedback()
+                    }}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-[var(--surface-fill)] focus-visible:outline-2 focus-visible:outline-ring">
+                    <MessageSquare className="size-4" aria-hidden="true" />
+                    反馈问题
+                </a>
+            </header>
+            <div aria-live="polite">
+                {loading ? <p className="text-sm text-muted-foreground">加载中…</p>
+                    : error ? <div className="space-y-2">
+                        <p role="alert" className="text-sm text-destructive">{error}</p>
+                        <ActionButton icon={<RotateCw className="size-4" aria-hidden="true" />}
+                            onClick={() => setAttempt((value) => value + 1)}
+                            className="focus-visible:outline-2 focus-visible:outline-ring">重试</ActionButton>
+                    </div>
+                    : content.trim() ? <ArticleContent content={content} />
+                        : <p className="text-sm text-muted-foreground">暂无常见问题。</p>}
+            </div>
         </div>
     )
 }

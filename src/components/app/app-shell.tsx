@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from "react"
 
 import { DownloadBanner } from "@/components/app/download-banner"
 import { CloseConfirmDialog } from "@/components/app/close-confirm-dialog"
@@ -60,7 +67,23 @@ function AppShell({
     // 懒加载/异步数据会让页面高度逐步撑开，恢复可能被骨架屏高度钳制，
     // 等容器长高到能容纳目标位置后再补一次恢复
     const pendingRestoreRef = useRef<{ top: number } | null>(null)
+
     useEffect(() => {
+        const main = mainRef.current
+        if (!main) {
+            return
+        }
+        const rememberScroll = () => {
+            const key = lastScrollKeyRef.current
+            if (key) {
+                scrollMemoryRef.current.set(key, main.scrollTop)
+            }
+        }
+        main.addEventListener("scroll", rememberScroll, { passive: true })
+        return () => main.removeEventListener("scroll", rememberScroll)
+    }, [])
+
+    useLayoutEffect(() => {
         const main = mainRef.current
         if (!main) {
             return
@@ -74,7 +97,7 @@ function AppShell({
         const saved = scrollMemoryRef.current.get(key) ?? 0
         lastScrollKeyRef.current = key
         pendingRestoreRef.current = { top: saved }
-        main.scrollTo({ top: saved, left: 0 })
+        main.scrollTop = saved
         // 目标位置当前就能容纳说明恢复已生效，无需补恢复
         if (main.scrollTop === saved) {
             pendingRestoreRef.current = null
@@ -137,8 +160,12 @@ function AppShell({
                 back()
                 return true
             }
+            if (activeRoute === "feedback") {
+                onNavigate("settings")
+                return true
+            }
             return false
-        }, [fullPlayerOpen, detail, back]),
+        }, [fullPlayerOpen, detail, back, activeRoute, onNavigate]),
     })
 
     return (
@@ -155,10 +182,10 @@ function AppShell({
             {/* 网页版下载提示条：navbar 下方、内容上方；桌面版不渲染 */}
             <DownloadBanner />
 
-            <MobileNavBar activeRoute={activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
+            <MobileNavBar activeRoute={activeRoute === "feedback" ? "settings" : activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
 
             <div className="flex min-h-0 flex-1">
-                <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
+                <Sidebar activeRoute={activeRoute === "feedback" ? "settings" : activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
 
                 <main
                     ref={mainRef}

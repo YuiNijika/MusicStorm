@@ -73,6 +73,7 @@ const RadiosPage = lazy(() => import("@/pages/radios").then(m => ({ default: m.R
 const SearchPage = lazy(() => import("@/pages/search").then(m => ({ default: m.SearchPage })))
 const StatsPage = lazy(() => import("@/pages/stats").then(m => ({ default: m.StatsPage })))
 const CommentsPage = lazy(() => import("@/pages/comments").then(m => ({ default: m.CommentsPage })))
+const FeedbackPage = lazy(() => import("@/pages/feedback").then(m => ({ default: m.FeedbackPage })))
 
 import "./App.css"
 import "./Style.css"
@@ -82,11 +83,15 @@ function AppRoutes({
     titleBarStyle,
     onTitleBarStyleChange,
     settingsTab,
+    onNavigate,
+    onSettingsTabChange,
 }: {
     route: AppRoute
     titleBarStyle: TitleBarStyle
     onTitleBarStyleChange: (style: TitleBarStyle) => void
     settingsTab?: SettingsTab
+    onNavigate: (route: AppRoute) => void
+    onSettingsTabChange: (tab: SettingsTab) => void
 }) {
     const { detail, openPlaylist, openAlbum, openRadio, back } = useMusicNavigation()
 
@@ -182,7 +187,16 @@ function AppRoutes({
                     titleBarStyle={titleBarStyle}
                     onTitleBarStyleChange={onTitleBarStyleChange}
                     initialTab={settingsTab}
+                    onOpenFeedback={() => onNavigate("feedback")}
+                    onTabChange={onSettingsTabChange}
                 />
+            </Suspense>
+        )
+    }
+    if (route === "feedback") {
+        return (
+            <Suspense fallback={<p role="status">加载中…</p>}>
+                <FeedbackPage onBack={() => onNavigate("settings")} />
             </Suspense>
         )
     }
@@ -325,6 +339,7 @@ const WEB_HASH_ROUTES: Record<string, AppRoute> = {
     search: "search",
     stats: "stats",
     settings: "settings",
+    feedback: "feedback",
 }
 
 function webHashToRoute(hash: string): AppRoute {
@@ -362,7 +377,7 @@ function AppWithNav({
             // 导航提交，关详情页/设置 tab/路由一起在快照里完成
             runRouteTransition(() => {
                 closeDetail()
-                if (next !== "settings") {
+                if (next !== "settings" && next !== "feedback") {
                     setSettingsTab(undefined)
                 }
                 setRoute(next)
@@ -444,6 +459,8 @@ function AppWithNav({
                 titleBarStyle={titleBarStyle}
                 onTitleBarStyleChange={onTitleBarStyleChange}
                 settingsTab={settingsTab}
+                onNavigate={handleNavigateWeb}
+                onSettingsTabChange={setSettingsTab}
             />
         </AppShell>
     )
