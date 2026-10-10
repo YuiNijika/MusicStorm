@@ -1,0 +1,1 @@
+export{Or as getCurrentWindow}from"./App-DoQIsBn1.js";
