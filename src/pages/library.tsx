@@ -10,6 +10,7 @@ import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import {
     Dialog,
@@ -703,9 +704,12 @@ function LibraryPage() {
                             description="在网易云上传的歌曲会同步到这里"
                         />
                     ) : (
-                        <div className="apple-list-surface space-y-0.5 p-1.5">
-                            {cloud.map((track, index) => (
-                                <div key={track.id} data-cloud-row={index}>
+                        <div className="apple-list-surface p-1.5">
+                            <VirtualList
+                                items={cloud}
+                                itemHeight={58}
+                                getItemKey={(track) => track.id}
+                                renderItem={(track, index) => (
                                     <TrackRow
                                         track={track}
                                         index={index}
@@ -723,8 +727,8 @@ function LibraryPage() {
                                             playOrToggle(item, cloud)
                                         }
                                     />
-                                </div>
-                            ))}
+                                )}
+                            />
                         </div>
                     )}
                 </Section>

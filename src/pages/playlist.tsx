@@ -33,6 +33,7 @@ import {
     setPlaylistTracksView,
     setTrackSort,
 } from "@/lib/library/layout-prefs"
+import { normalizeCloudTrackOrder } from "@/lib/library/playlist-order"
 import { sortTracks, TRACK_SORT_OPTIONS } from "@/lib/library/sort"
 import {
     listLocalTracksForPlaylist,
@@ -78,10 +79,7 @@ function localRowToTrack(row: LocalPlaylistTrackRow): Track {
     }
 }
 
-// 本地条目按锚点插回云端列表：锚点是添加时歌单最前的云端曲目，插到锚点前面即还原
-// 「新添加的排最前」的时间序（网易云云端列表最新在前，同一条逻辑）。
-// 没有锚点的条目（升级前的旧数据、添加时歌单为空、锚点曲目被删）不沉底，
-// 与锚定在首支云端曲目上的条目一起按添加时间混排，保持在列表头部
+// 本地条目插在添加时记录的云端锚点之前，保持新增项目置前的顺序。
 function mergePlaylistTracks(
     cloudTracks: Track[],
     rows: LocalPlaylistTrackRow[],
@@ -91,7 +89,7 @@ function mergePlaylistTracks(
     }
     const cloudIds = new Set(cloudTracks.map((item) => item.id))
     const byAnchor = new Map<string, LocalPlaylistTrackRow[]>()
-    const frontRows: LocalPlaylistTrackRow[] = []
+    const unanchoredRows: LocalPlaylistTrackRow[] = []
     for (const row of rows) {
         const anchor = row.anchorTrackId ?? null
         if (anchor && cloudIds.has(anchor)) {
@@ -99,7 +97,7 @@ function mergePlaylistTracks(
             list.push(row)
             byAnchor.set(anchor, list)
         } else {
-            frontRows.push(row)
+            unanchoredRows.push(row)
         }
     }
     const byAddedDesc = (
@@ -109,25 +107,18 @@ function mergePlaylistTracks(
     for (const list of byAnchor.values()) {
         list.sort(byAddedDesc)
     }
-    frontRows.sort(byAddedDesc)
+    unanchoredRows.sort(byAddedDesc)
 
     const out: Track[] = []
-    // 列表头部：无锚点条目与锚定在首支云端曲目上的条目按添加时间混排，新添加的在最前
-    const firstCloud = cloudTracks[0]
-    const head = firstCloud
-        ? [...frontRows, ...(byAnchor.get(firstCloud.id) ?? [])].sort(byAddedDesc)
-        : frontRows
-    out.push(...head.map(localRowToTrack))
     for (let i = 0; i < cloudTracks.length; i += 1) {
-        out.push(cloudTracks[i]!)
-        const next = cloudTracks[i + 1]
-        if (next) {
-            const group = byAnchor.get(next.id)
-            if (group) {
-                out.push(...group.map(localRowToTrack))
-            }
+        const cloudTrack = cloudTracks[i]!
+        const group = byAnchor.get(cloudTrack.id)
+        if (group) {
+            out.push(...group.map(localRowToTrack))
         }
+        out.push(cloudTrack)
     }
+    out.push(...unanchoredRows.map(localRowToTrack))
     return out
 }
 
@@ -185,9 +176,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         [displayTracks, trackSort, customOrder],
     )
 
-    // 歌单封面优先级：曲目封面覆盖（用户设置）> 最新本地条目封面 > 云端第一首 > 官方封面。
-    // 本地音乐是用户主动加的，内页/列表页都稳定跟随本地封面（列表页 resolvePlaylistCover
-    // 同一规则），不随云端首曲变化或官方封面抢走
+    // 歌单封面优先级：用户覆盖 > 混排后的首曲 > 官方歌单封面。
     const heroCover = useMemo(() => {
         // 1. 歌单内任一曲目设置过自定义封面：以它为准，用户设置意图最强
         const overridden = displayTracks.find((track) => getCoverOverride(track.id))
@@ -198,34 +187,18 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         if (!localRowsReady) {
             return ""
         }
-        // 2. 最新本地条目封面优先（与列表页一致）
-        const latestLocal = [...localRows].sort(
-            (a, b) => b.addedAt - a.addedAt,
-        )[0]
-        if (latestLocal?.coverUrl) {
-            return latestLocal.coverUrl
-        }
-        // 3. 云端第一首曲目封面
-        if (tracks[0]) {
-            const url = resolveTrackCoverUrl(tracks[0].id, tracks[0].coverUrl)
+        // 混排顺序决定封面，云端新增歌曲或本地插入都会即时反映
+        for (const track of displayTracks) {
+            const url = resolveTrackCoverUrl(track.id, track.coverUrl)
             if (url) {
                 return url
             }
         }
-        // 4. 网易云官方歌单封面兜底
         if (playlist?.coverUrl) {
             return playlist.coverUrl
         }
-        // 5. 合并列表第一首兜底（纯本地歌单场景），仍取不到回退空
-        const first = displayTracks[0]
-        if (first) {
-            const url = resolveTrackCoverUrl(first.id, first.coverUrl)
-            if (url) {
-                return url
-            }
-        }
         return ""
-    }, [displayTracks, tracks, localRows, localRowsReady, playlist])
+    }, [displayTracks, localRowsReady, playlist])
 
     const dragEnabled =
         trackSort === "custom" && playlistTracksView === "list"
@@ -268,7 +241,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                     return
                 }
                 setPlaylist(result.playlist)
-                setTracks(result.tracks)
+                setTracks(
+                    normalizeCloudTrackOrder(playlistId, result.tracks),
+                )
                 setIsLoading(false)
             })
             .catch((error: unknown) => {

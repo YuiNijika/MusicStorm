@@ -10,7 +10,10 @@ const COL_6_MIN = 1100
 const COL_5_MIN = 980
 const COL_4_MIN = 700
 
-const PLAYLIST_GRID_CLASS = "grid gap-3"
+const PLAYLIST_GRID_CLASS =
+    // content-visibility 让浏览器跳过视口外卡片的渲染与布局，避免上千卡片时 DOM 爆炸；
+    // contain-intrinsic-size 提供未渲染项的预估占位，防止滚动条大幅跳动
+    "grid gap-3 [content-visibility:auto] [contain-intrinsic-size:auto_240px]"
 
 const PLAYLIST_FETCH_MAX = 48
 

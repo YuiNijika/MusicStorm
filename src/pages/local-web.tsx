@@ -98,7 +98,8 @@ function formatBytes(bytes: number): string {
 const EMPTY_STATE: WebLibraryState = { artists: [], albums: [], tracks: [] }
 
 const GRID_CLASS =
-    "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+    // content-visibility 跳过视口外卡片渲染，网页版本地库可能几千张专辑/艺人卡片
+    "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 [content-visibility:auto] [contain-intrinsic-size:auto_240px]"
 
 function LocalWebPage() {
     const { currentTrack, isPlaying, playOrToggle } = usePlayer()

@@ -398,23 +398,34 @@ function SearchPage() {
                                 description={`${remote.tracks.length} 首`}
                                 variant="listen"
                             >
-                                <div className="apple-list-surface space-y-0.5 p-1.5">
-                                    {remote.tracks.map((track, index) => (
-                                        <TrackRow
-                                            key={`${track.source}-${track.id}`}
-                                            track={track}
-                                            index={index}
-                                            showSource={false}
-                                            isActive={currentTrack?.id === track.id}
-                                            isPlaying={
-                                                currentTrack?.id === track.id &&
-                                                isPlaying
-                                            }
-                                            onPlay={(item) =>
-                                                playOrToggle(item, remote.tracks)
-                                            }
-                                        />
-                                    ))}
+                                <div className="apple-list-surface p-1.5">
+                                    <VirtualList
+                                        items={remote.tracks}
+                                        itemHeight={58}
+                                        getItemKey={(track) =>
+                                            `${track.source}-${track.id}`
+                                        }
+                                        renderItem={(track, index) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                showSource={false}
+                                                isActive={
+                                                    currentTrack?.id === track.id
+                                                }
+                                                isPlaying={
+                                                    currentTrack?.id === track.id &&
+                                                    isPlaying
+                                                }
+                                                onPlay={(item) =>
+                                                    playOrToggle(
+                                                        item,
+                                                        remote.tracks,
+                                                    )
+                                                }
+                                            />
+                                        )}
+                                    />
                                 </div>
                             </Section>
                         ) : null}

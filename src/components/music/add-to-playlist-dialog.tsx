@@ -10,9 +10,13 @@ import {
 } from "@/components/ui/dialog"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { addTrackToPlaylist } from "@/lib/netease/track-actions"
+import {
+    fetchPlaylistDetail,
+    fetchPlaylistHead,
+} from "@/lib/netease/playlist"
 import { fetchUserPlaylists } from "@/lib/netease/user"
-import { fetchPlaylistHead } from "@/lib/netease/playlist"
 import { addLocalTracksToPlaylist } from "@/lib/local/local-playlist"
+import { recordCloudPlaylistAddition } from "@/lib/library/playlist-order"
 import { notifyError, notifySuccess } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
 
@@ -76,6 +80,15 @@ function AddToPlaylistDialog({
             const neteaseIds = items
                 .filter((item) => item.source !== "local")
                 .map((item) => item.id)
+            let existingCloudIds: string[] = []
+            if (neteaseIds.length > 0) {
+                try {
+                    const current = await fetchPlaylistDetail(playlist.id)
+                    existingCloudIds = current.tracks.map((item) => item.id)
+                } catch {
+                    existingCloudIds = []
+                }
+            }
             if (localIds.length > 0) {
                 // 取目标歌单当前的排头云端曲目做锚点，本地条目按添加时间插队而非永远置顶
                 let anchorTrackId: string | null = null
@@ -93,6 +106,11 @@ function AddToPlaylistDialog({
             }
             if (neteaseIds.length > 0) {
                 await addTrackToPlaylist(playlist.id, neteaseIds)
+                recordCloudPlaylistAddition(
+                    playlist.id,
+                    existingCloudIds,
+                    neteaseIds,
+                )
             }
             notifySuccess("已添加到歌单", {
                 description: `${playlist.title} · ${items.length} 首`,

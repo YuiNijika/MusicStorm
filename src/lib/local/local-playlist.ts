@@ -79,16 +79,17 @@ async function fetchLocalPlaylistCovers(
     }
 }
 
-// 歌单列表封面接管规则，与详情页合并逻辑对齐：
-// 有本地条目且取得到本地封面时一律用本地封面（本地音乐是用户主动加的，
-// 封面稳定跟随它，不再随云端首曲变化而翻转）；否则云端排头，用云端第一首封面
-// （取不到回退歌单封面）
+// 歌单列表封面跟随混排后的首曲。
+// 只有本地条目的锚点就是当前云端首曲时，本地条目才排在它前面并接管封面。
 function resolvePlaylistCover(
     cloudCover: string,
     local: LocalPlaylistCover | undefined,
     head?: PlaylistHeadInfo | undefined,
 ): string {
-    if (local?.coverUrl) {
+    if (
+        local?.coverUrl &&
+        (!head?.firstTrackId || local.anchorTrackId === head.firstTrackId)
+    ) {
         return local.coverUrl
     }
     return head?.firstCoverUrl ?? cloudCover
