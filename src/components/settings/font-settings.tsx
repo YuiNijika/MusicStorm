@@ -105,7 +105,7 @@ function FontSettings() {
  setDraftFamily(preset.family)
  setFontPrefs({
  customFamily: preset.family,
- fontUrl: "",
+ fontUrl: preset.fontUrl ?? "",
  followThemeFont: preset.family.length ===0,
  })
  notifySuccess(`已切换到${preset.label}`, {

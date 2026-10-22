@@ -9,12 +9,22 @@ type ProxyInput = {
     url: string
     method?: ProxyMethod
     body?: Record<string, string | number | boolean | undefined>
+    referer?: string
 }
 
 const ROUTE_MAP: Record<string, string> = {
     "/x/web-interface/nav": "/auth/nav",
-    "/x/passport-login/web/qrcode/generate": "/auth/qrcode/generate",
-    "/x/passport-login/web/qrcode/poll": "/auth/qrcode/poll",
+    "/x/passport-tv-login/qrcode/auth_code": "/auth/qrcode/generate",
+    "/x/passport-tv-login/qrcode/poll": "/auth/qrcode/poll",
+    "/x/passport-login/web/key": "/auth/login/key",
+    "/x/passport-login/oauth2/login": "/auth/login/password",
+    "/x/passport-login/sms/send": "/auth/login/sms/send",
+    "/x/passport-login/login/sms": "/auth/login/sms",
+    "/x/safecenter/user/info": "/auth/risk/info",
+    "/x/safecenter/captcha/pre": "/auth/risk/captcha",
+    "/x/safecenter/common/sms/send": "/auth/risk/sms/send",
+    "/x/safecenter/login/tel/verify": "/auth/risk/sms/verify",
+    "/x/passport-login/oauth2/access_token": "/auth/login/access-token",
     "/x/passport-login/web/cookie/info": "/auth/cookie/info",
     "/x/passport-login/web/cookie/refresh": "/auth/cookie/refresh",
     "/x/passport-login/web/confirm/refresh": "/auth/cookie/confirm-refresh",
@@ -86,8 +96,15 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
         if (!isTauriRuntime()) {
             throw new Error("B站内置模式需在桌面应用中运行，请切换到对接模式")
         }
+        if ((input.method ?? "GET") === "POST") {
+            return invoke<unknown>("bilibili_post_json", {
+                url: input.url,
+                body: input.body ?? null,
+                refererUrl: input.referer ?? null,
+            })
+        }
         if ((input.method ?? "GET") !== "GET") {
-            throw new Error("B站内置模式暂不支持此写操作")
+            throw new Error("B站内置模式暂不支持此请求方法")
         }
         return invoke<unknown>("bilibili_get_json", { url: input.url })
     }
@@ -117,13 +134,20 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
                       .filter(([, value]) => value !== undefined)
                       .map(([key, value]) => [key, String(value)]),
               ).toString()
+    const requestBody =
+        body && input.referer
+            ? new URLSearchParams([
+                  ...new URLSearchParams(body).entries(),
+                  ["referer_url", input.referer],
+              ]).toString()
+            : body
     if (body) {
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     }
     const response = await fetch(target, {
         method,
         headers,
-        body,
+        body: requestBody,
         credentials: "omit",
     })
     const json = (await response.json()) as unknown

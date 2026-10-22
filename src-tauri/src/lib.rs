@@ -32,8 +32,8 @@ cache_cover_data_url, cache_cover_url, clear_cover_cache, cover_paths_exist,
 purge_cover_cache_cmd,
 };
 use bilibili::{
- bilibili_cache_audio, bilibili_clear_cookie, bilibili_complete_qr_login,
- bilibili_get_json, bilibili_set_cookie,
+ bilibili_cache_audio, bilibili_clear_cookie, bilibili_get_json, bilibili_post_json,
+ bilibili_set_cookie,
 };
 #[cfg(not(target_os = "android"))]
 use cover_cache::pick_cover_image;
@@ -1250,7 +1250,7 @@ pub fn run() {
             audio_stop,
             netease_http_post,
             bilibili_get_json,
-            bilibili_complete_qr_login,
+            bilibili_post_json,
  bilibili_set_cookie,
  bilibili_clear_cookie,
             bilibili_cache_audio,

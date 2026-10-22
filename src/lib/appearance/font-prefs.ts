@@ -3,6 +3,7 @@ const STYLE_ID = "musicstorm-custom-font"
 
 type FontPresetId =
  | "theme"
+ | "pingfang"
  | "geist"
  | "system"
  | "serif"
@@ -14,6 +15,7 @@ type FontPreset = {
  label: string
  description: string
  family: string
+ fontUrl?: string
 }
 
 type FontPrefs = {
@@ -28,6 +30,13 @@ const FONT_PRESETS: FontPreset[] = [
  label: "跟随主题",
  description: "跟随当前主题自带的字体",
  family: "",
+ },
+ {
+ id: "pingfang",
+ label: "苹方",
+ description: "MusicStorm 内置的中文界面字体",
+ family: "MusicStorm PingFang",
+ fontUrl: "/fonts/PingFang-Medium-SC.ttf",
  },
  {
  id: "geist",
@@ -66,9 +75,9 @@ const FONT_PRESETS: FontPreset[] = [
 ]
 
 const DEFAULT_FONT_PREFS: FontPrefs = {
- customFamily: "",
- fontUrl: "",
- followThemeFont: true,
+ customFamily: "MusicStorm PingFang",
+ fontUrl: "/fonts/PingFang-Medium-SC.ttf",
+ followThemeFont: false,
 }
 
 function sanitizeFamily(value: string): string {
@@ -85,6 +94,9 @@ function sanitizeFontUrl(value: string): string {
  return ""
  }
  if (/^data:font\//i.test(trimmed)) {
+ return trimmed
+ }
+ if (/^\/fonts\/[A-Za-z0-9._/-]+$/.test(trimmed)) {
  return trimmed
  }
  try {

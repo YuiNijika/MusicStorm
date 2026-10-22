@@ -1,20 +1,28 @@
-import { LogOut, RefreshCw } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { ArrowLeft, LogOut, RefreshCw } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
 
 import { cn } from "@/lib/utils"
 import {
  AUTH_EVENT,
  completeBilibiliLogin,
+ completeBilibiliRiskLogin,
  createBilibiliQrLogin,
  fetchBilibiliAuthStatus,
+ getBilibiliRiskGeetest,
+ loginBilibiliWithPassword,
+ loginBilibiliWithSms,
  logoutBilibili,
  pollBilibiliQrLogin,
  saveBilibiliCookie,
+ sendBilibiliRiskSms,
+ sendBilibiliSmsCode,
  type BilibiliAuthStatus,
+ type BilibiliGeetestChallenge,
+ type BilibiliRiskLogin,
 } from "@/lib/bilibili/auth"
+import { GeetestWebView, type GeetestResult } from "@/components/bilibili/geetest-webview"
 import { notifyFromError, notifySuccess } from "@/lib/notify"
-import { isWebMode } from "@/lib/web-mode"
 import {
  Dialog,
  DialogContent,
@@ -37,7 +45,7 @@ type QrState =
  message?: string
  }
 
-type AuthTab = "qr" | "cookie"
+type AuthTab = "password" | "sms" | "qr" | "cookie"
 
 function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  const [tab, setTab] = useState<AuthTab>("qr")
@@ -54,6 +62,18 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  const [cookieText, setCookieText] = useState("")
  const [cookieError, setCookieError] = useState("")
  const [loading, setLoading] = useState(false)
+ const [username, setUsername] = useState("")
+ const [password, setPassword] = useState("")
+ const [phone, setPhone] = useState("")
+ const [smsCode, setSmsCode] = useState("")
+ const [captchaKey, setCaptchaKey] = useState("")
+ const [cooldown, setCooldown] = useState(0)
+ const [riskLogin, setRiskLogin] = useState<BilibiliRiskLogin | null>(null)
+ const [riskChallenge, setRiskChallenge] =
+ useState<BilibiliGeetestChallenge | null>(null)
+ const [riskCaptchaKey, setRiskCaptchaKey] = useState("")
+ const [riskSmsCode, setRiskSmsCode] = useState("")
+ const riskSmsBusyRef = useRef(false)
 
  useEffect(() => {
  if (!open) {
@@ -61,6 +81,17 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  }
  setTab("qr")
  setCookieText("")
+ setUsername("")
+ setPassword("")
+ setPhone("")
+ setSmsCode("")
+ setCaptchaKey("")
+ setCooldown(0)
+ setRiskLogin(null)
+ setRiskChallenge(null)
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
+ riskSmsBusyRef.current = false
  let cancelled = false
  setLoading(true)
  void fetchBilibiliAuthStatus()
@@ -80,6 +111,14 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  }
  }, [open])
 
+ useEffect(() => {
+ if (cooldown <= 0) {
+ return
+ }
+ const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000)
+ return () => window.clearTimeout(timer)
+ }, [cooldown])
+
  const startQrLogin = useCallback(async () => {
  setQrState({ status: "loading" })
  try {
@@ -93,7 +132,7 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  }, [])
 
  useEffect(() => {
- if (!open || isWebMode() || tab !== "qr" || qr || qrState.status !== "idle") {
+ if (!open || tab !== "qr" || qr || qrState.status !== "idle") {
  return
  }
  void startQrLogin()
@@ -118,24 +157,15 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 if (!active || completed) {
                     return
                 }
-                if (result.status === "confirmed" && result.url) {
+                if (result.status === "confirmed") {
                     completed = true
                     window.clearInterval(timer)
-                    const next = await completeBilibiliLogin(result.url)
+                    const next = await completeBilibiliLogin()
                     setStatus(next)
                     setQrState({ status: "idle" })
                     onOpenChange(false)
                     notifySuccess("B站登录成功", {
                         description: next.account?.name,
-                    })
-                    return
-                }
-                if (result.status === "confirmed") {
-                    completed = true
-                    window.clearInterval(timer)
-                    setQrState({
-                        status: "failed",
-                        message: "B站没有返回登录跳转地址，请重新扫码",
                     })
                     return
                 }
@@ -207,6 +237,8 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  async function saveCookie() {
  setLoading(true)
  setCookieError("")
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
  try {
  const next = await saveBilibiliCookie(cookieText)
  setStatus(next)
@@ -217,6 +249,182 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  })
  } catch (error) {
  setCookieError("登录失败，请检查 Cookie 是否完整且仍有效，然后重试。")
+ notifyFromError("登录失败", error)
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ async function passwordLogin() {
+ if (loading) {
+ return
+ }
+ if (!username.trim() || !password) {
+ setCookieError("请输入账号和密码")
+ return
+ }
+ setLoading(true)
+ setCookieError("")
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
+ try {
+ const result = await loginBilibiliWithPassword(username, password)
+ if (result.type === "risk") {
+ setRiskLogin(result.risk)
+ setRiskChallenge(null)
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
+ return
+ }
+ setStatus(result.status)
+ onOpenChange(false)
+ notifySuccess("B站登录成功", { description: result.status.account?.name })
+ } catch (error) {
+ setCookieError(error instanceof Error ? error.message : "登录失败")
+ notifyFromError("登录失败", error)
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ async function beginRiskCaptcha() {
+ if (!riskLogin || loading || cooldown > 0) {
+ return
+ }
+ setLoading(true)
+ setCookieError("")
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
+ try {
+ const challenge = await getBilibiliRiskGeetest()
+ setRiskChallenge(challenge)
+ } catch (error) {
+ setCookieError(
+ error instanceof Error ? error.message : "获取安全验证失败",
+ )
+ notifyFromError("获取安全验证失败", error)
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ const handleRiskGeetestSuccess = useCallback(
+ async (result: GeetestResult) => {
+ if (
+ !riskLogin ||
+ !riskChallenge ||
+ loading ||
+ riskSmsBusyRef.current
+ ) {
+ return
+ }
+ riskSmsBusyRef.current = true
+ setLoading(true)
+ setCookieError("")
+ try {
+ const key = await sendBilibiliRiskSms({
+ risk: riskLogin,
+ challenge: riskChallenge,
+ validate: result.geetest_validate,
+ seccode: result.geetest_seccode,
+ challengeResult: result.geetest_challenge,
+ })
+ setRiskCaptchaKey(key)
+ setRiskChallenge(null)
+ setCooldown(60)
+ notifySuccess("安全验证通过，短信验证码已发送")
+ } catch (error) {
+ setRiskChallenge(null)
+ setCookieError(error instanceof Error ? error.message : "发送验证码失败")
+ notifyFromError("发送安全验证短信失败", error)
+ } finally {
+ riskSmsBusyRef.current = false
+ setLoading(false)
+ }
+ },
+ [loading, riskChallenge, riskLogin],
+ )
+
+ const handleRiskGeetestCancel = useCallback(() => {
+ setRiskChallenge(null)
+ }, [])
+
+ const handleRiskGeetestError = useCallback((message: string) => {
+ setRiskChallenge(null)
+ setCookieError(message)
+ }, [])
+
+ async function finishRiskLogin() {
+ if (!riskLogin || !riskCaptchaKey || !riskSmsCode.trim() || loading) {
+ return
+ }
+ setLoading(true)
+ setCookieError("")
+ try {
+ const next = await completeBilibiliRiskLogin({
+ risk: riskLogin,
+ code: riskSmsCode,
+ captchaKey: riskCaptchaKey,
+ })
+ setStatus(next)
+ onOpenChange(false)
+ notifySuccess("B站登录成功", { description: next.account?.name })
+ } catch (error) {
+ setCookieError(error instanceof Error ? error.message : "手机号验证失败")
+ notifyFromError("手机号验证失败", error)
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ async function sendSmsCode() {
+ if (loading || cooldown > 0) {
+ return
+ }
+ if (!/^\d{6,15}$/.test(phone.trim())) {
+ setCookieError("请输入有效的手机号")
+ return
+ }
+ setLoading(true)
+ setCookieError("")
+ try {
+ const key = await sendBilibiliSmsCode(phone)
+ setCaptchaKey(key)
+ setCooldown(60)
+ notifySuccess("验证码已发送")
+ } catch (error) {
+ setCookieError(error instanceof Error ? error.message : "验证码发送失败")
+ notifyFromError("验证码发送失败", error)
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ async function smsLogin() {
+ if (loading) {
+ return
+ }
+ if (!captchaKey) {
+ setCookieError("请先获取验证码")
+ return
+ }
+ if (!smsCode.trim()) {
+ setCookieError("请输入验证码")
+ return
+ }
+ setLoading(true)
+ setCookieError("")
+ try {
+ const next = await loginBilibiliWithSms({
+ phone,
+ code: smsCode,
+ captchaKey,
+ })
+ setStatus(next)
+ onOpenChange(false)
+ notifySuccess("B站登录成功", { description: next.account?.name })
+ } catch (error) {
+ setCookieError(error instanceof Error ? error.message : "登录失败")
  notifyFromError("登录失败", error)
  } finally {
  setLoading(false)
@@ -293,11 +501,6 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 登录状态只保存在本机
  </DialogDescription>
  </DialogHeader>
- {isWebMode() ? (
- <p className="rounded-xl bg-[var(--surface-fill)] px-3 py-2 text-[13px] text-muted-foreground">
- B站登录暂时只支持客户端
- </p>
- ) : (
  <div className="space-y-3">
  <div
  role="tablist"
@@ -305,6 +508,8 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  className="material-segmented flex gap-1 rounded-full p-1"
  >
  {([
+ ["password", "密码"],
+ ["sms", "短信"],
  ["qr", "扫码"],
  ["cookie", "Cookie"],
  ] as const).map(([id, label]) => (
@@ -343,7 +548,15 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  const nextTab = tabs[nextIndex]
  nextTab?.focus()
  if (nextTab) {
- setTab(nextTab.id.endsWith("-cookie") ? "cookie" : "qr")
+ setTab(
+ nextTab.id.endsWith("-password")
+ ? "password"
+ : nextTab.id.endsWith("-sms")
+ ? "sms"
+ : nextTab.id.endsWith("-cookie")
+ ? "cookie"
+ : "qr",
+ )
  }
  }}
  className={cn(
@@ -357,7 +570,172 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  </button>
  ))}
  </div>
- {tab === "qr" ? (
+ {tab === "password" ? (
+ <div
+ id="bilibili-auth-panel-password"
+ role="tabpanel"
+ aria-labelledby="bilibili-auth-tab-password"
+ className="space-y-3"
+ >
+ {riskLogin ? (
+ <div className="space-y-3">
+ <div className="flex items-start gap-2">
+ <button
+ type="button"
+ aria-label="返回密码登录"
+ title="返回密码登录"
+ onClick={() => {
+ setRiskLogin(null)
+ setRiskChallenge(null)
+ setRiskCaptchaKey("")
+ setRiskSmsCode("")
+ riskSmsBusyRef.current = false
+ }}
+ className="mt-0.5 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+ >
+ <ArrowLeft aria-hidden="true" className="size-4" />
+ </button>
+ <div className="min-w-0">
+ <p className="text-[13px] font-medium">需要验证绑定手机号</p>
+ <p className="mt-1 text-[12px] text-muted-foreground">
+ 验证码将发送至 {riskLogin.hiddenPhone}
+ </p>
+ </div>
+ </div>
+ {riskChallenge ? (
+ <GeetestWebView
+ challenge={riskChallenge}
+ onSuccess={handleRiskGeetestSuccess}
+ onCancel={handleRiskGeetestCancel}
+ onError={handleRiskGeetestError}
+ />
+ ) : null}
+ <ActionButton
+ variant="default"
+ className="min-h-11"
+ disabled={loading || cooldown > 0}
+ onClick={() => void beginRiskCaptcha()}
+ >
+ {cooldown > 0
+ ? `${cooldown}s 后可重新获取`
+ : loading
+ ? "正在准备验证…"
+ : riskCaptchaKey
+ ? "重新发送验证码"
+ : "获取短信验证码"}
+ </ActionButton>
+ {riskCaptchaKey ? (
+ <>
+ <input
+ type="text"
+ name="bilibili-risk-sms-code"
+ value={riskSmsCode}
+ onChange={(event) => setRiskSmsCode(event.currentTarget.value)}
+ placeholder="短信验证码…"
+ aria-label="手机号验证短信验证码"
+ inputMode="numeric"
+ autoComplete="one-time-code"
+ spellCheck={false}
+ disabled={loading}
+ className="material-field h-11 w-full rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
+ />
+ <ActionButton
+ variant="primary"
+ className="min-h-11"
+ disabled={loading || !riskSmsCode.trim()}
+ onClick={() => void finishRiskLogin()}
+ >
+ {loading ? "验证中…" : "验证并登录"}
+ </ActionButton>
+ </>
+ ) : null}
+ </div>
+ ) : (
+ <>
+ <input
+ type="text"
+ name="bilibili-username"
+ value={username}
+ onChange={(event) => setUsername(event.currentTarget.value)}
+ placeholder="邮箱或手机号…"
+ aria-label="B站账号"
+ autoComplete="username"
+ spellCheck={false}
+ disabled={loading}
+ className="material-field h-11 w-full rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
+ />
+ <input
+ type="password"
+ name="bilibili-password"
+ value={password}
+ onChange={(event) => setPassword(event.currentTarget.value)}
+ placeholder="密码…"
+ aria-label="B站密码"
+ autoComplete="current-password"
+ disabled={loading}
+ className="material-field h-11 w-full rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
+ />
+ <ActionButton
+ variant="primary"
+ disabled={loading || !username.trim() || !password}
+ onClick={() => void passwordLogin()}
+ >
+ {loading ? "登录中…" : "登录"}
+ </ActionButton>
+ </>
+ )}
+ </div>
+ ) : tab === "sms" ? (
+ <div
+ id="bilibili-auth-panel-sms"
+ role="tabpanel"
+ aria-labelledby="bilibili-auth-tab-sms"
+ className="space-y-3"
+ >
+ <input
+ type="tel"
+ name="bilibili-phone"
+ value={phone}
+ onChange={(event) => setPhone(event.currentTarget.value)}
+ placeholder="手机号…"
+ aria-label="B站手机号"
+ inputMode="tel"
+ spellCheck={false}
+ autoComplete="tel"
+ disabled={loading}
+ className="material-field h-11 w-full rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
+ />
+ <div className="flex gap-2">
+ <input
+ type="text"
+ name="bilibili-sms-code"
+ value={smsCode}
+ onChange={(event) => setSmsCode(event.currentTarget.value)}
+ placeholder="验证码…"
+ aria-label="短信验证码"
+ inputMode="numeric"
+ spellCheck={false}
+ disabled={loading}
+ className="material-field h-11 min-w-0 flex-1 rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
+ />
+ <button
+ type="button"
+ disabled={loading || cooldown > 0}
+ onClick={() => void sendSmsCode()}
+ className="h-11 shrink-0 cursor-pointer rounded-full bg-[var(--surface-fill)] px-3 text-[12px] font-medium transition-colors hover:bg-[var(--surface-fill-hover)] disabled:opacity-50 sm:h-10"
+ >
+ {cooldown > 0 ? `${cooldown}s` : "获取验证码"}
+ </button>
+ </div>
+ <ActionButton
+ variant="primary"
+ disabled={loading || !captchaKey || !smsCode.trim()}
+ onClick={() => void smsLogin()}
+ >
+ {loading ? "登录中…" : "登录"}
+ </ActionButton>
+ </div>
+ ) : tab === "qr" ? (
  <div
  id="bilibili-auth-panel-qr"
  role="tabpanel"
@@ -454,14 +832,9 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  autoComplete="off"
  spellCheck={false}
  placeholder="粘贴包含 SESSDATA 的 Cookie…"
- className="material-field w-full resize-y rounded-xl px-3 py-2 text-[12px] outline-none focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+ className="material-field w-full resize-y rounded-xl px-3 py-2 text-base outline-none focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50 sm:text-[12px]"
  />
  </label>
- {cookieError ? (
- <p role="alert" className="text-[12px] text-rose-600 dark:text-rose-300">
- {cookieError}
- </p>
- ) : null}
  <p className="text-[12px] leading-relaxed text-muted-foreground">
  从浏览器中复制 B站登录 Cookie。凭据仅保存在本机，请勿分享给他人。
  </p>
@@ -474,8 +847,12 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  </ActionButton>
  </div>
  )}
+ {cookieError ? (
+ <p role="alert" aria-live="polite" className="text-[12px] text-rose-600 dark:text-rose-300">
+ {cookieError}
+ </p>
+ ) : null}
  </div>
- )}
  </DialogContent>
  </Dialog>
  )

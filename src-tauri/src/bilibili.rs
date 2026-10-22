@@ -1,6 +1,6 @@
 use reqwest::blocking::Client;
 use reqwest::header::{
-    ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, LOCATION, REFERER, SET_COOKIE, USER_AGENT,
+    ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, REFERER, USER_AGENT,
 };
 use reqwest::redirect::{Attempt, Policy};
 use reqwest::Url;
@@ -9,7 +9,6 @@ use serde_json::Value;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -27,23 +26,12 @@ const JSON_TIMEOUT_SECONDS: u64 = 15;
 const REQUEST_TIMEOUT_SECONDS: u64 =180;
 const COOKIE_VERSION: &str = "v1";
 const PASSPORT_HOST: &str = "passport.bilibili.com";
-const LOGIN_CALLBACK_HOST: &str = "passport.biligame.com";
-const BILIBILI_CN_CALLBACK_HOST: &str = "passport.bilibili.cn";
-const BILIBILI_CN_CALLBACK_PATH: &str = "/x/passport-login/web/crossDomain";
-const BIGFUN_SSO_HOST: &str = "passport.bigfunapp.cn";
-const BIGFUN_SSO_PATH: &str = "/api/v2/sso";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BilibiliAudioCache {
     path: String,
     reused: bool,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BilibiliLoginCompletion {
-    logged_in: bool,
 }
 
 fn api_path_allowed(path: &str) -> bool {
@@ -61,220 +49,6 @@ fn api_path_allowed(path: &str) -> bool {
     )
 }
 
-fn passport_path_allowed(path: &str) -> bool {
- path == "/x/passport-login/web/qrcode/generate"
- || path == "/x/passport-login/web/qrcode/poll"
-}
-
-fn validate_login_callback_url(raw: &str) -> Result<Url, String> {
-    let url = Url::parse(raw.trim()).map_err(|_| "登录回调地址无效".to_string())?;
-    if url.scheme() != "https"
-        || url.host_str() != Some(LOGIN_CALLBACK_HOST)
-        || url.path() != "/x/passport-login/web/crossDomain"
-        || url.username().len() > 0
-        || url.password().is_some()
-    {
-        return Err("登录回调地址不受信任".into());
-    }
-    Ok(url)
-}
-
-fn validate_login_redirect_url(raw: &str) -> Result<Url, String> {
-    let mut url = Url::parse(raw.trim()).map_err(|_| "登录跳转地址无效".to_string())?;
-    let host = url
-        .host_str()
-        .unwrap_or_default()
-        .trim_end_matches('.')
-        .to_string();
-    let is_bilibili_domain =
-        host == "bilibili.com" || host.ends_with(".bilibili.com");
-    let is_biligame_domain = host == "biligame.com" || host.ends_with(".biligame.com");
-    let is_bilibili_cn_callback =
-        host == BILIBILI_CN_CALLBACK_HOST && url.path() == BILIBILI_CN_CALLBACK_PATH;
-    let is_bigfun_sso = host == BIGFUN_SSO_HOST && url.path() == BIGFUN_SSO_PATH;
-    let host_allowed =
-        is_bilibili_domain || is_biligame_domain || is_bilibili_cn_callback || is_bigfun_sso;
-    let path_allowed = (host != BIGFUN_SSO_HOST || is_bigfun_sso)
-        && (host != BILIBILI_CN_CALLBACK_HOST || is_bilibili_cn_callback);
-    if url.scheme() == "http" && host_allowed && path_allowed {
-        url.set_scheme("https")
-            .map_err(|_| "登录跳转地址无效".to_string())?;
-    }
-    if url.scheme() != "https"
-        || !host_allowed
-        || !path_allowed
-        || url.port().is_some()
-        || url.username().len() > 0
-        || url.password().is_some()
-    {
-        return Err(format!(
-            "登录跳转地址不受信任 {}{}",
-            host,
-            url.path()
-        ));
-    }
-    Ok(url)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::validate_login_redirect_url;
-
-    #[test]
-    fn accepts_bilibili_bigfun_sso_endpoint() {
-        assert!(validate_login_redirect_url(
-            "https://passport.bigfunapp.cn/api/v2/sso?ticket=test"
-        )
-        .is_ok());
-        assert!(validate_login_redirect_url(
-            "https://passport.bilibili.com/x/passport-login/web/crossDomain?ticket=test"
-        )
-        .is_ok());
-        assert!(validate_login_redirect_url(
-            "https://passport.bilibili.cn/x/passport-login/web/crossDomain?ticket=test"
-        )
-        .is_ok());
-        assert!(validate_login_redirect_url("https://passport.biligame.com/").is_ok());
-        assert!(validate_login_redirect_url("https://auth.bilibili.com/").is_ok());
-        assert_eq!(
-            validate_login_redirect_url("http://www.bilibili.com/").unwrap().scheme(),
-            "https"
-        );
-    }
-
-    #[test]
-    fn rejects_other_bigfun_paths_and_lookalike_hosts() {
-        assert!(validate_login_redirect_url("https://passport.bigfunapp.cn/other/path").is_err());
-        assert!(validate_login_redirect_url(
-            "https://passport.bigfunapp.cn.attacker.example/api/v2/sso"
-        )
-        .is_err());
-        assert!(validate_login_redirect_url("https://passport.bilibili.cn/").is_err());
-        assert!(validate_login_redirect_url(
-            "https://passport.bilibili.cn.attacker.example/x/passport-login/web/crossDomain"
-        )
-        .is_err());
-        assert!(validate_login_redirect_url("https://bilibili.com.attacker.example/").is_err());
-        assert!(validate_login_redirect_url("https://passport.bilibili.com:8443/").is_err());
-    }
-}
-
-fn collect_set_cookie(headers: &reqwest::header::HeaderMap, cookies: &mut BTreeMap<String, String>) {
-    for value in headers.get_all(SET_COOKIE).iter() {
-        let Ok(text) = value.to_str() else {
-            continue;
-        };
-        let Some((name, value)) = text
-            .split(';')
-            .next()
-            .and_then(|part| part.split_once('='))
-        else {
-            continue;
-        };
-        let name = name.trim();
-        let value = value.trim();
-        if !name.is_empty() && !value.is_empty() {
-            cookies.insert(name.to_string(), value.to_string());
-        }
-    }
-}
-
-fn parse_cookie_header(header: &str) -> BTreeMap<String, String> {
-    header
-        .split(';')
-        .filter_map(|part| {
-            let (name, value) = part.trim().split_once('=')?;
-            let name = name.trim();
-            let value = value.trim();
-            if name.is_empty() || value.is_empty() {
-                return None;
-            }
-            Some((name.to_string(), value.to_string()))
-        })
-        .collect()
-}
-
-#[tauri::command]
-pub async fn bilibili_complete_qr_login(
-    app: AppHandle,
-    callback_url: String,
-) -> Result<BilibiliLoginCompletion, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut target = validate_login_callback_url(&callback_url)?;
-        let client = Client::builder()
-            .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECONDS))
-            .timeout(Duration::from_secs(JSON_TIMEOUT_SECONDS))
-            .redirect(Policy::none())
-            .build()
-            .map_err(|error| format!("创建登录客户端失败 {error}"))?;
-        let mut cookies = BTreeMap::new();
-
-        for hop in 0..4 {
-            let mut request = bilibili_headers(client.get(target.clone()));
-            if !cookies.is_empty() {
-                let cookie = cookies
-                    .iter()
-                    .map(|(name, value)| format!("{name}={value}"))
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                request = request.header(reqwest::header::COOKIE, cookie);
-            }
-            let response = request
-                .send()
-                .map_err(|error| format!("完成B站登录失败 {error}"))?;
-            collect_set_cookie(response.headers(), &mut cookies);
-            if !response.status().is_redirection() {
-                break;
-            }
-            if hop == 3 {
-                return Err("B站登录跳转次数过多".into());
-            }
-            let location = response
-                .headers()
-                .get(LOCATION)
-                .and_then(|value| value.to_str().ok())
-                .ok_or_else(|| "B站登录跳转地址缺失".to_string())?;
-            let next = target
-                .join(location)
-                .map_err(|_| "登录跳转地址无效".to_string())?;
-            target = validate_login_redirect_url(next.as_str())?;
-        }
-
-        let cookie = cookies
-            .iter()
-            .map(|(name, value)| format!("{name}={value}"))
-            .collect::<Vec<_>>()
-            .join("; ");
-        if !cookies.contains_key("SESSDATA") {
-            return Err("B站登录未返回有效登录状态".into());
-        }
-        let response = json_client()?
-            .get("https://api.bilibili.com/x/web-interface/nav")
-            .header(reqwest::header::COOKIE, &cookie)
-            .header(ACCEPT, "application/json")
-            .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9")
-            .header("Sec-Fetch-Site", "same-site")
-            .header("Sec-Fetch-Mode", "cors")
-            .send()
-            .map_err(|_| "B站登录状态验证请求失败".to_string())?
-            .error_for_status()
-            .map_err(|_| "B站登录状态验证请求失败".to_string())?;
-        let nav_bytes = response
-            .bytes()
-            .map_err(|_| "B站登录状态验证响应读取失败".to_string())?;
-        let nav: Value = serde_json::from_slice(&nav_bytes)
-            .map_err(|_| "B站登录状态验证响应无效".to_string())?;
-        if nav.pointer("/data/isLogin").and_then(Value::as_bool) != Some(true) {
-            return Err("登录回调已完成，但B站未确认登录状态".into());
-        }
-
-        write_cookie(&app, &cookie)?;
-        Ok(BilibiliLoginCompletion { logged_in: true })
-    })
-    .await
-    .map_err(|error| format!("B站登录任务失败 {error}"))?
-}
-
 fn validate_api_url(raw: &str) -> Result<Url, String> {
  let url = Url::parse(raw.trim()).map_err(|_| "哔哩哔哩接口地址无效".to_string())?;
  let host = url.host_str().unwrap_or_default();
@@ -288,6 +62,39 @@ fn validate_api_url(raw: &str) -> Result<Url, String> {
  return Err("哔哩哔哩接口地址不受信任".into());
  }
  Ok(url)
+}
+
+fn passport_path_allowed(path: &str) -> bool {
+    matches!(
+        path,
+        "/x/passport-tv-login/qrcode/auth_code"
+            | "/x/passport-tv-login/qrcode/poll"
+            | "/x/passport-login/web/key"
+            | "/x/passport-login/oauth2/login"
+            | "/x/passport-login/sms/send"
+            | "/x/passport-login/login/sms"
+            | "/x/passport-login/oauth2/access_token"
+            | "/x/safecenter/user/info"
+            | "/x/safecenter/captcha/pre"
+            | "/x/safecenter/common/sms/send"
+            | "/x/safecenter/login/tel/verify"
+    )
+}
+
+fn validate_risk_referer(raw: Option<&str>) -> Result<Option<Url>, String> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let referer = Url::parse(raw.trim()).map_err(|_| "安全验证来源地址无效".to_string())?;
+    if referer.scheme() != "https"
+        || referer.host_str() != Some(PASSPORT_HOST)
+        || referer.path() != "/h5-app/passport/risk/verify"
+        || !referer.username().is_empty()
+        || referer.password().is_some()
+    {
+        return Err("安全验证来源地址不受信任".into());
+    }
+    Ok(Some(referer))
 }
 
 fn cookie_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -436,7 +243,6 @@ fn bilibili_headers(
 pub async fn bilibili_get_json(app: AppHandle, url: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let target = validate_api_url(&url)?;
-        let is_qr_poll = target.path() == "/x/passport-login/web/qrcode/poll";
         let client = json_client()?;
  let request = bilibili_headers(client.get(target));
  let request = if let Some(cookie) = read_cookie(&app) {
@@ -451,25 +257,6 @@ pub async fn bilibili_get_json(app: AppHandle, url: String) -> Result<Value, Str
  .header("Sec-Fetch-Mode", "cors")
  .send()
             .map_err(|error| format!("哔哩哔哩请求失败 {error}"))?;
-        let mut response_cookies = BTreeMap::new();
-        if is_qr_poll {
-            collect_set_cookie(response.headers(), &mut response_cookies);
-            if response_cookies.contains_key("SESSDATA") {
-                let cookie = if let Some(existing) = read_cookie(&app) {
-                    let mut merged = parse_cookie_header(&existing);
-                    merged.append(&mut response_cookies);
-                    merged
-                } else {
-                    response_cookies
-                };
-                let cookie = cookie
-                    .iter()
-                    .map(|(name, value)| format!("{name}={value}"))
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                write_cookie(&app, &cookie)?;
-            }
-        }
         let status = response.status();
         if !status.is_success() {
             return Err(format!("哔哩哔哩请求失败 HTTP {status}"));
@@ -491,6 +278,86 @@ pub async fn bilibili_get_json(app: AppHandle, url: String) -> Result<Value, Str
     })
     .await
     .map_err(|error| format!("哔哩哔哩请求任务失败 {error}"))?
+}
+
+#[tauri::command]
+pub async fn bilibili_post_json(
+    app: AppHandle,
+    url: String,
+    body: Option<Value>,
+    referer_url: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = validate_api_url(&url)?;
+        let referer = validate_risk_referer(referer_url.as_deref())?;
+        if target.host_str() != Some(PASSPORT_HOST)
+            || !passport_path_allowed(target.path())
+        {
+            return Err("哔哩哔哩登录接口不受信任".into());
+        }
+        let client = json_client()?;
+        let request = bilibili_headers(client.post(target));
+        let request = if let Some(referer) = referer {
+            request.header(REFERER, referer.as_str())
+        } else {
+            request
+        };
+        let request = if let Some(cookie) = read_cookie(&app) {
+            request.header(reqwest::header::COOKIE, cookie)
+        } else {
+            request
+        };
+        let form = body
+            .and_then(|value| value.as_object().cloned())
+            .map(|values| {
+                values
+                    .into_iter()
+                    .filter_map(|(key, value)| {
+                        let value = match value {
+                            Value::String(value) => value,
+                            Value::Number(value) => value.to_string(),
+                            Value::Bool(value) => value.to_string(),
+                            _ => return None,
+                        };
+                        Some((key, value))
+                    })
+                    .collect::<std::collections::HashMap<_, _>>()
+            });
+        let request = if let Some(form) = form {
+            request
+                .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .form(&form)
+        } else {
+            request
+        };
+        let response = request
+            .header(ACCEPT, "application/json")
+            .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9")
+            .header("Sec-Fetch-Site", "same-site")
+            .header("Sec-Fetch-Mode", "cors")
+            .send()
+            .map_err(|error| format!("哔哩哔哩登录请求失败 {error}"))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(format!("哔哩哔哩登录请求失败 HTTP {status}"));
+        }
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_JSON_BYTES)
+        {
+            return Err("哔哩哔哩登录响应过大".into());
+        }
+        let bytes = response
+            .bytes()
+            .map_err(|error| format!("读取哔哩哔哩登录响应失败 {error}"))?;
+        if bytes.len() as u64 > MAX_JSON_BYTES {
+            return Err("哔哩哔哩登录响应过大".into());
+        }
+        serde_json::from_slice::<Value>(&bytes)
+            .map_err(|error| format!("哔哩哔哩登录响应格式无效 {error}"))
+    })
+    .await
+    .map_err(|error| format!("哔哩哔哩登录任务失败 {error}"))?
 }
 
 fn download_audio_headers(

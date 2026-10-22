@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link
+      rel="preload"
+      href="/fonts/PingFang-Medium-SC.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
@@ -83,6 +90,11 @@
       })();
     </script>
     <style>
+      @font-face {
+        font-family: "MusicStorm PingFang";
+        src: url("/fonts/PingFang-Medium-SC.ttf") format("truetype");
+        font-display: swap;
+      }
       #boot-loading {
         position: fixed;
         inset: 0;
@@ -97,8 +109,8 @@
           #ecedef 100%
         );
         font-family:
-          -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
-          sans-serif;
+          "MusicStorm PingFang", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", system-ui, sans-serif;
         -webkit-user-select: none;
         user-select: none;
       }
