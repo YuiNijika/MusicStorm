@@ -1,4 +1,4 @@
-export type MusicSource = "local" | "netease"
+export type MusicSource = "local" | "netease" | "bilibili"
 
 export type TrackArtist = {
     id: string
@@ -31,6 +31,20 @@ export type Track = {
     fileName?: string
     /** 本地内容 MD5，统计归类 */
     contentHash?: string
+    /** 哔哩哔哩视频号 */
+    bvid?: string
+    /** 哔哩哔哩分区名称 */
+    tname?: string
+    /** 哔哩哔哩 av 号 */
+    aid?: number
+    /** 哔哩哔哩分集号 */
+    cid?: number
+    /** 哔哩哔哩音频流编号 */
+    audioId?: number
+    /** 视频原始页面 */
+    webUrl?: string
+    /** 哔哩哔哩视频播放量 */
+    viewCount?: number
 }
 
 export type Playlist = {

@@ -27,7 +27,8 @@ function readJson<T>(key: string, fallback: T): T {
         if (!raw) {
             return fallback
         }
-        return JSON.parse(raw) as T
+        const parsed: unknown = JSON.parse(raw)
+        return (parsed == null ? fallback : parsed) as T
     } catch {
         return fallback
     }

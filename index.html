@@ -7,13 +7,34 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#f5f5f7" />
+    <meta name="theme-color" content="#f5f6f8" />
     <title>MusicStorm</title>
     <script>
       (function () {
         var KEY = "musicstorm-theme";
+        var STYLE_KEY = "musicstorm-theme-style";
+        var THEME_COLORS = {
+          default: ["#f5f6f8", "#17181b"],
+          minecraft: ["#e7e1cf", "#1d201a"],
+          material: ["#f8fafd", "#111418"],
+          windows: ["#f3f3f3", "#202020"],
+          nord: ["#eceff4", "#242933"],
+          sunset: ["#fbf1e8", "#241d1b"],
+          forest: ["#eef2e8", "#1b241c"],
+          monochrome: ["#f4f4f4", "#171717"],
+        };
         function systemDark() {
           return window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+        function readStyle() {
+          try {
+            var value = window.localStorage.getItem(STYLE_KEY);
+            return Object.prototype.hasOwnProperty.call(THEME_COLORS, value)
+              ? value
+              : "default";
+          } catch (e) {
+            return "default";
+          }
         }
         function apply() {
           var stored = null;
@@ -29,8 +50,16 @@
                 ? "dark"
                 : "light";
           var root = document.documentElement;
+          var style = readStyle();
           root.classList.toggle("dark", resolved === "dark");
           root.dataset.theme = resolved;
+          root.dataset.themeStyle = style;
+          root.style.colorScheme = resolved;
+          var colors = THEME_COLORS[style] || THEME_COLORS.default;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute("content", colors[resolved === "dark" ? 1 : 0]);
+          }
         }
         apply();
         // system 模式下跟随系统明暗切换
@@ -143,6 +172,82 @@
       html[data-theme="dark"] #boot-loading .progress > i {
         background: #f5f5f7;
       }
+      html[data-theme-style="minecraft"] #boot-loading {
+        background-color: #e7e1cf;
+        background-image:
+          linear-gradient(45deg, rgba(80, 67, 43, 0.06) 25%, transparent 25%),
+          linear-gradient(-45deg, rgba(80, 67, 43, 0.06) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, rgba(80, 67, 43, 0.06) 75%),
+          linear-gradient(-45deg, transparent 75%, rgba(80, 67, 43, 0.06) 75%);
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        background-size: 16px 16px;
+        font-family: "Courier New", "Microsoft YaHei", monospace;
+      }
+      html[data-theme-style="minecraft"][data-theme="dark"] #boot-loading {
+        background-color: #1d201a;
+        background-image:
+          linear-gradient(45deg, rgba(238, 233, 216, 0.035) 25%, transparent 25%),
+          linear-gradient(-45deg, rgba(238, 233, 216, 0.035) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, rgba(238, 233, 216, 0.035) 75%),
+          linear-gradient(-45deg, transparent 75%, rgba(238, 233, 216, 0.035) 75%);
+      }
+      html[data-theme-style="minecraft"] #boot-loading .logo {
+        border-radius: 4px;
+        image-rendering: pixelated;
+        box-shadow: 5px 5px 0 rgba(71, 61, 44, 0.42);
+      }
+      html[data-theme-style="minecraft"] #boot-loading .progress {
+        border-radius: 0;
+      }
+      html[data-theme-style="minecraft"] #boot-loading .progress > i {
+        border-radius: 0;
+        background: #477a2f;
+      }
+      html[data-theme-style="material"] #boot-loading {
+        background: #f8fafd;
+        font-family: Roboto, "Microsoft YaHei", sans-serif;
+      }
+      html[data-theme-style="material"][data-theme="dark"] #boot-loading {
+        background: #111418;
+      }
+      html[data-theme-style="material"] #boot-loading .logo {
+        border-radius: 16px;
+      }
+      html[data-theme-style="windows"] #boot-loading {
+        background: #f3f3f3;
+        font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+      html[data-theme-style="windows"][data-theme="dark"] #boot-loading {
+        background: #202020;
+      }
+      html[data-theme-style="windows"] #boot-loading .logo {
+        border-radius: 4px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+      }
+      html[data-theme-style="nord"] #boot-loading {
+        background: #eceff4;
+      }
+      html[data-theme-style="nord"][data-theme="dark"] #boot-loading {
+        background: #242933;
+      }
+      html[data-theme-style="sunset"] #boot-loading {
+        background: #fbf1e8;
+      }
+      html[data-theme-style="sunset"][data-theme="dark"] #boot-loading {
+        background: #241d1b;
+      }
+      html[data-theme-style="forest"] #boot-loading {
+        background: #eef2e8;
+      }
+      html[data-theme-style="forest"][data-theme="dark"] #boot-loading {
+        background: #1b241c;
+      }
+      html[data-theme-style="monochrome"] #boot-loading {
+        background: #f4f4f4;
+      }
+      html[data-theme-style="monochrome"][data-theme="dark"] #boot-loading {
+        background: #171717;
+      }
 
       @keyframes boot-hero-in {
         from {
@@ -168,7 +273,8 @@
           animation: none;
         }
         #boot-loading .progress > i {
-          animation-duration: 3.5s;
+          animation: none;
+          transform: translateX(70%);
         }
       }
     </style>
@@ -177,7 +283,14 @@
   <body>
     <div id="boot-loading">
       <div class="hero">
-        <img class="logo" src="/icon.png" alt="MusicStorm" draggable="false" />
+        <img
+          class="logo"
+          src="/icon.png"
+          alt="MusicStorm"
+          width="88"
+          height="88"
+          draggable="false"
+        />
         <h1>MusicStorm</h1>
         <p>正在准备你的音乐库…</p>
         <div class="progress" aria-hidden="true"><i></i></div>

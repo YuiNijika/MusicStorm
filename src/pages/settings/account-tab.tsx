@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react"
 
+import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
+import {
+    AUTH_EVENT,
+    fetchBilibiliAuthStatus,
+    logoutBilibili,
+    type BilibiliAccount,
+} from "@/lib/bilibili/auth"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import {
     formatError,
@@ -28,7 +35,7 @@ function formatSigninTime(ts: number): string {
     return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
-function AccountTab({ onLogin }: { onLogin: () => void }) {
+function NeteaseAccountContent({ onLogin }: { onLogin: () => void }) {
     const {
         ready,
         loggedIn,
@@ -123,11 +130,6 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
 
     return (
         <div className="space-y-3">
-            <TabHeader
-                title="账号"
-                description="登录网易云，支持多账号切换与每日签到"
-            />
-
             <div className="space-y-3">
                 <SettingsGroup
                     title="当前账号"
@@ -286,6 +288,131 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                     </SettingsGroup>
                 ) : null}
             </div>
+        </div>
+    )
+}
+
+function AccountTab({ onLogin }: { onLogin: () => void }) {
+    const [provider, setProvider] = useState<"netease" | "bilibili">("netease")
+    const [bilibiliDialogOpen, setBilibiliDialogOpen] = useState(false)
+    const [bilibiliAccount, setBilibiliAccount] =
+        useState<BilibiliAccount | null>(null)
+
+    useEffect(() => {
+        function syncBilibiliAccount() {
+            void fetchBilibiliAuthStatus()
+                .then((status) => setBilibiliAccount(status.account))
+                .catch(() => setBilibiliAccount(null))
+        }
+        syncBilibiliAccount()
+        window.addEventListener(AUTH_EVENT, syncBilibiliAccount)
+        return () =>
+            window.removeEventListener(AUTH_EVENT, syncBilibiliAccount)
+    }, [])
+
+    async function handleBilibiliLogout() {
+        await logoutBilibili()
+        setBilibiliAccount(null)
+    }
+
+    return (
+        <div className="space-y-3">
+            <TabHeader
+                title="账号"
+                description="分别管理网易云与哔哩哔哩登录状态"
+            />
+            <div
+                role="tablist"
+                aria-label="账号服务"
+                className="apple-segmented flex w-full max-w-sm"
+            >
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={provider === "netease"}
+                    onClick={() => setProvider("netease")}
+                    className="apple-segmented-item flex-1 cursor-pointer text-[13px] font-medium"
+                >
+                    网易云
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={provider === "bilibili"}
+                    onClick={() => setProvider("bilibili")}
+                    className="apple-segmented-item flex-1 cursor-pointer text-[13px] font-medium"
+                >
+                    哔哩哔哩
+                </button>
+            </div>
+            {provider === "netease" ? (
+                <NeteaseAccountContent onLogin={onLogin} />
+            ) : (
+                <div className="space-y-3">
+                    <SettingsGroup
+                        title="哔哩哔哩账号"
+                        description="登录后可将收藏夹作为资料库使用"
+                    >
+                        {bilibiliAccount ? (
+                            <div className="flex min-h-11 flex-wrap items-center gap-3">
+                                {bilibiliAccount.avatarUrl ? (
+                                    <img
+                                        src={bilibiliAccount.avatarUrl}
+                                        alt=""
+                                        width={48}
+                                        height={48}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="size-12 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="flex size-12 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[14px] font-medium">
+                                        {bilibiliAccount.name.slice(0, 1)}
+                                    </span>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-[15px] font-medium">
+                                        {bilibiliAccount.name}
+                                    </p>
+                                    <p className="text-[13px] text-muted-foreground">
+                                        UID {bilibiliAccount.mid}
+                                    </p>
+                                </div>
+                                <ActionButton
+                                    variant="danger"
+                                    onClick={() => void handleBilibiliLogout()}
+                                >
+                                    退出登录
+                                </ActionButton>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                当前未登录，登录后可以在资料库查看收藏夹。
+                            </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                            <ActionButton
+                                variant="primary"
+                                onClick={() => setBilibiliDialogOpen(true)}
+                            >
+                                {bilibiliAccount ? "管理账号" : "登录哔哩哔哩"}
+                            </ActionButton>
+                        </div>
+                    </SettingsGroup>
+                    <SettingsGroup
+                        title="资料库"
+                        description="登录后，B站收藏夹会显示在B站模式的资料库中"
+                    >
+                        <p className="text-sm text-muted-foreground">
+                            收藏夹中的音乐会按收藏夹分组显示，可以直接加入播放队列。
+                        </p>
+                    </SettingsGroup>
+                </div>
+            )}
+            <BilibiliAuthDialog
+                open={bilibiliDialogOpen}
+                onOpenChange={setBilibiliDialogOpen}
+            />
         </div>
     )
 }

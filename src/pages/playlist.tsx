@@ -1,4 +1,12 @@
-import { Heart, Library, ListMinus, Pencil, Sparkles, Trash2 } from "lucide-react"
+import {
+ Download,
+ Heart,
+ Library,
+ ListMinus,
+ Pencil,
+ Sparkles,
+ Trash2,
+} from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
@@ -14,6 +22,7 @@ import { SourceBadge } from "@/components/music/source-badge"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
 import { VirtualList } from "@/components/music/virtual-list"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import {
     Dialog,
     DialogContent,
@@ -49,6 +58,12 @@ import {
     getCoverOverride,
     resolveTrackCoverUrl,
 } from "@/lib/music/cover-overrides"
+import {
+ canBatchDownload,
+ chooseDownloadDirectory,
+ downloadPlaylistTracks,
+ type PlaylistDownloadProgress,
+} from "@/lib/music/batch-download"
 import { fetchIntelligencePlaylist } from "@/lib/netease/fm"
 import {
     deletePlaylist,
@@ -56,9 +71,18 @@ import {
     updatePlaylistDesc,
     updatePlaylistName,
 } from "@/lib/netease/playlist"
-import { formatError, notifyFromError, notifySuccess } from "@/lib/notify"
+import {
+ formatError,
+ notifyFromError,
+ notifyLoading,
+ notifySuccess,
+ notifyUpdate,
+} from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+const TRACK_ROW_HEIGHT = 58
+const MEDIA_ROW_HEIGHT = 236
 
 type PlaylistPageProps = {
     playlistId: string
@@ -126,7 +150,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
     const { loggedIn, profile } = useNeteaseSession()
     const { playlistTracksView, trackSort } = useLibraryLayout()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
     const {
         likedSongPlaylistId,
         isPlaylistSubscribed,
@@ -153,6 +177,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
         null,
     )
+    const [batchBusy, setBatchBusy] = useState(false)
+    const [batchProgress, setBatchProgress] =
+        useState<PlaylistDownloadProgress | null>(null)
 
     const isOwnLiked = playlistId === likedSongPlaylistId
     const isOwnPlaylist =
@@ -218,6 +245,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         // 本地条目查询与云端详情并行：本地 DB 通常更快，先就绪时封面直接是本地，
         // 不会被云端封面临时占位（合并展示仍等两者都到）
         setLocalRowsReady(false)
+        setLocalRows([])
+        setTracks([])
+        setPlaylist(null)
         void listLocalTracksForPlaylist(playlistId)
             .then((rows) => {
                 if (!cancelled) {
@@ -389,6 +419,100 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
         )
     }
 
+    async function handleDownloadAll() {
+        if (batchBusy || sortedTracks.length === 0) {
+            return
+        }
+        let directory: string | null = null
+        try {
+            directory = await chooseDownloadDirectory()
+        } catch (error) {
+            notifyFromError("无法选择下载目录", error)
+            return
+        }
+        if (!directory) {
+            return
+        }
+        const cloudCount = new Set(
+            sortedTracks
+                .filter((track) => track.source === "netease")
+                .map((track) => track.id),
+        ).size
+        if (cloudCount === 0) {
+            notifySuccess("没有需要下载的在线歌曲", {
+                description: "本地歌曲已保存在原位置",
+            })
+            return
+        }
+
+        setBatchBusy(true)
+        setBatchProgress({
+            total: cloudCount,
+            completed: 0,
+            succeeded: 0,
+            failed: 0,
+            skipped: sortedTracks.length - cloudCount,
+        })
+        const toastId = notifyLoading("正在下载歌单…", {
+            description: `准备下载 ${cloudCount} 首`,
+            timeout: 0,
+        })
+        let lastUpdatedAt = 0
+        try {
+            const result = await downloadPlaylistTracks({
+                tracks: sortedTracks,
+                directory,
+                onProgress: (progress) => {
+                    const now = Date.now()
+                    if (
+                        progress.completed !== progress.total &&
+                        now - lastUpdatedAt < 120
+                    ) {
+                        return
+                    }
+                    lastUpdatedAt = now
+                    setBatchProgress(progress)
+                    notifyUpdate(toastId, {
+                        type: "loading",
+                        title: "正在下载歌单…",
+                        description: `${progress.completed}/${progress.total} · 成功 ${progress.succeeded} · 失败 ${progress.failed}`,
+                        timeout: 0,
+                    })
+                },
+            })
+            setBatchProgress(result)
+            const firstFailure = result.failures[0]
+            notifyUpdate(toastId, {
+                type:
+                    result.failed > 0
+                        ? "warning"
+                        : result.succeeded > 0
+                          ? "success"
+                          : "info",
+                title:
+                    result.failed > 0
+                        ? "歌单下载完成，部分失败"
+                        : "歌单下载完成",
+                description: `成功 ${result.succeeded} 首 · 跳过 ${result.skipped} 首 · 失败 ${result.failed} 首${
+                    firstFailure
+                        ? ` · ${firstFailure.title} ${firstFailure.reason}`
+                        : ""
+                }`,
+                timeout: result.failed > 0 ? 5200 : 3600,
+            })
+        } catch (error) {
+            notifyUpdate(toastId, {
+                type: "error",
+                title: "歌单下载失败",
+                description: formatError(error),
+                timeout: 4800,
+            })
+        } finally {
+            setBatchBusy(false)
+            setBatchProgress(null)
+        }
+    }
+
     // 稳定回调供 TrackRow 复用：TrackRow 已 memo，引用稳定时窗口内
     // 重叠行在滚动重渲时直接跳过，避免快速滚动每帧重建整窗
     const handleRowPlay = useCallback(
@@ -402,7 +526,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
     }, [])
 
     return (
-        <div className="space-y-6">
+        <div ref={gridRef} className="space-y-6">
             <BackButton onClick={onBack} />
 
             {isLoading ? (
@@ -462,6 +586,29 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                         className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
                                     >
                                         播放全部
+                                    </button>
+                                ) : null}
+                                {canBatchDownload() &&
+                                sortedTracks.some(
+                                    (track) =>
+                                        track.source === "netease",
+                                ) ? (
+                                    <button
+                                        type="button"
+                                        disabled={batchBusy}
+                                        aria-busy={batchBusy}
+                                        onClick={() =>
+                                            void handleDownloadAll()
+                                        }
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium tabular-nums transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <Download
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                        {batchBusy && batchProgress
+                                            ? `下载中 ${batchProgress.completed}/${batchProgress.total}…`
+                                            : "下载全部"}
                                     </button>
                                 ) : null}
                                 {sortedTracks.length > 0 ? (
@@ -544,10 +691,13 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                         {sortedTracks.length === 0 ? (
                             <StateHero variant="empty" title="暂无歌曲" />
                         ) : playlistTracksView === "card" ? (
-                            <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {sortedTracks.map((track) => (
+                            <VirtualGrid
+                                items={sortedTracks}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(track) => track.id}
+                                renderItem={(track) => (
                                     <MediaCard
-                                        key={track.id}
                                         coverUrl={resolveTrackCoverUrl(
                                             track.id,
                                             track.coverUrl,
@@ -591,14 +741,15 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                             )
                                         }
                                     />
-                                ))}
-                            </div>
+                                )}
+                            />
                         ) : (
                             <div className="apple-list-surface p-1.5">
                                 {dragEnabled ? (
                                     <DragList
                                         items={sortedTracks}
                                         enabled
+                                        itemHeight={TRACK_ROW_HEIGHT}
                                         onReorder={handleReorder}
                                         renderItem={(track, index, handle) => (
                                             <TrackRow
@@ -636,7 +787,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                 ) : (
                                     <VirtualList
                                         items={sortedTracks}
-                                        itemHeight={58}
+                                        itemHeight={TRACK_ROW_HEIGHT}
                                         getItemKey={(track) => track.id}
                                         renderItem={(track, index) => (
                                             <TrackRow

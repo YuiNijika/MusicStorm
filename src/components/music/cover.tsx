@@ -30,7 +30,7 @@ const SIZE_PX = {
 
 // memo：src/alt/size/className 均为稳定字符串 props，父组件高频重渲（如播放条 200ms tick）时整棵跳过
 const Cover = memo(function Cover({ src, alt, size = "md", className }: CoverProps) {
-    const [failed, setFailed] = useState(false)
+ const [failed, setFailed] = useState(false)
     // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
     const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
     const resolvedSrc = useCachedCoverUrl(src, kind)
@@ -39,7 +39,7 @@ const Cover = memo(function Cover({ src, alt, size = "md", className }: CoverPro
     useEffect(() => {
         setFailed(false)
     }, [src, resolvedSrc])
-    const showImage = Boolean(src) && !failed
+ const showImage = Boolean(src && resolvedSrc) && !failed
     const px = SIZE_PX[size]
 
     // 本地缓存文件被清理后索引残留失效路径会在这里炸出 404：

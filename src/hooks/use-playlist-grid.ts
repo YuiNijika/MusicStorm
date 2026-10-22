@@ -9,11 +9,9 @@ import { useCallback, useEffect, useState, type RefCallback } from "react"
 const COL_6_MIN = 1100
 const COL_5_MIN = 980
 const COL_4_MIN = 700
+const DEFAULT_MINIMUM_COLUMNS = 3
 
-const PLAYLIST_GRID_CLASS =
-    // content-visibility 让浏览器跳过视口外卡片的渲染与布局，避免上千卡片时 DOM 爆炸；
-    // contain-intrinsic-size 提供未渲染项的预估占位，防止滚动条大幅跳动
-    "grid gap-3 [content-visibility:auto] [contain-intrinsic-size:auto_240px]"
+const PLAYLIST_GRID_CLASS = "grid gap-3"
 
 const PLAYLIST_FETCH_MAX = 48
 
@@ -27,17 +25,40 @@ type PlaylistGridState = {
     gridRef: RefCallback<HTMLElement>
 }
 
-function colsFromWidth(width: number): number {
-    if (width >= COL_6_MIN) {
-        return 6
+type PlaylistGridOptions = {
+    minimumColumns?: number
+}
+
+function clampColumns(columns: number): number {
+    return Math.min(6, Math.max(1, Math.floor(columns)))
+}
+
+function colsFromWidth(
+    width: number,
+    minimumColumns = DEFAULT_MINIMUM_COLUMNS,
+): number {
+    let columns = DEFAULT_MINIMUM_COLUMNS
+    if (width >= COL_4_MIN) {
+        columns = 4
     }
     if (width >= COL_5_MIN) {
-        return 5
+        columns = 5
     }
-    if (width >= COL_4_MIN) {
-        return 4
+    if (width >= COL_6_MIN) {
+        columns = 6
     }
-    return 3
+    return clampColumns(Math.max(columns, minimumColumns))
+}
+
+function initialColumns(minimumColumns: number): number {
+    if (typeof window === "undefined") {
+        return clampColumns(Math.max(4, minimumColumns))
+    }
+    // 首帧近似：减去侧栏约 240，避免误用整窗 xl
+    return colsFromWidth(
+        Math.max(0, window.innerWidth - 240),
+        minimumColumns,
+    )
 }
 
 function buildState(cols: number): Omit<PlaylistGridState, "gridRef"> {
@@ -49,14 +70,10 @@ function buildState(cols: number): Omit<PlaylistGridState, "gridRef"> {
     }
 }
 
-function usePlaylistGrid(): PlaylistGridState {
-    const [cols, setCols] = useState(() => {
-        if (typeof window === "undefined") {
-            return 4
-        }
-        // 首帧近似：减去侧栏约 240，避免误用整窗 xl
-        return colsFromWidth(Math.max(0, window.innerWidth - 240))
-    })
+function usePlaylistGrid({
+    minimumColumns = DEFAULT_MINIMUM_COLUMNS,
+}: PlaylistGridOptions = {}): PlaylistGridState {
+    const [cols, setCols] = useState(() => initialColumns(minimumColumns))
     const [node, setNode] = useState<HTMLElement | null>(null)
 
     const gridRef = useCallback<RefCallback<HTMLElement>>((el) => {
@@ -69,7 +86,7 @@ function usePlaylistGrid(): PlaylistGridState {
         }
 
         function apply(width: number) {
-            setCols(colsFromWidth(width))
+            setCols(colsFromWidth(width, minimumColumns))
         }
 
         apply(node.getBoundingClientRect().width)
@@ -83,7 +100,7 @@ function usePlaylistGrid(): PlaylistGridState {
         })
         observer.observe(node)
         return () => observer.disconnect()
-    }, [node])
+    }, [minimumColumns, node])
 
     return {
         ...buildState(cols),

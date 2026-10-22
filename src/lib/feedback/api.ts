@@ -69,7 +69,7 @@ async function request(path: string, init: RequestInit = {}): Promise<unknown> {
         }
         if (!response.ok || body.success !== true) {
             throw new FeedbackError(
-                typeof body.message === "string" ? body.message : "请求失败，请稍后重试。",
+                "请求失败，请稍后重试。",
                 typeof body.error_code === "string" ? body.error_code : undefined,
             )
         }

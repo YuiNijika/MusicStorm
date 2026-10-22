@@ -228,8 +228,12 @@
     font-variant-numeric: tabular-nums;
 }
 
-.feedback-threads > div + div {
+.feedback-threads > [data-feedback-thread] + [data-feedback-thread] {
     border-top: 1px solid var(--separator);
+}
+
+.feedback-threads {
+    overflow-anchor: none;
 }
 
 .feedback-comment {

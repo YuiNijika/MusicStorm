@@ -37,6 +37,9 @@ type PlaylistDetailData = {
     code?: number
 }
 
+const DETAIL_CHUNK_SIZE = 200
+const DETAIL_FETCH_CONCURRENCY = 2
+
 function mapPlaylistCard(item: PersonalizedItem): Playlist {
     return {
         id: String(item.id),
@@ -57,6 +60,43 @@ async function fetchRecommendPlaylists(limit = 12): Promise<Playlist[]> {
     return (data.result ?? []).map(mapPlaylistCard)
 }
 
+async function fetchSongsByIds(ids: number[]): Promise<NeteaseSong[]> {
+    const chunks: number[][] = []
+    for (let index = 0; index < ids.length; index += DETAIL_CHUNK_SIZE) {
+        chunks.push(ids.slice(index, index + DETAIL_CHUNK_SIZE))
+    }
+    if (chunks.length === 0) {
+        return []
+    }
+
+    const results = new Array<NeteaseSong[]>(chunks.length)
+    let nextIndex = 0
+    async function worker() {
+        while (true) {
+            const current = nextIndex
+            nextIndex += 1
+            const chunk = chunks[current]
+            if (!chunk) {
+                return
+            }
+            const detail = await fetchSongDetail(chunk.join(","))
+            results[current] = detail.songs ?? []
+        }
+    }
+    await Promise.all(
+        Array.from(
+            {
+                length: Math.min(
+                    DETAIL_FETCH_CONCURRENCY,
+                    chunks.length,
+                ),
+            },
+            () => worker(),
+        ),
+    )
+    return results.flat()
+}
+
 async function fetchPlaylistDetail(id: string): Promise<{
     playlist: Playlist
     tracks: Track[]
@@ -74,13 +114,17 @@ async function fetchPlaylistDetail(id: string): Promise<{
     let tracks = (raw.tracks ?? []).map(mapNeteaseSongToTrack)
     const trackIds = raw.trackIds?.map((item) => item.id) ?? []
 
-    // 未登录 tracks 可能不完整，用 trackIds 与 song/detail 补齐最多 80 首
-    if (trackIds.length > tracks.length) {
-        const ids = trackIds.slice(0, 80).join(",")
-        if (ids) {
-            const detail = await fetchSongDetail(ids)
-            tracks = (detail.songs ?? []).map(mapNeteaseSongToTrack)
+    // 未登录 tracks 可能不完整，按批次补齐缺失曲目并保留云端顺序
+    if (trackIds.length > 0) {
+        const byId = new Map(tracks.map((track) => [Number(track.id), track]))
+        const missing = trackIds.filter((id) => !byId.has(id))
+        const songs = await fetchSongsByIds(missing)
+        for (const song of songs) {
+            byId.set(song.id, mapNeteaseSongToTrack(song))
         }
+        tracks = trackIds
+            .map((id) => byId.get(id))
+            .filter((track): track is Track => track != null)
     }
 
     const playlist: Playlist = {

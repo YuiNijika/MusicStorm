@@ -245,7 +245,13 @@ function LyricsView({
                     return
                 }
 
-                if (currentTrack.source === "local") {
+ if (currentTrack.source === "bilibili") {
+ setLines([])
+ setStatus("empty")
+ return
+ }
+
+ if (currentTrack.source === "local") {
                     const result = await loadLocalLyricLines(currentTrack)
                     if (cancelled) {
                         return

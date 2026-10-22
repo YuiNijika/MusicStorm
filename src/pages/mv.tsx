@@ -6,6 +6,7 @@ import { BackButton } from "@/components/music/back-button"
 import { Cover } from "@/components/music/cover"
 import { MvDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { MvPlayer } from "@/components/music/mv-player"
 import { Section } from "@/components/music/section"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
@@ -31,10 +32,12 @@ type MvPageProps = {
     onBack: () => void
 }
 
+const MEDIA_ROW_HEIGHT = 236
+
 function MvPage({ mvId, onBack }: MvPageProps) {
     const { openArtist, openMv } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
     const [data, setData] = useState<MvPlayable | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -181,7 +184,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
     }
 
     return (
-        <div className="space-y-5 pb-2">
+        <div ref={gridRef} className="space-y-5 pb-2">
             <BackButton onClick={onBack} />
 
             {loading ? (
@@ -313,10 +316,13 @@ function MvPage({ mvId, onBack }: MvPageProps) {
 
                     {simiStatus === "ready" && simiMvs.length > 0 ? (
                         <Section title="相似 MV" variant="listen">
-                            <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {simiMvs.map((mv) => (
+                            <VirtualGrid
+                                items={simiMvs}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(mv) => mv.id}
+                                renderItem={(mv) => (
                                     <MediaCard
-                                        key={mv.id}
                                         coverUrl={mv.coverUrl}
                                         title={mv.title}
                                         subtitle={mv.artistName || "MV"}
@@ -324,8 +330,8 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                                         widthClassName="w-full"
                                         className="w-full"
                                     />
-                                ))}
-                            </div>
+                                )}
+                            />
                         </Section>
                     ) : null}
                 </>

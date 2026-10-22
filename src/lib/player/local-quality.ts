@@ -10,12 +10,12 @@ import type { EnginePref } from "@/lib/player/engine-policy"
 import type { Track } from "@/lib/types"
 
 // 无 bitrate 时普通有损不算高音质，避免 auto 误开原生引擎
-function isLocalHighQualityTrack(track: Track): boolean {
-    if (track.source !== "local" || !track.filePath) {
+function isHighQualityFile(track: Track, filePath: string): boolean {
+    if (!filePath) {
         return false
     }
 
-    const path = track.filePath
+    const path = filePath
     const ext = extensionOf(path)
 
     if (HIGH_QUALITY_EXTS.has(ext)) {
@@ -38,8 +38,21 @@ function isLocalHighQualityTrack(track: Track): boolean {
     return false
 }
 
+function isLocalHighQualityTrack(track: Track): boolean {
+    if (track.source !== "local" || !track.filePath) {
+        return false
+    }
+    return isHighQualityFile(track, track.filePath)
+}
+
 // 远程地址永不进 native（桌面用 H5）；auto 仅高音质
-function shouldUseNativeForTrack(track: Track, pref: EnginePref): boolean {
+function shouldUseNativeForTrack(input: {
+    track: Track
+    pref: EnginePref
+    filePath?: string
+}): boolean {
+    const { track, pref } = input
+    const filePath = input.filePath ?? track.filePath
     if (pref === "html5" || !isTauriRuntime()) {
         return false
     }
@@ -48,20 +61,20 @@ function shouldUseNativeForTrack(track: Track, pref: EnginePref): boolean {
     if (isAndroid() && hasAndroidAudio()) {
         return true
     }
-    if (!track.filePath || track.source === "netease") {
+    if (!filePath || track.source === "netease") {
         return false
     }
-    if (/^https?:\/\//i.test(track.filePath)) {
+    if (/^https?:\/\//i.test(filePath)) {
         return false
     }
     if (pref === "native") {
         return true
     }
-    const extension = extensionOf(track.filePath)
+    const extension = extensionOf(filePath)
     if (extension && !NATIVE_DECODER_EXTS.has(extension)) {
         return true
     }
-    return isLocalHighQualityTrack(track)
+    return isHighQualityFile(track, filePath)
 }
 
-export { isLocalHighQualityTrack, shouldUseNativeForTrack }
+export { isHighQualityFile, isLocalHighQualityTrack, shouldUseNativeForTrack }

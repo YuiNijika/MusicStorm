@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { Play } from "lucide-react"
+import { memo } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { cn } from "@/lib/utils"
@@ -17,7 +18,7 @@ type MediaCardProps = {
     overlay?: ReactNode
 }
 
-function MediaCard({
+const MediaCard = memo(function MediaCard({
     coverUrl,
     title,
     subtitle,
@@ -84,6 +85,6 @@ function MediaCard({
             </div>
         </button>
     )
-}
+})
 
 export { MediaCard }

@@ -3,14 +3,16 @@ import { useEffect, useState } from "react"
 import { coverPathToUrl, isTauriRuntime } from "@/lib/local/cover"
 import { getCoverCacheLimitBytes } from "@/lib/music/cover-cache-prefs"
 import {
-    REMOTE_COVER_EVENT,
     ensureRemoteCoverCached,
     getCachedRemoteCover,
+    isBilibiliCoverUrl,
+    REMOTE_COVER_EVENT,
 } from "@/lib/music/remote-cover-cache"
 
-// coverPathToUrl 对无法转换的路径返回空串，直接塞进 img 会触发空 src 警告
-// 并让浏览器重新请求整个页面，这里统一回退到原始地址
-function resolveAssetUrl(path: string | null | undefined, fallback: string): string {
+function resolveAssetUrl(
+    path: string | null | undefined,
+    fallback: string,
+): string {
     return coverPathToUrl(path) || fallback
 }
 
@@ -18,8 +20,6 @@ function isRemoteUrl(url: string): boolean {
     if (!/^https?:\/\//i.test(url)) {
         return false
     }
-    // Windows 上 convertFileSrc 产出 http://asset.localhost，是本地 asset 虚拟协议，
-    // 不是可下载的远程封面；误判会触发无意义的下载并可能污染缓存索引
     try {
         return new URL(url).hostname !== "asset.localhost"
     } catch {
@@ -27,57 +27,73 @@ function isRemoteUrl(url: string): boolean {
     }
 }
 
-// 远程封面 → 本地缓存 URL 的透明升级：远程且已缓存立即用本地 asset（离线可用），未缓存先用远程渲染后台下载后切换
 function useCachedCoverUrl(
     src: string,
     kind: "original" | "thumbnail" = "original",
 ): string {
-    // 纯网页端无本地文件缓存：直接走原 URL，交给浏览器 HTTP 强缓存/协商缓存，
-    // 不做 base64 假缓存（remote-cover-cache 的持久层被 Tauri 桥挡死，转了也存不下）
     const tauri = isTauriRuntime()
-    // 用户关闭封面缓存：不回读旧缓存也不触发下载，一律走远程
     const disabled = tauri && getCoverCacheLimitBytes() === 0
+    const protectedRemote =
+        tauri && isRemoteUrl(src) && isBilibiliCoverUrl(src)
     const [resolved, setResolved] = useState<string>(() => {
-        if (!tauri || disabled) {
-            return src
-        }
-        if (!isRemoteUrl(src)) {
+        if (!tauri || !isRemoteUrl(src)) {
             return src
         }
         const cached = getCachedRemoteCover(src)
-        return cached
-            ? resolveAssetUrl(
-                  kind === "thumbnail" ? cached.thumbnailPath : cached.originalPath,
-                  src,
-              )
-            : src
+        if (!cached) {
+            return disabled ? src : protectedRemote ? "" : src
+        }
+        return resolveAssetUrl(
+            kind === "thumbnail"
+                ? cached.thumbnailPath
+                : cached.originalPath,
+            "",
+        )
     })
 
     useEffect(() => {
-        if (!tauri || disabled) {
+        if (!tauri) {
             return
         }
         if (!isRemoteUrl(src)) {
             setResolved(src)
             return
         }
-        // 已缓存直接切本地；未缓存先保持远程，后台下载完成后事件触发切换
+
         const cached = getCachedRemoteCover(src)
         if (cached) {
             setResolved(
                 resolveAssetUrl(
-                    kind === "thumbnail" ? cached.thumbnailPath : cached.originalPath,
-                    src,
+                    kind === "thumbnail"
+                        ? cached.thumbnailPath
+                        : cached.originalPath,
+                    "",
                 ),
             )
             return
         }
-        setResolved(src)
-        void ensureRemoteCoverCached(src)
 
-        function onReady(event: Event) {
+        setResolved(disabled ? src : protectedRemote ? "" : src)
+        if (disabled) {
+            return
+        }
+
+        void ensureRemoteCoverCached(src).then((next) => {
+            if (!next) {
+                return
+            }
+            setResolved(
+                resolveAssetUrl(
+                    kind === "thumbnail"
+                        ? next.thumbnailPath
+                        : next.originalPath,
+                    "",
+                ),
+            )
+        })
+
+        function onReady(event: Event): void {
             const detail = (event as CustomEvent<string>).detail
-            // 空 detail 是索引剪枝的全局广播，所有挂载中的封面都重新解析
             if (detail && detail !== src) {
                 return
             }
@@ -88,22 +104,20 @@ function useCachedCoverUrl(
                         kind === "thumbnail"
                             ? latest.thumbnailPath
                             : latest.originalPath,
-                        src,
+                        "",
                     ),
                 )
                 return
             }
-            // 索引条目已被剪枝（本地文件被清理）：回退远程渲染并重新下载
-            setResolved(src)
+            setResolved(protectedRemote ? "" : src)
             void ensureRemoteCoverCached(src)
         }
+
         window.addEventListener(REMOTE_COVER_EVENT, onReady)
         return () => window.removeEventListener(REMOTE_COVER_EVENT, onReady)
-        // tauri/disabled：运行时判定恒定，纳入依赖仅为满足 exhaustive-deps；
-        // 关闭/纯网页端直接返回，不注册监听
-    }, [src, kind, tauri, disabled])
+    }, [src, kind, tauri, disabled, protectedRemote])
 
     return resolved
 }
 
-export { useCachedCoverUrl, isRemoteUrl }
+export { isRemoteUrl, useCachedCoverUrl }

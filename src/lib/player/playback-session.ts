@@ -30,7 +30,7 @@ function isTrack(value: unknown): value is Track {
         typeof t.title === "string" &&
         typeof t.artist === "string" &&
         typeof t.source === "string" &&
-        (t.source === "local" || t.source === "netease")
+        (t.source === "local" || t.source === "netease" || t.source === "bilibili")
     )
 }
 
@@ -126,6 +126,10 @@ function writePlaybackSession(session: PlaybackSession): void {
                     return { ...webRest, coverUrl: "" }
                 }
                 return { ...rest, coverUrl: "" }
+            }
+            if (track.source === "bilibili") {
+                const { url: _url, ...rest } = track
+                return rest
             }
             if (!track.url) {
                 return track

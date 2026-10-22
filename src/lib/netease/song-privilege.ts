@@ -73,13 +73,13 @@ function describeSongUrlFailure(item: SongUrlItem | undefined | null): string {
         return "无法获取播放地址"
     }
 
-    if (item.message && String(item.message).trim()) {
-        return String(item.message).trim()
-    }
-
     const paywall = describePaywall(item)
     if (paywall) {
         return paywall
+    }
+
+    if (item.message && String(item.message).trim()) {
+        return String(item.message).trim()
     }
 
     const entryCode = item.code

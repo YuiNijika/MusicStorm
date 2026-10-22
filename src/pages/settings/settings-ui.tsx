@@ -102,19 +102,31 @@ function ChoiceChip({
     label,
     active,
     onClick,
+    disabled = false,
+    title,
 }: {
     label: string
     active: boolean
     onClick: () => void
+    disabled?: boolean
+    title?: string
 }) {
     return (
         <button
             type="button"
             aria-pressed={active}
-            onClick={onClick}
+            aria-disabled={disabled || undefined}
+            title={title}
+            disabled={disabled}
+            onClick={() => {
+                if (!disabled) {
+                    onClick()
+                }
+            }}
             className={cn(
                 "apple-segmented-item cursor-pointer whitespace-nowrap px-3.5 text-[13px] font-medium transition-[color,background-color,transform]",
                 "active:duration-[var(--duration-press)]",
+                "disabled:cursor-not-allowed disabled:opacity-40",
                 active
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground",

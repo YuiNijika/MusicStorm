@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { MessageSquare, RotateCw } from "lucide-react"
 
 import { ArticleContent } from "@/components/article-content"
+import { Skeleton } from "@/components/ui/skeleton"
 import { fetchArticle } from "@/lib/feedback/api"
 import { isWebMode } from "@/lib/web-mode"
 import { ActionButton } from "@/pages/settings/settings-ui"
@@ -50,7 +51,12 @@ function FaqTab({ onOpenFeedback }: { onOpenFeedback: () => void }) {
                 </a>
             </header>
             <div aria-live="polite">
-                {loading ? <p className="text-sm text-muted-foreground">加载中…</p>
+                {loading ? <div role="status" aria-label="常见问题加载中" className="space-y-3">
+                    <Skeleton className="h-5 w-2/3" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-11/12" />
+                    <Skeleton className="h-4 w-4/5" />
+                </div>
                     : error ? <div className="space-y-2">
                         <p role="alert" className="text-sm text-destructive">{error}</p>
                         <ActionButton icon={<RotateCw className="size-4" aria-hidden="true" />}

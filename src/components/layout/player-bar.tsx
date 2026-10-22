@@ -15,13 +15,13 @@ import { useEffect, useRef, useState } from "react"
 import { Cover } from "@/components/music/cover"
 import { QueuePanel } from "@/components/layout/queue-panel"
 import { SeekElasticSlider } from "@/components/music/seek-elastic-slider"
-import { SourceBadge } from "@/components/music/source-badge"
 import { SpeedPopover } from "@/components/music/speed-popover"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useLiked } from "@/hooks/use-liked"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
+import { SourceBadge } from "@/components/music/source-badge"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
@@ -76,10 +76,23 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
             ? "循环：列表"
             : "顺序播放"
     const primaryArtist = currentTrack?.artists?.find((item) => item.id)
+    const artistLabel =
+        currentTrack?.source === "bilibili"
+            ? currentTrack.artist?.trim() ||
+              currentTrack.artists
+                  ?.map((artist) => artist.name.trim())
+                  .filter(Boolean)
+                  .join(" / ") ||
+              "未知作者"
+            : currentTrack?.artist || "未知艺人"
     const canOpenArtist =
-        currentTrack?.source === "netease" && Boolean(primaryArtist?.id)
+ currentTrack?.source === "netease" && Boolean(primaryArtist?.id)
     const canOpenAlbum =
-        currentTrack?.source === "netease" && Boolean(currentTrack.albumId)
+ currentTrack?.source === "netease" && Boolean(currentTrack.albumId)
+    const secondaryMeta =
+        currentTrack?.source === "bilibili"
+            ? currentTrack.tname?.trim()
+            : currentTrack?.album
 
     async function handleToggleLike() {
         if (!canLike || !currentTrack) {
@@ -295,7 +308,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                     size="md"
                                     className="shadow-[0_6px_16px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] transition-[box-shadow] group-hover:shadow-[0_10px_24px_rgba(15,23,42,0.22)] dark:ring-white/[0.08]"
                                 />
-                            </button>
+ </button>
                             <div className="min-w-0 flex-1">
                                 <button
                                     type="button"
@@ -318,14 +331,14 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                                 openArtist(primaryArtist!.id)
                                             }
                                             className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                            title={currentTrack.artist}
+                                            title={artistLabel}
                                         >
-                                            {currentTrack.artist}
+                                            {artistLabel}
                                         </button>
                                     ) : (
-                                        <span>{currentTrack.artist}</span>
+                                        <span>{artistLabel}</span>
                                     )}
-                                    {currentTrack.album ? (
+                                    {secondaryMeta ? (
                                         <>
                                             <span className="mx-1 text-muted-foreground/50">
                                                 ·
@@ -339,15 +352,15 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                                         )
                                                     }
                                                     className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                                    title={currentTrack.album}
+                                                    title={secondaryMeta}
                                                 >
-                                                    {currentTrack.album}
+                                                    {secondaryMeta}
                                                 </button>
                                             ) : (
-                                                <span>{currentTrack.album}</span>
+                                                <span>{secondaryMeta}</span>
                                             )}
                                         </>
-                                    ) : null}
+ ) : null}
                                 </p>
                             </div>
                             {canLike ? (
@@ -447,7 +460,7 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                 </div>
 
                 <div className="hidden items-center justify-end gap-1 md:flex">
-                    {currentTrack?.source === "netease" && currentTrack.id ? (
+ {currentTrack?.source === "netease" && currentTrack.id ? (
                         <ControlButton
                             title="评论"
                             onClick={() =>

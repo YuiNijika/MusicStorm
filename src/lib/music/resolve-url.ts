@@ -1,5 +1,11 @@
 import { convertFileSrc } from "@tauri-apps/api/core"
 
+import { resolveBilibiliAudio } from "@/lib/bilibili/playback"
+import {
+    findFallbackSource,
+    forgetFallbackSource,
+    isCopyrightUnavailable,
+} from "@/lib/music/fallback-source"
 import { isAndroid } from "@/lib/platform"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import {
@@ -14,7 +20,14 @@ import type { Track } from "@/lib/types"
 import { isWebMode } from "@/lib/web-mode"
 
 export type ResolvePlayableResult =
-    | { ok: true; url: string; trial?: boolean }
+    | {
+          ok: true
+          url: string
+          filePath?: string
+          track: Track
+          trial?: boolean
+          fallbackSource?: "bilibili"
+      }
     | { ok: false; reason: string; entry?: SongUrlItem }
 
 /**
@@ -49,14 +62,29 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
     if (track.filePath && track.source === "local") {
         // 网页版导入的本地歌 filePath 即 blob URL，可直接播放，无需 Tauri 转换
         if (isWebMode()) {
-            return { ok: true, url: track.filePath }
+            return {
+                ok: true,
+                url: track.filePath,
+                filePath: track.filePath,
+                track,
+            }
         }
         // Android 原生 MediaPlayer 直接吃原始绝对路径；asset:// 协议它不识别
         if (isAndroid()) {
-            return { ok: true, url: track.filePath }
+            return {
+                ok: true,
+                url: track.filePath,
+                filePath: track.filePath,
+                track,
+            }
         }
         try {
-            return { ok: true, url: convertFileSrc(track.filePath) }
+            return {
+                ok: true,
+                url: convertFileSrc(track.filePath),
+                filePath: track.filePath,
+                track,
+            }
         } catch {
             return { ok: false, reason: "本地文件无法打开" }
         }
@@ -85,6 +113,7 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
                     return {
                         ok: true,
                         url: normalizeNeteaseMediaUrl(entry.url),
+                        track,
                         trial: isTrial,
                     }
                 }
@@ -93,23 +122,84 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
             }
         }
 
+        const reason = describeSongUrlFailure(bestEntry)
+        if (!isWebMode() && isCopyrightUnavailable(bestEntry, reason)) {
+            const fallback = await findFallbackSource(track)
+            if (fallback) {
+                try {
+                    const audio = await resolveBilibiliAudio(fallback)
+                    return {
+                        ok: true,
+                        url: convertFileSrc(audio.path),
+                        filePath: audio.path,
+                        track: {
+                            ...track,
+                            bvid: audio.track.bvid,
+                            aid: audio.track.aid,
+                            cid: audio.track.cid,
+                            audioId: audio.track.audioId,
+                            bitrateKbps:
+                                audio.track.bitrateKbps ??
+                                track.bitrateKbps,
+                            filePath: audio.path,
+                            webUrl: audio.track.webUrl,
+                        },
+                        fallbackSource: "bilibili",
+                    }
+                } catch {
+                    forgetFallbackSource(track)
+                    // Keep the original failure when the fallback is unavailable
+                }
+            }
+        }
+
         return {
             ok: false,
-            reason: describeSongUrlFailure(bestEntry),
+            reason,
             entry: bestEntry,
         }
     }
 
+    if (track.source === "bilibili") {
+        try {
+            const resolved = await resolveBilibiliAudio(track)
+            return {
+                ok: true,
+                url: convertFileSrc(resolved.path),
+                filePath: resolved.path,
+                track: resolved.track,
+            }
+        } catch (error) {
+            return {
+                ok: false,
+                reason:
+                    error instanceof Error
+                        ? error.message
+                        : "哔哩哔哩音频暂时不可用",
+            }
+        }
+    }
+
     if (track.url) {
-        return { ok: true, url: normalizeNeteaseMediaUrl(track.url) }
+        return { ok: true, url: normalizeNeteaseMediaUrl(track.url), track }
     }
 
     if (track.filePath) {
         if (isWebMode()) {
-            return { ok: true, url: track.filePath }
+            return {
+                ok: true,
+                url: track.filePath,
+                filePath: track.filePath,
+                track,
+            }
         }
         try {
-            return { ok: true, url: convertFileSrc(track.filePath) }
+            return {
+                ok: true,
+                url: convertFileSrc(track.filePath),
+                filePath: track.filePath,
+                track,
+            }
         } catch {
             return { ok: false, reason: "本地文件无法打开" }
         }

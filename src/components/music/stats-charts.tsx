@@ -28,7 +28,11 @@ const sourceConfig = {
         label: "本地",
         color: "var(--primary)",
     },
-    netease: {
+    bilibili: {
+ label: "哔哩哔哩",
+ color: "#fb7299",
+ },
+ netease: {
         label: "网易云",
         color: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
     },
@@ -39,7 +43,8 @@ const sourceConfig = {
 } satisfies ChartConfig
 
 const SOURCE_COLORS: Record<string, string> = {
-    local: "var(--primary)",
+ local: "var(--primary)",
+ bilibili: "#fb7299",
     netease: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
     other: "color-mix(in oklch, var(--muted-foreground) 50%, transparent)",
 }
@@ -90,12 +95,14 @@ function barFill(day: string, tKey: string, hasToday: boolean): string {
 function sourceLabel(source: string): string {
     if (source === "local") return "本地"
     if (source === "netease") return "网易云"
+ if (source === "bilibili") return "哔哩哔哩"
     return source || "其他"
 }
 
 function sourceColorKey(source: string): keyof typeof sourceConfig {
     if (source === "local") return "local"
     if (source === "netease") return "netease"
+ if (source === "bilibili") return "bilibili"
     return "other"
 }
 

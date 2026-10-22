@@ -63,6 +63,7 @@ import {
 } from "@/lib/app/in-app-shortcut-prefs"
 import {
     CHROME_EVENT,
+    resolveFullPlayerLayout,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
     LYRICS_SCALE_STEP,
@@ -145,6 +146,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     // 关闭态冻结 tick 订阅：避免整棵全屏播放器树每 200ms 白渲一次；打开时恢复
     const { positionMs, durationMs } = usePlaybackTick(phase !== "closed")
     const [mountedTrack, setMountedTrack] = useState(currentTrack)
+    const previousTrackIdRef = useRef<string | null>(null)
     const [likeCount, setLikeCount] = useState<number | null>(null)
     // 移动端只保留 封面/歌词 两种布局；classic 是桌面分栏，窄屏降级到封面
     const availableLayouts = isMobile
@@ -166,6 +168,16 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const [lyricsMounted, setLyricsMounted] = useState(false)
 
     const displayTrack = mountedTrack ?? currentTrack
+    useEffect(() => {
+        const nextTrack = currentTrack
+        if (!nextTrack || nextTrack.id === previousTrackIdRef.current) {
+            return
+        }
+        previousTrackIdRef.current = nextTrack.id
+        setLayout(() =>
+            resolveFullPlayerLayout(nextTrack.source, getFullPlayerLayout()),
+        )
+    }, [currentTrack])
     const canLike = Boolean(
         loggedIn && displayTrack?.source === "netease" && displayTrack?.id,
     )
@@ -373,7 +385,21 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         displayTrack.coverUrl,
     )
     const totalMs = durationMs > 0 ? durationMs : displayTrack.durationMs
-    const showQuality = displayTrack.source === "netease"
+    const artistLabel =
+        displayTrack.source === "bilibili"
+            ? displayTrack.artist?.trim() ||
+              displayTrack.artists
+                  ?.map((artist) => artist.name.trim())
+                  .filter(Boolean)
+                  .join(" / ") ||
+              "未知作者"
+            : displayTrack.artist || "未知艺人"
+    const secondaryMeta =
+        displayTrack.source === "bilibili"
+            ? displayTrack.tname?.trim()
+            : displayTrack.album
+ const showQuality =
+ displayTrack.source === "netease" || displayTrack.source === "bilibili"
     const liked = isTrackLiked(displayTrack.id)
     const primaryArtist = displayTrack.artists?.find((item) => item.id)
     const canOpenArtist =
@@ -598,12 +624,12 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                         onClick={navigateArtist}
                         className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
                     >
-                        {displayTrack.artist}
+                        {artistLabel}
                     </button>
                 ) : (
-                    <span>{displayTrack.artist}</span>
+                    <span>{artistLabel}</span>
                 )}
-                {displayTrack.album ? (
+                {secondaryMeta ? (
                     <>
                         <span className="mx-1 text-muted-foreground/50">·</span>
                         {canOpenAlbum ? (
@@ -612,10 +638,10 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                 onClick={navigateAlbum}
                                 className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
                             >
-                                {displayTrack.album}
+                                {secondaryMeta}
                             </button>
                         ) : (
-                            <span>{displayTrack.album}</span>
+                            <span>{secondaryMeta}</span>
                         )}
                     </>
                 ) : null}
@@ -1000,10 +1026,10 @@ const TransportBar = memo(function TransportBar({
                             </span>
                         ) : null}
                     </>
-                ) : source === "local" ? (
+ ) : source === "local" || source === "bilibili" ? (
                     // 本地曲目无喜欢：来源徽章补到这个空位，保持布局平衡
                     <span className="flex size-10 items-center">
-                        <SourceBadge source="local" />
+ <SourceBadge source={source} />
                     </span>
                 ) : (
                     <span className="size-10" aria-hidden />
@@ -1285,6 +1311,9 @@ function CachedBackdropImage({ src }: { src: string }) {
     // 解码位图与合成纹理都小一个量级
     const kind = isAndroid() ? "thumbnail" : "original"
     const resolved = useCachedCoverUrl(src, kind)
+ if (!resolved) {
+ return null
+ }
     return (
         <img
             src={resolved}

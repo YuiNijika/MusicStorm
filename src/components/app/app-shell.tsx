@@ -60,6 +60,7 @@ function AppShell({
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
     const { detail, back } = useMusicNavigation()
     const mainRef = useRef<HTMLElement>(null)
+    const contentRef = useRef<HTMLDivElement>(null)
     // 滚动位置按「路由 + 详情」分别记忆：离开时保存，返回时恢复，
     // 否则从歌单详情返回资料库时列表会跳回顶部
     const scrollMemoryRef = useRef<Map<string, number>>(new Map())
@@ -78,6 +79,10 @@ function AppShell({
             if (key) {
                 scrollMemoryRef.current.set(key, main.scrollTop)
             }
+            const pending = pendingRestoreRef.current
+            if (pending && Math.abs(main.scrollTop - pending.top) > 2) {
+                pendingRestoreRef.current = null
+            }
         }
         main.addEventListener("scroll", rememberScroll, { passive: true })
         return () => main.removeEventListener("scroll", rememberScroll)
@@ -91,9 +96,6 @@ function AppShell({
         const key = detail
             ? `detail:${detail.type}:${detail.id}`
             : `route:${activeRoute}`
-        if (lastScrollKeyRef.current && lastScrollKeyRef.current !== key) {
-            scrollMemoryRef.current.set(lastScrollKeyRef.current, main.scrollTop)
-        }
         const saved = scrollMemoryRef.current.get(key) ?? 0
         lastScrollKeyRef.current = key
         pendingRestoreRef.current = { top: saved }
@@ -120,7 +122,7 @@ function AppShell({
             main.scrollTo({ top: pending.top, left: 0 })
             pendingRestoreRef.current = null
         })
-        observer.observe(main)
+        observer.observe(contentRef.current ?? main)
         return () => observer.disconnect()
     }, [])
     // 网页版无窗口/托盘/系统媒体集成；桌面 hooks 内部自带 web 守卫
@@ -170,6 +172,16 @@ function AppShell({
 
     return (
         <div className="app-root flex h-screen flex-col overflow-hidden text-foreground">
+            <a
+                href="#main-content"
+                onClick={(event) => {
+                    event.preventDefault()
+                    document.getElementById("main-content")?.focus()
+                }}
+                className="sr-only fixed left-4 top-4 z-[300] rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus-visible:outline-2 focus-visible:outline-ring"
+            >
+                跳到主要内容
+            </a>
             {!nativeMacOS ? (
                 <div className="hidden md:block">
                     <TitleBar
@@ -188,10 +200,12 @@ function AppShell({
                 <Sidebar activeRoute={activeRoute === "feedback" ? "settings" : activeRoute} onNavigate={onNavigate} showActive={detail?.type !== "comments"} />
 
                 <main
+                    id="main-content"
                     ref={mainRef}
+                    tabIndex={-1}
                     className="page-content-host apple-scroll min-w-0 flex-1 overflow-y-auto"
                 >
-                    <div className="w-full px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-10 md:pb-10 xl:px-16">
+                    <div ref={contentRef} className="w-full px-4 pt-4 pb-24 sm:px-6 sm:py-6 md:px-10 md:pb-10 xl:px-16">
                         {children}
                     </div>
                 </main>

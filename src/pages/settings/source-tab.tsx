@@ -11,11 +11,14 @@ import { notifyInfo, notifySuccess, notifyError } from "@/lib/notify"
 import {
     API_SETTINGS_EVENT,
     DEFAULT_BASE_URL,
+    DEFAULT_BILIBILI_BASE_URL,
     EXTERNAL_SOURCES,
     getApiSettings,
+    getBilibiliBaseUrl,
     getNeteaseBaseUrl,
     resolveEffectiveBaseUrl,
     setApiMode,
+    setApiSettings,
     setExternalSource,
     speedTestApi,
     type ApiMode,
@@ -42,6 +45,9 @@ function SourceTab() {
     const [customDraft, setCustomDraft] = useState(
         () => getApiSettings().customUrl || DEFAULT_BASE_URL,
     )
+    const [bilibiliDraft, setBilibiliDraft] = useState(
+        () => getApiSettings().bilibiliBaseUrl || DEFAULT_BILIBILI_BASE_URL,
+    )
     const [savedHint, setSavedHint] = useState<string | null>(null)
     const [nativeHint, setNativeHint] = useState<string | null>(null)
     const [speedHint, setSpeedHint] = useState<string | null>(null)
@@ -49,6 +55,7 @@ function SourceTab() {
     const [qualityBr, setQualityBr] = useState<QualityBr>(() =>
         getNeteaseQualityBr(),
     )
+    const webMode = isWebMode()
 
     useEffect(() => {
         function sync() {
@@ -57,6 +64,9 @@ function SourceTab() {
             if (next.source === "custom" && next.customUrl) {
                 setCustomDraft(next.customUrl)
             }
+            setBilibiliDraft(
+                next.bilibiliBaseUrl || DEFAULT_BILIBILI_BASE_URL,
+            )
         }
         window.addEventListener(API_SETTINGS_EVENT, sync)
         return () => window.removeEventListener(API_SETTINGS_EVENT, sync)
@@ -68,7 +78,7 @@ function SourceTab() {
             return
         }
         let cancelled = false
-        setNativeHint("正在检测内置 API…")
+        setNativeHint("正在检测内置服务…")
         void probeNativeApi().then((status) => {
             if (!cancelled) {
                 setNativeHint(status.message)
@@ -88,13 +98,13 @@ function SourceTab() {
         const next = setApiMode(mode)
         setSettings(next)
         const title =
-            mode === "integrated" ? "已切换内置 API" : "已切换对接 API"
+            mode === "integrated" ? "已使用内置服务" : "已使用外部服务"
         flash(title)
         notifySuccess(title, {
             description:
                 mode === "integrated"
-                    ? "加密在应用内完成，桌面代理发请求"
-                    : "将使用下方外部源",
+                    ? "无需额外配置"
+                    : "将使用下方选择的服务",
         })
     }
 
@@ -105,14 +115,14 @@ function SourceTab() {
         if (source === "custom") {
             const next = setExternalSource("custom", customDraft)
             setSettings(next)
-            flash("已选自定义，请确认 URL 后保存")
-            notifyInfo("已选自定义源", { description: "确认 URL 后点保存" })
+            flash("已选自定义服务")
+            notifyInfo("已选自定义服务", { description: "确认地址后点保存" })
             return
         }
         const next = setExternalSource(source)
         setSettings(next)
-        flash("已切换 API 源")
-        notifySuccess("已切换 API 源", {
+        flash("已切换外部服务")
+        notifySuccess("已切换外部服务", {
             description:
                 EXTERNAL_SOURCES.find((item) => item.id === source)?.label ??
                 source,
@@ -129,8 +139,22 @@ function SourceTab() {
         setSettings(next)
         const effective = resolveEffectiveBaseUrl(next)
         setCustomDraft(effective)
-        flash("已保存自定义源")
-        notifySuccess("已保存自定义源", { description: effective })
+        flash("已保存自定义服务")
+        notifySuccess("已保存自定义服务", { description: effective })
+    }
+
+    function handleSaveBilibili() {
+        const url = bilibiliDraft.trim() || DEFAULT_BILIBILI_BASE_URL
+        if (url === settings.bilibiliBaseUrl) {
+            return
+        }
+        const next = setApiSettings({ bilibiliBaseUrl: url })
+        setSettings(next)
+        setBilibiliDraft(next.bilibiliBaseUrl)
+        flash("已保存B站服务")
+        notifySuccess("已保存B站服务", {
+            description: next.bilibiliBaseUrl,
+        })
     }
 
     async function handleSpeedTest() {
@@ -139,9 +163,9 @@ function SourceTab() {
         if (settings.mode === "integrated") {
             const status = await probeNativeApi()
             setSpeedLoading(false)
-            setSpeedHint(status.ready ? "内置就绪" : status.message)
+            setSpeedHint(status.ready ? "内置服务就绪" : status.message)
             if (!status.ready) {
-                notifyError("内置 API 未就绪", { description: status.message })
+                notifyError("内置服务未就绪", { description: status.message })
             }
             return
         }
@@ -155,23 +179,21 @@ function SourceTab() {
 
     const sourceLabel =
         EXTERNAL_SOURCES.find((item) => item.id === settings.source)?.label ??
-        "API 源"
-    const webMode = isWebMode()
-
+        "在线服务"
     return (
         <div className="space-y-3">
             <TabHeader
                 title="音源"
                 description={
                     webMode
-                        ? "对接外部 NCM 源与音质偏好"
-                        : "内置 API 或对接外部 NCM 源与音质偏好"
+                        ? "选择网易云服务与音质偏好"
+                        : "使用内置服务，或连接外部网易云服务"
                 }
             />
 
             <div className="space-y-3">
                 {!webMode ? (
-                    <SettingsGroup title="API 模式" description="默认使用应用内置">
+                    <SettingsGroup title="连接方式" description="默认使用应用内置">
                         <ChipRow>
                             <ChoiceChip
                                 label="应用内置"
@@ -179,7 +201,7 @@ function SourceTab() {
                                 onClick={() => handleMode("integrated")}
                             />
                             <ChoiceChip
-                                label="对接 API"
+                                label="外部服务"
                                 active={settings.mode === "external"}
                                 onClick={() => handleMode("external")}
                             />
@@ -187,7 +209,7 @@ function SourceTab() {
                         {settings.mode === "integrated" ? (
                             <p className="text-[13px] text-muted-foreground">
                                 {nativeHint ??
-                                    "内置运行时：加密在应用内完成，桌面代理发请求"}
+                                    "由应用直接连接，无需额外配置"}
                             </p>
                         ) : null}
                         <div className="flex min-h-11 flex-wrap items-center gap-2">
@@ -216,11 +238,11 @@ function SourceTab() {
                 ) : null}
 
                 <SettingsGroup
-                    title={webMode ? "外部 API 源" : "外部源"}
+                    title="外部服务"
                     description={
                         webMode
-                            ? "官方 / 社区预设，或自定义 Base URL"
-                            : "切换到对接 API 后在此选择"
+                            ? "官方 / 社区预设，或自定义服务地址"
+                            : "切换到外部服务后在此选择"
                     }
                 >
                     <Select
@@ -245,7 +267,7 @@ function SourceTab() {
                     {settings.source === "custom" ? (
                         <div className="space-y-2">
                             <p className="text-[13px] font-medium text-muted-foreground">
-                                自定义 URL
+                                自定义服务地址
                             </p>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <input
@@ -259,8 +281,11 @@ function SourceTab() {
                                             event.currentTarget.blur()
                                         }
                                     }}
+                                    aria-label="自定义服务地址"
+                                    autoComplete="off"
+                                    spellCheck={false}
                                     placeholder={DEFAULT_BASE_URL}
-                                    className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
+                                    className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none focus-visible:outline-2 focus-visible:outline-ring"
                                 />
                                 <ActionButton
                                     variant="primary"
@@ -301,6 +326,48 @@ function SourceTab() {
                             ) : null}
                         </div>
                     ) : null}
+                </SettingsGroup>
+
+                <SettingsGroup
+                    title="B站服务"
+                    description="对接模式下用于搜索、播放和收藏夹"
+                >
+                    <div className="space-y-2">
+                        <p className="text-[13px] font-medium text-muted-foreground">
+                            对接服务地址
+                        </p>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <input
+                                value={bilibiliDraft}
+                                onChange={(event) =>
+                                    setBilibiliDraft(
+                                        event.currentTarget.value,
+                                    )
+                                }
+                                onBlur={handleSaveBilibili}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.currentTarget.blur()
+                                    }
+                                }}
+                                aria-label="B站对接服务地址"
+                                autoComplete="off"
+                                spellCheck={false}
+                                placeholder={DEFAULT_BILIBILI_BASE_URL}
+                                className="material-field h-9 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none focus-visible:outline-2 focus-visible:outline-ring"
+                            />
+                            <ActionButton
+                                variant="primary"
+                                className="shrink-0"
+                                onClick={handleSaveBilibili}
+                            >
+                                保存
+                            </ActionButton>
+                        </div>
+                        <p className="truncate text-[13px] text-muted-foreground">
+                            {getBilibiliBaseUrl()}
+                        </p>
+                    </div>
                 </SettingsGroup>
 
                 <SettingsGroup

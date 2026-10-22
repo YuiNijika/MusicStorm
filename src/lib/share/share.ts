@@ -33,7 +33,11 @@ export type ShareTarget = {
 
 /** 是否为可分享的曲目：仅网易云在线曲目可迁移到网页版直放 */
 function isShareableTrack(track: Track | null | undefined): boolean {
-    return Boolean(track && track.source === "netease" && track.id)
+ return Boolean(
+ track &&
+ (track.source === "netease" || track.source === "bilibili") &&
+ track.id,
+ )
 }
 
 /** 导出曲名 → 网页站深链（hash 路由 `#play?id=<songId>`，规避静态部署丢 query） */
@@ -45,7 +49,10 @@ function buildPlayLink(track: Track): string | null {
     const base = isWebMode()
         ? `${window.location.origin}${window.location.pathname}`
         : WEB_PLAYER_URL
-    return `${base}#play?id=${encodeURIComponent(track.id)}`
+ if (track.source === "bilibili" && track.webUrl) {
+ return track.webUrl
+ }
+ return `${base}#play?id=${encodeURIComponent(track.id)}`
 }
 
 /** 导出曲名 → 应用自定义协议深链（`musicstorm://play?id=<songId>`），供已安装应用直接打开 */
@@ -53,7 +60,10 @@ function buildAppLink(track: Track): string | null {
     if (!isShareableTrack(track)) {
         return null
     }
-    return `${APP_PROTOCOL}://play?id=${encodeURIComponent(track.id)}`
+ if (track.source === "bilibili" && track.webUrl) {
+ return track.webUrl
+ }
+ return `${APP_PROTOCOL}://play?id=${encodeURIComponent(track.id)}`
 }
 
 // 分享文案长度上限：避免标题/摘要过长导致分享接口拒绝或 URL 超长
@@ -73,12 +83,13 @@ function buildShareTitle(track: Track): string {
 }
 
 function buildShareSummary(track: Track): string {
-    return truncate(
-        `推荐一首歌：《${track.title}》${track.artist}，在 MusicStorm 上在线听`,
-        SUMMARY_MAX,
-    )
+ return truncate(
+ track.source === "bilibili"
+ ? `推荐一个视频：《${track.title}》${track.artist}`
+ : `推荐一首歌：《${track.title}》${track.artist}，在 MusicStorm上在线听`,
+ SUMMARY_MAX,
+ )
 }
-
 function escapeQuery(value: string): string {
     return encodeURIComponent(value)
 }

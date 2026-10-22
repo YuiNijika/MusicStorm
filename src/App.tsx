@@ -2,6 +2,10 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 import { AppShell } from "@/components/app/app-shell"
+import {
+    FrontendModeProvider,
+    useFrontendMode,
+} from "@/components/app/frontend-mode-provider"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { Toaster, toast } from "@/components/ui/toast"
@@ -19,6 +23,7 @@ import {
 import { isWebMode } from "@/lib/web-mode"
 import { isAndroid } from "@/lib/platform"
 import { runRouteTransition } from "@/lib/app/route-transition"
+import { readFrontendMode } from "@/lib/frontend-mode"
 import { reextractLocalCovers } from "@/lib/local/import-folder"
 import {
     PERFORMANCE_MODE_EVENT,
@@ -57,8 +62,12 @@ import {
     SettingsPageSkeleton,
     StatsPageSkeleton,
 } from "@/components/music/loading-skeletons"
+import { Skeleton as FeedbackSkeleton } from "@/pages/feedback/skeleton"
 
 const SettingsPage = lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage })))
+const BilibiliPage = lazy(() => import("@/pages/bilibili").then(m => ({ default: m.BilibiliPage })))
+const BilibiliSearchPage = lazy(() => import("@/pages/bilibili-search").then(m => ({ default: m.BilibiliSearchPage })))
+const BilibiliLibraryPage = lazy(() => import("@/pages/bilibili-library").then(m => ({ default: m.BilibiliLibraryPage })))
 const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
 const DiscoverPage = lazy(() => import("@/pages/discover").then(m => ({ default: m.DiscoverPage })))
 const ArtistPage = lazy(() => import("@/pages/artist").then(m => ({ default: m.ArtistPage })))
@@ -93,6 +102,7 @@ function AppRoutes({
     onNavigate: (route: AppRoute) => void
     onSettingsTabChange: (tab: SettingsTab) => void
 }) {
+    const { mode } = useFrontendMode()
     const { detail, openPlaylist, openAlbum, openRadio, back } = useMusicNavigation()
 
     const playlistFallback = <PlaylistDetailSkeleton />
@@ -142,6 +152,13 @@ function AppRoutes({
         )
     }
 
+    if (route === "bilibili" || (route === "home" && mode === "bilibili")) {
+        return (
+            <Suspense fallback={<PlaylistGridSkeleton count={8} />}>
+                <BilibiliPage onNavigate={onNavigate} />
+            </Suspense>
+        )
+    }
     if (route === "home") {
         return (
             <HomePage onOpenPlaylist={openPlaylist} onOpenRadio={openRadio} />
@@ -169,13 +186,29 @@ function AppRoutes({
         return <Suspense fallback={<LocalPageSkeleton />}><LocalPage /></Suspense>
     }
     if (route === "library") {
-        return <Suspense fallback={gridFallback}><LibraryPage /></Suspense>
+ return (
+ <Suspense fallback={gridFallback}>
+ {mode === "bilibili" ? (
+ <BilibiliLibraryPage />
+ ) : (
+ <LibraryPage />
+ )}
+ </Suspense>
+ )
     }
     if (route === "radios") {
         return <Suspense fallback={<RadiosPageSkeleton />}><RadiosPage /></Suspense>
     }
     if (route === "search") {
-        return <Suspense fallback={<SearchResultsSkeleton />}><SearchPage /></Suspense>
+        return (
+            <Suspense fallback={<SearchResultsSkeleton />}>
+                {mode === "bilibili" ? (
+                    <BilibiliSearchPage />
+                ) : (
+                    <SearchPage />
+                )}
+            </Suspense>
+        )
     }
     if (route === "stats") {
         return <Suspense fallback={<StatsPageSkeleton />}><StatsPage /></Suspense>
@@ -195,7 +228,7 @@ function AppRoutes({
     }
     if (route === "feedback") {
         return (
-            <Suspense fallback={<p role="status">加载中…</p>}>
+            <Suspense fallback={<FeedbackSkeleton />}>
                 <FeedbackPage onBack={() => onNavigate("settings")} />
             </Suspense>
         )
@@ -204,13 +237,25 @@ function AppRoutes({
 }
 
 function App() {
-    const [route, setRoute] = useState<AppRoute>(() =>
-        isWebMode() ? webHashToRoute(window.location.hash) : "home",
-    )
+    const [route, setRoute] = useState<AppRoute>(() => {
+        const initialMode = readFrontendMode()
+        const hashRoute = isWebMode()
+            ? webHashToRoute(window.location.hash)
+            : "home"
+        return initialMode === "bilibili" && hashRoute === "home"
+            ? "bilibili"
+            : hashRoute
+    })
     const [titleBarStyle, setTitleBarStyle] = useState<TitleBarStyle>(() =>
         readTitleBarStyle(),
     )
-    const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>()
+ const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(() =>
+ readSettingsTabFromHash(),
+ )
+ const handleSettingsTabChange = useCallback((tab: SettingsTab) => {
+ setSettingsTab(tab)
+ writeSettingsTabHash(tab)
+ }, [])
 
     useApiCacheAutoPurge()
     useDevtoolsShortcut()
@@ -273,32 +318,37 @@ function App() {
 
     return (
         <ThemeProvider>
-            <Toaster toastManager={toast}>
-                <AppUpdateProvider>
-                    <IntegratedApiBootEffect />
-                    <NeteaseSessionProvider>
-                        <LikedProvider>
-                            <PlayerProvider>
-                                <DesktopLyricSyncProvider />
-                                <MiniPlayerSyncProvider />
-                                <MusicNavigationProvider>
-                                    <AppWithNav
-                                        route={route}
-                                        setRoute={setRoute}
-                                        titleBarStyle={titleBarStyle}
-                                        onTitleBarStyleChange={
-                                            handleTitleBarStyleChange
-                                        }
-                                        settingsTab={settingsTab}
-                                        setSettingsTab={setSettingsTab}
-                                    />
-                                </MusicNavigationProvider>
-                            </PlayerProvider>
-                        </LikedProvider>
-                    </NeteaseSessionProvider>
-                </AppUpdateProvider>
-                <StarToast />
-            </Toaster>
+            <FrontendModeProvider>
+                <Toaster toastManager={toast}>
+                    <AppUpdateProvider>
+                        <IntegratedApiBootEffect />
+                        <NeteaseSessionProvider>
+                            <LikedProvider>
+                                <PlayerProvider>
+                                    <DesktopLyricSyncProvider />
+                                    <MiniPlayerSyncProvider />
+                                    <MusicNavigationProvider>
+                                        <AppWithNav
+                                            route={route}
+                                            setRoute={setRoute}
+                                            titleBarStyle={titleBarStyle}
+                                            onTitleBarStyleChange={
+                                                handleTitleBarStyleChange
+                                            }
+                                            settingsTab={settingsTab}
+                                            setSettingsTab={setSettingsTab}
+                                            onSettingsTabChange={
+                                                handleSettingsTabChange
+                                            }
+                                        />
+                                    </MusicNavigationProvider>
+                                </PlayerProvider>
+                            </LikedProvider>
+                        </NeteaseSessionProvider>
+                    </AppUpdateProvider>
+                    <StarToast />
+                </Toaster>
+            </FrontendModeProvider>
         </ThemeProvider>
     )
 }
@@ -332,6 +382,7 @@ function MiniPlayerSyncProvider() {
 // 未知或空 hash 回落到主页，避免链接拼错导致白屏。
 const WEB_HASH_ROUTES: Record<string, AppRoute> = {
     player: "home",
+    bilibili: "bilibili",
     discover: "discover",
     local: "local",
     library: "library",
@@ -340,6 +391,19 @@ const WEB_HASH_ROUTES: Record<string, AppRoute> = {
     stats: "stats",
     settings: "settings",
     feedback: "feedback",
+}
+
+const SETTINGS_HASH_TABS: Record<string, SettingsTab> = {
+ appearance: "appearance",
+ themes: "themes",
+ layout: "layout",
+ source: "source",
+ playback: "playback",
+ account: "account",
+ update: "update",
+ hotkeys: "hotkeys",
+ faq: "faq",
+ other: "other",
 }
 
 function webHashToRoute(hash: string): AppRoute {
@@ -354,6 +418,31 @@ function webRouteToHash(route: AppRoute): string {
     return `#/${key ?? "player"}`
 }
 
+function readSettingsTabFromHash(): SettingsTab | undefined {
+    if (typeof window === "undefined") {
+        return undefined
+    }
+    const params = new URLSearchParams(window.location.hash.split("?")[1] ?? "")
+    const value = params.get("tab")
+    if (
+        !value ||
+        !Object.prototype.hasOwnProperty.call(SETTINGS_HASH_TABS, value)
+    ) {
+        return undefined
+    }
+    return SETTINGS_HASH_TABS[value]
+}
+
+function writeSettingsTabHash(tab: SettingsTab): void {
+ if (!isWebMode() || webHashToRoute(window.location.hash) !== "settings") {
+ return
+ }
+ const next = `#/settings?tab=${encodeURIComponent(tab)}`
+ if (window.location.hash !== next) {
+ window.history.replaceState(null, "", next)
+ }
+}
+
 function AppWithNav({
     route,
     setRoute,
@@ -361,6 +450,7 @@ function AppWithNav({
     onTitleBarStyleChange,
     settingsTab,
     setSettingsTab,
+onSettingsTabChange,
 }: {
     route: AppRoute
     setRoute: (route: AppRoute) => void
@@ -368,8 +458,10 @@ function AppWithNav({
     onTitleBarStyleChange: (style: TitleBarStyle) => void
     settingsTab?: SettingsTab
     setSettingsTab: (tab: SettingsTab | undefined) => void
+onSettingsTabChange: (tab: SettingsTab) => void
 }) {
     const { closeDetail } = useMusicNavigation()
+    const { mode, setMode, visibleModules } = useFrontendMode()
 
     const handleNavigate = useCallback(
         (next: AppRoute) => {
@@ -392,6 +484,25 @@ function AppWithNav({
         setRoute("settings")
     }, [closeDetail, setRoute, setSettingsTab])
 
+    useEffect(() => {
+        if (route === "bilibili" && mode !== "bilibili") {
+            setMode("bilibili")
+            return
+        }
+        const allowed = new Set<AppRoute>([
+            ...visibleModules.map((module) => module.id),
+            "settings",
+            "feedback",
+        ])
+        if (allowed.has(route)) {
+            return
+        }
+        const fallback =
+            visibleModules[0]?.id ??
+            (mode === "bilibili" ? "bilibili" : "home")
+        handleNavigate(fallback)
+    }, [handleNavigate, mode, route, setMode, visibleModules])
+
     // 网页版与浏览器地址栏同步：/#/player 进入应用，#/local 等映射路由。
     // 桌面版保持纯内存路由，不受 hash 影响。
     useEffect(() => {
@@ -400,11 +511,19 @@ function AppWithNav({
         }
         function sync() {
             const next = webHashToRoute(window.location.hash)
+            closeDetail()
+setSettingsTab(
+next === "settings"
+? readSettingsTabFromHash()
+: next === "feedback"
+? undefined
+: undefined,
+)
             setRoute(next)
         }
         window.addEventListener("hashchange", sync)
         return () => window.removeEventListener("hashchange", sync)
-    }, [])
+    }, [closeDetail, setSettingsTab])
 
     // 导航时同步 hash（网页版可分享/刷新保持页面；触发 hashchange 后 setRoute 幂等）
     const handleNavigateWeb = useCallback(
@@ -460,7 +579,7 @@ function AppWithNav({
                 onTitleBarStyleChange={onTitleBarStyleChange}
                 settingsTab={settingsTab}
                 onNavigate={handleNavigateWeb}
-                onSettingsTabChange={setSettingsTab}
+ onSettingsTabChange={onSettingsTabChange}
             />
         </AppShell>
     )

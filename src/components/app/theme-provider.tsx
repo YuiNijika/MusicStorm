@@ -11,7 +11,6 @@ import {
 import { flushSync } from "react-dom"
 
 import {
-    applyAppearanceToDom,
     normalizeHue,
     readAppearancePrefs,
     writeAppearancePrefs,
@@ -19,6 +18,16 @@ import {
     type AppearancePrefs,
     type TintScope,
 } from "@/lib/appearance/appearance-prefs"
+import {
+ applyFontToDom,
+ readFontPrefs,
+ writeFontPrefs,
+ type FontPrefs,
+} from "@/lib/appearance/font-prefs"
+import { applyThemeToDom } from "@/lib/theme/apply"
+import { getThemeDefinition, isThemeStyle } from "@/lib/theme/themes"
+import { rememberTheme } from "@/lib/theme/recent"
+import type { ThemeStyle } from "@/lib/theme/types"
 
 type Theme = "light" | "dark" | "system"
 type ResolvedTheme = "light" | "dark"
@@ -26,7 +35,11 @@ type ResolvedTheme = "light" | "dark"
 type ThemeContextValue = {
     theme: Theme
     resolvedTheme: ResolvedTheme
+    themeStyle: ThemeStyle
+fontPrefs: FontPrefs
     setTheme: (theme: Theme) => void
+    setThemeStyle: (style: ThemeStyle) => void
+setFontPrefs: (prefs: FontPrefs) => void
     toggleTheme: () => void
     appearance: AppearancePrefs
     setAccent: (accent: AccentTone) => void
@@ -43,6 +56,8 @@ type ThemeContextValue = {
 }
 
 const STORAGE_KEY = "musicstorm-theme"
+const STYLE_STORAGE_KEY = "musicstorm-theme-style"
+const FONT_PREFS_EVENT = "musicstorm:font-prefs"
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
@@ -100,10 +115,15 @@ function runThemeTransition(mutate: () => void) {
                 pseudoElement: "::view-transition-new(root)",
             },
         )
-    })
-    void transition.finished.finally(() => {
-        root.classList.remove("theme-switching")
-    })
+    }).catch(() => undefined)
+    void transition.finished.then(
+        () => {
+            root.classList.remove("theme-switching")
+        },
+        () => {
+            root.classList.remove("theme-switching")
+        },
+    )
 }
 
 function getSystemTheme(): ResolvedTheme {
@@ -123,6 +143,14 @@ function applyTheme(resolved: ResolvedTheme) {
     root.dataset.theme = resolved
 }
 
+function readThemeStyle(): ThemeStyle {
+    if (typeof window === "undefined") {
+        return "default"
+    }
+    const stored = window.localStorage.getItem(STYLE_STORAGE_KEY)
+    return isThemeStyle(stored) ? stored : "default"
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [theme, setThemeState] = useState<Theme>(() => {
         if (typeof window === "undefined") {
@@ -134,24 +162,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
         return "system"
     })
+    const [themeStyle, setThemeStyleState] = useState<ThemeStyle>(() =>
+        readThemeStyle(),
+    )
     const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
         resolveTheme(theme),
     )
     const [appearance, setAppearance] = useState<AppearancePrefs>(() =>
         readAppearancePrefs(),
     )
+ const [fontPrefs, setFontPrefsState] = useState<FontPrefs>(() =>
+ readFontPrefs(),
+ )
 
     // 外观最新值镜像：render 期同步，保证过渡闭包能取到最新外观
     const appearanceRef = useRef(appearance)
     appearanceRef.current = appearance
+    const themeStyleRef = useRef(themeStyle)
+    themeStyleRef.current = themeStyle
+ const fontPrefsRef = useRef(fontPrefs)
+ fontPrefsRef.current = fontPrefs
 
     useEffect(() => {
         const next = resolveTheme(theme)
         setResolvedTheme(next)
         applyTheme(next)
         window.localStorage.setItem(STORAGE_KEY, theme)
-        applyAppearanceToDom(appearance)
-    }, [theme, appearance])
+        window.localStorage.setItem(STYLE_STORAGE_KEY, themeStyle)
+        applyThemeToDom({
+            style: themeStyle,
+            mode: next,
+            appearance,
+        })
+ applyFontToDom({
+ prefs: fontPrefs,
+ themeFontFamily: getThemeDefinition(themeStyle).fontFamily,
+ })
+ }, [theme, themeStyle, appearance, fontPrefs])
 
     useEffect(() => {
         if (theme !== "system") {
@@ -162,7 +209,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             const next = getSystemTheme()
             setResolvedTheme(next)
             applyTheme(next)
-            applyAppearanceToDom(appearance)
+            applyThemeToDom({
+                style: themeStyleRef.current,
+                mode: next,
+                appearance,
+            })
+ applyFontToDom({
+ prefs: fontPrefsRef.current,
+ themeFontFamily: getThemeDefinition(
+ themeStyleRef.current,
+ ).fontFamily,
+ })
         }
         media.addEventListener("change", onChange)
         return () => media.removeEventListener("change", onChange)
@@ -171,14 +228,49 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const setTheme = useCallback((next: Theme) => {
         runThemeTransition(() => {
             // DOM 明暗 + 颜色变量必须在截帧前同步落地：applyTheme 切 class，
-            // applyAppearanceToDom 注入 --background 等 inline 变量——两者留到
+            // 主题层注入 --background 等 inline 变量——两者留到
             // effect 再跑的话，startViewTransition 截到的新快照还是旧外观，
             // 动画空转，结束后才跳变（白切黑"黑了还闪一下"就是这么来的）
-            applyTheme(resolveTheme(next))
-            applyAppearanceToDom(appearanceRef.current)
+            const mode = resolveTheme(next)
+            applyTheme(mode)
+            applyThemeToDom({
+                style: themeStyleRef.current,
+                mode,
+                appearance: appearanceRef.current,
+            })
+ applyFontToDom({
+ prefs: fontPrefsRef.current,
+ themeFontFamily: getThemeDefinition(
+ themeStyleRef.current,
+ ).fontFamily,
+ })
             setThemeState(next)
         })
     }, [])
+
+    const setThemeStyle = useCallback((next: ThemeStyle) => {
+        runThemeTransition(() => {
+            const mode = resolveTheme(theme)
+            const definition = getThemeDefinition(next)
+            applyTheme(mode)
+            applyThemeToDom({
+                style: next,
+                mode,
+                appearance: appearanceRef.current,
+            })
+ applyFontToDom({
+ prefs: fontPrefsRef.current,
+ themeFontFamily: definition.fontFamily,
+ })
+            themeStyleRef.current = next
+            window.localStorage.setItem(STYLE_STORAGE_KEY, next)
+ rememberTheme(next)
+            setThemeStyleState(next)
+            if (!definition.capabilities.includes("glass")) {
+                document.documentElement.classList.add("glass-disabled")
+            }
+        })
+    }, [theme])
 
     const toggleTheme = useCallback(() => {
         runThemeTransition(() =>
@@ -186,7 +278,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 const resolved = resolveTheme(current)
                 const next = resolved === "dark" ? "light" : "dark"
                 applyTheme(next)
-                applyAppearanceToDom(appearanceRef.current)
+                applyThemeToDom({
+                    style: themeStyleRef.current,
+                    mode: next,
+                    appearance: appearanceRef.current,
+                })
+ applyFontToDom({
+ prefs: fontPrefsRef.current,
+ themeFontFamily: getThemeDefinition(
+ themeStyleRef.current,
+ ).fontFamily,
+ })
                 return next
             }),
         )
@@ -288,11 +390,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+ const setFontPrefs = useCallback((next: FontPrefs) => {
+ const written = writeFontPrefs(next)
+ fontPrefsRef.current = written
+ setFontPrefsState(written)
+ applyFontToDom({
+ prefs: written,
+ themeFontFamily: getThemeDefinition(
+ themeStyleRef.current,
+ ).fontFamily,
+ })
+ window.dispatchEvent(
+ new CustomEvent<FontPrefs>(FONT_PREFS_EVENT, {
+ detail: written,
+ }),
+ )
+ }, [])
+
     const value = useMemo(
         () => ({
             theme,
             resolvedTheme,
+            themeStyle,
+ fontPrefs,
             setTheme,
+            setThemeStyle,
+ setFontPrefs,
             toggleTheme,
             appearance,
             setAccent,
@@ -305,11 +428,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setBackgroundOpacity,
             setBackgroundBlur,
             setBingWallpaper,
-        }),
-        [
+ }),
+ [
             theme,
             resolvedTheme,
+            themeStyle,
+ fontPrefs,
             setTheme,
+            setThemeStyle,
+ setFontPrefs,
             toggleTheme,
             appearance,
             setAccent,

@@ -11,6 +11,7 @@ import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
 import { VirtualList } from "@/components/music/virtual-list"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import {
     Dialog,
@@ -71,6 +72,10 @@ const LIBRARY_TABS: Array<{ id: LibraryTab; label: string }> = [
     { id: "cloud", label: "云盘" },
 ]
 
+const TRACK_ROW_HEIGHT = 58
+const PLAYLIST_ROW_HEIGHT = 66
+const MEDIA_ROW_HEIGHT = 236
+
 // 网易云 301/未登录/系统错误等登录态失效错误：提示补「可尝试重新登录」
 function describeLoadError(error: unknown): string {
     const base =
@@ -84,8 +89,12 @@ function LibraryPage() {
     const { ready, loggedIn, profile } = useNeteaseSession()
     const { likedSongPlaylistId } = useLiked()
     const { playlistView, playlistSort } = useLibraryLayout()
-    const { count: skeletonCount, gridClass, gridStyle, gridRef } =
-        usePlaylistGrid()
+    const {
+        cols,
+        count: skeletonCount,
+        gridStyle,
+        gridRef,
+    } = usePlaylistGrid()
     const { playOrToggle, currentTrack, isPlaying } = usePlayer()
 
     const [tab, setTab] = useState<LibraryTab>("playlists")
@@ -407,7 +416,7 @@ function LibraryPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div ref={gridRef} className="space-y-6">
             <PageTitle
                 title="资料库"
                 subtitle={loggedIn ? "网易云歌单与收藏" : "来自网易云"}
@@ -478,7 +487,6 @@ function LibraryPage() {
                         <PlaylistGridSkeleton
                             count={skeletonCount}
                             style={gridStyle}
-                            gridRef={gridRef}
                         />
                     ) : (
                         <div className="apple-list-surface space-y-1 p-1.5">
@@ -515,7 +523,8 @@ function LibraryPage() {
                     <DragList
                         items={sortedPlaylists}
                         enabled={playlistSort === "custom"}
-                        className="apple-list-surface space-y-0.5 p-1.5"
+                        itemHeight={PLAYLIST_ROW_HEIGHT}
+                        className="apple-list-surface p-1.5"
                         onReorder={(next) =>
                             setPlaylistListOrder(next.map((item) => item.id))
                         }
@@ -561,8 +570,12 @@ function LibraryPage() {
                         }}
                     />
                 ) : (
-                    <div ref={gridRef} className={gridClass} style={gridStyle}>
-                        {sortedPlaylists.map((playlist) => {
+                    <VirtualGrid
+                        items={sortedPlaylists}
+                        columns={cols}
+                        estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                        getItemKey={(playlist) => playlist.id}
+                        renderItem={(playlist) => {
                             const isLikedFolder =
                                 playlist.id === likedSongPlaylistId
                             return (
@@ -587,8 +600,8 @@ function LibraryPage() {
                                     className="w-full"
                                 />
                             )
-                        })}
-                    </div>
+                        }}
+                    />
                 )}
             </Section>
             ) : tab === "artists" ? (
@@ -616,10 +629,13 @@ function LibraryPage() {
                             description="在歌手页点收藏后会出现在这里"
                         />
                     ) : (
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {artists.map((artist) => (
+                        <VirtualGrid
+                            items={artists}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(artist) => artist.id}
+                            renderItem={(artist) => (
                                 <MediaCard
-                                    key={artist.id}
                                     coverUrl={artist.coverUrl}
                                     title={artist.name}
                                     subtitle={
@@ -631,8 +647,8 @@ function LibraryPage() {
                                     widthClassName="w-full"
                                     className="w-full"
                                 />
-                            ))}
-                        </div>
+                            )}
+                        />
                     )}
                 </Section>
             ) : tab === "mvs" ? (
@@ -660,10 +676,13 @@ function LibraryPage() {
                             description="在 MV 页点收藏后会出现在这里"
                         />
                     ) : (
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {mvs.map((mv) => (
+                        <VirtualGrid
+                            items={mvs}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(mv) => mv.id}
+                            renderItem={(mv) => (
                                 <MediaCard
-                                    key={mv.id}
                                     coverUrl={mv.coverUrl}
                                     title={mv.title}
                                     subtitle={mv.artistName || "MV"}
@@ -671,8 +690,8 @@ function LibraryPage() {
                                     widthClassName="w-full"
                                     className="w-full"
                                 />
-                            ))}
-                        </div>
+                            )}
+                        />
                     )}
                 </Section>
             ) : tab === "cloud" ? (
@@ -707,7 +726,7 @@ function LibraryPage() {
                         <div className="apple-list-surface p-1.5">
                             <VirtualList
                                 items={cloud}
-                                itemHeight={58}
+                                itemHeight={TRACK_ROW_HEIGHT}
                                 getItemKey={(track) => track.id}
                                 renderItem={(track, index) => (
                                     <TrackRow

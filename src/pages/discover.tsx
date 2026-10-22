@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 
 import { PlaylistGridSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
+import { VirtualGrid } from "@/components/music/virtual-grid"
+import { VirtualList } from "@/components/music/virtual-list"
 import { PageTitle } from "@/components/music/page-title"
 import { Section } from "@/components/music/section"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
@@ -63,6 +65,7 @@ const PLAYLIST_CATS = [
 
 // 每批展示数量：首屏少输出，点「加载更多」再补一批
 const PAGE_SIZE = 12
+const MEDIA_ROW_HEIGHT = 236
 
 function LoadMoreButton({
     visible,
@@ -125,8 +128,12 @@ function AreaFilter<T extends string | number>({
 
 function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
     const { playOrToggle, currentTrack, isPlaying } = usePlayer()
-    const { count: skeletonCount, gridClass, gridStyle, gridRef } =
-        usePlaylistGrid()
+    const {
+        cols,
+        count: skeletonCount,
+        gridStyle,
+        gridRef,
+    } = usePlaylistGrid()
 
     // 首屏只加载排行榜，其余区块滚动到附近再拉取，避免一次性请求+渲染过多卡片
     const albumsSection = useInViewOnce<HTMLDivElement>()
@@ -340,7 +347,7 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
     }
 
     return (
-        <div className="space-y-8 pb-4">
+        <div ref={gridRef} className="space-y-8 pb-4">
             <PageTitle title="发现" subtitle="官方榜单 · 新碟 · 新歌速递" />
 
             <Section
@@ -368,10 +375,13 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                     <StateHero variant="empty" title="暂无榜单" />
                 ) : (
                     <>
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {toplists.slice(0, toplistShown).map((item) => (
+                        <VirtualGrid
+                            items={toplists.slice(0, toplistShown)}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(item) => item.id}
+                            renderItem={(item) => (
                                 <MediaCard
-                                    key={item.id}
                                     coverUrl={item.coverUrl}
                                     title={item.title}
                                     subtitle={item.description || "榜单"}
@@ -379,8 +389,8 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                     widthClassName="w-full"
                                     className="w-full"
                                 />
-                            ))}
-                        </div>
+                            )}
+                        />
                         <LoadMoreButton
                             visible={toplistShown < toplists.length}
                             loading={false}
@@ -393,42 +403,45 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
             </Section>
 
             <div ref={albumsSection.ref}>
-            <Section
-                title="新碟上架"
-                description="最新发行专辑"
-                variant="listen"
-                action={
-                    <AreaFilter
-                        options={ALBUM_AREAS}
-                        value={albumArea}
-                        onChange={setAlbumArea}
-                    />
-                }
-            >
-                {albumStatus === "idle" || albumStatus === "loading" ? (
-                    <PlaylistGridSkeleton
-                        count={Math.min(skeletonCount, 5)}
-                        style={gridStyle}
-                    />
-                ) : albumStatus === "error" ? (
-                    <StateHero
-                        variant="error"
-                        title="新碟上架加载失败"
-                        description="请检查网络或 API 设置后重试"
-                        action={
-                            <HeroRetryButton
-                                onClick={() => setAlbumRetry((n) => n + 1)}
-                            />
-                        }
-                    />
-                ) : albums.length === 0 ? (
-                    <StateHero variant="empty" title="暂无新碟" />
-                ) : (
-                    <>
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {albums.map((album) => (
+                <Section
+                    title="新碟上架"
+                    description="最新发行专辑"
+                    variant="listen"
+                    action={
+                        <AreaFilter
+                            options={ALBUM_AREAS}
+                            value={albumArea}
+                            onChange={setAlbumArea}
+                        />
+                    }
+                >
+                    {albumStatus === "idle" || albumStatus === "loading" ? (
+                        <PlaylistGridSkeleton
+                            count={Math.min(skeletonCount, 5)}
+                            style={gridStyle}
+                        />
+                    ) : albumStatus === "error" ? (
+                        <StateHero
+                            variant="error"
+                            title="新碟上架加载失败"
+                            description="请检查网络或 API 设置后重试"
+                            action={
+                                <HeroRetryButton
+                                    onClick={() => setAlbumRetry((n) => n + 1)}
+                                />
+                            }
+                        />
+                    ) : albums.length === 0 ? (
+                        <StateHero variant="empty" title="暂无新碟" />
+                    ) : (
+                        <>
+                            <VirtualGrid
+                                items={albums}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(album) => album.id}
+                                renderItem={(album) => (
                                 <MediaCard
-                                    key={album.id}
                                     coverUrl={album.coverUrl}
                                     title={album.title}
                                     subtitle={
@@ -444,59 +457,62 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                     widthClassName="w-full"
                                     className="w-full"
                                 />
-                            ))}
-                        </div>
-                        <LoadMoreButton
-                            visible={albumHasMore}
-                            loading={albumLoadingMore}
-                            onClick={() => void loadMoreAlbums()}
-                        />
-                    </>
-                )}
-            </Section>
+                                )}
+                            />
+                            <LoadMoreButton
+                                visible={albumHasMore}
+                                loading={albumLoadingMore}
+                                onClick={() => void loadMoreAlbums()}
+                            />
+                        </>
+                    )}
+                </Section>
             </div>
 
             <div ref={songsSection.ref}>
-            <Section
-                title="新歌速递"
-                description="最新上架单曲"
-                variant="listen"
-                action={
-                    <AreaFilter
-                        options={SONG_AREAS}
-                        value={songType}
-                        onChange={setSongType}
-                    />
-                }
-            >
-                {songStatus === "idle" || songStatus === "loading" ? (
-                    <div className="apple-list-surface space-y-1 p-1.5">
-                        {Array.from({ length: 6 }).map((_, index) => (
-                            <div
-                                key={index}
-                                className="h-14 animate-pulse rounded-xl bg-[var(--surface-fill)]"
-                            />
-                        ))}
-                    </div>
-                ) : songStatus === "error" ? (
-                    <StateHero
-                        variant="error"
-                        title="新歌速递加载失败"
-                        description="请检查网络或 API 设置后重试"
-                        action={
-                            <HeroRetryButton
-                                onClick={() => setSongRetry((n) => n + 1)}
-                            />
-                        }
-                    />
-                ) : songs.length === 0 ? (
-                    <StateHero variant="empty" title="暂无新歌" />
-                ) : (
-                    <>
-                        <div className="apple-list-surface space-y-0.5 p-1.5">
-                            {songs.slice(0, songShown).map((track, index) => (
+                <Section
+                    title="新歌速递"
+                    description="最新上架单曲"
+                    variant="listen"
+                    action={
+                        <AreaFilter
+                            options={SONG_AREAS}
+                            value={songType}
+                            onChange={setSongType}
+                        />
+                    }
+                >
+                    {songStatus === "idle" || songStatus === "loading" ? (
+                        <div className="apple-list-surface space-y-1 p-1.5">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-14 animate-pulse rounded-xl bg-[var(--surface-fill)]"
+                                />
+                            ))}
+                        </div>
+                    ) : songStatus === "error" ? (
+                        <StateHero
+                            variant="error"
+                            title="新歌速递加载失败"
+                            description="请检查网络或 API 设置后重试"
+                            action={
+                                <HeroRetryButton
+                                    onClick={() => setSongRetry((n) => n + 1)}
+                                />
+                            }
+                        />
+                    ) : songs.length === 0 ? (
+                        <StateHero variant="empty" title="暂无新歌" />
+                    ) : (
+                        <>
+                            <VirtualList
+                                items={songs.slice(0, songShown)}
+                                itemHeight={58}
+                                className="apple-list-surface p-1.5"
+                                getItemKey={(track) => track.id}
+                                renderItem={(track, index) => (
                                 <TrackRow
-                                    key={track.id}
                                     track={track}
                                     index={index}
                                     isActive={currentTrack?.id === track.id}
@@ -510,58 +526,63 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                         playOrToggle(item, songs)
                                     }
                                 />
-                            ))}
-                        </div>
-                        <LoadMoreButton
-                            visible={songShown < songs.length}
-                            loading={false}
-                            onClick={() => setSongShown((n) => n + PAGE_SIZE)}
-                        />
-                    </>
-                )}
-            </Section>
+                                )}
+                            />
+                            <LoadMoreButton
+                                visible={songShown < songs.length}
+                                loading={false}
+                                onClick={() =>
+                                    setSongShown((n) => n + PAGE_SIZE)
+                                }
+                            />
+                        </>
+                    )}
+                </Section>
             </div>
 
             <div ref={catSection.ref}>
-            <Section
-                title="分类歌单"
-                description="网友精选碟"
-                variant="listen"
-                action={
-                    <AreaFilter
-                        options={PLAYLIST_CATS.map((cat) => ({
-                            value: cat,
-                            label: cat,
-                        }))}
-                        value={playlistCat}
-                        onChange={setPlaylistCat}
-                    />
-                }
-            >
-                {catStatus === "idle" || catStatus === "loading" ? (
-                    <PlaylistGridSkeleton
-                        count={Math.min(skeletonCount, 5)}
-                        style={gridStyle}
-                    />
-                ) : catStatus === "error" ? (
-                    <StateHero
-                        variant="error"
-                        title="分类歌单加载失败"
-                        description="请检查网络或 API 设置后重试"
-                        action={
-                            <HeroRetryButton
-                                onClick={() => setCatRetry((n) => n + 1)}
-                            />
-                        }
-                    />
-                ) : catPlaylists.length === 0 ? (
-                    <StateHero variant="empty" title="暂无歌单" />
-                ) : (
-                    <>
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {catPlaylists.map((playlist) => (
+                <Section
+                    title="分类歌单"
+                    description="网友精选碟"
+                    variant="listen"
+                    action={
+                        <AreaFilter
+                            options={PLAYLIST_CATS.map((cat) => ({
+                                value: cat,
+                                label: cat,
+                            }))}
+                            value={playlistCat}
+                            onChange={setPlaylistCat}
+                        />
+                    }
+                >
+                    {catStatus === "idle" || catStatus === "loading" ? (
+                        <PlaylistGridSkeleton
+                            count={Math.min(skeletonCount, 5)}
+                            style={gridStyle}
+                        />
+                    ) : catStatus === "error" ? (
+                        <StateHero
+                            variant="error"
+                            title="分类歌单加载失败"
+                            description="请检查网络或 API 设置后重试"
+                            action={
+                                <HeroRetryButton
+                                    onClick={() => setCatRetry((n) => n + 1)}
+                                />
+                            }
+                        />
+                    ) : catPlaylists.length === 0 ? (
+                        <StateHero variant="empty" title="暂无歌单" />
+                    ) : (
+                        <>
+                            <VirtualGrid
+                                items={catPlaylists}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(playlist) => playlist.id}
+                                renderItem={(playlist) => (
                                 <MediaCard
-                                    key={playlist.id}
                                     coverUrl={playlist.coverUrl}
                                     title={playlist.title}
                                     subtitle={
@@ -573,16 +594,16 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                     widthClassName="w-full"
                                     className="w-full"
                                 />
-                            ))}
-                        </div>
-                        <LoadMoreButton
-                            visible={catHasMore}
-                            loading={catLoadingMore}
-                            onClick={() => void loadMoreCat()}
-                        />
-                    </>
-                )}
-            </Section>
+                                )}
+                            />
+                            <LoadMoreButton
+                                visible={catHasMore}
+                                loading={catLoadingMore}
+                                onClick={() => void loadMoreCat()}
+                            />
+                        </>
+                    )}
+                </Section>
             </div>
         </div>
     )

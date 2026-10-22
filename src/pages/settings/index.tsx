@@ -4,8 +4,10 @@ import {
     Heart,
     MessageSquare,
     Keyboard,
+    LayoutDashboard,
     Music2,
     Palette,
+    SwatchBook,
     Play,
     RefreshCw,
     SlidersHorizontal,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { NeteaseAuthDialog } from "@/components/auth/netease-auth-dialog"
+import { useFrontendMode } from "@/components/app/frontend-mode-provider"
 import type { TitleBarStyle } from "@/components/app/title-bar"
 import { isWebMode } from "@/lib/web-mode"
 import { openExternalUrl } from "@/lib/open-external"
@@ -24,14 +27,22 @@ import { HotkeysTab } from "@/pages/settings/hotkeys-tab"
 import { OtherTab } from "@/pages/settings/other-tab"
 import { PlaybackTab } from "@/pages/settings/playback-tab"
 import { SourceTab } from "@/pages/settings/source-tab"
+import { ThemesTab } from "@/pages/settings/themes-tab"
+import { LayoutTab } from "@/pages/settings/layout-tab"
 import { UpdateTab } from "@/pages/settings/update-tab"
 import type { SettingsTab } from "@/lib/app/title-bar-prefs"
 import { cn } from "@/lib/utils"
 
 const SPONSOR_URL = "https://blog.miomoe.cn/page/sponsor"
 
-const TABS: { id: SettingsTab | "feedback" | "sponsor"; label: string; icon: LucideIcon }[] = [
+const TABS: {
+    id: SettingsTab | "feedback" | "sponsor"
+    label: string
+    icon: LucideIcon
+}[] = [
     { id: "appearance", label: "外观", icon: Palette },
+    { id: "themes", label: "主题", icon: SwatchBook },
+    { id: "layout", label: "布局", icon: LayoutDashboard },
     { id: "source", label: "音源", icon: Music2 },
     { id: "playback", label: "播放", icon: Play },
     { id: "account", label: "账号", icon: User },
@@ -58,6 +69,7 @@ function SettingsPage({
     onOpenFeedback,
     onTabChange,
 }: SettingsPageProps) {
+    const { mode } = useFrontendMode()
     const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance")
     const [authOpen, setAuthOpen] = useState(false)
 
@@ -67,22 +79,41 @@ function SettingsPage({
         }
     }, [initialTab])
 
-    const visibleTabs = isWebMode()
-        ? TABS.filter((item) => item.id !== "update")
-        : TABS
+    const visibleTabs = TABS.filter((item) => {
+        if (isWebMode() && item.id === "update") {
+            return false
+        }
+        return mode === "bilibili"
+            ? item.id !== "source" && item.id !== "account"
+            : true
+    })
+    const tabVisible = visibleTabs.some((item) => item.id === tab)
+
+    useEffect(() => {
+        if (tabVisible) {
+            return
+        }
+        setTab("layout")
+        onTabChange("layout")
+    }, [onTabChange, tab, tabVisible])
 
     return (
         <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+            <h1 className="sr-only">设置</h1>
             <nav
                 aria-label="设置分类"
                 className="shrink-0 lg:sticky lg:top-6 lg:w-44 lg:self-start"
             >
-                <div className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
+                        <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain pb-1 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
                     {visibleTabs.map((item) => {
                         const active = tab === item.id
                         if (item.id === "sponsor") {
                             return (
-                                <a key={item.id} href={SPONSOR_URL} target="_blank" rel="noopener noreferrer"
+                                <a
+                                    key={item.id}
+                                    href={SPONSOR_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     onClick={(event) => {
                                         if (isWebMode()) {
                                             return
@@ -90,24 +121,40 @@ function SettingsPage({
                                         event.preventDefault()
                                         void openExternalUrl(SPONSOR_URL)
                                     }}
-                                    className="flex shrink-0 touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:opacity-70 focus-visible:outline-2 focus-visible:outline-ring lg:w-full lg:rounded-xl">
-                                    <item.icon className="size-4 shrink-0" aria-hidden="true" />
+                                    className="flex shrink-0 touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:opacity-70 focus-visible:outline-2 focus-visible:outline-ring lg:w-full lg:rounded-xl"
+                                >
+                                    <item.icon
+                                        className="size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
                                     <span className="whitespace-nowrap">{item.label}</span>
                                 </a>
                             )
                         }
                         if (item.id === "feedback") {
                             return (
-                                <a key={item.id} href="#/feedback"
+                                <a
+                                    key={item.id}
+                                    href="#/feedback"
                                     onClick={(event) => {
-                                        if (isWebMode() && (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)) {
+                                        if (
+                                            isWebMode() &&
+                                            (event.ctrlKey ||
+                                                event.metaKey ||
+                                                event.altKey ||
+                                                event.shiftKey)
+                                        ) {
                                             return
                                         }
                                         event.preventDefault()
                                         onOpenFeedback()
                                     }}
-                                    className="flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:w-full lg:rounded-xl">
-                                    <item.icon className="size-4 shrink-0" aria-hidden="true" />
+                                    className="flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:w-full lg:rounded-xl"
+                                >
+                                    <item.icon
+                                        className="size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
                                     <span className="whitespace-nowrap">{item.label}</span>
                                 </a>
                             )
@@ -149,21 +196,33 @@ function SettingsPage({
                     key={tab}
                     className="animate-in fade-in-0 slide-in-from-top-1 duration-[var(--duration-enter)] ease-[var(--ease-enter)]"
                 >
-                    {tab === "source" ? <SourceTab /> : null}
-                    {tab === "playback" ? <PlaybackTab /> : null}
-                    {tab === "account" ? (
-                        <AccountTab onLogin={() => setAuthOpen(true)} />
-                    ) : null}
-                    {tab === "appearance" ? (
-                        <AppearanceTab
-                            titleBarStyle={titleBarStyle}
-                            onTitleBarStyleChange={onTitleBarStyleChange}
-                        />
-                    ) : null}
-                    {!isWebMode() && tab === "update" ? <UpdateTab /> : null}
-                    {tab === "hotkeys" ? <HotkeysTab /> : null}
-                    {tab === "faq" ? <FaqTab onOpenFeedback={onOpenFeedback} /> : null}
-                    {tab === "other" ? <OtherTab /> : null}
+                    <div
+                        className="min-w-0"
+                        role="region"
+                        aria-label="设置内容"
+                    >
+                        {tab === "source" ? <SourceTab /> : null}
+                        {tab === "playback" ? <PlaybackTab /> : null}
+                        {tab === "account" ? (
+                            <AccountTab onLogin={() => setAuthOpen(true)} />
+                        ) : null}
+                        {tab === "appearance" ? (
+                            <AppearanceTab
+                                titleBarStyle={titleBarStyle}
+                                onTitleBarStyleChange={onTitleBarStyleChange}
+                            />
+                        ) : null}
+                        {tab === "themes" ? <ThemesTab /> : null}
+                        {tab === "layout" ? <LayoutTab /> : null}
+                        {!isWebMode() && tab === "update" ? (
+                            <UpdateTab />
+                        ) : null}
+                        {tab === "hotkeys" ? <HotkeysTab /> : null}
+                        {tab === "faq" ? (
+                            <FaqTab onOpenFeedback={onOpenFeedback} />
+                        ) : null}
+                        {tab === "other" ? <OtherTab /> : null}
+                    </div>
                 </div>
             </div>
 

@@ -1,5 +1,6 @@
 import {
     BarChart3,
+ AudioLines,
     Compass,
     FolderOpen,
     Home,
@@ -21,6 +22,7 @@ import {
     lazy,
     Suspense,
     useCallback,
+ useEffect,
     useLayoutEffect,
     useRef,
     useState,
@@ -39,35 +41,32 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useTheme } from "@/components/app/theme-provider"
+import { useFrontendMode } from "@/components/app/frontend-mode-provider"
 import { useNeteaseSessionSafe } from "@/hooks/use-netease-session"
 import { useOpenAuthOnExpiry } from "@/hooks/use-open-auth-on-expiry"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
+import { ModeSwitch } from "@/components/layout/mode-switch"
+import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
+import {
+ AUTH_EVENT,
+ fetchBilibiliAuthStatus,
+ type BilibiliAccount,
+} from "@/lib/bilibili/auth"
 import {
     ACCENT_OPTIONS,
     accentSwatch,
     resolveAccentHue,
 } from "@/lib/appearance/appearance-prefs"
 import type { AppRoute } from "@/lib/routes"
-import { NAV_ITEMS } from "@/lib/routes"
+import type { WorkspaceModule } from "@/lib/frontend-mode"
 import { isAndroid } from "@/lib/platform"
 import { isWebMode } from "@/lib/web-mode"
 import { cn } from "@/lib/utils"
 
-// 仅 <md 显示的核心 tab；≥md 侧边栏接管
-const MOBILE_TABS: AppRoute[] = [
-    "home",
-    "discover",
-    "local",
-    "library",
-    "radios",
-    "search",
-    "stats",
-    "settings",
-]
-
 const ICONS: Record<AppRoute, LucideIcon> = {
     feedback: Settings2,
     home: Home,
+ bilibili: AudioLines,
     discover: Compass,
     library: Library,
     radios: Podcast,
@@ -91,6 +90,7 @@ type MobileNavBarProps = {
 
 function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavBarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSessionSafe()
+    const { mode, visibleModules } = useFrontendMode()
     const {
         theme,
         setTheme,
@@ -102,10 +102,37 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
         setGlassBlur,
     } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
+ const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
+ const [bilibiliAccount, setBilibiliAccount] =
+ useState<BilibiliAccount | null>(null)
     // 登录失效时自动弹出网易云登录对话框
-    useOpenAuthOnExpiry(() => setAuthOpen(true))
+    useOpenAuthOnExpiry(() => {
+        if (mode === "netease") {
+            setAuthOpen(true)
+        }
+    })
+ useEffect(() => {
+ if (mode !== "bilibili") {
+ return
+ }
+ function syncAccount() {
+ void fetchBilibiliAuthStatus()
+ .then((status) =>
+ setBilibiliAccount(status.account),
+ )
+ .catch(() => setBilibiliAccount(null))
+ }
+ syncAccount()
+ window.addEventListener(AUTH_EVENT, syncAccount)
+ return () =>
+ window.removeEventListener(AUTH_EVENT, syncAccount)
+ }, [mode])
     const customActive = appearance.accent === "custom"
     const customHue = resolveAccentHue(appearance)
+    const mobileTabs: AppRoute[] = [
+        ...visibleModules.map((module) => module.id),
+        "settings",
+    ]
 
     return (
         <nav
@@ -121,7 +148,8 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
             <div className="flex items-center justify-between gap-1 px-2 py-2">
                 {/* Segmented tabs — Apple Music 风格滑动指示器 */}
                 <SegmentedTabs
-                    tabs={MOBILE_TABS}
+                    tabs={mobileTabs}
+                    modules={visibleModules}
                     icons={ICONS}
                     activeRoute={activeRoute}
                     onNavigate={onNavigate}
@@ -129,6 +157,7 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                 />
 
                 <div className="flex shrink-0 items-center">
+                    <ModeSwitch variant="icon" onNavigate={onNavigate} />
                     {/* 调色板：移动端快捷换主题色，不打断当前页面 */}
                     <DropdownMenu>
                         <DropdownMenuTrigger
@@ -368,7 +397,8 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     </DropdownMenu>
 
                     {/* 账号入口 */}
-                    <DropdownMenu>
+ {mode === "netease" ? (
+                        <DropdownMenu>
                     <DropdownMenuTrigger
                         aria-label="账号菜单"
                         className={cn(
@@ -427,7 +457,29 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                             </>
                         )}
                     </DropdownMenuContent>
-                </DropdownMenu>
+                        </DropdownMenu>
+ ) : (
+ <button
+ type="button"
+ aria-label="B站账号"
+ onClick={() => setBilibiliAuthOpen(true)}
+ className="ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-[background-color,transform] hover:bg-[var(--surface-fill)] active:scale-[0.95] focus-visible:outline-2 focus-visible:outline-ring"
+ >
+ {bilibiliAccount?.avatarUrl ? (
+ <img
+ src={bilibiliAccount.avatarUrl}
+ alt=""
+ width={24}
+ height={24}
+ loading="lazy"
+ decoding="async"
+ className="size-6 rounded-full object-cover"
+ />
+ ) : (
+ <User className="size-5 opacity-60" />
+ )}
+ </button>
+ )}
                 </div>
             </div>
 
@@ -436,6 +488,10 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
+ <BilibiliAuthDialog
+ open={bilibiliAuthOpen}
+ onOpenChange={setBilibiliAuthOpen}
+ />
         </nav>
     )
 }
@@ -444,27 +500,39 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
 
 type SegmentedTabsProps = {
     tabs: AppRoute[]
+    modules: WorkspaceModule[]
     icons: Record<AppRoute, LucideIcon>
     activeRoute: AppRoute
     onNavigate: (route: AppRoute) => void
     showActive?: boolean
 }
 
-function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true }: SegmentedTabsProps) {
+function SegmentedTabs({
+    tabs,
+    modules,
+    icons,
+    activeRoute,
+    onNavigate,
+    showActive = true,
+}: SegmentedTabsProps) {
     const indicatorRef = useRef<HTMLButtonElement>(null)
 
     return (
         <div
+            role="group"
+            aria-label="工作区页面"
             className="material-segmented relative flex rounded-full p-0.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
             {tabs.map((id) => {
                 const Icon = icons[id]
-                const item = NAV_ITEMS.find((n) => n.id === id)
+                const item = modules.find((module) => module.id === id)
+                const label = id === "settings" ? "设置" : (item?.label ?? id)
                 const isActive = showActive && activeRoute === id
                 return (
                     <button
                         key={id}
                         type="button"
+                        aria-current={isActive ? "page" : undefined}
                         ref={isActive ? indicatorRef : undefined}
                         onClick={() => onNavigate(id)}
                         className={cn(
@@ -480,7 +548,7 @@ function SegmentedTabs({ tabs, icons, activeRoute, onNavigate, showActive = true
                             className="size-4 shrink-0 sm:size-3.5"
                             strokeWidth={isActive ? 2.2 : 1.8}
                         />
-                        <span className="hidden sm:inline">{item?.label ?? id}</span>
+                        <span className="hidden sm:inline">{label}</span>
                     </button>
                 )
             })}

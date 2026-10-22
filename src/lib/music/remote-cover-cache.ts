@@ -122,20 +122,69 @@ async function writeMap(next: RemoteCoverMap): Promise<void> {
     }
 }
 
+function normalizeCoverUrl(url: string): string {
+ try {
+ const parsed = new URL(url.trim())
+ if (
+ parsed.hostname === "hdslb.com" ||
+ parsed.hostname.endsWith(".hdslb.com") ||
+ parsed.hostname === "bilibili.com" ||
+ parsed.hostname.endsWith(".bilibili.com") ||
+ parsed.hostname.endsWith(".126.net") ||
+ parsed.hostname.endsWith(".163.com")
+ ) {
+ parsed.protocol = "https:"
+ parsed.search = ""
+ return parsed.toString()
+ }
+ } catch {
+ return url.trim()
+ }
+ return url.trim()
+}
+
+function isBilibiliCoverUrl(url: string): boolean {
+ try {
+ const host = new URL(url.trim()).hostname.toLowerCase()
+ return (
+ host === "bilibili.com" ||
+ host.endsWith(".bilibili.com") ||
+ host === "hdslb.com" ||
+ host.endsWith(".hdslb.com") ||
+ host === "bilivideo.com" ||
+ host.endsWith(".bilivideo.com") ||
+ host === "bilivideo.cn" ||
+ host.endsWith(".bilivideo.cn")
+ )
+ } catch {
+ return false
+ }
+}
+
 function urlHash(url: string): string {
-    // URL 可能很长（CDN 带签名参数），索引键用稳定哈希
-    let hash = 5381
-    for (let i = 0; i < url.length; i += 1) {
-        hash = ((hash << 5) + hash + url.charCodeAt(i)) >>> 0
-    }
-    return hash.toString(36)
+ // CDN会给同一张图追加短期参数，先去掉查询串，避免重复下载与失配
+ const normalized = normalizeCoverUrl(url)
+ let hash =5381
+ for (let i =0; i < normalized.length; i +=1) {
+ hash = ((hash <<5) + hash + normalized.charCodeAt(i)) >>>0
+ }
+ return hash.toString(36)
+}
+
+function findCacheKey(url: string): string | null {
+ const direct = urlHash(url)
+ if (cache[direct]) {
+ return direct
+ }
+ return null
 }
 
 function getCachedRemoteCover(url: string): CachedCover | null {
     if (!ready) {
         return null
     }
-    return cache[urlHash(url)] ?? null
+ const key = findCacheKey(url)
+ return key ? (cache[key] ?? null) : null
 }
 
 async function ensureRemoteCoverCached(url: string): Promise<CachedCover | null> {
@@ -152,30 +201,37 @@ async function ensureRemoteCoverCached(url: string): Promise<CachedCover | null>
     if (hit) {
         return hit
     }
-    const failedTs = failedAt.get(urlHash(trimmed))
+ const failureKey = urlHash(trimmed)
+ const failedTs = failedAt.get(failureKey)
     if (failedTs !== undefined && Date.now() - failedTs < FAILED_RETRY_MS) {
         return null
     }
-    const pending = inFlight.get(trimmed)
+ const pendingKey = normalizeCoverUrl(trimmed)
+ const pending = inFlight.get(pendingKey)
     if (pending) {
         return pending
     }
-    const task = withDownloadSlot(async () => {
-        try {
-            const cached = await cacheCoverUrl(trimmed)
+ const task = withDownloadSlot(async () => {
+ try {
+ //缓存下载由客户端补齐图片请求头，刷新后也能完成封面落盘
+ const cached = await cacheCoverUrl(trimmed)
             // 带上原始 URL，剪枝后才能精确广播到引用该封面的组件
-            await writeMap({ ...cache, [urlHash(trimmed)]: { ...cached, url: trimmed } })
+ const key = urlHash(trimmed)
+ await writeMap({
+ ...cache,
+ [key]: { ...cached, url: normalizeCoverUrl(trimmed) },
+ })
             window.dispatchEvent(new CustomEvent(REMOTE_COVER_EVENT, { detail: trimmed }))
             return cached
         } catch {
             // 下载失败记住失败时刻，避免滚动时反复请求死链
-            failedAt.set(urlHash(trimmed), Date.now())
+ failedAt.set(failureKey, Date.now())
             return null
         } finally {
-            inFlight.delete(trimmed)
+ inFlight.delete(pendingKey)
         }
     })
-    inFlight.set(trimmed, task)
+ inFlight.set(pendingKey, task)
     return task
 }
 
@@ -255,10 +311,13 @@ async function invalidateRemoteCover(url: string): Promise<void> {
         return
     }
     await ensureLoaded()
-    const key = urlHash(trimmed)
-    if (!cache[key]) {
+ const key = findCacheKey(trimmed)
+ if (!key || !cache[key]) {
+ failedAt.delete(urlHash(trimmed))
+ void ensureRemoteCoverCached(trimmed)
         return
     }
+ failedAt.delete(urlHash(trimmed))
     const next = { ...cache }
     delete next[key]
     await writeMap(next)
@@ -271,6 +330,7 @@ export {
     REMOTE_COVER_EVENT,
     ensureRemoteCoverCached,
     getCachedRemoteCover,
+ isBilibiliCoverUrl,
     invalidateRemoteCover,
     pruneRemoteCoverIndex,
 }

@@ -6,7 +6,8 @@ import {
     FolderOpen,
     Heart,
     ImageOff,
-    ImagePlus,
+ ImagePlus,
+ ExternalLink,
     Library,
     ListMinus,
     ListPlus,
@@ -78,6 +79,7 @@ import {
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { openExternalUrl } from "@/lib/open-external"
 import { isWebMode } from "@/lib/web-mode"
 
 type TrackRowProps = {
@@ -137,9 +139,11 @@ const TrackRow = memo(function TrackRow({
 
     const isNetease = track.source === "netease"
     const isLocal = track.source === "local"
+const isBilibili = track.source === "bilibili"
+    const albumLabel = isBilibili ? track.tname?.trim() : track.album
     const albumCol = showAlbumMeta && (showAlbumColumn ?? isNetease)
     const inlineAlbum = showAlbumMeta && !albumCol
-    const actions = showActions ?? (isNetease || isLocal)
+ const actions = showActions ?? (isNetease || isLocal || isBilibili)
     const hasTrailing = Boolean(trailing)
     const liked = isNetease && isTrackLiked(track.id)
     const coverUrl = resolveTrackCoverUrl(track.id, track.coverUrl, "thumbnail")
@@ -159,9 +163,22 @@ const TrackRow = memo(function TrackRow({
     }, [])
 
     const artists =
-        track.artists && track.artists.length > 0
-            ? track.artists
-            : [{ id: "", name: track.artist || "未知艺人" }]
+        isBilibili
+            ? [
+                  {
+                      id: "",
+                      name:
+                          track.artist?.trim() ||
+                          track.artists
+                              ?.map((artist) => artist.name.trim())
+                              .filter(Boolean)
+                              .join(" / ") ||
+                          "未知作者",
+                  },
+              ]
+            : track.artists && track.artists.length > 0
+              ? track.artists
+              : [{ id: "", name: track.artist || "未知艺人" }]
 
     function handleRowKey(event: KeyboardEvent<HTMLDivElement>) {
         if (event.key === "Enter" || event.key === " ") {
@@ -301,11 +318,18 @@ const TrackRow = memo(function TrackRow({
             notifyError("打开文件夹失败", {
                 description: "系统未提供文件管理器",
             })
-        }
-    }
+ }
+ }
 
-    return (
-        <>
+ function handleOpenBilibili() {
+ if (!isBilibili || !track.webUrl) {
+ return
+ }
+ void openExternalUrl(track.webUrl)
+ }
+
+ return (
+ <>
         <ContextMenu>
             <ContextMenuTrigger
                 render={(props) => (
@@ -483,7 +507,7 @@ const TrackRow = memo(function TrackRow({
                                 {artists.map((artist) => artist.name).join(" / ")}
                             </TooltipContent>
                         </Tooltip>
-                        {inlineAlbum && track.album ? (
+                        {inlineAlbum && albumLabel ? (
                             <>
                                 <span className="mx-1.5 text-muted-foreground/50">
                                     ·
@@ -505,10 +529,10 @@ const TrackRow = memo(function TrackRow({
                                                     }
                                                     className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
                                                 >
-                                                    {track.album}
+                                                    {albumLabel}
                                                 </button>
                                             ) : (
-                                                <span>{track.album}</span>
+                                                <span>{albumLabel}</span>
                                             )
                                         }
                                     />
@@ -518,7 +542,7 @@ const TrackRow = memo(function TrackRow({
                                         className="max-w-[260px]"
                                     >
                                         <span className="line-clamp-3">
-                                            {track.album}
+                                            {albumLabel}
                                         </span>
                                     </TooltipContent>
                                 </Tooltip>
@@ -526,7 +550,7 @@ const TrackRow = memo(function TrackRow({
                         ) : null}
                     </p>
                 </div>
-                {showSource && !(actions && isLocal) ? (
+ {showSource && !(actions && isLocal) ? (
                     <span className="flex shrink-0 items-center">
                         <SourceBadge source={track.source} />
                     </span>
@@ -548,11 +572,11 @@ const TrackRow = memo(function TrackRow({
                                         }
                                         className="inline-block max-w-full truncate py-1 text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                                     >
-                                        {track.album || "未知专辑"}
+                                        {albumLabel || "未知专辑"}
                                     </button>
                                 ) : (
                                     <span>
-                                        {track.album || "未知专辑"}
+                                        {albumLabel || "未知专辑"}
                                     </span>
                                 )
                             }
@@ -563,7 +587,7 @@ const TrackRow = memo(function TrackRow({
                             className="max-w-[260px]"
                         >
                             <span className="line-clamp-3">
-                                {track.album || "未知专辑"}
+                                {albumLabel || "未知专辑"}
                             </span>
                         </TooltipContent>
                     </Tooltip>
@@ -586,8 +610,16 @@ const TrackRow = memo(function TrackRow({
                         className={cn("size-3.5", liked && "fill-current")}
                     />
                 </button>
-            ) : actions && isLocal ? (
-                showSource ? (
+ ) : actions && isBilibili ? (
+ showSource ? (
+ <span className="flex size-8 shrink-0 items-center justify-center">
+ <SourceBadge source="bilibili" />
+ </span>
+ ) : (
+ <span className="size-8 shrink-0" aria-hidden />
+ )
+ ) : actions && isLocal ? (
+ showSource ? (
                     // 本地曲目无云端爱心，用「本地」标识填充该列，与云端爱心位对齐
                     <span className="flex size-8 shrink-0 items-center justify-center">
                         <SourceBadge source="local" />
@@ -708,16 +740,22 @@ const TrackRow = memo(function TrackRow({
                                 下载歌曲
                             </DropdownMenuItem>
                         ) : null}
-                        <DropdownMenuItem onClick={() => setLyricEditOpen(true)}>
-                            <Pencil />
-                            编辑歌词
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => void handleOverrideLyric()}
-                        >
-                            <FilePlus2 />
-                            {isLocal ? "更换歌词" : "覆盖歌词"}
-                        </DropdownMenuItem>
+ {!isBilibili ? (
+ <>
+ <DropdownMenuItem
+ onClick={() => setLyricEditOpen(true)}
+ >
+ <Pencil />
+编辑歌词
+ </DropdownMenuItem>
+ <DropdownMenuItem
+ onClick={() => void handleOverrideLyric()}
+ >
+ <FilePlus2 />
+ {isLocal ? "更换歌词" : "覆盖歌词"}
+ </DropdownMenuItem>
+ </>
+ ) : null}
                         {hasLyricOverride ? (
                             <DropdownMenuItem onClick={handleClearLyric}>
                                 <Eraser />
@@ -758,8 +796,19 @@ const TrackRow = memo(function TrackRow({
                                     从本地移除
                                 </DropdownMenuItem>
                             </>
-                        ) : null}
-                    </DropdownMenuContent>
+ ) : null}
+ {isBilibili ? (
+ <>
+ <DropdownMenuSeparator />
+ <DropdownMenuItem
+ onClick={handleOpenBilibili}
+ >
+ <ExternalLink />
+在哔哩哔哩打开
+ </DropdownMenuItem>
+ </>
+ ) : null}
+ </DropdownMenuContent>
                 </DropdownMenu>
             ) : null}
         </div>
@@ -822,14 +871,18 @@ const TrackRow = memo(function TrackRow({
                     </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => setLyricEditOpen(true)}>
-                    <Pencil />
-                    编辑歌词
-                </ContextMenuItem>
-                <ContextMenuItem onClick={() => void handleOverrideLyric()}>
-                    <FilePlus2 />
-                    {isLocal ? "更换歌词" : "覆盖歌词"}
-                </ContextMenuItem>
+ {!isBilibili ? (
+ <>
+ <ContextMenuItem onClick={() => setLyricEditOpen(true)}>
+ <Pencil />
+编辑歌词
+ </ContextMenuItem>
+ <ContextMenuItem onClick={() => void handleOverrideLyric()}>
+ <FilePlus2 />
+ {isLocal ? "更换歌词" : "覆盖歌词"}
+ </ContextMenuItem>
+ </>
+ ) : null}
                 {hasLyricOverride ? (
                     <ContextMenuItem onClick={handleClearLyric}>
                         <Eraser />
@@ -870,8 +923,17 @@ const TrackRow = memo(function TrackRow({
                             从本地移除
                         </ContextMenuItem>
                     </>
-                ) : null}
-            </ContextMenuContent>
+ ) : null}
+ {isBilibili ? (
+ <>
+ <ContextMenuSeparator />
+ <ContextMenuItem onClick={handleOpenBilibili}>
+ <ExternalLink />
+在哔哩哔哩打开
+ </ContextMenuItem>
+ </>
+ ) : null}
+ </ContextMenuContent>
         </ContextMenu>
 
         <LyricEditDialog

@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { MessageCircleReply } from "lucide-react"
 
 import { safeWebUrl, type Comment } from "@/lib/feedback/api"
 import { openExternalUrl } from "@/lib/open-external"
 import { isWebMode } from "@/lib/web-mode"
 import { Content } from "./content"
+import {
+    VariableVirtualList,
+    type FocusRequest,
+} from "./virtual-comments"
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -16,11 +20,17 @@ function commentDate(raw: string): string {
     return Number.isNaN(date.getTime()) ? raw : dateFormatter.format(date)
 }
 
-function CommentRow({ comment, onReply, canReply, replyTo }: {
+type CommentThread = {
+    root: Comment
+    replies: Comment[]
+}
+
+function CommentRow({ comment, onReply, canReply, replyTo, onLocateReply }: {
     comment: Comment
     onReply: () => void
     canReply: boolean
     replyTo?: Comment
+    onLocateReply?: () => void
 }) {
     const [imageFailed, setImageFailed] = useState(false)
     const name = comment.name || "匿名"
@@ -49,14 +59,7 @@ function CommentRow({ comment, onReply, canReply, replyTo }: {
                 <Content content={comment.content} prefix={replyTo ? <button type="button"
                     aria-label={`查看 ${replyTo.name || "匿名"} 的评论`}
                     title="定位到被回复的评论"
-                    onClick={() => {
-                        const target = document.getElementById(`feedback-comment-${replyTo.uuid}`)
-                        target?.focus({ preventScroll: true })
-                        target?.scrollIntoView({
-                            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-                            block: "center",
-                        })
-                    }}
+                    onClick={onLocateReply}
                     className="feedback-mention">
                     @{replyTo.name || "匿名"}
                 </button> : null} />
@@ -76,7 +79,8 @@ function Comments({ comments, onReply, canReply }: {
     onReply: (comment: Comment) => void
     canReply: boolean
 }) {
-    const threads = useMemo(() => {
+    const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null)
+    const threads = useMemo<CommentThread[]>(() => {
         const approved = comments.filter((comment) => comment.status === "approved")
         const ids = new Set(approved.map((comment) => comment.uuid))
         const replies = new Map<string, Comment[]>()
@@ -92,6 +96,38 @@ function Comments({ comments, onReply, canReply }: {
         }
         return roots.map((root) => ({ root, replies: replies.get(root.uuid) ?? [] }))
     }, [comments])
+    const threadKeyByComment = useMemo(() => {
+        const result = new Map<string, string>()
+        for (const { root, replies } of threads) {
+            result.set(root.uuid, root.uuid)
+            for (const reply of replies) {
+                result.set(reply.uuid, root.uuid)
+            }
+        }
+        return result
+    }, [threads])
+
+    const locateComment = useCallback((comment: Comment) => {
+        const itemKey = threadKeyByComment.get(comment.uuid)
+        if (!itemKey) {
+            return
+        }
+        setFocusRequest((current) => ({
+            itemKey,
+            elementId: `feedback-comment-${comment.uuid}`,
+            requestId: (current?.requestId ?? 0) + 1,
+        }))
+    }, [threadKeyByComment])
+
+    const handleFocusRequest = useCallback((requestId: number) => {
+        setFocusRequest((current) =>
+            current?.requestId === requestId ? null : current,
+        )
+    }, [])
+    const getThreadKey = useCallback(
+        ({ root }: CommentThread) => root.uuid,
+        [],
+    )
 
     return (
         <section aria-labelledby="feedback-comments-title" className="feedback-comments">
@@ -102,17 +138,24 @@ function Comments({ comments, onReply, canReply }: {
                 </span> : null}
             </header>
             {threads.length === 0 ? <p className="feedback-comments-empty">暂无反馈。</p> : null}
-            <div className="feedback-threads">
-                {threads.map(({ root, replies }) => (
-                    <div key={root.uuid} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 180px" }}>
+            <VariableVirtualList
+                items={threads}
+                getItemKey={getThreadKey}
+                estimatedItemHeight={180}
+                focusRequest={focusRequest}
+                onFocusRequestHandled={handleFocusRequest}
+                renderItem={({ root, replies }) => (
+                    <>
                         <CommentRow comment={root} canReply={canReply} onReply={() => onReply(root)} />
                         {replies.length > 0 ? <div className="feedback-thread-replies">
                             {replies.map((reply) => <CommentRow key={reply.uuid} comment={reply}
-                                replyTo={root} canReply={canReply} onReply={() => onReply(root)} />)}
+                                replyTo={root} canReply={canReply}
+                                onLocateReply={() => locateComment(root)}
+                                onReply={() => onReply(root)} />)}
                         </div> : null}
-                    </div>
-                ))}
-            </div>
+                    </>
+                )}
+            />
         </section>
     )
 }

@@ -15,6 +15,8 @@ import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+const QUEUE_ROW_HEIGHT = 48
+
 // memo：无 props；播放条 200ms tick 连带重渲时整块跳过，自身仍走 usePlayer 按需更新
 const QueuePanel = memo(function QueuePanel() {
     const {
@@ -43,10 +45,26 @@ const QueuePanel = memo(function QueuePanel() {
             return
         }
         const frame = requestAnimationFrame(() => {
-            const node = scrollRef.current?.querySelector<HTMLElement>(
-                `[data-queue-index="${currentIndex}"]`,
-            )
-            node?.scrollIntoView({ block: "center", behavior: "smooth" })
+            const container = scrollRef.current
+            if (!container) {
+                return
+            }
+            const containerRect = container.getBoundingClientRect()
+            const listRect = container.firstElementChild?.getBoundingClientRect()
+            const rowTop =
+                (listRect?.top ?? containerRect.top) -
+                containerRect.top +
+                container.scrollTop +
+                currentIndex * QUEUE_ROW_HEIGHT
+            const centeredTop =
+                rowTop - (container.clientHeight - QUEUE_ROW_HEIGHT) / 2
+            container.scrollTo({
+                top: Math.max(0, centeredTop),
+                behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+                    .matches
+                    ? "auto"
+                    : "smooth",
+            })
         })
         return () => cancelAnimationFrame(frame)
     }, [open, currentIndex])
@@ -134,6 +152,7 @@ const QueuePanel = memo(function QueuePanel() {
                         <DragList
                             items={queue}
                             enabled={count > 1}
+                            itemHeight={QUEUE_ROW_HEIGHT}
                             onReorder={handleReorder}
                             renderItem={(track, index, handle) => {
                                 const active = index === currentIndex
@@ -203,7 +222,8 @@ const QueuePanel = memo(function QueuePanel() {
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-0.5">
-                                            {track.source === "netease" ? (
+ {track.source === "netease" ||
+ track.source === "local" ? (
                                                 <button
                                                     type="button"
                                                     title="添加到歌单"

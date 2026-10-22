@@ -10,6 +10,7 @@ import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
 import { VirtualList } from "@/components/music/virtual-list"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import { useLibraryLayout } from "@/hooks/use-library-layout"
 import { useLiked } from "@/hooks/use-liked"
@@ -33,13 +34,16 @@ type AlbumPageProps = {
     onBack: () => void
 }
 
+const TRACK_ROW_HEIGHT = 58
+const MEDIA_ROW_HEIGHT = 236
+
 function AlbumPage({ albumId, onBack }: AlbumPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
     const { openArtist } = useMusicNavigation()
     const { loggedIn } = useNeteaseSession()
     const { isAlbumSubscribed, toggleAlbumSubscribed } = useLiked()
     const { albumTracksView, trackSort } = useLibraryLayout()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
 
     const [profile, setProfile] = useState<AlbumProfile | null>(null)
     const [tracks, setTracks] = useState<Track[]>([])
@@ -98,7 +102,7 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
     }
 
     return (
-        <div className="space-y-6 pb-2">
+        <div ref={gridRef} className="space-y-6 pb-2">
             <BackButton onClick={onBack} />
 
             {loading ? (
@@ -209,10 +213,13 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                         {sortedTracks.length === 0 ? (
                             <StateHero variant="empty" title="暂无曲目" />
                         ) : albumTracksView === "card" ? (
-                            <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {sortedTracks.map((track) => (
+                            <VirtualGrid
+                                items={sortedTracks}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(track) => track.id}
+                                renderItem={(track) => (
                                     <MediaCard
-                                        key={track.id}
                                         title={track.title}
                                         subtitle={track.artist}
                                         coverUrl={resolveTrackCoverUrl(
@@ -225,12 +232,12 @@ function AlbumPage({ albumId, onBack }: AlbumPageProps) {
                                             playOrToggle(track, sortedTracks)
                                         }
                                     />
-                                ))}
-                            </div>
+                                )}
+                            />
                         ) : (
                             <VirtualList
                                 items={sortedTracks}
-                                itemHeight={58}
+                                itemHeight={TRACK_ROW_HEIGHT}
                                 className="apple-list-surface p-1.5"
                                 getItemKey={(track) => track.id}
                                 renderItem={(track, index) => (

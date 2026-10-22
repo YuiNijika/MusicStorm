@@ -4,14 +4,13 @@ import {
     useEffect,
     useMemo,
     useState,
-    type CSSProperties,
     type ReactNode,
-    type Ref,
 } from "react"
 
 import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
 import { MediaCard } from "@/components/music/media-card"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { PageTitle } from "@/components/music/page-title"
 import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
@@ -35,6 +34,9 @@ import { fetchDjPrograms, fetchDjSublist, fetchHomeRadios } from "@/lib/netease/
 import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+const RADIO_ROW_HEIGHT = 66
+const MEDIA_ROW_HEIGHT = 236
 
 function radioSubtitle(radio: Radio): string {
     const owner = radio.djName || radio.category
@@ -60,13 +62,14 @@ function RadioList({
         <DragList
             items={items}
             enabled={draggable}
+            itemHeight={RADIO_ROW_HEIGHT}
             onReorder={(next) =>
                 setRadioOrder(
                     scope,
                     next.map((radio) => radio.id),
                 )
             }
-            className="apple-list-surface space-y-0.5 p-1.5"
+            className="apple-list-surface p-1.5"
             renderItem={(radio, _index, handle) => (
                 <div className="group flex items-center gap-1 rounded-2xl transition-colors hover:bg-[var(--surface-fill)]">
                     {handle ? <div className="ml-1 shrink-0">{handle}</div> : null}
@@ -119,9 +122,7 @@ function RadioCollection({
     scope,
     view,
     draggable,
-    gridClass,
-    gridStyle,
-    gridRef,
+    columns,
     onOpen,
     onPlay,
 }: {
@@ -129,9 +130,7 @@ function RadioCollection({
     scope: RadioOrderScope
     view: "card" | "list"
     draggable: boolean
-    gridClass: string
-    gridStyle: CSSProperties
-    gridRef?: Ref<HTMLDivElement>
+    columns: number
     onOpen: (id: string) => void
     onPlay: (radio: Radio) => void
 }) {
@@ -148,18 +147,21 @@ function RadioCollection({
     }
 
     return (
-        <div ref={gridRef} className={gridClass} style={gridStyle}>
-            {items.map((radio) => (
+        <VirtualGrid
+            items={items}
+            columns={columns}
+            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+            getItemKey={(radio) => radio.id}
+            renderItem={(radio) => (
                 <MediaCard
-                    key={radio.id}
                     title={radio.title}
                     subtitle={radioSubtitle(radio)}
                     coverUrl={radio.coverUrl}
                     widthClassName="w-full"
                     onClick={() => onOpen(radio.id)}
                 />
-            ))}
-        </div>
+            )}
+        />
     )
 }
 
@@ -169,7 +171,7 @@ function RadiosPage() {
     const { ready, loggedIn } = useNeteaseSession()
     const { subscribedRadioIds, refresh } = useLiked()
     const { radioSort, radioView } = useLibraryLayout()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
 
     const playRadio = useCallback(async (radio: Radio) => {
         try {
@@ -284,11 +286,13 @@ function RadiosPage() {
 
     return (
         <div className="space-y-6 pb-4">
-            <PageTitle
-                title="电台"
-                subtitle="订阅同步 · 发现播客"
-                trailing={controls}
-            />
+            <div ref={gridRef}>
+                <PageTitle
+                    title="电台"
+                    subtitle="订阅同步 · 发现播客"
+                    trailing={controls}
+                />
+            </div>
 
             {error && !discover.length ? (
                 <StateHero
@@ -331,9 +335,7 @@ function RadiosPage() {
                                 scope="subscribed"
                                 view={radioView}
                                 draggable={dragEnabled}
-                                gridClass={gridClass}
-                                gridStyle={gridStyle}
-                                gridRef={gridRef}
+                                columns={cols}
                                 onOpen={openRadio}
                                 onPlay={playRadio}
                             />
@@ -355,8 +357,7 @@ function RadiosPage() {
                                 scope="discover"
                                 view={radioView}
                                 draggable={dragEnabled}
-                                gridClass={gridClass}
-                                gridStyle={gridStyle}
+                                columns={cols}
                                 onOpen={openRadio}
                                 onPlay={playRadio}
                             />

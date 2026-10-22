@@ -1,9 +1,13 @@
+import type { MusicSource } from "@/lib/types"
+
 const LAYOUT_STORAGE_KEY = "musicstorm-full-player-layout"
+const DEFAULT_LAYOUT_STORAGE_KEY = "musicstorm-full-player-default-layout"
 const CHROME_STORAGE_KEY = "musicstorm-full-player-chrome"
 const LAYOUT_EVENT = "musicstorm:full-player-layout"
 const CHROME_EVENT = "musicstorm:full-player-chrome"
 
 type FullPlayerLayout = "classic" | "cover" | "lyrics"
+type FullPlayerDefaultLayout = "auto" | FullPlayerLayout
 type LyricsAlign = "left" | "center" | "right"
 
 type FullPlayerChrome = {
@@ -40,8 +44,27 @@ const FULL_PLAYER_LAYOUTS: {
     { id: "lyrics", label: "歌词", description: "纯歌词，可调对齐" },
 ]
 
+const FULL_PLAYER_DEFAULT_LAYOUTS: {
+    id: FullPlayerDefaultLayout
+    label: string
+    description: string
+}[] = [
+    {
+        id: "auto",
+        label: "自动",
+        description: "B站使用封面，其他来源沿用当前模板",
+    },
+    ...FULL_PLAYER_LAYOUTS,
+]
+
 function isFullPlayerLayout(value: string): value is FullPlayerLayout {
     return value === "classic" || value === "cover" || value === "lyrics"
+}
+
+function isFullPlayerDefaultLayout(
+    value: string,
+): value is FullPlayerDefaultLayout {
+    return value === "auto" || isFullPlayerLayout(value)
 }
 
 function isLyricsAlign(value: unknown): value is LyricsAlign {
@@ -86,6 +109,30 @@ function setFullPlayerLayout(layout: FullPlayerLayout): void {
     window.dispatchEvent(new CustomEvent(LAYOUT_EVENT))
 }
 
+function getFullPlayerDefaultLayout(): FullPlayerDefaultLayout {
+    if (typeof window === "undefined") {
+        return "auto"
+    }
+    const raw = window.localStorage.getItem(DEFAULT_LAYOUT_STORAGE_KEY)
+    return raw && isFullPlayerDefaultLayout(raw) ? raw : "auto"
+}
+
+function setFullPlayerDefaultLayout(layout: FullPlayerDefaultLayout): void {
+    window.localStorage.setItem(DEFAULT_LAYOUT_STORAGE_KEY, layout)
+    window.dispatchEvent(new CustomEvent(LAYOUT_EVENT))
+}
+
+function resolveFullPlayerLayout(
+    source: MusicSource,
+    fallback: FullPlayerLayout,
+): FullPlayerLayout {
+    const preference = getFullPlayerDefaultLayout()
+    if (preference === "auto") {
+        return source === "bilibili" ? "cover" : fallback
+    }
+    return preference
+}
+
 function getFullPlayerChrome(): FullPlayerChrome {
     if (typeof window === "undefined") {
         return DEFAULT_CHROME
@@ -116,6 +163,7 @@ function resetFullPlayerChrome(): void {
 export {
     CHROME_EVENT,
     DEFAULT_CHROME,
+    FULL_PLAYER_DEFAULT_LAYOUTS,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
     LYRICS_ALIGNS,
@@ -123,9 +171,17 @@ export {
     LYRICS_SCALE_MIN,
     LYRICS_SCALE_STEP,
     getFullPlayerChrome,
+    getFullPlayerDefaultLayout,
     getFullPlayerLayout,
     resetFullPlayerChrome,
     setFullPlayerChrome,
+    setFullPlayerDefaultLayout,
     setFullPlayerLayout,
+    resolveFullPlayerLayout,
 }
-export type { FullPlayerChrome, FullPlayerLayout, LyricsAlign }
+export type {
+    FullPlayerChrome,
+    FullPlayerDefaultLayout,
+    FullPlayerLayout,
+    LyricsAlign,
+}

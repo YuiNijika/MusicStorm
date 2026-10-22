@@ -1,5 +1,6 @@
 import {
     BarChart3,
+ AudioLines,
     Compass,
     FolderOpen,
     Home,
@@ -17,7 +18,9 @@ import {
 } from "lucide-react"
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react"
 
+import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
 import { useTheme } from "@/components/app/theme-provider"
+import { useFrontendMode } from "@/components/app/frontend-mode-provider"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,15 +30,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { useOpenAuthOnExpiry } from "@/hooks/use-open-auth-on-expiry"
+import { ModeSwitch } from "@/components/layout/mode-switch"
 import {
     SIDEBAR_STYLE_EVENT,
     readSidebarStyle,
     type SidebarStyle,
 } from "@/lib/app/sidebar-prefs"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
+import { AUTH_EVENT, fetchBilibiliAuthStatus, type BilibiliAccount } from "@/lib/bilibili/auth"
 import { resolveVipTier } from "@/lib/netease/user"
 import type { AppRoute } from "@/lib/routes"
-import { NAV_GROUPS, NAV_ITEMS } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
 // 登录弹窗按需加载，避免登录表单进启动包
@@ -48,6 +52,7 @@ const NeteaseAuthDialog = lazy(() =>
 const ICONS: Record<AppRoute, LucideIcon> = {
     feedback: Settings2,
     home: Home,
+ bilibili: AudioLines,
     discover: Compass,
     library: Library,
     radios: Podcast,
@@ -56,17 +61,6 @@ const ICONS: Record<AppRoute, LucideIcon> = {
     stats: BarChart3,
     settings: Settings2,
 }
-
-// 主导航只留内容入口，统计承电台之后便于发烧友直达，设置与账号不占导航位
-const PRIMARY_ROUTES: AppRoute[] = [
-    "home",
-    "discover",
-    "search",
-    "local",
-    "library",
-    "radios",
-    "stats",
-]
 
 type SidebarProps = {
     activeRoute: AppRoute
@@ -113,9 +107,33 @@ function CompactSidebar({
 }: SidebarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSession()
     const { theme, setTheme } = useTheme()
+    const { mode, visibleModules } = useFrontendMode()
     const [authOpen, setAuthOpen] = useState(false)
+ const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
+ const [bilibiliAccount, setBilibiliAccount] =
+ useState<BilibiliAccount | null>(null)
     // 登录失效时自动弹出网易云登录对话框
-    useOpenAuthOnExpiry(() => setAuthOpen(true))
+    useOpenAuthOnExpiry(() => {
+        if (mode === "netease") {
+            setAuthOpen(true)
+        }
+    })
+ useEffect(() => {
+ if (mode !== "bilibili") {
+ return
+ }
+ function syncAccount() {
+ void fetchBilibiliAuthStatus()
+ .then((status) =>
+ setBilibiliAccount(status.account),
+ )
+ .catch(() => setBilibiliAccount(null))
+ }
+ syncAccount()
+ window.addEventListener(AUTH_EVENT, syncAccount)
+ return () =>
+ window.removeEventListener(AUTH_EVENT, syncAccount)
+ }, [mode])
 
     // 底部功能图标：头像账号菜单、主题快切、设置
     // 默认跟随系统：图标按解析后的实际明暗显示，不做第三态
@@ -137,26 +155,22 @@ function CompactSidebar({
         <aside className="material-sidebar hidden w-[76px] shrink-0 flex-col items-center md:flex">
             <nav
                 aria-label="主导航"
-                className="mt-3 flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1.5 pb-2"
+                className="mt-2 flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1.5 pb-2"
             >
-                {PRIMARY_ROUTES.map((id) => {
-                    const item = NAV_ITEMS.find((n) => n.id === id)
-                    const Icon = ICONS[id]
-                    const isActive = showActive && activeRoute === id
-                    if (!item) {
-                        return null
-                    }
+                {visibleModules.map((item) => {
+                    const Icon = ICONS[item.id]
+                    const isActive = showActive && activeRoute === item.id
                     return (
                         <button
-                            key={id}
+                            key={item.id}
                             type="button"
                             aria-current={isActive ? "page" : undefined}
-                            onClick={() => onNavigate(id)}
+                            onClick={() => onNavigate(item.id)}
                             className={cn(
                                 "flex w-[60px] cursor-pointer flex-col items-center justify-center gap-[3px] rounded-xl py-2",
                                 "transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)]",
-                                isActive
-                                    ? "bg-[var(--sidebar-accent)] text-primary"
+ isActive
+ ? "bg-[var(--sidebar-accent)] text-primary"
                                     : "text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
                             )}
                         >
@@ -184,6 +198,11 @@ function CompactSidebar({
                 >
                     <ThemeIcon className="size-[19px]" strokeWidth={1.9} />
                 </ToolButton>
+                <ModeSwitch
+                    variant="icon"
+                    onNavigate={onNavigate}
+                    className="shrink-0"
+                />
                 <ToolButton
                     title="设置"
                     active={showActive && activeRoute === "settings"}
@@ -192,7 +211,8 @@ function CompactSidebar({
                     <Settings2 className="size-[19px]" strokeWidth={1.9} />
                 </ToolButton>
 
-                <DropdownMenu>
+ {mode === "netease" ? (
+                    <DropdownMenu>
                     <DropdownMenuTrigger
                         aria-label={loggedIn ? "账号" : "登录"}
                         className={cn(
@@ -264,7 +284,30 @@ function CompactSidebar({
                             </>
                         )}
                     </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenu>
+ ) : (
+ <button
+ type="button"
+ title="登录B站账号"
+ aria-label="登录B站账号"
+ onClick={() => setBilibiliAuthOpen(true)}
+ className="mt-1.5 flex size-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.95] focus-visible:outline-2 focus-visible:outline-ring"
+ >
+ {bilibiliAccount?.avatarUrl ? (
+ <img
+ src={bilibiliAccount.avatarUrl}
+ alt=""
+ width={28}
+ height={28}
+ loading="lazy"
+ decoding="async"
+ className="size-7 rounded-full object-cover"
+ />
+ ) : (
+ <User className="size-3.5 opacity-70" />
+ )}
+ </button>
+ )}
             </div>
 
             {authOpen ? (
@@ -272,6 +315,10 @@ function CompactSidebar({
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
+ <BilibiliAuthDialog
+ open={bilibiliAuthOpen}
+ onOpenChange={setBilibiliAuthOpen}
+ />
         </aside>
     )
 }
@@ -282,66 +329,104 @@ function ClassicSidebar({
     showActive,
 }: SidebarProps) {
     const { ready, loggedIn, profile, logout } = useNeteaseSession()
+    const { theme, setTheme } = useTheme()
+    const { mode, visibleModules } = useFrontendMode()
     const [authOpen, setAuthOpen] = useState(false)
+ const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
+ const [bilibiliAccount, setBilibiliAccount] =
+ useState<BilibiliAccount | null>(null)
+
+    const resolvedTheme =
+        theme === "system"
+            ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+            : theme
+    const ThemeIcon = resolvedTheme === "dark" ? MoonStar : SunMedium
+
+    function cycleTheme() {
+        setTheme(resolvedTheme === "light" ? "dark" : "light")
+    }
+
+ useEffect(() => {
+ if (mode !== "bilibili") {
+ return
+ }
+ function syncAccount() {
+ void fetchBilibiliAuthStatus()
+ .then((status) =>
+ setBilibiliAccount(status.account),
+ )
+ .catch(() => setBilibiliAccount(null))
+ }
+ syncAccount()
+ window.addEventListener(AUTH_EVENT, syncAccount)
+ return () =>
+ window.removeEventListener(AUTH_EVENT, syncAccount)
+ }, [mode])
 
     return (
         <aside className="material-sidebar hidden w-[224px] shrink-0 flex-col md:flex">
             <nav className="mt-2 flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
-                {NAV_GROUPS.map((group, groupIndex) => (
-                    <div
-                        key={group.id}
-                        className={cn(
-                            "flex flex-col",
-                            groupIndex > 0 && "mt-4",
-                        )}
-                    >
-                        <p className="px-3 pb-1.5 text-[11px] font-medium tracking-[0.04em] text-muted-foreground/60">
-                            {group.label}
-                        </p>
-                        <div className="flex flex-col gap-0.5">
-                            {NAV_ITEMS.filter((item) => item.group === group.id).map(
-                                (item) => {
-                                    const Icon = ICONS[item.id]
-                                    const isActive =
-                                        showActive && activeRoute === item.id
+                <p className="px-3 pb-1.5 text-[11px] font-medium tracking-[0.04em] text-muted-foreground/60">
+                    {mode === "bilibili" ? "B站工作区" : "网易云工作区"}
+                </p>
+                <div className="flex flex-col gap-0.5">
+                    {visibleModules.map((item) => {
+                        const Icon = ICONS[item.id]
+                        const isActive =
+                            showActive && activeRoute === item.id
 
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => onNavigate(item.id)}
-                                            className={cn(
-                                                "group flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-[color,background-color,transform] active:scale-[0.99] active:duration-[var(--duration-press)]",
-                                                isActive
-                                                    ? "bg-sidebar-accent text-foreground"
-                                                    : "text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
-                                            )}
-                                        >
-                                            <Icon
-                                                className={cn(
-                                                    "size-[18px] shrink-0 transition-opacity",
-                                                    isActive ? "opacity-100" : "opacity-70",
-                                                )}
-                                                strokeWidth={isActive ? 2.2 : 1.9}
-                                            />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-[13px] font-medium tracking-[-0.01em]">
-                                                    {item.label}
-                                                </span>
-                                                <span className="block truncate text-[11px] text-muted-foreground">
-                                                    {item.description}
-                                                </span>
-                                            </span>
-                                        </button>
-                                    )
-                                },
-                            )}
-                        </div>
-                    </div>
-                ))}
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                aria-current={isActive ? "page" : undefined}
+                                onClick={() => onNavigate(item.id)}
+                                className={cn(
+                                    "group flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-[color,background-color,transform] active:scale-[0.99] active:duration-[var(--duration-press)]",
+ isActive
+ ? "bg-sidebar-accent text-foreground"
+                                        : "text-muted-foreground hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
+                                )}
+                            >
+                                <Icon
+                                    className={cn(
+                                        "size-[18px] shrink-0 transition-opacity",
+                                        isActive
+                                            ? "opacity-100"
+                                            : "opacity-70",
+                                    )}
+                                    strokeWidth={isActive ? 2.2 : 1.9}
+                                />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[13px] font-medium tracking-[-0.01em]">
+                                        {item.label}
+                                    </span>
+                                    <span className="block truncate text-[11px] text-muted-foreground">
+                                        {item.description}
+                                    </span>
+                                </span>
+                            </button>
+                        )
+                    })}
+                </div>
             </nav>
 
             <div className="border-t border-black/[0.06] p-2 dark:border-white/[0.06]">
+                <div className="mb-2 flex items-center gap-2">
+                    <ToolButton title="切换明暗" onClick={cycleTheme}>
+                        <ThemeIcon
+                            className="size-[19px]"
+                            strokeWidth={1.9}
+                        />
+                    </ToolButton>
+                    <ModeSwitch
+                        onNavigate={onNavigate}
+                        className="min-w-0 flex-1"
+                    />
+                </div>
+            {mode === "netease" ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         className={cn(
@@ -420,6 +505,39 @@ function ClassicSidebar({
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+ ) : (
+ <button
+ type="button"
+ onClick={() => setBilibiliAuthOpen(true)}
+ className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-fill)] focus-visible:outline-2 focus-visible:outline-ring"
+ >
+ {bilibiliAccount?.avatarUrl ? (
+ <img
+ src={bilibiliAccount.avatarUrl}
+ alt=""
+ width={32}
+ height={32}
+ loading="lazy"
+ decoding="async"
+ className="size-8 rounded-full object-cover"
+ />
+ ) : (
+ <span className="flex size-8 items-center justify-center rounded-full bg-[var(--surface-fill)]">
+ <User className="size-4 opacity-70" />
+ </span>
+ )}
+ <span className="min-w-0 flex-1">
+ <span className="block truncate text-[13px] font-medium">
+ {bilibiliAccount?.name ?? "登录B站账号"}
+ </span>
+ <span className="block truncate text-[11px] text-muted-foreground">
+ {bilibiliAccount
+ ? "收藏夹已同步"
+ : "登录后查看收藏夹"}
+ </span>
+ </span>
+ </button>
+ )}
             </div>
 
             {authOpen ? (
@@ -427,6 +545,10 @@ function ClassicSidebar({
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
+ <BilibiliAuthDialog
+ open={bilibiliAuthOpen}
+ onOpenChange={setBilibiliAuthOpen}
+ />
         </aside>
     )
 }

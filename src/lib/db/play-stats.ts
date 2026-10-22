@@ -301,7 +301,12 @@ function clusterTopTracks(rows: TopTrackStat[]): TopTrackCluster[] {
 
 function clusterToTrack(cluster: TopTrackCluster): Track {
     const primary = cluster.members[0]
-    const source = (cluster.source === "local" ? "local" : "netease") as MusicSource
+ const source: MusicSource =
+ cluster.source === "local"
+ ? "local"
+ : cluster.source === "bilibili"
+ ? "bilibili"
+ : "netease"
     return {
         id: primary?.trackId ?? cluster.key,
         title: cluster.title,
@@ -312,7 +317,7 @@ function clusterToTrack(cluster: TopTrackCluster): Track {
         source,
         filePath: primary?.filePath || undefined,
         fileName: primary?.fileName || undefined,
-        contentHash: primary?.contentHash || undefined,
+ contentHash: primary?.contentHash || undefined,
     }
 }
 

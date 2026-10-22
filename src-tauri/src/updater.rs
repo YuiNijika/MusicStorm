@@ -9,6 +9,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+use crate::remote_url;
 
 const DOWNLOAD_NAME: &str = "MusicStorm-setup.exe";
 // 进度发射粒度：约每 512KB 一次，8MB 安装包约 16 次更新，足够顺滑
@@ -56,10 +57,7 @@ pub async fn download_update(
     url: String,
     sha256: Option<String>,
 ) -> Result<String, String> {
-    let url = url.trim().to_string();
-    if url.is_empty() {
-        return Err("下载地址为空".into());
-    }
+    let url = remote_url::validate_remote_url(&url)?;
     let dest = download_target()?;
 
     let handle = app.clone();
@@ -67,6 +65,7 @@ pub async fn download_update(
         let mut builder = Client::builder()
             // 下载本身可能较慢（镜像源），只限制连接与重定向，不设总超时
             .connect_timeout(Duration::from_secs(15))
+            .redirect(remote_url::redirect_policy())
             .user_agent(format!("MusicStorm-update/{}", option_env!("CARGO_PKG_VERSION").unwrap_or("dev")));
         // 直连 GitHub 失败时（如走系统代理的网络），读取代理环境变量手动接管
         let proxy_env = std::env::var("HTTPS_PROXY")
@@ -92,8 +91,25 @@ pub async fn download_update(
             .error_for_status()
             .map_err(|e| format!("下载安装包失败: {e}"))?;
 
+        const MAX_UPDATE_BYTES: u64 = 500 * 1024 * 1024;
+        if response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.to_ascii_lowercase().starts_with("text/html"))
+        {
+            return Err("更新地址返回了网页而不是安装包".into());
+        }
         let total = response.content_length().unwrap_or(0);
-        let mut file = File::create(&dest).map_err(|e| format!("创建缓存文件失败: {e}"))?;
+        if total > MAX_UPDATE_BYTES {
+            return Err("更新包过大".into());
+        }
+        let temp = dest.with_file_name(format!(
+            ".{DOWNLOAD_NAME}.{}.part",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&temp);
+        let mut file = File::create(&temp).map_err(|e| format!("创建临时缓存文件失败: {e}"))?;
 
         let mut stream = response;
         let mut downloaded: u64 = 0;
@@ -102,13 +118,24 @@ pub async fn download_update(
         loop {
             let n = stream
                 .read(&mut buf)
-                .map_err(|e| format!("读取下载内容失败: {e}"))?;
+                .map_err(|e| {
+                    let _ = std::fs::remove_file(&temp);
+                    format!("读取下载内容失败: {e}")
+                })?;
             if n == 0 {
                 break;
             }
             file.write_all(&buf[..n])
-                .map_err(|e| format!("写入缓存文件失败: {e}"))?;
+                .map_err(|e| {
+                    let _ = std::fs::remove_file(&temp);
+                    format!("写入缓存文件失败: {e}")
+                })?;
             downloaded += n as u64;
+            if downloaded > MAX_UPDATE_BYTES {
+                drop(file);
+                let _ = std::fs::remove_file(&temp);
+                return Err("更新包过大".into());
+            }
             // 均匀粒度发射进度，避免高频 IPC
             if downloaded - last_emit >= PROGRESS_EMIT_BYTES {
                 last_emit = downloaded;
@@ -125,17 +152,33 @@ pub async fn download_update(
 
         if total > 0 && downloaded != total {
             drop(file);
-            let _ = std::fs::remove_file(&dest);
+            let _ = std::fs::remove_file(&temp);
             return Err("下载不完整（大小不一致），已删除残留文件".into());
         }
+        if downloaded == 0 {
+            drop(file);
+            let _ = std::fs::remove_file(&temp);
+            return Err("更新包为空".into());
+        }
 
+        file.sync_all().map_err(|e| {
+            let _ = std::fs::remove_file(&temp);
+            format!("保存缓存文件失败: {e}")
+        })?;
         if let Some(expected) = sha256.filter(|s| !s.trim().is_empty()) {
-            let actual = sha256_hex(&dest)?;
+            let actual = sha256_hex(&temp).map_err(|error| {
+                let _ = std::fs::remove_file(&temp);
+                error
+            })?;
             if !actual.eq_ignore_ascii_case(expected.trim()) {
-                drop(file);
-                let _ = std::fs::remove_file(&dest);
+                let _ = std::fs::remove_file(&temp);
                 return Err("下载文件校验失败（sha256 不匹配），已删除残留文件".into());
             }
+        }
+        drop(file);
+        if let Err(error) = std::fs::rename(&temp, &dest) {
+            let _ = std::fs::remove_file(&temp);
+            return Err(format!("保存缓存文件失败: {error}"));
         }
 
         Ok(dest.to_string_lossy().into_owned())

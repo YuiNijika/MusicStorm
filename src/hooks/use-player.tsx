@@ -16,7 +16,7 @@ import { LOCAL_LIBRARY_EVENT } from "@/lib/local/library-store"
 import { resolvePlayableUrl } from "@/lib/music/resolve-url"
 import { getNeteaseQualityBr } from "@/lib/netease/quality"
 import { guardNetEaseSession } from "@/lib/netease/session-guard"
-import { notifyError, notifyWarning } from "@/lib/notify"
+import { notifyError, notifyInfo, notifyWarning } from "@/lib/notify"
 import { isAndroid } from "@/lib/platform"
 import {
     createAndroidEngine,
@@ -245,6 +245,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const nativeRef = useRef<AudioEngine | null>(null)
     const activeRef = useRef<AudioEngine | null>(null)
     const nativeAvailableRef = useRef(false)
+    const resolvedPlayableRef = useRef<{
+        trackId: string
+        url: string
+        filePath?: string
+    } | null>(null)
 
     const queueRef = useRef(queue)
     const indexRef = useRef(currentIndex)
@@ -603,6 +608,54 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         [flushSession],
     )
 
+    useEffect(() => {
+        function persistCurrentSession() {
+            const currentQueue = queueRef.current
+            const currentIndex = indexRef.current
+            if (
+                currentQueue.length === 0 ||
+                currentIndex < 0 ||
+                currentIndex >= currentQueue.length
+            ) {
+                return
+            }
+            lastSessionWriteRef.current = Date.now()
+            writePlaybackSession({
+                queue: currentQueue,
+                currentIndex,
+                positionMs: positionRef.current,
+                volume: volumeRef.current,
+                isMuted: mutedRef.current,
+                shuffle: shuffleRef.current,
+                repeat: repeatRef.current,
+                wasPlaying: isPlayingRef.current,
+            })
+        }
+
+        function onPageHide() {
+            persistCurrentSession()
+            flushSession(false)
+        }
+
+        function onPageShow(event: PageTransitionEvent) {
+            if (!event.persisted || !isPlayingRef.current) {
+                return
+            }
+            const track = queueRef.current[indexRef.current]
+            if (track) {
+                beginSession(track)
+            }
+        }
+
+        window.addEventListener("pagehide", onPageHide)
+        window.addEventListener("pageshow", onPageShow)
+        return () => {
+            window.removeEventListener("pagehide", onPageHide)
+            window.removeEventListener("pageshow", onPageShow)
+            flushSession(false)
+        }
+    }, [beginSession, flushSession])
+
     const advance = useCallback((direction: 1 | -1) => {
         const list = queueRef.current
         const idx = indexRef.current
@@ -883,33 +936,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             pauseBothEngines()
 
             const pref = getEnginePref()
-            const wantNative =
-                nativeAvailableRef.current &&
-                Boolean(nativeRef.current) &&
-                shouldUseNativeForTrack(track, pref)
-
-            let engine: AudioEngine = html5
-            let status: EngineStatus = "html5"
-            let usedNative = false
-
-            if (wantNative) {
-                engine = nativeRef.current!
-                status = "native"
-                usedNative = true
-            } else if (pref === "native" && track.filePath && !nativeAvailableRef.current) {
-                // 用户强制本地原生输出但 probe 失败
-                status = "degraded"
-            }
-
-            activeRef.current = engine
-            setEngineStatus(status)
-            engineStatusRef.current = status
-            applyUserVolume()
-
-            const resolved =
-                usedNative && track.filePath
-                    ? ({ ok: true as const, url: track.filePath })
-                    : await resolvePlayableUrl(track)
+            const resolved = await resolvePlayableUrl(track)
 
             if (cancelled || gen !== loadGenRef.current) {
                 return
@@ -926,7 +953,57 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 })
                 return
             }
-            const url = resolved.url
+
+            const resolvedTrack = resolved.track
+            if (resolved.fallbackSource) {
+                notifyInfo("已自动切换可用音源", {
+                    description: track.title,
+                    id: `fallback-source-${track.id}`,
+                    timeout: 2200,
+                })
+            }
+            const resolvedFilePath =
+                resolved.filePath ?? resolvedTrack.filePath
+            resolvedPlayableRef.current = {
+                trackId: currentTrackId,
+                url: resolved.url,
+                filePath: resolvedFilePath,
+            }
+            const wantNative =
+                nativeAvailableRef.current &&
+                Boolean(nativeRef.current) &&
+                shouldUseNativeForTrack({
+                    track: resolvedTrack,
+                    pref,
+                    filePath: resolvedFilePath,
+                })
+
+            let engine: AudioEngine = html5
+            let status: EngineStatus = "html5"
+            let usedNative = false
+
+            if (wantNative) {
+                engine = nativeRef.current!
+                status = "native"
+                usedNative = true
+            } else if (
+                pref === "native" &&
+                resolvedFilePath &&
+                !nativeAvailableRef.current
+            ) {
+                // 用户强制本地原生输出但 probe 失败
+                status = "degraded"
+            }
+
+            activeRef.current = engine
+            setEngineStatus(status)
+            engineStatusRef.current = status
+            applyUserVolume()
+
+            const url =
+                usedNative && resolvedFilePath
+                    ? resolvedFilePath
+                    : resolved.url
 
             // 拿到的若是试听链接：本地若认为已登录、实则是 cookie 失效导致
             // 网易云按游客返回 30s 试听，则核对登录态并提示重新登录
@@ -955,21 +1032,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     setEngineStatus("degraded")
                     engineStatusRef.current = "degraded"
                     applyUserVolume()
-                    const fallback = await resolvePlayableUrl(track)
-                    if (!fallback.ok || cancelled || gen !== loadGenRef.current) {
+                    if (cancelled || gen !== loadGenRef.current) {
                         isPlayingRef.current = false
                         hardStopEngines()
                         setIsPlaying(false)
-                        if (!fallback.ok) {
-                            notifyWarning("无法播放", {
-                                description: `${track.title} · ${fallback.reason}`,
-                                id: `play-fail-${track.id}`,
-                            })
-                        }
                         return
                     }
                     try {
-                        await Promise.resolve(html5.load(fallback.url))
+                        await Promise.resolve(html5.load(resolved.url))
                         engine = html5
                         usedNative = false
                     } catch (fallbackError) {
@@ -1148,9 +1218,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     )
                     try {
                         engine.pause()
-                        const fallback = await resolvePlayableUrl(track)
+                        const cached =
+                            resolvedPlayableRef.current?.trackId === track.id
+                                ? resolvedPlayableRef.current
+                                : null
+                        const fallback = cached
+                            ? null
+                            : await resolvePlayableUrl(track)
                         if (
-                            !fallback.ok ||
                             cancelled ||
                             gen !== pauseGenRef.current ||
                             !isPlayingRef.current
@@ -1158,7 +1233,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                             isPlayingRef.current = false
                             hardStopEngines()
                             setIsPlaying(false)
-                            if (!fallback.ok) {
+                            return
+                        }
+                        if (!cached && fallback && !fallback.ok) {
+                            isPlayingRef.current = false
+                            hardStopEngines()
+                            setIsPlaying(false)
+                            notifyWarning("无法播放", {
+                                description: `${track.title} · ${fallback.reason}`,
+                                id: `play-fail-${track.id}`,
+                            })
+                            return
+                        }
+                        const fallbackUrl = cached?.url ??
+                            (fallback?.ok ? fallback.url : null)
+                        if (!fallbackUrl) {
+                            isPlayingRef.current = false
+                            hardStopEngines()
+                            setIsPlaying(false)
+                            if (fallback && !fallback.ok) {
                                 notifyWarning("无法播放", {
                                     description: `${track.title} · ${fallback.reason}`,
                                     id: `play-fail-${track.id}`,
@@ -1175,7 +1268,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                         activeRef.current = html5
                         setEngineStatus("degraded")
                         engineStatusRef.current = "degraded"
-                        await Promise.resolve(html5.load(fallback.url))
+                        await Promise.resolve(html5.load(fallbackUrl))
                         if (
                             cancelled ||
                             gen !== pauseGenRef.current ||

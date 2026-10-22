@@ -8,6 +8,7 @@ const LEGACY_PRESET_KEY = "musicstorm-netease-base-preset"
 
 // 自定义空值与集成降级回落
 const DEFAULT_BASE_URL = "https://api.miomoe.cn/netease/music"
+const DEFAULT_BILIBILI_BASE_URL = "https://api.miomoe.cn/bilibili"
 
 const EXTERNAL_SOURCES = [
     {
@@ -34,6 +35,7 @@ type ApiSettings = {
      * 内置模式现为 TS 直连，不再使用；保留仅为兼容旧 localStorage。
      */
     integratedBaseUrl: string
+    bilibiliBaseUrl: string
 }
 
 const API_SETTINGS_EVENT = "musicstorm-api-settings-change"
@@ -43,6 +45,7 @@ const DEFAULT_SETTINGS: ApiSettings = {
     source: "official",
     customUrl: "",
     integratedBaseUrl: "",
+    bilibiliBaseUrl: DEFAULT_BILIBILI_BASE_URL,
 }
 
 function normalizeUrl(url: string): string {
@@ -118,6 +121,10 @@ function readRaw(): ApiSettings {
                     typeof data.integratedBaseUrl === "string"
                         ? data.integratedBaseUrl
                         : "",
+                bilibiliBaseUrl:
+                    typeof data.bilibiliBaseUrl === "string"
+                        ? normalizeUrl(data.bilibiliBaseUrl)
+                        : DEFAULT_BILIBILI_BASE_URL,
             }
         }
     } catch {
@@ -135,7 +142,10 @@ function readRaw(): ApiSettings {
         return migrated
     }
 
-    return { ...DEFAULT_SETTINGS, mode: isWebMode() ? "external" : DEFAULT_SETTINGS.mode }
+    return {
+        ...DEFAULT_SETTINGS,
+        mode: isWebMode() ? "external" : DEFAULT_SETTINGS.mode,
+    }
 }
 
 function writeSettings(next: ApiSettings, emit = true): void {
@@ -171,6 +181,11 @@ function setApiSettings(patch: Partial<ApiSettings>): ApiSettings {
                 : prev.customUrl,
         // 历史 sidecar 字段：不再读写业务语义，落盘恒空
         integratedBaseUrl: "",
+        bilibiliBaseUrl:
+            patch.bilibiliBaseUrl !== undefined
+                ? normalizeUrl(patch.bilibiliBaseUrl) ||
+                  DEFAULT_BILIBILI_BASE_URL
+                : prev.bilibiliBaseUrl,
     }
     writeSettings(next)
     return next
@@ -211,6 +226,10 @@ function resolveEffectiveBaseUrl(settings: ApiSettings = readRaw()): string {
 
 function getNeteaseBaseUrl(): string {
     return resolveEffectiveBaseUrl()
+}
+
+function getBilibiliBaseUrl(): string {
+    return readRaw().bilibiliBaseUrl || DEFAULT_BILIBILI_BASE_URL
 }
 
 /** @deprecated 请用 setApiSettings / setExternalSource；保留兼容调用点 */
@@ -319,6 +338,7 @@ function applyApiPreset(id: ApiPresetId, customUrl?: string): string {
 export {
     API_SETTINGS_EVENT,
     DEFAULT_BASE_URL,
+    DEFAULT_BILIBILI_BASE_URL,
     DEFAULT_SETTINGS,
     EXTERNAL_SOURCES,
     NETEASE_API_PRESETS,
@@ -326,6 +346,7 @@ export {
     getApiPresetId,
     getApiSettings,
     getNeteaseBaseUrl,
+    getBilibiliBaseUrl,
     resolveEffectiveBaseUrl,
     setApiMode,
     setApiSettings,

@@ -21,9 +21,9 @@ import {
     removeTracksBulk,
 } from "@/lib/local/library-store"
 import {
-    searchNeteaseAll,
-    type NeteaseSearchBundle,
-} from "@/lib/netease/search"
+    searchOnline,
+    type OnlineSearchBundle,
+} from "@/lib/music/online-search"
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify"
 import {
     SEARCH_HISTORY_EVENT,
@@ -35,9 +35,9 @@ import {
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-type SearchMode = "local" | "netease"
+type SearchMode = "local" | "online"
 
-const EMPTY_BUNDLE: NeteaseSearchBundle = {
+const EMPTY_BUNDLE: OnlineSearchBundle = {
     tracks: [],
     artists: [],
     albums: [],
@@ -55,8 +55,9 @@ function SearchPage() {
     const [submittedQuery, setSubmittedQuery] = useState("")
     const [history, setHistory] = useState<string[]>(() => getSearchHistory())
     const [inputFocused, setInputFocused] = useState(false)
-    const [mode, setMode] = useState<SearchMode>("netease")
-    const [remote, setRemote] = useState<NeteaseSearchBundle>(EMPTY_BUNDLE)
+    const [mode, setMode] = useState<SearchMode>("online")
+    const [remote, setRemote] =
+        useState<OnlineSearchBundle>(EMPTY_BUNDLE)
     const [isLoading, setIsLoading] = useState(false)
     const [errorText, setErrorText] = useState<string | null>(null)
     // 本地曲库变更时刷新搜索目录（移除单曲后立即可见）
@@ -155,7 +156,7 @@ function SearchPage() {
     }, [localCatalog, query])
 
     useEffect(() => {
-        if (mode !== "netease") {
+        if (mode !== "online") {
             setRemote(EMPTY_BUNDLE)
             setErrorText(null)
             setIsLoading(false)
@@ -174,8 +175,8 @@ function SearchPage() {
         setIsLoading(true)
         setErrorText(null)
 
-        void searchNeteaseAll(keyword)
-            .then((bundle: NeteaseSearchBundle) => {
+        void searchOnline(keyword)
+            .then((bundle: OnlineSearchBundle) => {
                 if (cancelled) {
                     return
                 }
@@ -191,7 +192,7 @@ function SearchPage() {
                 const message =
                     error instanceof Error
                         ? error.message
-                        : "无法连接网易云接口，请确认服务已启动"
+                        : "无法连接在线音源，请稍后重试"
                 setErrorText(message)
                 notifyError("搜索失败", { description: message })
             })
@@ -199,14 +200,14 @@ function SearchPage() {
         return () => {
             cancelled = true
         }
-    }, [mode, submittedQuery])
+ }, [mode, submittedQuery])
 
     function runSearch() {
         const keyword = query.trim()
         if (keyword) {
             addSearchHistory(keyword)
         }
-        if (mode === "netease") {
+        if (mode === "online") {
             setSubmittedQuery(keyword)
             return
         }
@@ -251,13 +252,14 @@ function SearchPage() {
 
     function runHistorySearch(keyword: string) {
         setQuery(keyword)
-        if (mode === "netease") {
+        if (mode === "online") {
             setSubmittedQuery(keyword)
         }
         setInputFocused(false)
     }
 
     const remoteKeyword = submittedQuery.trim()
+    const onlineLabel = "在线 · 网易云"
     const hasRemoteAny =
         remote.tracks.length > 0 ||
         remote.artists.length > 0 ||
@@ -267,12 +269,13 @@ function SearchPage() {
 
     return (
         <div className="space-y-6">
+            <h1 className="sr-only">搜索</h1>
             <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                     <ModeChip
-                        active={mode === "netease"}
-                        label="网易云"
-                        onClick={() => handleModeChange("netease")}
+ active={mode === "online"}
+ label={onlineLabel}
+ onClick={() => handleModeChange("online")}
                     />
                     <ModeChip
                         active={mode === "local"}
@@ -284,9 +287,18 @@ function SearchPage() {
                 <div className="relative">
                 <div className="flex gap-2">
                     <label className="material-field flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-3.5">
-                        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <SearchIcon
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-muted-foreground"
+                        />
                         <input
                             value={query}
+                            type="search"
+                            name="search"
+                            aria-label="搜索关键词"
+                            enterKeyHint="search"
+                            autoComplete="off"
+                            spellCheck={false}
                             onFocus={() => setInputFocused(true)}
                             onBlur={() =>
                                 window.setTimeout(
@@ -302,27 +314,28 @@ function SearchPage() {
                                 }
                             }}
                             placeholder={
-                                mode === "netease"
+                                mode === "online"
                                     ? "歌曲、艺人、专辑、歌单、播客"
                                     : "歌曲、艺人、专辑"
                             }
-                            className="h-full w-full bg-transparent text-[14px] outline-none placeholder:text-muted-foreground"
+                            className="h-full w-full bg-transparent text-[14px] outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
                         />
                     </label>
                     <button
                         type="button"
                         onClick={runSearch}
                         disabled={
-                            mode === "netease"
+ mode === "online"
                                 ? !query.trim() || isLoading
                                 : false
                         }
                         className={cn(
                             "apple-primary-action h-11 shrink-0 cursor-pointer rounded-2xl px-4 text-[13px] font-medium",
                             "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
+                            "focus-visible:outline-2 focus-visible:outline-ring",
                         )}
                     >
-                        {mode === "netease" && isLoading ? "搜索中…" : "搜索"}
+                        {mode === "online" && isLoading ? "搜索中…" : "搜索"}
                     </button>
                 </div>
 
@@ -332,30 +345,35 @@ function SearchPage() {
                             最近搜索
                         </p>
                         {history.map((item) => (
-                            <button
+                            <div
                                 key={item}
-                                type="button"
-                                onClick={() => runHistorySearch(item)}
-                                className="group flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-fill)]"
+                                className="flex w-full items-center rounded-xl transition-colors hover:bg-[var(--surface-fill)]"
                             >
-                                <HistoryIcon className="size-4 shrink-0 text-muted-foreground/50" />
-                                <span className="min-w-0 flex-1 truncate text-[13px]">
-                                    {item}
-                                </span>
-                                <span
-                                    role="button"
-                                    tabIndex={-1}
-                                    aria-label={`删除 ${item}`}
-                                    onClick={(event) => {
-                                        event.preventDefault()
-                                        event.stopPropagation()
-                                        removeSearchHistory(item)
-                                    }}
-                                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-[opacity,background-color] hover:bg-[var(--surface-fill-hover)] hover:opacity-100 group-hover:opacity-100"
+                                <button
+                                    type="button"
+                                    onClick={() => runHistorySearch(item)}
+                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
                                 >
-                                    <X className="size-3.5" />
-                                </span>
-                            </button>
+                                    <HistoryIcon
+                                        aria-hidden="true"
+                                        className="size-4 shrink-0 text-muted-foreground/50"
+                                    />
+                                    <span className="min-w-0 flex-1 truncate text-[13px]">
+                                        {item}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label={`删除 ${item}`}
+                                    onClick={() => removeSearchHistory(item)}
+                                    className="relative mr-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-60 transition-[opacity,background-color] after:absolute after:-inset-2 after:content-[''] hover:bg-[var(--surface-fill-hover)] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring"
+                                >
+                                    <X
+                                        aria-hidden="true"
+                                        className="size-3.5"
+                                    />
+                                </button>
+                            </div>
                         ))}
                         <button
                             type="button"
@@ -369,7 +387,7 @@ function SearchPage() {
                 </div>
             </div>
 
-            {mode === "netease" ? (
+ {mode === "online" ? (
                 isLoading ? (
                     <SearchResultsSkeleton />
                 ) : errorText ? (
@@ -393,46 +411,29 @@ function SearchPage() {
                 ) : (
                     <div className="space-y-8">
                         {remote.tracks.length > 0 ? (
-                            <Section
-                                title="歌曲"
-                                description={`${remote.tracks.length} 首`}
-                                variant="listen"
-                            >
-                                <div className="apple-list-surface p-1.5">
-                                    <VirtualList
-                                        items={remote.tracks}
-                                        itemHeight={58}
-                                        getItemKey={(track) =>
-                                            `${track.source}-${track.id}`
-                                        }
-                                        renderItem={(track, index) => (
-                                            <TrackRow
-                                                track={track}
-                                                index={index}
-                                                showSource={false}
-                                                isActive={
-                                                    currentTrack?.id === track.id
-                                                }
-                                                isPlaying={
-                                                    currentTrack?.id === track.id &&
-                                                    isPlaying
-                                                }
-                                                onPlay={(item) =>
-                                                    playOrToggle(
-                                                        item,
-                                                        remote.tracks,
-                                                    )
-                                                }
-                                            />
-                                        )}
-                                    />
-                                </div>
-                            </Section>
-                        ) : null}
-
-                        {remote.artists.length > 0 ? (
-                            <Section
-                                title="艺人"
+ <Section title="歌曲" description={`${remote.tracks.length}首`} variant="listen">
+ <div className="apple-list-surface p-1.5">
+ <VirtualList
+ items={remote.tracks}
+ itemHeight={58}
+ getItemKey={(track) => `${track.source}-${track.id}`}
+ renderItem={(track, index) => (
+ <TrackRow
+ track={track}
+ index={index}
+ showSource={true}
+ isActive={currentTrack?.id === track.id}
+ isPlaying={currentTrack?.id === track.id && isPlaying}
+ onPlay={(item) => playOrToggle(item, remote.tracks)}
+ />
+ )}
+ />
+ </div>
+ </Section>
+ ) : null}
+ {remote.artists.length >0 ? (
+ <Section
+ title="艺人"
                                 description={`${remote.artists.length}`}
                                 variant="listen"
                                 action={<RailControls api={artistRail.api} />}
@@ -672,12 +673,14 @@ function ModeChip({
     return (
         <button
             type="button"
+            aria-pressed={active}
             onClick={onClick}
             className={cn(
                 "cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)]",
                 active
                     ? "bg-foreground text-background"
                     : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
+                "focus-visible:outline-2 focus-visible:outline-ring",
             )}
         >
             {label}

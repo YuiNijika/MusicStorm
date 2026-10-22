@@ -2,17 +2,25 @@ use crate::db::ensure_storage_paths;
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use md5::{Digest, Md5};
+use reqwest::header::{ACCEPT, REFERER, USER_AGENT};
 use serde::Serialize;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::AppHandle;
+use crate::remote_url;
 
 const MAX_COVER_BYTES: usize = 12 * 1024 * 1024;
 const THUMBNAIL_SIZE: u32 = 192;
 // 下载超时：CDN 挂死时快速放行阻塞线程，避免占满线程池拖垮其他 IPC
 const COVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 const COVER_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(20);
+const BILIBILI_REFERER: &str = "https://www.bilibili.com/";
+const BILIBILI_ACCEPT: &str =
+ "image/webp,image/jpeg,image/png,image/apng,*/*;q=0.8";
+const BILIBILI_ORIGIN: &str = "https://www.bilibili.com";
+const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Windows NT10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 /// 封面缓存上限：文件数与总大小，超出后按最旧清理
 const MAX_COVER_FILES: usize = 4_000;
@@ -148,7 +156,7 @@ fn image_extension(data: &[u8]) -> Result<&'static str, String> {
         image::ImageFormat::Jpeg => Ok("jpg"),
         image::ImageFormat::Png => Ok("png"),
         image::ImageFormat::WebP => Ok("webp"),
-        _ => Err("封面仅支持 JPEG、PNG 或 WebP".into()),
+ _ => Err("封面仅支持 JPEG、PNG或 WebP".into()),
     }
 }
 
@@ -237,6 +245,12 @@ pub fn cache_cover_file_at(
     if !path.is_file() {
         return Err("封面文件不存在".into());
     }
+    let size = fs::metadata(path)
+        .map_err(|error| format!("读取封面失败: {error}"))?
+        .len();
+    if size > MAX_COVER_BYTES as u64 {
+        return Err("封面图片过大（超过 12MB）".into());
+    }
     let data = fs::read(path).map_err(|error| format!("读取封面失败: {error}"))?;
     cache_cover_bytes_at(covers_dir, &data)
 }
@@ -245,6 +259,12 @@ pub fn cache_cover_file_at(
 pub fn cache_cover_file(app: &AppHandle, path: &Path) -> Result<CachedCover, String> {
     if !path.is_file() {
         return Err("封面文件不存在".into());
+    }
+    let size = fs::metadata(path)
+        .map_err(|error| format!("读取封面失败: {error}"))?
+        .len();
+    if size > MAX_COVER_BYTES as u64 {
+        return Err("封面图片过大（超过 12MB）".into());
     }
     let data = fs::read(path).map_err(|error| format!("读取封面失败: {error}"))?;
     cache_cover_bytes(app, &data)
@@ -266,29 +286,69 @@ pub fn pick_cover_image(app: AppHandle) -> Result<Option<CachedCover>, String> {
 #[tauri::command]
 pub async fn cache_cover_url(app: AppHandle, url: String) -> Result<CachedCover, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let url = url.trim();
-        if url.is_empty() {
-            return Err("封面地址为空".into());
-        }
+        let url = remote_url::validate_remote_url(&url)?;
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(COVER_CONNECT_TIMEOUT)
             .timeout(COVER_DOWNLOAD_TIMEOUT)
+            .redirect(remote_url::redirect_policy())
             .build()
             .map_err(|error| format!("创建封面下载客户端失败: {error}"))?;
-        let response = client
-            .get(url)
+ let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+ let referer = if host == "hdslb.com"
+ || host.ends_with(".hdslb.com")
+ || host == "bilibili.com"
+ || host.ends_with(".bilibili.com")
+ || host == "bilivideo.com"
+ || host.ends_with(".bilivideo.com")
+ || host == "bilivideo.cn"
+ || host.ends_with(".bilivideo.cn")
+ {
+ BILIBILI_REFERER
+ } else if host.ends_with(".126.net") || host.ends_with(".163.com") {
+ "https://music.163.com/"
+ } else {
+ ""
+ };
+ let request = client
+ .get(url)
+ .header(ACCEPT, BILIBILI_ACCEPT)
+ .header(USER_AGENT, BROWSER_USER_AGENT);
+ let request = if referer.is_empty() {
+ request
+ } else if referer == BILIBILI_REFERER {
+ request
+ .header(REFERER, referer)
+ .header(reqwest::header::ORIGIN, BILIBILI_ORIGIN)
+ } else {
+ request.header(REFERER, referer)
+ };
+ let response = request
             .send()
             .map_err(|error| format!("下载封面失败: {error}"))?
             .error_for_status()
             .map_err(|error| format!("下载封面失败: {error}"))?;
+ let content_type = response
+ .headers()
+ .get(reqwest::header::CONTENT_TYPE)
+ .and_then(|value| value.to_str().ok())
+ .unwrap_or_default()
+ .to_ascii_lowercase();
+ if content_type.starts_with("text/html") {
+ return Err("图片地址返回了网页而不是封面".into());
+ }
         if let Some(length) = response.content_length() {
             if length > MAX_COVER_BYTES as u64 {
                 return Err("封面图片过大（超过 12MB）".into());
             }
         }
-        let bytes = response
-            .bytes()
+        let mut bytes = Vec::new();
+        response
+            .take((MAX_COVER_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
             .map_err(|error| format!("读取封面失败: {error}"))?;
+        if bytes.len() > MAX_COVER_BYTES {
+            return Err("封面图片过大（超过 12MB）".into());
+        }
         cache_cover_bytes(&app, &bytes)
     })
     .await
@@ -302,6 +362,9 @@ pub fn cache_cover_data_url(app: AppHandle, data_url: String) -> Result<CachedCo
     let (_, payload) = data_url
         .split_once(',')
         .ok_or_else(|| "旧封面数据无效".to_string())?;
+    if payload.len() > ((MAX_COVER_BYTES * 4 / 3) + 1024) {
+        return Err("封面图片过大（超过 12MB）".into());
+    }
     let data = general_purpose::STANDARD
         .decode(payload.trim().as_bytes())
         .map_err(|error| format!("解码旧封面失败: {error}"))?;

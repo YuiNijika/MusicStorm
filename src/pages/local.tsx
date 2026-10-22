@@ -31,6 +31,7 @@ import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { VirtualList } from "@/components/music/virtual-list"
 import { ViewModeToggle } from "@/components/music/view-mode-toggle"
 import {
@@ -93,9 +94,15 @@ type ConfirmState =
     | { kind: "remove-artists"; artists: LocalArtist[]; albumCount?: number }
     | { kind: "remove-albums"; albums: LocalAlbum[] }
 
+const TRACK_ROW_HEIGHT = 58
+const LIBRARY_ROW_HEIGHT = 66
+const MEDIA_ROW_HEIGHT = 236
+
+type LocalAlbumCardItem = LocalAlbum | "all"
+
 function LocalPage() {
     const { playOrToggle, currentTrack, isPlaying } = usePlayer()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
     const { trackSort, localAlbumSort, localAlbumView } = useLibraryLayout()
     const lib = useLocalLibrary()
     const [orderTick, setOrderTick] = useState(0)
@@ -195,6 +202,14 @@ function LocalPage() {
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set())
     // 批量加入歌单的曲目集合，非空即弹出选择弹窗
     const [playlistAddTracks, setPlaylistAddTracks] = useState<Track[]>([])
+
+    const albumCardItems = useMemo<LocalAlbumCardItem[]>(() => {
+        const items: LocalAlbumCardItem[] = [...sortedAlbums]
+        if (selectionMode === null && lib.allTracks.length > 0) {
+            items.unshift("all")
+        }
+        return items
+    }, [lib.allTracks.length, selectionMode, sortedAlbums])
 
     function toggleSelection(id: string) {
         setSelection((prev) => {
@@ -424,7 +439,7 @@ function LocalPage() {
             ""
 
         return (
-            <div className="space-y-6 pb-4">
+            <div ref={gridRef} className="space-y-6 pb-4">
                 <BackButton onClick={lib.goRoot} label="资料库" />
 
                 <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -521,14 +536,18 @@ function LocalPage() {
                         title="专辑"
                         description={`${lib.artistAlbums.length} 张 · 点开进入曲目`}
                     >
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {lib.artistAlbums.map((album) => {
+                        <VirtualGrid
+                            items={lib.artistAlbums}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(album) => album.id}
+                            renderItem={(album) => {
                                 const count = lib.library.tracks.filter(
                                     (track) => track.albumId === album.id,
                                 ).length
                                 const selected = selection.has(album.id)
                                 return (
-                                    <div key={album.id} className="group relative">
+                                    <div className="group relative">
                                         <MediaCard
                                             coverUrl={lib.albumCoverThumb(album)}
                                             title={album.title}
@@ -563,8 +582,8 @@ function LocalPage() {
                                         )}
                                     </div>
                                 )
-                            })}
-                        </div>
+                            }}
+                        />
                     </Section>
                 )}
 
@@ -628,7 +647,7 @@ function LocalPage() {
                   }`
 
         return (
-            <div className="space-y-5 pb-4">
+            <div ref={gridRef} className="space-y-5 pb-4">
                 <BackButton onClick={lib.goRoot} label="资料库" />
 
                 <header className="flex flex-wrap items-end justify-between gap-3 px-0.5">
@@ -746,6 +765,7 @@ function LocalPage() {
                             <DragList
                                 items={sortedTracks}
                                 enabled
+                                itemHeight={TRACK_ROW_HEIGHT}
                                 onReorder={handleTrackReorder}
                                 renderItem={(track, index, handle) => (
                                     <TrackRow
@@ -769,7 +789,7 @@ function LocalPage() {
                         ) : (
                             <VirtualList
                                 items={sortedTracks}
-                                itemHeight={58}
+                                itemHeight={TRACK_ROW_HEIGHT}
                                 getItemKey={(track) => track.id}
                                 renderItem={(track, index) => (
                                     <TrackRow
@@ -820,7 +840,7 @@ function LocalPage() {
 
     // —— 资料库根：艺人分组 + 专辑网格 ——
     return (
-        <div className="space-y-7 pb-4">
+        <div ref={gridRef} className="space-y-7 pb-4">
             <PageTitle
                 title="资料库"
                 subtitle={lib.subtitle}
@@ -999,8 +1019,12 @@ function LocalPage() {
                             title="艺人"
                             description={`${sortedArtists.length} 位 · 子专辑文件夹自动归组`}
                         >
-                            <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {sortedArtists.map((artist) => {
+                            <VirtualGrid
+                                items={sortedArtists}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(artist) => artist.id}
+                                renderItem={(artist) => {
                                     const albums = lib.library.albums.filter(
                                         (album) => album.artistId === artist.id,
                                     )
@@ -1012,7 +1036,7 @@ function LocalPage() {
                                             "",
                                     )
                                     return (
-                                        <div key={artist.id} className="group relative">
+                                        <div className="group relative">
                                             <MediaCard
                                                 coverUrl={cover}
                                                 title={artist.name}
@@ -1046,8 +1070,8 @@ function LocalPage() {
                                             )}
                                         </div>
                                     )
-                                })}
-                            </div>
+                                }}
+                            />
                         </Section>
                     ) : null}
 
@@ -1102,6 +1126,7 @@ function LocalPage() {
                             ) : null}
                             <DragList
                                 items={sortedAlbums}
+                                itemHeight={LIBRARY_ROW_HEIGHT}
                                 enabled={
                                     selectionMode === null &&
                                     localAlbumSort === "custom"
@@ -1176,28 +1201,37 @@ function LocalPage() {
                             />
                         </div>
                     ) : (
-                        <div ref={gridRef} className={gridClass} style={gridStyle}>
-                            {selectionMode === null && lib.allTracks.length > 0 ? (
-                                <MediaCard
-                                    coverUrl=""
-                                    title="全部歌曲"
-                                    subtitle={`${lib.allTracks.length} 首`}
-                                    widthClassName="w-full"
-                                    onClick={lib.openAllSongs}
-                                    overlay={
-                                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-rose-500/90 to-violet-600/90">
-                                            <Disc3 className="size-12 text-white/90" />
-                                        </div>
-                                    }
-                                />
-                            ) : null}
-                            {sortedAlbums.map((album) => {
+                        <VirtualGrid
+                            items={albumCardItems}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(item) =>
+                                item === "all" ? "all-tracks" : item.id
+                            }
+                            renderItem={(item) => {
+                                if (item === "all") {
+                                    return (
+                                        <MediaCard
+                                            coverUrl=""
+                                            title="全部歌曲"
+                                            subtitle={`${lib.allTracks.length} 首`}
+                                            widthClassName="w-full"
+                                            onClick={lib.openAllSongs}
+                                            overlay={
+                                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-rose-500/90 to-violet-600/90">
+                                                    <Disc3 className="size-12 text-white/90" />
+                                                </div>
+                                            }
+                                        />
+                                    )
+                                }
+                                const album = item
                                 const count = lib.library.tracks.filter(
                                     (track) => track.albumId === album.id,
                                 ).length
                                 const selected = selection.has(album.id)
                                 return (
-                                    <div key={album.id} className="group relative">
+                                    <div className="group relative">
                                         <MediaCard
                                             coverUrl={lib.albumCoverThumb(album)}
                                             title={album.title}
@@ -1234,8 +1268,8 @@ function LocalPage() {
                                         )}
                                     </div>
                                 )
-                            })}
-                        </div>
+                            }}
+                        />
                     )}
                 </Section>
                 </>

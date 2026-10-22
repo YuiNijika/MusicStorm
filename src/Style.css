@@ -67,8 +67,8 @@
         /* 底层柔光渐变：给毛玻璃 backdrop-filter 提供可模糊的色彩层次，
          * 纯色背景上 blur + saturate 无内容可模糊，卡片会退化成纯白 */
         background:
-            radial-gradient(130% 95% at 6% -10%, oklch(0.85 0.075 290 / 70%), transparent 54%),
-            radial-gradient(120% 90% at 100% 110%, oklch(0.86 0.085 245 / 62%), transparent 56%),
+            radial-gradient(130% 95% at 6% -10%, var(--theme-glow-primary), transparent 54%),
+            radial-gradient(120% 90% at 100% 110%, var(--theme-glow-secondary), transparent 56%),
             var(--background);
         font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
         text-rendering: optimizeLegibility;
@@ -81,8 +81,8 @@
 
     .dark body {
         background:
-            radial-gradient(130% 95% at 6% -10%, oklch(0.32 0.07 290 / 48%), transparent 54%),
-            radial-gradient(120% 90% at 100% 110%, oklch(0.29 0.075 245 / 42%), transparent 56%),
+            radial-gradient(130% 95% at 6% -10%, var(--theme-glow-primary), transparent 54%),
+            radial-gradient(120% 90% at 100% 110%, var(--theme-glow-secondary), transparent 56%),
             var(--background);
     }
 
@@ -388,26 +388,26 @@
 
 .full-player-surface {
     isolation: isolate;
-    background: #f4f6fb;
+    background: var(--theme-full-player-bg);
     color: var(--foreground);
 }
 
 .dark .full-player-surface {
-    background: #11141c;
+    background: var(--theme-full-player-bg);
 }
 
 .full-player-backdrop {
     z-index: 0;
     overflow: hidden;
     background:
-        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.94), transparent 42%),
-        linear-gradient(145deg, #f7f8fc 0%, #eef2f8 55%, #f8f4f6 100%);
+        radial-gradient(circle at 18% 12%, var(--glass-highlight), transparent 42%),
+        linear-gradient(145deg, var(--theme-full-player-bg), var(--background));
 }
 
 .dark .full-player-backdrop {
     background:
-        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.06), transparent 38%),
-        linear-gradient(145deg, #181c27 0%, #11141c 58%, #19141b 100%);
+        radial-gradient(circle at 18% 12%, var(--glass-highlight), transparent 38%),
+        linear-gradient(145deg, var(--theme-full-player-bg), var(--background));
 }
 
 .full-player-backdrop-image {
@@ -431,25 +431,25 @@
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(246, 248, 252, 0.7)),
-        rgba(248, 249, 253, 0.36);
+        linear-gradient(180deg, var(--theme-full-player-wash), transparent),
+        var(--theme-full-player-wash);
     backdrop-filter: blur(28px) saturate(135%);
     -webkit-backdrop-filter: blur(28px) saturate(135%);
 }
 
 .dark .full-player-backdrop-tint {
     background:
-        linear-gradient(180deg, rgba(17, 20, 28, 0.28), rgba(17, 20, 28, 0.62)),
-        rgba(20, 23, 31, 0.38);
+        linear-gradient(180deg, transparent, var(--theme-full-player-wash)),
+        var(--theme-full-player-wash);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
     .full-player-backdrop-tint {
-        background: rgba(248, 249, 253, 0.82);
+        background: var(--theme-full-player-bg);
     }
 
     .dark .full-player-backdrop-tint {
-        background: rgba(20, 23, 31, 0.86);
+        background: var(--theme-full-player-bg);
     }
 }
 

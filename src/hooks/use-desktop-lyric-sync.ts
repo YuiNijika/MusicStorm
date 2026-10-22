@@ -87,8 +87,13 @@ export function useDesktopLyricSync() {
                     return
                 }
 
-                // Local track
-                if (currentTrack.source === "local") {
+ if (currentTrack.source === "bilibili") {
+ linesRef.current = []
+ return
+ }
+
+ // Local track
+ if (currentTrack.source === "local") {
                     if (currentTrack.lyricText?.trim()) {
                         const lines = parseLyricText(currentTrack.lyricText)
                         if (!cancelled) {

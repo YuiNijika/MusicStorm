@@ -6,6 +6,7 @@ import { ArtistDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { VirtualList } from "@/components/music/virtual-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
@@ -38,6 +39,10 @@ type ArtistPageProps = {
     onBack: () => void
 }
 
+const TRACK_ROW_HEIGHT = 58
+const MEDIA_ROW_HEIGHT = 236
+const MV_ROW_HEIGHT = 210
+
 type LazyState<T> = {
     status: "idle" | "loading" | "ready" | "error"
     data: T
@@ -65,7 +70,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
     const { loggedIn } = useNeteaseSession()
     const { openAlbum, openArtist, openMv } = useMusicNavigation()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
 
     const [subscribed, setSubscribed] = useState(false)
     const [subBusy, setSubBusy] = useState(false)
@@ -391,7 +396,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
     }, [tab, artistId, profile?.id, tabRetry])
 
     return (
-        <div className="space-y-5">
+        <div ref={gridRef} className="space-y-5">
             <BackButton onClick={onBack} />
 
             {loading ? (
@@ -507,7 +512,7 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                 <>
                                     <VirtualList
                                         items={allSongs}
-                                        itemHeight={58}
+                                        itemHeight={TRACK_ROW_HEIGHT}
                                         className="apple-list-surface p-1.5"
                                         getItemKey={(track) => track.id}
                                         renderItem={(track, index) => (
@@ -564,10 +569,13 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                 <StateHero variant="empty" title="暂无专辑" />
                             ) : (
                                 <>
-                                    <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                        {albums.map((album) => (
+                                    <VirtualGrid
+                                        items={albums}
+                                        columns={cols}
+                                        estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                        getItemKey={(album) => album.id}
+                                        renderItem={(album) => (
                                             <MediaCard
-                                                key={album.id}
                                                 coverUrl={album.coverUrl}
                                                 title={album.title}
                                                 subtitle={
@@ -583,8 +591,8 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                                 widthClassName="w-full"
                                                 onClick={() => openAlbum(album.id)}
                                             />
-                                        ))}
-                                    </div>
+                                        )}
+                                    />
                                     {/* 下滑追加哨兵：进入视口触发下一页 */}
                                     <div
                                         ref={albumsSentinelRef}
@@ -639,16 +647,14 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             ) : mvs.data.length === 0 ? (
                                 <StateHero variant="empty" title="暂无 MV" />
                             ) : (
-                                <div
-                                    className="grid gap-4"
-                                    style={{
-                                        gridTemplateColumns:
-                                            "repeat(auto-fill, minmax(180px, 1fr))",
-                                    }}
-                                >
-                                    {mvs.data.map((mv) => (
+                                <VirtualGrid
+                                    items={mvs.data}
+                                    columns={cols}
+                                    estimatedRowHeight={MV_ROW_HEIGHT}
+                                    rowGap={16}
+                                    getItemKey={(mv) => mv.id}
+                                    renderItem={(mv) => (
                                         <button
-                                            key={mv.id}
                                             type="button"
                                             onClick={() => openMv(mv.id)}
                                             className={cn(
@@ -678,8 +684,8 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                                 </p>
                                             </div>
                                         </button>
-                                    ))}
-                                </div>
+                                    )}
+                                />
                             )}
                         </TabsContent>
 
@@ -743,14 +749,13 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                             ) : similar.data.length === 0 ? (
                                 <StateHero variant="empty" title="暂无相似艺人" />
                             ) : (
-                                <div
-                                    ref={gridRef}
-                                    className={gridClass}
-                                    style={gridStyle}
-                                >
-                                    {similar.data.map((artist) => (
+                                <VirtualGrid
+                                    items={similar.data}
+                                    columns={cols}
+                                    estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                    getItemKey={(artist) => artist.id}
+                                    renderItem={(artist) => (
                                         <button
-                                            key={artist.id}
                                             type="button"
                                             onClick={() => openArtist(artist.id)}
                                             className={cn(
@@ -775,8 +780,8 @@ function ArtistPage({ artistId, onBack }: ArtistPageProps) {
                                                 </p>
                                             </div>
                                         </button>
-                                    ))}
-                                </div>
+                                    )}
+                                />
                             )}
                         </TabsContent>
                     </Tabs>

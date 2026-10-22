@@ -1,0 +1,188 @@
+html[data-theme-style="minecraft"] body {
+    background-color: var(--background);
+    background-image:
+        linear-gradient(45deg, color-mix(in srgb, var(--foreground) 5%, transparent) 25%, transparent 25%),
+        linear-gradient(-45deg, color-mix(in srgb, var(--foreground) 5%, transparent) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, color-mix(in srgb, var(--foreground) 5%, transparent) 75%),
+        linear-gradient(-45deg, transparent 75%, color-mix(in srgb, var(--foreground) 5%, transparent) 75%);
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    background-size: 16px 16px;
+    image-rendering: pixelated;
+}
+
+html[data-theme-style="minecraft"] .app-root {
+    background:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary) 7%, transparent) 0 25%,
+            transparent 25% 100%
+        ),
+        var(--background);
+}
+
+html[data-theme-style="minecraft"] :where(
+        .material-panel,
+        .material-field,
+        .material-surface,
+        .apple-list-surface,
+        .apple-segmented,
+        .full-player-surface
+    ) {
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    box-shadow: var(--shadow-card);
+}
+
+html[data-theme-style="minecraft"] :where(
+        .material-chrome,
+        .material-sidebar,
+        .material-player,
+        .mobile-nav-bar
+    ) {
+    border-color: var(--border);
+    border-radius: 0;
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+html[data-theme-style="minecraft"] :where(
+        .apple-control,
+        .apple-segmented-item,
+        .apple-primary-action
+    ) {
+    border-radius: 3px;
+    box-shadow: 2px 2px 0 color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+html[data-theme-style="minecraft"] :where(button, input, select, textarea) {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+}
+
+html[data-theme-style="minecraft"] :where(img, .material-panel, .material-surface) {
+    image-rendering: pixelated;
+}
+
+html[data-theme-style="material"] body {
+    background:
+        radial-gradient(
+            1100px 640px at 92% -10%,
+            color-mix(in srgb, var(--primary) 8%, transparent),
+            transparent 68%
+        ),
+        radial-gradient(
+            760px 520px at 4% 108%,
+            color-mix(in srgb, var(--chart-2) 7%, transparent),
+            transparent 66%
+        ),
+        var(--background);
+}
+
+html[data-theme-style="material"] :where(
+        .material-panel,
+        .material-field,
+        .material-surface,
+        .apple-list-surface
+    ) {
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+}
+
+html[data-theme-style="material"] :where(
+        .material-chrome,
+        .material-sidebar,
+        .material-player
+    ) {
+    border-color: color-mix(in srgb, var(--border) 62%, transparent);
+}
+
+html[data-theme-style="material"] :where(button, [role="button"], a):focus-visible {
+    outline-width: 2px;
+    outline-offset: 3px;
+}
+
+html[data-theme-style="windows"] body {
+    background: var(--background);
+}
+
+html[data-theme-style="windows"] .app-root {
+    background: var(--background);
+}
+
+html[data-theme-style="windows"] :where(
+        .material-panel,
+        .material-field,
+        .material-surface,
+        .apple-list-surface,
+        .apple-segmented
+    ) {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: var(--shadow-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+html[data-theme-style="windows"] :where(
+        .material-chrome,
+        .material-sidebar,
+        .material-player,
+        .mobile-nav-bar
+    ) {
+    border-color: var(--border);
+    border-radius: 0;
+    box-shadow: 0 -1px 0 var(--border), 0 1px 0 var(--border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+html[data-theme-style="windows"] :where(
+        .apple-control,
+        .apple-segmented-item,
+        .apple-primary-action
+    ) {
+    border-radius: 3px;
+}
+
+html[data-theme-style="windows"] :where(
+        button,
+        input,
+        select,
+        textarea,
+        h1,
+        h2,
+        h3
+    ) {
+    font-family: var(--font-sans);
+}
+
+html[data-theme-style="windows"] .full-player-backdrop {
+    background: var(--theme-full-player-bg);
+}
+
+html[data-theme-style="minecraft"] .full-player-backdrop {
+    background:
+        linear-gradient(
+            45deg,
+            color-mix(in srgb, var(--foreground) 4%, transparent) 25%,
+            transparent 25% 75%,
+            color-mix(in srgb, var(--foreground) 4%, transparent) 75%
+        ),
+        var(--theme-full-player-bg);
+    background-size: 18px 18px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    html[data-theme-style] :where(
+            .material-panel,
+            .material-field,
+            .material-surface,
+            .apple-list-surface,
+            .material-chrome,
+            .material-sidebar,
+            .material-player,
+            .mobile-nav-bar
+        ) {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}

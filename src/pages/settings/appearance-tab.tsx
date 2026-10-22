@@ -34,6 +34,7 @@ import {
 import { coverPathToUrl, pickCoverImage } from "@/lib/local/cover"
 import {
     CHROME_EVENT,
+    FULL_PLAYER_DEFAULT_LAYOUTS,
     FULL_PLAYER_LAYOUTS,
     LAYOUT_EVENT,
     LYRICS_ALIGNS,
@@ -41,10 +42,13 @@ import {
     LYRICS_SCALE_MIN,
     LYRICS_SCALE_STEP,
     getFullPlayerChrome,
+    getFullPlayerDefaultLayout,
     getFullPlayerLayout,
+    setFullPlayerDefaultLayout,
     setFullPlayerChrome,
     setFullPlayerLayout,
     type FullPlayerChrome,
+    type FullPlayerDefaultLayout,
     type FullPlayerLayout,
     type LyricsAlign,
 } from "@/lib/player/full-player-prefs"
@@ -52,6 +56,10 @@ import { notifyFromError, notifySuccess, notifyWarning } from "@/lib/notify"
 import { isNativeMacOS } from "@/lib/platform"
 import { fetchBingWallpaper } from "@/lib/bing/wallpaper"
 import { getNeteaseBaseUrl } from "@/lib/netease/client"
+import { THEME_DEFINITIONS, getThemeDefinition } from "@/lib/theme/themes"
+import { RECENT_LIMIT, readRecentThemes } from "@/lib/theme/recent"
+import { ThemeCard } from "@/components/settings/theme-card"
+import { FontSettings } from "@/components/settings/font-settings"
 import {
     ActionButton,
     ChoiceChip,
@@ -73,7 +81,10 @@ function AppearanceTab({
 }) {
     const {
         theme,
+        themeStyle,
+ resolvedTheme,
         setTheme,
+        setThemeStyle,
         appearance,
         setAccent,
         setTintScope,
@@ -89,6 +100,10 @@ function AppearanceTab({
     const [layout, setLayout] = useState<FullPlayerLayout>(() =>
         getFullPlayerLayout(),
     )
+    const [defaultLayout, setDefaultLayout] =
+        useState<FullPlayerDefaultLayout>(() =>
+            getFullPlayerDefaultLayout(),
+        )
     const [chrome, setChrome] = useState<FullPlayerChrome>(() =>
         getFullPlayerChrome(),
     )
@@ -105,6 +120,21 @@ function AppearanceTab({
     const customActive = appearance.accent === "custom"
     const nativeMacOS = isNativeMacOS()
     const { playlistView, playlistTracksView } = useLibraryLayout()
+    const activeTheme = getThemeDefinition(themeStyle)
+    const supportsGlass = activeTheme.capabilities.includes("glass")
+    const supportsBackground =
+        activeTheme.capabilities.includes("backgroundImage")
+    const supportsBing = activeTheme.capabilities.includes("bingWallpaper")
+ const recentThemes = readRecentThemes()
+ .map((id) => THEME_DEFINITIONS.find((item) => item.id === id))
+ .filter(
+ (item): item is (typeof THEME_DEFINITIONS)[number] =>
+ Boolean(item),
+ )
+    const visibleThemes = [
+        activeTheme,
+        ...recentThemes.filter((item) => item.id !== activeTheme.id),
+    ].slice(0, RECENT_LIMIT)
 
     // 毛玻璃由性能模式联动控制：开启时强制关闭、关闭时恢复记忆状态
     useEffect(() => {
@@ -139,6 +169,7 @@ function AppearanceTab({
     useEffect(() => {
         function onLayout() {
             setLayout(getFullPlayerLayout())
+            setDefaultLayout(getFullPlayerDefaultLayout())
         }
         function onChrome() {
             setChrome(getFullPlayerChrome())
@@ -154,6 +185,11 @@ function AppearanceTab({
     function handleLayoutPick(next: FullPlayerLayout) {
         setFullPlayerLayout(next)
         setLayout(next)
+    }
+
+    function handleDefaultLayoutPick(next: FullPlayerDefaultLayout) {
+        setFullPlayerDefaultLayout(next)
+        setDefaultLayout(next)
     }
 
     function handleLyricsAlign(next: LyricsAlign) {
@@ -236,9 +272,33 @@ function AppearanceTab({
 
     return (
         <div className="space-y-3">
-            <TabHeader title="外观" description="主题、色调、材质与全屏播放模板" />
+ <TabHeader
+ title="外观"
+ description="最近主题、字体、色调、材质与全屏播放模板"
+ />
+ <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+ <SettingsGroup
+ className="lg:col-span-2"
+ title="最近主题"
+ description={activeTheme.description}
+ >
+ <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+ {visibleThemes.map((item) => (
+ <ThemeCard
+ key={item.id}
+ theme={item}
+ mode={resolvedTheme}
+ active={themeStyle === item.id}
+ compact
+ onSelect={() => setThemeStyle(item.id)}
+ />
+ ))}
+ </div>
+ <p className="text-[13px] text-muted-foreground">
+这里保留最近使用的四个主题，更多风格请前往设置中的主题
+ </p>
+ </SettingsGroup>
 
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <SettingsGroup
                     className="lg:col-span-2"
                     title="全屏播放模板"
@@ -258,6 +318,18 @@ function AppearanceTab({
                             />
                         ))}
                     </ChipRow>
+                    <ChoiceRow label="默认模式">
+                        {FULL_PLAYER_DEFAULT_LAYOUTS.map((item) => (
+                            <ChoiceChip
+                                key={item.id}
+                                active={defaultLayout === item.id}
+                                onClick={() =>
+                                    handleDefaultLayoutPick(item.id)
+                                }
+                                label={item.label}
+                            />
+                        ))}
+                    </ChoiceRow>
                     {layout === "lyrics" ? (
                         <ChoiceRow label="歌词对齐">
                             {LYRICS_ALIGNS.map((item) => (
@@ -281,7 +353,10 @@ function AppearanceTab({
                     />
                 </SettingsGroup>
 
-                <SettingsGroup title="主题与色调" description="明暗模式与强调色">
+ <SettingsGroup
+ title="明暗与色调"
+ description="明暗模式与强调色"
+ >
                     <ChipRow>
                         <ChoiceChip
                             active={theme === "system"}
@@ -509,15 +584,27 @@ function AppearanceTab({
                     />
                 </SettingsGroup>
 
+ <SettingsGroup
+ className="lg:col-span-2"
+ title="字体"
+ description="主题字体跟随外观，也可以使用本机字体文件"
+ >
+ <FontSettings />
+ </SettingsGroup>
+
                 <SettingsGroup
                     className="lg:col-span-2"
                     title="材质与背景"
-                    description="性能模式下毛玻璃强制关闭"
+                    description={
+                        supportsGlass
+                            ? "性能模式下毛玻璃强制关闭"
+                            : "当前主题使用实体表面，不启用毛玻璃"
+                    }
                 >
                     <SwitchRow
                         title="常驻毛玻璃"
                         checked={appearance.materialGlass}
-                        disabled={performanceMode}
+                        disabled={performanceMode || !supportsGlass}
                         onCheckedChange={setMaterialGlass}
                     />
                     <SliderField
@@ -529,7 +616,7 @@ function AppearanceTab({
                         max={0.9}
                         step={0.01}
                         value={appearance.glassOpacity}
-                        disabled={performanceMode}
+                        disabled={performanceMode || !supportsGlass}
                         onChange={setGlassOpacity}
                     />
                     <SliderField
@@ -539,7 +626,7 @@ function AppearanceTab({
                         max={48}
                         step={1}
                         value={appearance.glassBlur}
-                        disabled={performanceMode}
+                        disabled={performanceMode || !supportsGlass}
                         onChange={setGlassBlur}
                     />
                     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -578,6 +665,7 @@ function AppearanceTab({
                             <ActionButton
                                 variant="primary"
                                 icon={<ImagePlus className="size-3.5" />}
+                                disabled={!supportsBackground}
                                 onClick={() => void handlePickBackground()}
                             >
                                 {appearance.backgroundUrl ? "更换图片" : "选择图片"}
@@ -586,6 +674,7 @@ function AppearanceTab({
                                 <ActionButton
                                     variant="danger"
                                     icon={<Trash2 className="size-3.5" />}
+                                    disabled={!supportsBackground}
                                     onClick={handleClearBackground}
                                 >
                                     清除
@@ -602,6 +691,7 @@ function AppearanceTab({
                         }
                         checked={appearance.bingWallpaper}
                         disabled={
+                            !supportsBing ||
                             !appearance.bingWallpaper &&
                             Boolean(appearance.backgroundUrl)
                         }
@@ -616,6 +706,7 @@ function AppearanceTab({
                         max={1}
                         step={0.05}
                         value={appearance.backgroundOpacity}
+                        disabled={!supportsBackground}
                         onChange={setBackgroundOpacity}
                     />
                     <SliderField
@@ -625,8 +716,14 @@ function AppearanceTab({
                         max={40}
                         step={1}
                         value={appearance.backgroundBlur}
+                        disabled={!supportsBackground}
                         onChange={setBackgroundBlur}
                     />
+                    {!supportsBackground ? (
+                        <p className="text-[13px] text-muted-foreground">
+                            当前主题保持原生桌面表面，背景图与必应壁纸暂时停用
+                        </p>
+                    ) : null}
                 </SettingsGroup>
             </div>
         </div>

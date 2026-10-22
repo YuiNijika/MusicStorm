@@ -20,6 +20,8 @@ import { PageTitle } from "@/components/music/page-title"
 import { Section } from "@/components/music/section"
 import { StateHero } from "@/components/music/state-hero"
 import { TrackRow } from "@/components/music/track-row"
+import { VirtualGrid } from "@/components/music/virtual-grid"
+import { VirtualList } from "@/components/music/virtual-list"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -36,6 +38,7 @@ import {
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { usePlayer } from "@/hooks/use-player"
+import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
 import { formatDuration } from "@/lib/format"
 import type {
     AlbumDraft,
@@ -97,12 +100,14 @@ function formatBytes(bytes: number): string {
 
 const EMPTY_STATE: WebLibraryState = { artists: [], albums: [], tracks: [] }
 
-const GRID_CLASS =
-    // content-visibility 跳过视口外卡片渲染，网页版本地库可能几千张专辑/艺人卡片
-    "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 [content-visibility:auto] [contain-intrinsic-size:auto_240px]"
+const GRID_ROW_HEIGHT = 236
+const GRID_COLUMN_GAP = 16
+const GRID_ROW_GAP = 24
+const TRACK_ROW_HEIGHT = 58
 
 function LocalWebPage() {
     const { currentTrack, isPlaying, playOrToggle } = usePlayer()
+    const { cols, gridRef } = usePlaylistGrid({ minimumColumns: 2 })
     const [state, setState] = useState<WebLibraryState>(EMPTY_STATE)
     const [nav, setNav] = useState<WebNav>({ kind: "root" })
     const [restoring, setRestoring] = useState(true)
@@ -678,7 +683,7 @@ function LocalWebPage() {
         const artist = selectedArtist
         const cover = resolveArtistCover(state, artist)
         return (
-            <div className="space-y-6 pb-4">
+            <div ref={gridRef} className="space-y-6 pb-4">
                 <BackButton onClick={() => setNav({ kind: "root" })} label="资料库" />
 
                 <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -738,9 +743,16 @@ function LocalWebPage() {
                         title="专辑"
                         description={`${artistAlbums.length} 张 · 点开进入曲目`}
                     >
-                        <div className={GRID_CLASS}>
-                            {artistAlbums.map((album) => (
-                                <div key={album.id} className="group relative">
+                        <VirtualGrid
+                            items={artistAlbums}
+                            columns={cols}
+                            estimatedRowHeight={GRID_ROW_HEIGHT}
+                            columnGap={GRID_COLUMN_GAP}
+                            rowGap={GRID_ROW_GAP}
+                            className="w-full"
+                            getItemKey={(album) => album.id}
+                            renderItem={(album) => (
+                                <div className="group relative">
                                     <MediaCard
                                         coverUrl={resolveAlbumCover(state, album)}
                                         title={album.title}
@@ -760,8 +772,8 @@ function LocalWebPage() {
                                         />
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        />
                     </Section>
                 )}
             {confirmDialogs}
@@ -821,48 +833,52 @@ function LocalWebPage() {
                         icon={FilePlus2}
                     />
                 ) : (
-                    <div className="apple-list-surface space-y-0.5 p-1.5">
-                        {albumTracks.map((track) => (
-                            <TrackRow
-                                key={track.id}
-                                track={track}
-                                isActive={currentTrack?.id === track.id}
-                                isPlaying={currentTrack?.id === track.id && isPlaying}
-                                showSource={false}
-                                showAlbumMeta={false}
-                                dense
-                                onPlay={(item) =>
-                                    void handlePlay(item as WebLocalTrack, albumTracks)
-                                }
-                                trailing={
-                                    track.needsAuth ? (
-                                        <span className="text-[12px] text-muted-foreground">
-                                            需授权
-                                        </span>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            aria-label={`移除 ${track.title}`}
-                                            onClick={() => removeSingleTrack(track)}
-                                            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
-                                        >
-                                            <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                aria-hidden="true"
+                    <div className="apple-list-surface p-1.5">
+                        <VirtualList
+                            items={albumTracks}
+                            itemHeight={TRACK_ROW_HEIGHT}
+                            getItemKey={(track) => track.id}
+                            renderItem={(track) => (
+                                <TrackRow
+                                    track={track}
+                                    isActive={currentTrack?.id === track.id}
+                                    isPlaying={currentTrack?.id === track.id && isPlaying}
+                                    showSource={false}
+                                    showAlbumMeta={false}
+                                    dense
+                                    onPlay={(item) =>
+                                        void handlePlay(item as WebLocalTrack, albumTracks)
+                                    }
+                                    trailing={
+                                        track.needsAuth ? (
+                                            <span className="text-[12px] text-muted-foreground">
+                                                需授权
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                aria-label={`移除 ${track.title}`}
+                                                onClick={() => removeSingleTrack(track)}
+                                                className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
                                             >
-                                                <path d="M6 6l12 12M18 6L6 18" />
-                                            </svg>
-                                        </button>
-                                    )
-                                }
-                            />
-                        ))}
+                                                <svg
+                                                    width="14"
+                                                    height="14"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M6 6l12 12M18 6L6 18" />
+                                                </svg>
+                                            </button>
+                                        )
+                                    }
+                                />
+                            )}
+                        />
                     </div>
                 )}
             {confirmDialogs}
@@ -873,7 +889,7 @@ function LocalWebPage() {
     // 全部歌曲
     if (nav.kind === "all") {
         return (
-            <div className="space-y-6 pb-4">
+            <div ref={gridRef} className="space-y-6 pb-4">
                 <BackButton onClick={() => setNav({ kind: "root" })} label="资料库" />
 
                 <PageTitle
@@ -900,48 +916,52 @@ function LocalWebPage() {
                         icon={FolderOpen}
                     />
                 ) : (
-                    <div className="apple-list-surface space-y-0.5 p-1.5">
-                        {state.tracks.map((track) => (
-                            <TrackRow
-                                key={track.id}
-                                track={track}
-                                isActive={currentTrack?.id === track.id}
-                                isPlaying={currentTrack?.id === track.id && isPlaying}
-                                showSource={false}
-                                showAlbumMeta={false}
-                                dense
-                                onPlay={(item) =>
-                                    void handlePlay(item as WebLocalTrack, state.tracks)
-                                }
-                                trailing={
-                                    track.needsAuth ? (
-                                        <span className="text-[12px] text-muted-foreground">
-                                            需授权
-                                        </span>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            aria-label={`移除 ${track.title}`}
-                                            onClick={() => removeSingleTrack(track)}
-                                            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
-                                        >
-                                            <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                aria-hidden="true"
+                    <div className="apple-list-surface p-1.5">
+                        <VirtualList
+                            items={state.tracks}
+                            itemHeight={TRACK_ROW_HEIGHT}
+                            getItemKey={(track) => track.id}
+                            renderItem={(track) => (
+                                <TrackRow
+                                    track={track}
+                                    isActive={currentTrack?.id === track.id}
+                                    isPlaying={currentTrack?.id === track.id && isPlaying}
+                                    showSource={false}
+                                    showAlbumMeta={false}
+                                    dense
+                                    onPlay={(item) =>
+                                        void handlePlay(item as WebLocalTrack, state.tracks)
+                                    }
+                                    trailing={
+                                        track.needsAuth ? (
+                                            <span className="text-[12px] text-muted-foreground">
+                                                需授权
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                aria-label={`移除 ${track.title}`}
+                                                onClick={() => removeSingleTrack(track)}
+                                                className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-foreground"
                                             >
-                                                <path d="M6 6l12 12M18 6L6 18" />
-                                            </svg>
-                                        </button>
-                                    )
-                                }
-                            />
-                        ))}
+                                                <svg
+                                                    width="14"
+                                                    height="14"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M6 6l12 12M18 6L6 18" />
+                                                </svg>
+                                            </button>
+                                        )
+                                    }
+                                />
+                            )}
+                        />
                     </div>
                 )}
             {confirmDialogs}
@@ -956,7 +976,7 @@ function LocalWebPage() {
         state.tracks.length === 0
 
     return (
-        <div className="space-y-7 pb-4">
+        <div ref={gridRef} className="space-y-7 pb-4">
             <PageTitle
                 title="资料库"
                 subtitle={isEmpty ? "导入本机音乐，自动按艺人 / 专辑归组" : subtitle}
@@ -1047,11 +1067,17 @@ function LocalWebPage() {
                             title="艺人"
                             description={`${sortedArtists.length} 位 · 子专辑自动归组`}
                         >
-                            <div className={GRID_CLASS}>
-                                {sortedArtists.map((artist) => {
+                            <VirtualGrid
+                                items={sortedArtists}
+                                columns={cols}
+                                estimatedRowHeight={GRID_ROW_HEIGHT}
+                                columnGap={GRID_COLUMN_GAP}
+                                rowGap={GRID_ROW_GAP}
+                                getItemKey={(artist) => artist.id}
+                                renderItem={(artist) => {
                                     const albums = listAlbumsByArtist(state, artist.id)
                                     return (
-                                        <div key={artist.id} className="group relative">
+                                        <div className="group relative">
                                             <MediaCard
                                                 coverUrl={resolveArtistCover(state, artist)}
                                                 title={artist.name}
@@ -1074,8 +1100,8 @@ function LocalWebPage() {
                                             </div>
                                         </div>
                                     )
-                                })}
-                            </div>
+                                }}
+                            />
                         </Section>
                     ) : null}
 
@@ -1096,9 +1122,15 @@ function LocalWebPage() {
                         }
                     >
                         {rootAlbums.length > 0 ? (
-                            <div className={GRID_CLASS}>
-                                {rootAlbums.map((album) => (
-                                    <div key={album.id} className="group relative">
+                            <VirtualGrid
+                                items={rootAlbums}
+                                columns={cols}
+                                estimatedRowHeight={GRID_ROW_HEIGHT}
+                                columnGap={GRID_COLUMN_GAP}
+                                rowGap={GRID_ROW_GAP}
+                                getItemKey={(album) => album.id}
+                                renderItem={(album) => (
+                                    <div className="group relative">
                                         <MediaCard
                                             coverUrl={resolveAlbumCover(state, album)}
                                             title={album.title}
@@ -1118,8 +1150,8 @@ function LocalWebPage() {
                                             />
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            />
                         ) : (
                             <StateHero
                                 variant="empty"

@@ -29,9 +29,9 @@ export default defineConfig(async () => ({
     // 多页入口：主窗口 + 桌面歌词窗口（打包版缺入口会 404，桌面歌词白屏）
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "index.html"),
-        "desktop-lyric": path.resolve(__dirname, "desktop-lyric.html"),
-        "mini-player": path.resolve(__dirname, "mini-player.html"),
+        main: path.resolve(import.meta.dirname, "index.html"),
+        "desktop-lyric": path.resolve(import.meta.dirname, "desktop-lyric.html"),
+        "mini-player": path.resolve(import.meta.dirname, "mini-player.html"),
       },
     },
   },

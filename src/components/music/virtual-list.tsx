@@ -24,6 +24,10 @@ type VisibleRange = {
     end: number
 }
 
+const DEFAULT_OVERSCAN_PX = 720
+const DEFAULT_VIRTUALIZE_AFTER = 50
+const INITIAL_RENDER_COUNT = 30
+
 function findScrollParent(element: HTMLElement): HTMLElement | Window {
     let parent = element.parentElement
     while (parent) {
@@ -74,6 +78,13 @@ function readVisibleRange(
     return { start, end }
 }
 
+function initialRange(itemCount: number, virtualized: boolean): VisibleRange {
+    return {
+        start: 0,
+        end: virtualized ? Math.min(itemCount, INITIAL_RENDER_COUNT) : itemCount,
+    }
+}
+
 // 感知外层页面滚动的固定行高虚拟列表；overscan 避免快速滚动空白。
 // 监听只在虚拟化时挂载，卸载即回收，避免重复渲染叠加监听器造成内存泄漏。
 function VirtualList<T>({
@@ -82,13 +93,16 @@ function VirtualList<T>({
     renderItem,
     getItemKey,
     className,
-    overscanPx = 720,
-    virtualizeAfter = 80,
+    overscanPx = DEFAULT_OVERSCAN_PX,
+    virtualizeAfter = DEFAULT_VIRTUALIZE_AFTER,
 }: VirtualListProps<T>) {
     const listRef = useRef<HTMLDivElement>(null)
     const scrollParentRef = useRef<HTMLElement | Window | null>(null)
-    const [range, setRange] = useState<VisibleRange>({ start: 0, end: 0 })
+    const frameRef = useRef<number | null>(null)
     const virtualized = items.length > virtualizeAfter
+    const [range, setRange] = useState<VisibleRange>(() =>
+        initialRange(items.length, virtualized),
+    )
 
     const updateRange = useCallback(() => {
         const list = listRef.current
@@ -114,12 +128,28 @@ function VirtualList<T>({
         )
     }, [itemHeight, items.length, overscanPx])
 
+    // 滚动事件可能一帧触发多次，合并后只读一次布局并提交一次窗口更新
+    const scheduleRangeUpdate = useCallback(() => {
+        if (frameRef.current !== null) {
+            return
+        }
+        frameRef.current = window.requestAnimationFrame(() => {
+            frameRef.current = null
+            updateRange()
+        })
+    }, [updateRange])
+
     // 挂载后、绘制前先算好首屏范围，避免先空白再跳帧
     useLayoutEffect(() => {
+        if (frameRef.current !== null) {
+            window.cancelAnimationFrame(frameRef.current)
+            frameRef.current = null
+        }
         // 数据或虚拟化状态变化时滚动容器可能改变，重新探测一次
         scrollParentRef.current = null
+        setRange(initialRange(items.length, virtualized))
         updateRange()
-    }, [updateRange, virtualized])
+    }, [items.length, updateRange, virtualized])
 
     // 仅在虚拟化时挂载滚动与尺寸监听，卸载即回收，杜绝监听器泄漏
     useEffect(() => {
@@ -132,21 +162,27 @@ function VirtualList<T>({
         }
         const scrollParent = findScrollParent(list)
         const eventTarget = scrollParent === window ? window : scrollParent
-        const observer = new ResizeObserver(() => updateRange())
+        const observer = new ResizeObserver(scheduleRangeUpdate)
 
-        eventTarget.addEventListener("scroll", updateRange, { passive: true })
-        window.addEventListener("resize", updateRange, { passive: true })
+        eventTarget.addEventListener("scroll", scheduleRangeUpdate, {
+            passive: true,
+        })
+        window.addEventListener("resize", scheduleRangeUpdate, { passive: true })
         observer.observe(list)
         if (scrollParent !== window) {
             observer.observe(scrollParent as HTMLElement)
         }
 
         return () => {
-            eventTarget.removeEventListener("scroll", updateRange)
-            window.removeEventListener("resize", updateRange)
+            eventTarget.removeEventListener("scroll", scheduleRangeUpdate)
+            window.removeEventListener("resize", scheduleRangeUpdate)
+            if (frameRef.current !== null) {
+                window.cancelAnimationFrame(frameRef.current)
+                frameRef.current = null
+            }
             observer.disconnect()
         }
-    }, [virtualized, updateRange, items.length])
+    }, [virtualized, scheduleRangeUpdate])
 
     const visibleItems = virtualized ? items.slice(range.start, range.end) : items
     const startIndex = virtualized ? range.start : 0
@@ -156,7 +192,12 @@ function VirtualList<T>({
         : 0
 
     return (
-        <div ref={listRef} className={cn("min-w-0", className)}>
+        <div
+            ref={listRef}
+            className={cn("min-w-0", className)}
+            style={{ overflowAnchor: "none" }}
+            data-virtual-list={virtualized ? "true" : "false"}
+        >
             {topSpacer > 0 ? <div aria-hidden style={{ height: topSpacer }} /> : null}
             {visibleItems.map((item, offset) => {
                 const index = startIndex + offset

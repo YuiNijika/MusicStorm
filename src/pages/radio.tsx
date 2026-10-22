@@ -6,6 +6,7 @@ import { Cover } from "@/components/music/cover"
 import { DragList } from "@/components/music/drag-list"
 import { RadioDetailSkeleton } from "@/components/music/loading-skeletons"
 import { MediaCard } from "@/components/music/media-card"
+import { VirtualGrid } from "@/components/music/virtual-grid"
 import { Section } from "@/components/music/section"
 import { SortSelect } from "@/components/music/sort-select"
 import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
@@ -29,6 +30,9 @@ import { formatError, notifyFromError } from "@/lib/notify"
 import type { Radio, RadioProgram } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+const PROGRAM_ROW_HEIGHT = 58
+const MEDIA_ROW_HEIGHT = 236
+
 type RadioPageProps = {
     radioId: string
     onBack: () => void
@@ -40,7 +44,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
     const { loggedIn } = useNeteaseSession()
     const { isRadioSubscribed, toggleRadioSubscribed } = useLiked()
     const { programSort, programView } = useLibraryLayout()
-    const { gridClass, gridStyle, gridRef } = usePlaylistGrid()
+    const { cols, gridRef } = usePlaylistGrid()
     const [radio, setRadio] = useState<Radio | null>(null)
     const [programs, setPrograms] = useState<RadioProgram[]>([])
     const [loading, setLoading] = useState(true)
@@ -104,7 +108,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
     const dragEnabled = programView === "list" && programSort === "custom"
 
     return (
-        <div className="space-y-6 pb-2">
+        <div ref={gridRef} className="space-y-6 pb-2">
             <BackButton onClick={onBack} />
 
             {loading ? (
@@ -245,13 +249,16 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                         {programs.length === 0 ? (
                             <StateHero variant="empty" title="暂无节目" />
                         ) : programView === "card" ? (
-                            <div ref={gridRef} className={gridClass} style={gridStyle}>
-                                {sortedPrograms.map((program) => {
+                            <VirtualGrid
+                                items={sortedPrograms}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(program) => program.id}
+                                renderItem={(program) => {
                                     const active =
                                         currentTrack?.id === program.track.id
                                     return (
                                         <MediaCard
-                                            key={program.id}
                                             coverUrl={program.coverUrl}
                                             title={program.title}
                                             subtitle={programSubtitle(program)}
@@ -270,19 +277,20 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                             }
                                         />
                                     )
-                                })}
-                            </div>
+                                }}
+                            />
                         ) : (
                             <DragList
                                 items={sortedPrograms}
                                 enabled={dragEnabled}
+                                itemHeight={PROGRAM_ROW_HEIGHT}
                                 onReorder={(next) =>
                                     setProgramOrder(
                                         radioId,
                                         next.map((program) => program.id),
                                     )
                                 }
-                                className="apple-list-surface space-y-0.5 p-1.5"
+                                className="apple-list-surface p-1.5"
                                 renderItem={(program, index, handle) => {
                                     const active =
                                         currentTrack?.id === program.track.id

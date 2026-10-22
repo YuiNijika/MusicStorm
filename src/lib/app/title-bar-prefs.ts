@@ -7,6 +7,8 @@ export type SettingsTab =
     | "playback"
     | "account"
     | "appearance"
+    | "themes"
+    | "layout"
     | "faq"
     | "hotkeys"
     | "update"
