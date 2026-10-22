@@ -48,12 +48,17 @@ const challenge=${value};
 const callbackName=${callbackName};
 const send=(message)=>window.parent.postMessage(message,"*");
 let captcha;
-window[callbackName]=(response)=>{
-  if(!response||response.status!=="success"||!response.data){
-    send({type:"error",message:"极验验证参数加载失败"});
-    return;
-  }
-  const config=Object.assign({
+let scriptReady=false;
+let configReady=false;
+let settled=false;
+const fail=(message)=>{
+  if(settled){return;}
+  settled=true;
+  send({type:"error",message});
+};
+const start=()=>{
+  if(!scriptReady||!configReady||settled){return;}
+  captcha=Geetest(Object.assign({
     gt,
     challenge,
     offline:false,
@@ -62,23 +67,42 @@ window[callbackName]=(response)=>{
     width:"100%",
     https:true,
     protocol:"https://"
-  },response.data);
-  captcha=new Geetest(config)
-    .onSuccess(()=>send({type:"success",result:captcha.getValidate()}))
-    .onError(()=>send({type:"error",message:"极验验证失败，请重试"}))
-    .onClose(()=>send({type:"close"}));
+  },window.geetestConfig||{}))
+    .onSuccess(()=>{
+      if(settled){return;}
+      settled=true;
+      send({type:"success",result:captcha.getValidate()});
+    })
+    .onError(()=>fail("极验验证失败，请重试"))
+    .onClose(()=>{
+      if(!settled){
+        settled=true;
+        send({type:"close"});
+      }
+    });
   captcha.onReady(()=>captcha.verify());
+};
+window[callbackName]=(response)=>{
+  if(!response||response.status!=="success"||!response.data){
+    fail("极验验证参数加载失败");
+    return;
+  }
+  window.geetestConfig=response.data;
+  configReady=true;
+  start();
 };
 const script=document.createElement("script");
 script.src="https://static.geetest.com/static/js/fullpage.0.0.0.js";
 script.onload=()=>{
-  const config=document.createElement("script");
-  config.src="https://api.geetest.com/gettype.php?gt="+encodeURIComponent(gt)+"&callback="+encodeURIComponent(callbackName);
-  config.onerror=()=>send({type:"error",message:"极验验证服务暂不可用"});
-  document.head.appendChild(config);
+  scriptReady=true;
+  start();
 };
-script.onerror=()=>send({type:"error",message:"极验验证组件载入失败"});
+script.onerror=()=>fail("极验验证组件载入失败");
 document.head.appendChild(script);
+const config=document.createElement("script");
+config.src="https://api.geetest.com/gettype.php?gt="+encodeURIComponent(gt)+"&callback="+encodeURIComponent(callbackName);
+config.onerror=()=>fail("极验验证服务暂不可用");
+document.head.appendChild(config);
 </script>
 </body>
 </html>`
@@ -150,7 +174,7 @@ function GeetestWebView({
                 title="哔哩哔哩极验安全验证"
                 srcDoc={srcDoc}
                 sandbox="allow-scripts allow-forms"
-                referrerPolicy="no-referrer"
+                referrerPolicy="strict-origin-when-cross-origin"
                 className="block h-[300px] w-full border-0 bg-transparent [overscroll-behavior:contain] [touch-action:manipulation]"
             />
         </section>
