@@ -1,7 +1,6 @@
-import { isWebMode } from "@/lib/web-mode"
 import type { Track } from "@/lib/types"
 
-// 分享落地页：网页版可直接播放在线曲目（hash 路由 `#play?id=`）
+//分享落地页固定指向 MusicStorm网站的播放器
 const WEB_PLAYER_URL = "https://music.miomoe.cn/player.html"
 
 // 自定义协议：`musicstorm://play?id=<id>`，用于浏览器探测/打开本机已安装的 MusicStorm 应用
@@ -31,7 +30,7 @@ export type ShareTarget = {
     ) => string | null
 }
 
-/** 是否为可分享的曲目：仅网易云在线曲目可迁移到网页版直放 */
+/**是否为可分享的曲目：网易云与 B站在线曲目都可生成 MusicStorm网页链接 */
 function isShareableTrack(track: Track | null | undefined): boolean {
  return Boolean(
  track &&
@@ -40,19 +39,16 @@ function isShareableTrack(track: Track | null | undefined): boolean {
  )
 }
 
-/** 导出曲名 → 网页站深链（hash 路由 `#play?id=<songId>`，规避静态部署丢 query） */
+/**导出曲名 → MusicStorm网站深链 */
 function buildPlayLink(track: Track): string | null {
     if (!isShareableTrack(track)) {
         return null
     }
     // 网页版直接在当前地址上拼接，保证域名跟随部署环境
-    const base = isWebMode()
-        ? `${window.location.origin}${window.location.pathname}`
-        : WEB_PLAYER_URL
- if (track.source === "bilibili" && track.webUrl) {
- return track.webUrl
- }
- return `${base}#play?id=${encodeURIComponent(track.id)}`
+if (track.source === "bilibili" && track.bvid) {
+return `${WEB_PLAYER_URL}#play?source=bilibili&bvid=${encodeURIComponent(track.bvid)}`
+}
+return `${WEB_PLAYER_URL}#play?id=${encodeURIComponent(track.id)}`
 }
 
 /** 导出曲名 → 应用自定义协议深链（`musicstorm://play?id=<songId>`），供已安装应用直接打开 */
@@ -60,10 +56,10 @@ function buildAppLink(track: Track): string | null {
     if (!isShareableTrack(track)) {
         return null
     }
- if (track.source === "bilibili" && track.webUrl) {
- return track.webUrl
- }
- return `${APP_PROTOCOL}://play?id=${encodeURIComponent(track.id)}`
+if (track.source === "bilibili" && track.bvid) {
+return `${APP_PROTOCOL}://play?source=bilibili&bvid=${encodeURIComponent(track.bvid)}`
+}
+return `${APP_PROTOCOL}://play?id=${encodeURIComponent(track.id)}`
 }
 
 // 分享文案长度上限：避免标题/摘要过长导致分享接口拒绝或 URL 超长
@@ -84,9 +80,7 @@ function buildShareTitle(track: Track): string {
 
 function buildShareSummary(track: Track): string {
  return truncate(
- track.source === "bilibili"
- ? `推荐一个视频：《${track.title}》${track.artist}`
- : `推荐一首歌：《${track.title}》${track.artist}，在 MusicStorm上在线听`,
+ `推荐一首歌：《${track.title}》${track.artist}，在 MusicStorm上在线听`,
  SUMMARY_MAX,
  )
 }

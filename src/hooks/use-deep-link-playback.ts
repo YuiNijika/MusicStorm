@@ -1,16 +1,21 @@
 import { useEffect, useRef } from "react"
 
+import { fetchBilibiliVideo } from "@/lib/bilibili/api"
+import { mapVideoData } from "@/lib/bilibili/map"
 import { mapNeteaseSongToTrack } from "@/lib/netease/map-track"
 import { fetchSongDetail } from "@/lib/netease/track"
 import type { Track } from "@/lib/types"
 
 /**
- * 从输入里解析出网易云歌曲 id。支持两种来源：
- * - 网页站 hash 深链：`#play?id=<id>`（或完整加载了 hash 的地址）
- * - 应用自定义协议：`musicstorm://play?id=<id>`（Android 拉起后经桥事件转发）
- * 格式不符返回 null。
- */
-function parsePlayId(input: string): string | null {
+ *从输入里解析网易云歌曲 id或 B站 BV号，支持网页站 hash与应用协议两种入口。
+*/
+type PlayDeepLink = {
+ id: string
+ source: "netease" | "bilibili"
+ bvid?: string
+}
+
+function parsePlayLink(input: string): PlayDeepLink | null {
     let body = input.trim()
     const schemeIdx = body.indexOf("://")
     if (schemeIdx >= 0) {
@@ -21,28 +26,47 @@ function parsePlayId(input: string): string | null {
         return null
     }
     const params = new URLSearchParams(body.slice("play".length))
-    const id = params.get("id") ?? ""
-    if (!/^\d+$/.test(id)) {
+ const id = params.get("id")?.trim() ?? ""
+ const bvid = params.get("bvid")?.trim() ?? ""
+ const source =
+ params.get("source") === "bilibili" || bvid
+ ? "bilibili"
+ : "netease"
+ if (
+ (source === "bilibili" && !bvid) ||
+ (source === "netease" && (!id || !/^\d+$/.test(id)))
+ ) {
         return null
     }
-    return id
+ return {
+ id: id || `bilibili:${bvid}`,
+ source,
+ bvid: bvid || undefined,
+ }
 }
 
 /**
- * 消费深链并直达播放：
- * - 网页站 hash 路由 `#play?id=<id>`（启动时读取一次）
- * - 应用自定义协议 `musicstorm://play?id=<id>`：桌面/移动端 app 经
- *   `musicstorm:deep-link` 事件（detail.url）转发到网页层后同样直达播放。
+ *消费深链并直达播放：网页站启动读取一次 hash，应用经深链事件转发后同样直达播放。
  */
 function useDeepLinkPlayback(onResolved: (track: Track) => void): void {
-    const resolvedRef = useRef(onResolved)
-    resolvedRef.current = onResolved
+ const resolvedRef = useRef(onResolved)
     const consumedHash = useRef(false)
 
     useEffect(() => {
-        async function playById(id: string) {
+ async function playDeepLink(link: PlayDeepLink) {
             try {
-                const result = await fetchSongDetail(id)
+ if (link.source === "bilibili") {
+ if (!link.bvid) {
+ return
+ }
+ const data = await fetchBilibiliVideo({ bvid: link.bvid })
+ const track = mapVideoData(data)
+ if (track) {
+ resolvedRef.current(track)
+ }
+ return
+ }
+ const result = await fetchSongDetail(link.id)
                 const song = result.songs?.[0]
                 if (song) {
                     resolvedRef.current(mapNeteaseSongToTrack(song))
@@ -54,19 +78,19 @@ function useDeepLinkPlayback(onResolved: (track: Track) => void): void {
 
         // 1) 启动即读取一次网页 hash 深链
         if (!consumedHash.current) {
-            const id = parsePlayId(window.location.hash)
-            if (id) {
+ const link = parsePlayLink(window.location.hash)
+ if (link) {
                 consumedHash.current = true
-                void playById(id)
+ void playDeepLink(link)
             }
         }
 
         // 2) 应用自定义协议拉起后经桥转发的深链事件（桌面 + Android）
         const onDeepLink = (event: Event) => {
             const detail = (event as CustomEvent<{ url?: string }>).detail
-            const id = parsePlayId(detail?.url ?? "")
-            if (id) {
-                void playById(id)
+ const link = parsePlayLink(detail?.url ?? "")
+ if (link) {
+ void playDeepLink(link)
             }
         }
         window.addEventListener("musicstorm:deep-link", onDeepLink)
