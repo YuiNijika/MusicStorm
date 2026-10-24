@@ -5,7 +5,8 @@ import QRCode from "qrcode"
 import { cn } from "@/lib/utils"
 import {
  AUTH_EVENT,
- completeBilibiliLogin,
+ QR_LOGIN_LIFETIME_MS,
+ QR_POLL_INTERVAL_MS,
  completeBilibiliRiskLogin,
  createBilibiliQrLogin,
  fetchBilibiliAuthStatus,
@@ -19,9 +20,11 @@ import {
  sendBilibiliSmsCode,
  type BilibiliAuthStatus,
  type BilibiliGeetestChallenge,
+ type BilibiliGeetestVerification,
  type BilibiliRiskLogin,
 } from "@/lib/bilibili/auth"
 import { GeetestWebView, type GeetestResult } from "@/components/bilibili/geetest-webview"
+import { AccountAvatar } from "@/components/bilibili/account-avatar"
 import { notifyFromError, notifySuccess } from "@/lib/notify"
 import {
  Dialog,
@@ -73,7 +76,16 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  useState<BilibiliGeetestChallenge | null>(null)
  const [riskCaptchaKey, setRiskCaptchaKey] = useState("")
  const [riskSmsCode, setRiskSmsCode] = useState("")
+ const [passwordChallenge, setPasswordChallenge] =
+ useState<BilibiliGeetestChallenge | null>(null)
+ const [smsChallenge, setSmsChallenge] =
+ useState<BilibiliGeetestChallenge | null>(null)
+ const [pendingVerification, setPendingVerification] =
+ useState<BilibiliGeetestVerification | null>(null)
+ const [resendVerification, setResendVerification] =
+ useState<BilibiliGeetestVerification | null>(null)
  const riskSmsBusyRef = useRef(false)
+ const qrExpiresAtRef = useRef(0)
 
  useEffect(() => {
  if (!open) {
@@ -91,6 +103,10 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setRiskChallenge(null)
  setRiskCaptchaKey("")
  setRiskSmsCode("")
+ setPasswordChallenge(null)
+ setSmsChallenge(null)
+ setPendingVerification(null)
+ setResendVerification(null)
  riskSmsBusyRef.current = false
  let cancelled = false
  setLoading(true)
@@ -123,6 +139,7 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setQrState({ status: "loading" })
  try {
  const session = await createBilibiliQrLogin()
+ qrExpiresAtRef.current = Date.now() + QR_LOGIN_LIFETIME_MS
  setQr(session)
  setQrState({ status: "waiting" })
  } catch (error) {
@@ -144,11 +161,17 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  if (!open || tab !== "qr" || !qrKey || !isPolling) {
  return
  }
-  let active = true
-  let polling = false
-  let completed = false
+ let active = true
+ let polling = false
+ let completed = false
  const timer = window.setInterval(() => {
         if (!active || polling || completed) {
+            return
+        }
+        if (Date.now() >= qrExpiresAtRef.current) {
+            completed = true
+            window.clearInterval(timer)
+            setQrState({ status: "expired", message: "二维码已过期，请重新生成" })
             return
         }
         polling = true
@@ -157,38 +180,40 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 if (!active || completed) {
                     return
                 }
-                if (result.status === "confirmed") {
+                if (result.status === "confirmed" && result.statusResult) {
                     completed = true
                     window.clearInterval(timer)
-                    const next = await completeBilibiliLogin()
-                    setStatus(next)
+                    setStatus(result.statusResult)
                     setQrState({ status: "idle" })
                     onOpenChange(false)
                     notifySuccess("B站登录成功", {
-                        description: next.account?.name,
+                        description: result.statusResult.account?.name,
                     })
                     return
                 }
-                setQrState({
-                    status: result.status,
-                    message: result.message,
-                })
+                if (result.status !== "confirmed") {
+                    setQrState({
+                        status: result.status,
+                        message: result.message,
+                    })
+                }
             })
-            .catch(() => {
+            .catch((error) => {
                 if (!active || completed) {
                     return
                 }
-                completed = true
-                window.clearInterval(timer)
                 setQrState({
-                    status: "failed",
-                    message: "登录状态检查失败，请重试",
+                    status: "waiting",
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "网络波动，正在重试登录状态",
                 })
             })
             .finally(() => {
                 polling = false
             })
- },1600)
+ }, QR_POLL_INTERVAL_MS)
   return () => {
       active = false
       window.clearInterval(timer)
@@ -255,7 +280,9 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  }
  }
 
- async function passwordLogin() {
+ async function passwordLogin(
+  verification = pendingVerification ?? undefined,
+ ) {
  if (loading) {
  return
  }
@@ -268,7 +295,11 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setRiskCaptchaKey("")
  setRiskSmsCode("")
  try {
- const result = await loginBilibiliWithPassword(username, password)
+ const result = await loginBilibiliWithPassword(
+ username,
+ password,
+  verification,
+ )
  if (result.type === "risk") {
  setRiskLogin(result.risk)
  setRiskChallenge(null)
@@ -276,6 +307,12 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setRiskSmsCode("")
  return
  }
+ if (result.type === "captcha") {
+ setPendingVerification(null)
+ setPasswordChallenge(result.challenge)
+ return
+ }
+ setPendingVerification(null)
  setStatus(result.status)
  onOpenChange(false)
  notifySuccess("B站登录成功", { description: result.status.account?.name })
@@ -377,7 +414,9 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  }
  }
 
- async function sendSmsCode() {
+ async function sendSmsCode(
+  verification = resendVerification ?? undefined,
+ ) {
  if (loading || cooldown > 0) {
  return
  }
@@ -388,8 +427,17 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setLoading(true)
  setCookieError("")
  try {
- const key = await sendBilibiliSmsCode(phone)
- setCaptchaKey(key)
+ const result = await sendBilibiliSmsCode(
+ phone,
+  verification,
+ )
+ if (result.type === "captcha") {
+ setResendVerification(null)
+ setSmsChallenge(result.challenge)
+ return
+ }
+ setResendVerification(null)
+ setCaptchaKey(result.captchaKey)
  setCooldown(60)
  notifySuccess("验证码已发送")
  } catch (error) {
@@ -399,6 +447,42 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  setLoading(false)
  }
  }
+
+ const handlePasswordGeetestSuccess = useCallback(
+ (result: GeetestResult) => {
+ if (!passwordChallenge) {
+ return
+ }
+ const verification: BilibiliGeetestVerification = {
+ challenge: passwordChallenge,
+ validate: result.geetest_validate,
+ seccode: result.geetest_seccode,
+ challengeResult: result.geetest_challenge,
+ }
+ setPasswordChallenge(null)
+ setPendingVerification(verification)
+ void passwordLogin(verification)
+ },
+ [passwordChallenge],
+ )
+
+ const handleSmsGeetestSuccess = useCallback(
+ (result: GeetestResult) => {
+ if (!smsChallenge) {
+ return
+ }
+ const verification: BilibiliGeetestVerification = {
+ challenge: smsChallenge,
+ validate: result.geetest_validate,
+ seccode: result.geetest_seccode,
+ challengeResult: result.geetest_challenge,
+ }
+ setSmsChallenge(null)
+ setResendVerification(verification)
+ void sendSmsCode(verification)
+ },
+ [smsChallenge],
+ )
 
  async function smsLogin() {
  if (loading) {
@@ -453,21 +537,12 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  </DialogDescription>
  </DialogHeader>
  <div className="flex min-w-0 items-center gap-3 py-2">
- {status.account.avatarUrl ? (
- <img
+ <AccountAvatar
  src={status.account.avatarUrl}
- alt=""
- width={48}
- height={48}
- loading="lazy"
- decoding="async"
- className="size-12 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/10"
+ name={status.account.name}
+ pixels={48}
+ className="ring-1 ring-black/10 dark:ring-white/10"
  />
- ) : (
- <span className="flex size-12 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[14px] font-medium">
- {status.account.name.slice(0,1)}
- </span>
- )}
  <div className="min-w-0">
  <p className="truncate text-[14px] font-medium">
  {status.account.name}
@@ -577,6 +652,17 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  aria-labelledby="bilibili-auth-tab-password"
  className="space-y-3"
  >
+ {passwordChallenge ? (
+ <GeetestWebView
+ challenge={passwordChallenge}
+ onSuccess={handlePasswordGeetestSuccess}
+ onCancel={() => setPasswordChallenge(null)}
+ onError={(message) => {
+ setPasswordChallenge(null)
+ setCookieError(message)
+ }}
+ />
+ ) : null}
  {riskLogin ? (
  <div className="space-y-3">
  <div className="flex items-start gap-2">
@@ -705,6 +791,17 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  disabled={loading}
  className="material-field h-11 w-full rounded-xl px-3 text-base outline-none sm:h-10 sm:text-[13px]"
  />
+ {smsChallenge ? (
+ <GeetestWebView
+ challenge={smsChallenge}
+ onSuccess={handleSmsGeetestSuccess}
+ onCancel={() => setSmsChallenge(null)}
+ onError={(message) => {
+ setSmsChallenge(null)
+ setCookieError(message)
+ }}
+ />
+ ) : null}
  <div className="flex gap-2">
  <input
  type="text"

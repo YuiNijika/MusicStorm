@@ -10,6 +10,8 @@ type CoverProps = {
     alt: string
     size?: "xs" | "sm" | "md" | "lg" | "xl"
     className?: string
+ /** Above-the-fold artwork should bypass lazy loading */
+ eager?: boolean
 }
 
 const SIZE_CLASS = {
@@ -29,7 +31,7 @@ const SIZE_PX = {
 } as const
 
 // memo：src/alt/size/className 均为稳定字符串 props，父组件高频重渲（如播放条 200ms tick）时整棵跳过
-const Cover = memo(function Cover({ src, alt, size = "md", className }: CoverProps) {
+const Cover = memo(function Cover({ src, alt, size = "md", className, eager = false }: CoverProps) {
  const [failed, setFailed] = useState(false)
     // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
     const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
@@ -74,15 +76,16 @@ const Cover = memo(function Cover({ src, alt, size = "md", className }: CoverPro
                     width={px.width}
                     height={px.height}
                     draggable={false}
-                    loading="lazy"
+ loading={eager ? "eager" : "lazy"}
+ fetchPriority={eager ? "high" : "auto"}
                     decoding="async"
-                    className="size-full object-cover"
+ className="size-full object-cover"
                     onError={handleImageError}
                 />
             ) : (
                 <div
                     aria-hidden
-                    className="flex size-full items-center justify-center text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-slate-300"
+ className="flex size-full items-center justify-center text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-slate-300"
                 >
                     MS
                 </div>

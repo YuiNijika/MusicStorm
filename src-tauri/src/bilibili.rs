@@ -1,6 +1,6 @@
 use reqwest::blocking::Client;
 use reqwest::header::{
-    ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, REFERER, USER_AGENT,
+    ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT,
 };
 use reqwest::redirect::{Attempt, Policy};
 use reqwest::Url;
@@ -19,6 +19,8 @@ use crate::db::ensure_storage_paths;
 const BILIBILI_REFERER: &str = "https://www.bilibili.com";
 const BILIBILI_ORIGIN: &str = "https://www.bilibili.com";
 const USER_AGENT_VALUE: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const LOGIN_USER_AGENT_VALUE: &str = "Mozilla/5.0 BiliDroid/2.0.1 (bbcallen@gmail.com) os/android model/android_hd mobi_app/android_hd build/2001100 channel/master innerVer/2001100 osVer/15 network/2";
+const LOGIN_TRACE_ID: &str = "11111111111111111111111111111111:1111111111111111:0:0";
 const MAX_JSON_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES: u64 = 200 * 1024 * 1024;
 const CONNECT_TIMEOUT_SECONDS: u64 = 12;
@@ -38,10 +40,15 @@ fn api_path_allowed(path: &str) -> bool {
     matches!(
         path,
         "/x/web-interface/nav"
+            | "/x/member/web/account"
             | "/x/web-interface/wbi/search/type"
             | "/x/web-interface/popular"
+ | "/x/web-interface/card"
             | "/x/web-interface/view"
  | "/x/web-interface/ranking/v2"
+ | "/x/polymer/web-space/seasons_series_list"
+ | "/x/polymer/web-space/seasons_archives_list"
+ | "/x/series/archives"
             | "/x/player/wbi/playurl"
  | "/x/v3/fav/folder/created/list-all"
  | "/x/v3/fav/folder/info"
@@ -239,17 +246,59 @@ fn bilibili_headers(
         .header(USER_AGENT, USER_AGENT_VALUE)
 }
 
+fn login_headers(
+    request: reqwest::blocking::RequestBuilder,
+    buvid: Option<&str>,
+) -> reqwest::blocking::RequestBuilder {
+    let request = request
+        .header(REFERER, BILIBILI_REFERER)
+        .header("Origin", BILIBILI_ORIGIN)
+        .header(USER_AGENT, LOGIN_USER_AGENT_VALUE)
+        .header("env", "prod")
+        .header("app-key", "android_hd")
+        .header("x-bili-trace-id", LOGIN_TRACE_ID)
+        .header("x-bili-aurora-eid", "")
+        .header("x-bili-aurora-zone", "")
+ .header("bili-http-engine", "cronet")
+ .header("Sec-Fetch-Site", "same-site")
+ .header("Sec-Fetch-Mode", "cors");
+    if let Some(value) = buvid.filter(|value| !value.trim().is_empty()) {
+        request.header("buvid", value)
+    } else {
+        request
+    }
+}
+
+fn request_cookie(
+    app: &AppHandle,
+    explicit: Option<String>,
+) -> Option<String> {
+    explicit
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| read_cookie(app))
+}
+
 #[tauri::command]
-pub async fn bilibili_get_json(app: AppHandle, url: String) -> Result<Value, String> {
+pub async fn bilibili_get_json(
+    app: AppHandle,
+    url: String,
+    cookie: Option<String>,
+    buvid: Option<String>,
+) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let target = validate_api_url(&url)?;
         let client = json_client()?;
- let request = bilibili_headers(client.get(target));
- let request = if let Some(cookie) = read_cookie(&app) {
- request.header(reqwest::header::COOKIE, cookie)
- } else {
- request
- };
+        let is_passport = target.host_str() == Some(PASSPORT_HOST);
+        let request = if is_passport {
+            login_headers(client.get(target), buvid.as_deref())
+        } else {
+            bilibili_headers(client.get(target))
+        };
+        let request = if let Some(cookie) = request_cookie(&app, cookie) {
+            request.header(COOKIE, cookie)
+        } else {
+            request
+        };
         let response = request
  .header(ACCEPT, "application/json")
  .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9")
@@ -286,24 +335,25 @@ pub async fn bilibili_post_json(
     url: String,
     body: Option<Value>,
     referer_url: Option<String>,
+    cookie: Option<String>,
+    buvid: Option<String>,
 ) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let target = validate_api_url(&url)?;
         let referer = validate_risk_referer(referer_url.as_deref())?;
-        if target.host_str() != Some(PASSPORT_HOST)
-            || !passport_path_allowed(target.path())
-        {
+        let path = target.path().to_string();
+        if target.host_str() != Some(PASSPORT_HOST) || !passport_path_allowed(&path) {
             return Err("哔哩哔哩登录接口不受信任".into());
         }
         let client = json_client()?;
-        let request = bilibili_headers(client.post(target));
+        let request = login_headers(client.post(target), buvid.as_deref());
         let request = if let Some(referer) = referer {
             request.header(REFERER, referer.as_str())
         } else {
             request
         };
-        let request = if let Some(cookie) = read_cookie(&app) {
-            request.header(reqwest::header::COOKIE, cookie)
+        let request = if let Some(cookie) = request_cookie(&app, cookie) {
+            request.header(COOKIE, cookie)
         } else {
             request
         };
@@ -325,7 +375,10 @@ pub async fn bilibili_post_json(
             });
         let request = if let Some(form) = form {
             request
-                .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+ .header(
+ CONTENT_TYPE,
+ "application/x-www-form-urlencoded; charset=utf-8",
+ )
                 .form(&form)
         } else {
             request
@@ -366,7 +419,7 @@ fn download_audio_headers(
 ) -> reqwest::blocking::RequestBuilder {
  let request = bilibili_headers(request);
  if let Some(cookie) = read_cookie(app) {
- request.header(reqwest::header::COOKIE, cookie)
+ request.header(COOKIE, cookie)
  } else {
  request
  }

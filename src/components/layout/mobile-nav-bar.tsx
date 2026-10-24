@@ -22,7 +22,6 @@ import {
     lazy,
     Suspense,
     useCallback,
- useEffect,
     useLayoutEffect,
     useRef,
     useState,
@@ -46,12 +45,7 @@ import { useNeteaseSessionSafe } from "@/hooks/use-netease-session"
 import { useOpenAuthOnExpiry } from "@/hooks/use-open-auth-on-expiry"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
 import { ModeSwitch } from "@/components/layout/mode-switch"
-import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
-import {
- AUTH_EVENT,
- fetchBilibiliAuthStatus,
- type BilibiliAccount,
-} from "@/lib/bilibili/auth"
+import { AccountMenu as BilibiliAccountMenu } from "@/components/bilibili/account-menu"
 import {
     ACCENT_OPTIONS,
     accentSwatch,
@@ -102,31 +96,12 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
         setGlassBlur,
     } = useTheme()
     const [authOpen, setAuthOpen] = useState(false)
- const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
- const [bilibiliAccount, setBilibiliAccount] =
- useState<BilibiliAccount | null>(null)
     // 登录失效时自动弹出网易云登录对话框
     useOpenAuthOnExpiry(() => {
         if (mode === "netease") {
             setAuthOpen(true)
         }
     })
- useEffect(() => {
- if (mode !== "bilibili") {
- return
- }
- function syncAccount() {
- void fetchBilibiliAuthStatus()
- .then((status) =>
- setBilibiliAccount(status.account),
- )
- .catch(() => setBilibiliAccount(null))
- }
- syncAccount()
- window.addEventListener(AUTH_EVENT, syncAccount)
- return () =>
- window.removeEventListener(AUTH_EVENT, syncAccount)
- }, [mode])
     const customActive = appearance.accent === "custom"
     const customHue = resolveAccentHue(appearance)
     const mobileTabs: AppRoute[] = [
@@ -459,26 +434,13 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     </DropdownMenuContent>
                         </DropdownMenu>
  ) : (
- <button
- type="button"
- aria-label="B站账号"
- onClick={() => setBilibiliAuthOpen(true)}
- className="ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-[background-color,transform] hover:bg-[var(--surface-fill)] active:scale-[0.95] focus-visible:outline-2 focus-visible:outline-ring"
- >
- {bilibiliAccount?.avatarUrl ? (
- <img
- src={bilibiliAccount.avatarUrl}
- alt=""
- width={24}
- height={24}
- loading="lazy"
- decoding="async"
- className="size-6 rounded-full object-cover"
+ <BilibiliAccountMenu
+ variant="compact"
+ side="bottom"
+ align="end"
+ avatarPixels={24}
+ className="ml-1 size-10"
  />
- ) : (
- <User className="size-5 opacity-60" />
- )}
- </button>
  )}
                 </div>
             </div>
@@ -488,10 +450,6 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
- <BilibiliAuthDialog
- open={bilibiliAuthOpen}
- onOpenChange={setBilibiliAuthOpen}
- />
         </nav>
     )
 }

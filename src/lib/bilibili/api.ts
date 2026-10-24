@@ -16,6 +16,8 @@ type BilibiliSearchItem = {
     stat?: { view?: number }
     typeid?: number
     typename?: string
+    tid?: number
+    tname?: string
 }
 
 type BilibiliSearchData = {
@@ -28,6 +30,64 @@ type BilibiliPopularData = {
 
 type BilibiliRankingData = {
  list?: BilibiliSearchItem[]
+}
+
+type BilibiliUserCardData = {
+ mid?: number
+ name?: string
+ face?: string
+ fans?: number
+ sign?: string
+}
+
+type BilibiliSeasonArchiveItem = {
+ bvid?: string
+ aid?: number
+ title?: string
+ pic?: string
+ duration?: number
+ author?: string
+}
+
+type BilibiliSeasonArchivesData = {
+ archives?: BilibiliSeasonArchiveItem[]
+ page?: {
+ total?: number
+ }
+}
+
+type BilibiliSeasonSeriesListData = {
+ items_lists?: {
+ page?: {
+ total?: number
+ }
+ seasons_list?: Array<{
+ meta?: {
+ season_id?: number
+ title?: string
+ name?: string
+ cover?: string
+ description?: string
+ total?: number
+ }
+ }>
+ series_list?: Array<{
+ meta?: {
+ series_id?: number
+ title?: string
+ name?: string
+ cover?: string
+ total?: number
+ }
+ }>
+ }
+}
+
+type BilibiliSeriesArchivesData = {
+ archives?: BilibiliSeasonArchiveItem[]
+ page?: {
+ total?: number
+ }
 }
 
 type BilibiliPage = {
@@ -165,6 +225,75 @@ async function fetchBilibiliMusicRanking(input: {
  return data.list ?? []
 }
 
+async function fetchBilibiliUserCard(
+ mid: number,
+): Promise<BilibiliUserCardData> {
+ const data = await bilibiliRequest<{
+ card?: BilibiliUserCardData
+ }>({
+ path: "/x/web-interface/card",
+ params: { mid },
+ wbi: false,
+ })
+ return data.card ?? {}
+}
+
+async function fetchBilibiliSeasonSeries(input: {
+ mid: number
+ page?: number
+ pageSize?: number
+}): Promise<BilibiliSeasonSeriesListData> {
+ return bilibiliRequest<BilibiliSeasonSeriesListData>({
+ path: "/x/polymer/web-space/seasons_series_list",
+ params: {
+ mid: input.mid,
+ page_num: input.page ??1,
+ page_size: input.pageSize ??20,
+ },
+ wbi: false,
+ })
+}
+
+async function fetchBilibiliSeasonArchives(input: {
+ mid: number
+ seasonId: number
+ page?: number
+ pageSize?: number
+}): Promise<BilibiliSeasonArchivesData> {
+ return bilibiliRequest<BilibiliSeasonArchivesData>({
+ path: "/x/polymer/web-space/seasons_archives_list",
+ params: {
+ mid: input.mid,
+ season_id: input.seasonId,
+ sort_reverse: "false",
+ page_num: input.page ??1,
+ page_size: input.pageSize ??30,
+ web_location: "333.1387",
+ },
+ wbi: false,
+ })
+}
+
+async function fetchBilibiliSeriesArchives(input: {
+ mid: number
+ seriesId: number
+ page?: number
+ pageSize?: number
+}): Promise<BilibiliSeriesArchivesData> {
+ return bilibiliRequest<BilibiliSeriesArchivesData>({
+ path: "/x/series/archives",
+ params: {
+ mid: input.mid,
+ series_id: input.seriesId,
+ sort: "desc",
+ pn: input.page ??1,
+ ps: input.pageSize ??20,
+ web_location: "333.1387",
+ },
+ wbi: false,
+ })
+}
+
 async function fetchBilibiliPlayData(input: {
     bvid: string
     cid: number
@@ -183,8 +312,12 @@ async function fetchBilibiliPlayData(input: {
 
 export {
     fetchBilibiliPlayData,
+ fetchBilibiliSeriesArchives,
+ fetchBilibiliSeasonArchives,
+ fetchBilibiliSeasonSeries,
  fetchBilibiliMusicRanking,
     fetchBilibiliPopularVideos,
+ fetchBilibiliUserCard,
     fetchBilibiliVideo,
     searchBilibiliVideos,
 }
@@ -193,5 +326,10 @@ export type {
     BilibiliAudioStream,
     BilibiliPlayData,
     BilibiliSearchItem,
+ BilibiliSeasonArchiveItem,
+ BilibiliSeasonArchivesData,
+ BilibiliSeasonSeriesListData,
+ BilibiliSeriesArchivesData,
+ BilibiliUserCardData,
     BilibiliVideoData,
 }

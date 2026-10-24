@@ -66,6 +66,8 @@ import { Skeleton as FeedbackSkeleton } from "@/pages/feedback/skeleton"
 
 const SettingsPage = lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage })))
 const BilibiliPage = lazy(() => import("@/pages/bilibili").then(m => ({ default: m.BilibiliPage })))
+const BilibiliUpPage = lazy(() => import("@/pages/bilibili-up").then(m => ({ default: m.BilibiliUpPage })))
+const BilibiliCollectionPage = lazy(() => import("@/pages/bilibili-collection").then(m => ({ default: m.BilibiliCollectionPage })))
 const BilibiliSearchPage = lazy(() => import("@/pages/bilibili-search").then(m => ({ default: m.BilibiliSearchPage })))
 const BilibiliLibraryPage = lazy(() => import("@/pages/bilibili-library").then(m => ({ default: m.BilibiliLibraryPage })))
 const AlbumPage = lazy(() => import("@/pages/album").then(m => ({ default: m.AlbumPage })))
@@ -119,6 +121,21 @@ function AppRoutes({
     if (detail?.type === "artist") {
         return <Suspense fallback={artistFallback}><ArtistPage artistId={detail.id} onBack={back} /></Suspense>
     }
+ if (detail?.type === "bilibili-up") {
+ return <Suspense fallback={artistFallback}><BilibiliUpPage mid={detail.id} onBack={back} /></Suspense>
+ }
+ if (detail?.type === "bilibili-collection") {
+ return (
+ <Suspense fallback={playlistFallback}>
+ <BilibiliCollectionPage
+ mid={detail.mid}
+ collectionId={detail.id}
+ kind={detail.kind}
+ onBack={back}
+ />
+ </Suspense>
+ )
+ }
     if (detail?.type === "album") {
         return <Suspense fallback={albumFallback}><AlbumPage albumId={detail.id} onBack={back} /></Suspense>
     }
@@ -155,7 +172,7 @@ function AppRoutes({
     if (route === "bilibili" || (route === "home" && mode === "bilibili")) {
         return (
             <Suspense fallback={<PlaylistGridSkeleton count={8} />}>
-                <BilibiliPage onNavigate={onNavigate} />
+ <BilibiliPage onNavigate={onNavigate} />
             </Suspense>
         )
     }

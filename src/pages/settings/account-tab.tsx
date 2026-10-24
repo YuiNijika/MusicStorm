@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
+import { AccountAvatar } from "@/components/bilibili/account-avatar"
 import {
     AUTH_EVENT,
     fetchBilibiliAuthStatus,
@@ -355,21 +356,11 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                     >
                         {bilibiliAccount ? (
                             <div className="flex min-h-11 flex-wrap items-center gap-3">
-                                {bilibiliAccount.avatarUrl ? (
-                                    <img
-                                        src={bilibiliAccount.avatarUrl}
-                                        alt=""
-                                        width={48}
-                                        height={48}
-                                        loading="lazy"
-                                        decoding="async"
-                                        className="size-12 rounded-full object-cover"
-                                    />
-                                ) : (
-                                    <span className="flex size-12 items-center justify-center rounded-full bg-[var(--surface-fill)] text-[14px] font-medium">
-                                        {bilibiliAccount.name.slice(0, 1)}
-                                    </span>
-                                )}
+                                <AccountAvatar
+                                    src={bilibiliAccount.avatarUrl}
+                                    name={bilibiliAccount.name}
+                                    pixels={48}
+                                />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-[15px] font-medium">
                                         {bilibiliAccount.name}
@@ -390,22 +381,30 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                                 当前未登录，登录后可以在资料库查看收藏夹。
                             </p>
                         )}
-                        <div className="flex flex-wrap gap-2">
-                            <ActionButton
-                                variant="primary"
-                                onClick={() => setBilibiliDialogOpen(true)}
-                            >
-                                {bilibiliAccount ? "管理账号" : "登录哔哩哔哩"}
-                            </ActionButton>
-                        </div>
+                        {bilibiliAccount ? null : (
+                            <div className="flex flex-wrap gap-2">
+                                <ActionButton
+                                    variant="primary"
+                                    onClick={() => setBilibiliDialogOpen(true)}
+                                >
+                                    登录哔哩哔哩
+                                </ActionButton>
+                            </div>
+                        )}
                     </SettingsGroup>
                     <SettingsGroup
                         title="资料库"
                         description="登录后，B站收藏夹会显示在B站模式的资料库中"
                     >
-                        <p className="text-sm text-muted-foreground">
-                            收藏夹中的音乐会按收藏夹分组显示，可以直接加入播放队列。
-                        </p>
+ {bilibiliAccount ? (
+ <p className="text-sm text-muted-foreground">
+收藏夹中的音乐会按收藏夹分组显示，可以直接加入播放队列。
+ </p>
+ ) : (
+ <p className="text-sm text-muted-foreground">
+登录后，收藏夹会自动出现在B站模式的资料库中。
+ </p>
+ )}
                     </SettingsGroup>
                 </div>
             )}

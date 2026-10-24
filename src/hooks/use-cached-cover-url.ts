@@ -9,6 +9,18 @@ import {
     REMOTE_COVER_EVENT,
 } from "@/lib/music/remote-cover-cache"
 
+const BILIBILI_COVER_REFRESH_MS =10 *60 *1000
+const bilibiliCoverRefreshAt = new Map<string, number>()
+
+function createProtectedRemoteFallback(src: string): string {
+ const lastRefresh = bilibiliCoverRefreshAt.get(src) ??0
+ if (Date.now() - lastRefresh >= BILIBILI_COVER_REFRESH_MS) {
+ bilibiliCoverRefreshAt.set(src, Date.now())
+ return src
+ }
+ return ""
+}
+
 function resolveAssetUrl(
     path: string | null | undefined,
     fallback: string,
@@ -30,9 +42,13 @@ function isRemoteUrl(url: string): boolean {
 function useCachedCoverUrl(
     src: string,
     kind: "original" | "thumbnail" = "original",
+    options: { ignoreCacheLimit?: boolean } = {},
 ): string {
     const tauri = isTauriRuntime()
-    const disabled = tauri && getCoverCacheLimitBytes() === 0
+    const disabled =
+        tauri &&
+        !options.ignoreCacheLimit &&
+        getCoverCacheLimitBytes() === 0
     const protectedRemote =
         tauri && isRemoteUrl(src) && isBilibiliCoverUrl(src)
     const [resolved, setResolved] = useState<string>(() => {
@@ -41,7 +57,11 @@ function useCachedCoverUrl(
         }
         const cached = getCachedRemoteCover(src)
         if (!cached) {
-            return disabled ? src : protectedRemote ? "" : src
+ return disabled
+ ? src
+ : protectedRemote
+ ? createProtectedRemoteFallback(src)
+ : src
         }
         return resolveAssetUrl(
             kind === "thumbnail"
@@ -73,7 +93,13 @@ function useCachedCoverUrl(
             return
         }
 
-        setResolved(disabled ? src : protectedRemote ? "" : src)
+ setResolved(
+ disabled
+ ? src
+ : protectedRemote
+ ? createProtectedRemoteFallback(src)
+ : src,
+ )
         if (disabled) {
             return
         }
@@ -109,7 +135,11 @@ function useCachedCoverUrl(
                 )
                 return
             }
-            setResolved(protectedRemote ? "" : src)
+ setResolved(
+ protectedRemote
+ ? createProtectedRemoteFallback(src)
+ : src,
+ )
             void ensureRemoteCoverCached(src)
         }
 

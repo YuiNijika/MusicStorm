@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react"
 
-import { AuthDialog as BilibiliAuthDialog } from "@/components/bilibili/auth-dialog"
+import { AccountMenu as BilibiliAccountMenu } from "@/components/bilibili/account-menu"
 import { useTheme } from "@/components/app/theme-provider"
 import { useFrontendMode } from "@/components/app/frontend-mode-provider"
 import {
@@ -37,7 +37,6 @@ import {
     type SidebarStyle,
 } from "@/lib/app/sidebar-prefs"
 import { openNeteaseRegister } from "@/lib/netease/open-register"
-import { AUTH_EVENT, fetchBilibiliAuthStatus, type BilibiliAccount } from "@/lib/bilibili/auth"
 import { resolveVipTier } from "@/lib/netease/user"
 import type { AppRoute } from "@/lib/routes"
 import { cn } from "@/lib/utils"
@@ -109,32 +108,12 @@ function CompactSidebar({
     const { theme, setTheme } = useTheme()
     const { mode, visibleModules } = useFrontendMode()
     const [authOpen, setAuthOpen] = useState(false)
- const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
- const [bilibiliAccount, setBilibiliAccount] =
- useState<BilibiliAccount | null>(null)
     // 登录失效时自动弹出网易云登录对话框
     useOpenAuthOnExpiry(() => {
         if (mode === "netease") {
             setAuthOpen(true)
         }
     })
- useEffect(() => {
- if (mode !== "bilibili") {
- return
- }
- function syncAccount() {
- void fetchBilibiliAuthStatus()
- .then((status) =>
- setBilibiliAccount(status.account),
- )
- .catch(() => setBilibiliAccount(null))
- }
- syncAccount()
- window.addEventListener(AUTH_EVENT, syncAccount)
- return () =>
- window.removeEventListener(AUTH_EVENT, syncAccount)
- }, [mode])
-
     // 底部功能图标：头像账号菜单、主题快切、设置
     // 默认跟随系统：图标按解析后的实际明暗显示，不做第三态
     const resolvedTheme =
@@ -286,27 +265,11 @@ function CompactSidebar({
                     </DropdownMenuContent>
                     </DropdownMenu>
  ) : (
- <button
- type="button"
- title="登录B站账号"
- aria-label="登录B站账号"
- onClick={() => setBilibiliAuthOpen(true)}
- className="mt-1.5 flex size-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.95] focus-visible:outline-2 focus-visible:outline-ring"
- >
- {bilibiliAccount?.avatarUrl ? (
- <img
- src={bilibiliAccount.avatarUrl}
- alt=""
- width={28}
- height={28}
- loading="lazy"
- decoding="async"
- className="size-7 rounded-full object-cover"
+ <BilibiliAccountMenu
+ variant="compact"
+ avatarPixels={28}
+ className="mt-1.5 size-8"
  />
- ) : (
- <User className="size-3.5 opacity-70" />
- )}
- </button>
  )}
             </div>
 
@@ -315,10 +278,6 @@ function CompactSidebar({
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
- <BilibiliAuthDialog
- open={bilibiliAuthOpen}
- onOpenChange={setBilibiliAuthOpen}
- />
         </aside>
     )
 }
@@ -332,9 +291,6 @@ function ClassicSidebar({
     const { theme, setTheme } = useTheme()
     const { mode, visibleModules } = useFrontendMode()
     const [authOpen, setAuthOpen] = useState(false)
- const [bilibiliAuthOpen, setBilibiliAuthOpen] = useState(false)
- const [bilibiliAccount, setBilibiliAccount] =
- useState<BilibiliAccount | null>(null)
 
     const resolvedTheme =
         theme === "system"
@@ -347,23 +303,6 @@ function ClassicSidebar({
     function cycleTheme() {
         setTheme(resolvedTheme === "light" ? "dark" : "light")
     }
-
- useEffect(() => {
- if (mode !== "bilibili") {
- return
- }
- function syncAccount() {
- void fetchBilibiliAuthStatus()
- .then((status) =>
- setBilibiliAccount(status.account),
- )
- .catch(() => setBilibiliAccount(null))
- }
- syncAccount()
- window.addEventListener(AUTH_EVENT, syncAccount)
- return () =>
- window.removeEventListener(AUTH_EVENT, syncAccount)
- }, [mode])
 
     return (
         <aside className="material-sidebar hidden w-[224px] shrink-0 flex-col md:flex">
@@ -506,37 +445,7 @@ function ClassicSidebar({
                     </DropdownMenuContent>
                 </DropdownMenu>
  ) : (
- <button
- type="button"
- onClick={() => setBilibiliAuthOpen(true)}
- className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-fill)] focus-visible:outline-2 focus-visible:outline-ring"
- >
- {bilibiliAccount?.avatarUrl ? (
- <img
- src={bilibiliAccount.avatarUrl}
- alt=""
- width={32}
- height={32}
- loading="lazy"
- decoding="async"
- className="size-8 rounded-full object-cover"
- />
- ) : (
- <span className="flex size-8 items-center justify-center rounded-full bg-[var(--surface-fill)]">
- <User className="size-4 opacity-70" />
- </span>
- )}
- <span className="min-w-0 flex-1">
- <span className="block truncate text-[13px] font-medium">
- {bilibiliAccount?.name ?? "登录B站账号"}
- </span>
- <span className="block truncate text-[11px] text-muted-foreground">
- {bilibiliAccount
- ? "收藏夹已同步"
- : "登录后查看收藏夹"}
- </span>
- </span>
- </button>
+ <BilibiliAccountMenu variant="profile" />
  )}
             </div>
 
@@ -545,10 +454,6 @@ function ClassicSidebar({
                     <NeteaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
                 </Suspense>
             ) : null}
- <BilibiliAuthDialog
- open={bilibiliAuthOpen}
- onOpenChange={setBilibiliAuthOpen}
- />
         </aside>
     )
 }

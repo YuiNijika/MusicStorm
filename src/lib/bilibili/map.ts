@@ -70,6 +70,7 @@ function mapSearchItem(item: BilibiliSearchItem): Track | null {
         return null
     }
     const id = bilibiliTrackId(bvid, aid)
+    const category = item.typename?.trim() || item.tname?.trim()
     return {
         id,
         title: stripHtml(item.title ?? "") || "未命名视频",
@@ -77,8 +78,8 @@ function mapSearchItem(item: BilibiliSearchItem): Track | null {
             item.author?.trim() ||
             item.owner?.name?.trim() ||
             "未知作者",
-        album: item.typename?.trim() || "哔哩哔哩",
-        tname: item.typename?.trim() || undefined,
+        album: category || "哔哩哔哩",
+        tname: category || undefined,
  coverUrl: pickImageUrl(item.pic, item.cover, item.pic_url),
         durationMs: parseDuration(item.duration),
         source: "bilibili",

@@ -14,6 +14,13 @@ export type AppRoute =
 export type MusicDetail =
     | { type: "playlist"; id: string }
     | { type: "artist"; id: string }
+ | { type: "bilibili-up"; id: string }
+ | {
+ type: "bilibili-collection"
+ id: string
+ mid: string
+ kind: "season" | "series"
+ }
     | { type: "album"; id: string }
     | { type: "radio"; id: string }
     | { type: "radio-program"; id: string; radioId?: string }

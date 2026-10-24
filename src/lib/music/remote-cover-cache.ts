@@ -128,6 +128,8 @@ function normalizeCoverUrl(url: string): string {
  if (
  parsed.hostname === "hdslb.com" ||
  parsed.hostname.endsWith(".hdslb.com") ||
+ parsed.hostname === "biliimg.com" ||
+ parsed.hostname.endsWith(".biliimg.com") ||
  parsed.hostname === "bilibili.com" ||
  parsed.hostname.endsWith(".bilibili.com") ||
  parsed.hostname.endsWith(".126.net") ||
@@ -151,6 +153,8 @@ function isBilibiliCoverUrl(url: string): boolean {
  host.endsWith(".bilibili.com") ||
  host === "hdslb.com" ||
  host.endsWith(".hdslb.com") ||
+ host === "biliimg.com" ||
+ host.endsWith(".biliimg.com") ||
  host === "bilivideo.com" ||
  host.endsWith(".bilivideo.com") ||
  host === "bilivideo.cn" ||

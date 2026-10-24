@@ -10,10 +10,13 @@ type ProxyInput = {
     method?: ProxyMethod
     body?: Record<string, string | number | boolean | undefined>
     referer?: string
+    cookie?: string
+    buvid?: string
 }
 
 const ROUTE_MAP: Record<string, string> = {
     "/x/web-interface/nav": "/auth/nav",
+    "/x/member/web/account": "/member/account",
     "/x/passport-tv-login/qrcode/auth_code": "/auth/qrcode/generate",
     "/x/passport-tv-login/qrcode/poll": "/auth/qrcode/poll",
     "/x/passport-login/web/key": "/auth/login/key",
@@ -30,7 +33,11 @@ const ROUTE_MAP: Record<string, string> = {
     "/x/passport-login/web/confirm/refresh": "/auth/cookie/confirm-refresh",
     "/x/web-interface/wbi/search/type": "/search",
     "/x/web-interface/popular": "/popular",
+ "/x/web-interface/card": "/user/card",
     "/x/web-interface/ranking/v2": "/ranking",
+ "/x/polymer/web-space/seasons_series_list": "/seasons/series",
+ "/x/polymer/web-space/seasons_archives_list": "/seasons/archives",
+ "/x/series/archives": "/seasons/series-archives",
     "/x/web-interface/view": "/video",
     "/x/player/wbi/playurl": "/player",
     "/audio/music-service-c/web/song/info": "/audio/info",
@@ -78,8 +85,9 @@ function normalizeExternalResponse(body: unknown): unknown {
             payload?.upstreamMessage ||
                 envelope.message ||
                 "B站对接接口请求失败",
-        ) as Error & { code?: number }
+        ) as Error & { code?: number; data?: unknown }
         error.code = payload?.upstreamCode
+        error.data = payload?.data
         throw error
     }
     return {
@@ -101,12 +109,18 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
                 url: input.url,
                 body: input.body ?? null,
                 refererUrl: input.referer ?? null,
+                cookie: input.cookie ?? null,
+                buvid: input.buvid ?? null,
             })
         }
         if ((input.method ?? "GET") !== "GET") {
             throw new Error("B站内置模式暂不支持此请求方法")
         }
-        return invoke<unknown>("bilibili_get_json", { url: input.url })
+        return invoke<unknown>("bilibili_get_json", {
+            url: input.url,
+            cookie: input.cookie ?? null,
+            buvid: input.buvid ?? null,
+        })
     }
 
     const upstreamUrl = new URL(input.url)
@@ -122,9 +136,12 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
     const headers: Record<string, string> = {
         Accept: "application/json",
     }
-    const cookie = readCookieHeader()
+    const cookie = input.cookie ?? readCookieHeader()
     if (cookie) {
         headers["X-Bilibili-Cookie"] = cookie
+    }
+    if (input.buvid) {
+        headers["X-Bilibili-Buvid"] = input.buvid
     }
     const body =
         method === "GET" || !input.body

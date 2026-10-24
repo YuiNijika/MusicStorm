@@ -296,6 +296,8 @@ pub async fn cache_cover_url(app: AppHandle, url: String) -> Result<CachedCover,
  let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
  let referer = if host == "hdslb.com"
  || host.ends_with(".hdslb.com")
+ || host == "biliimg.com"
+ || host.ends_with(".biliimg.com")
  || host == "bilibili.com"
  || host.ends_with(".bilibili.com")
  || host == "bilivideo.com"
