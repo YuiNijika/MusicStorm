@@ -25,7 +25,6 @@ import {
 } from "@/lib/bilibili/favorites"
 import { notifyFromError } from "@/lib/notify"
 import type { Track } from "@/lib/types"
-import { isWebMode } from "@/lib/web-mode"
 
 const MEDIA_ROW_HEIGHT =236
 
@@ -42,12 +41,7 @@ function BilibiliLibraryPage() {
  const [error, setError] = useState<string | null>(null)
  const [revision, setRevision] = useState(0)
 
- useEffect(() => {
- if (isWebMode()) {
- setLoading(false)
- setError("B站资料库暂时只支持客户端")
- return
- }
+useEffect(() => {
  let cancelled = false
  setLoading(true)
  setError(null)
@@ -79,7 +73,7 @@ function BilibiliLibraryPage() {
  setError(
  reason instanceof Error
  ? reason.message
- : "资料库暂时不可用",
+ : "收藏夹暂时不可用",
  )
  })
  return () => {
@@ -113,7 +107,7 @@ function BilibiliLibraryPage() {
  return (
  <div
  role="status"
- aria-label="正在加载资料库…"
+ aria-label="正在加载收藏夹…"
  className="space-y-4"
  >
  <div className="h-8 w-40 animate-pulse rounded bg-[var(--surface-fill)]" />
@@ -133,7 +127,7 @@ function BilibiliLibraryPage() {
  return (
  <StateHero
  variant="error"
- title="资料库暂时不可用"
+ title="收藏夹暂时不可用"
  description={error}
  action={
  <HeroRetryButton
@@ -153,7 +147,7 @@ function BilibiliLibraryPage() {
  <StateHero
  variant="auth"
  title="登录后查看收藏夹"
- description="登录后，收藏夹会显示为资料库"
+ description="登录后查看账号收藏夹"
  />
  )
  }
@@ -169,7 +163,7 @@ function BilibiliLibraryPage() {
  }}
  className="cursor-pointer text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
  >
-←返回资料库
+←返回收藏夹
  </button>
  <div>
  <h1 className="line-clamp-2 break-words text-[24px] font-bold tracking-[-0.03em]">
@@ -225,7 +219,7 @@ function BilibiliLibraryPage() {
  return (
  <div ref={gridRef} className="space-y-6">
  <PageTitle
- title="资料库"
+ title="收藏夹"
  subtitle={`${account.name} · 收藏夹 ${folders.length}个`}
  trailing={
  <button

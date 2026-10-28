@@ -4,6 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react"
 import { createRoot } from "react-dom/client"
 
+import { formatDuration } from "@/lib/format"
+
 interface MiniPlayerState {
   title: string
   artist: string
@@ -25,10 +27,7 @@ function sendPlayerCommand(
 }
 
 function formatTime(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  return formatDuration(ms)
 }
 
 function MusicNotePlaceholder() {

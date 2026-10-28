@@ -2,8 +2,14 @@ import { memo, useEffect, useState } from "react"
 
 import { useCachedCoverUrl, isRemoteUrl } from "@/hooks/use-cached-cover-url"
 import { reextractLocalCovers } from "@/lib/local/import-folder"
-import { invalidateRemoteCover } from "@/lib/music/remote-cover-cache"
+import {
+    invalidateRemoteCover,
+    isBilibiliCoverUrl,
+} from "@/lib/music/remote-cover-cache"
 import { cn } from "@/lib/utils"
+
+const BILIBILI_INVALID_COVER_URL =
+    "https://i0.hdslb.com/bfs/archive/be27fd62c99036dce67efface486fb0a88ffed06.jpg"
 
 type CoverProps = {
     src: string
@@ -33,6 +39,7 @@ const SIZE_PX = {
 // memo：src/alt/size/className 均为稳定字符串 props，父组件高频重渲（如播放条 200ms tick）时整棵跳过
 const Cover = memo(function Cover({ src, alt, size = "md", className, eager = false }: CoverProps) {
  const [failed, setFailed] = useState(false)
+    const [fallbackSrc, setFallbackSrc] = useState<string | null>(null)
     // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
     const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
     const resolvedSrc = useCachedCoverUrl(src, kind)
@@ -40,14 +47,24 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
     // 自愈链路（invalidate→重下→事件切回本地）改的是 resolvedSrc，也依赖这里复位
     useEffect(() => {
         setFailed(false)
+        setFallbackSrc(null)
     }, [src, resolvedSrc])
- const showImage = Boolean(src && resolvedSrc) && !failed
+    const imageSrc = fallbackSrc ?? resolvedSrc
+ const showImage = Boolean(src && imageSrc) && !failed
     const px = SIZE_PX[size]
 
     // 本地缓存文件被清理后索引残留失效路径会在这里炸出 404：
     // 远程封面剔除索引条目并回源重下；本地封面（asset 路径）触发
     // 曲库重解析原音频提取封面（带冷却，多图同时 404 只重扫一次）
     function handleImageError() {
+        if (
+            isBilibiliCoverUrl(src) &&
+            imageSrc !== BILIBILI_INVALID_COVER_URL
+        ) {
+            setFallbackSrc(BILIBILI_INVALID_COVER_URL)
+            void invalidateRemoteCover(src)
+            return
+        }
         setFailed(true)
         if (isRemoteUrl(src)) {
             if (resolvedSrc !== src) {
@@ -70,12 +87,15 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
         >
             {showImage ? (
                 <img
-                    key={resolvedSrc}
-                    src={resolvedSrc}
+                    key={imageSrc}
+                    src={imageSrc}
                     alt={alt}
                     width={px.width}
                     height={px.height}
                     draggable={false}
+                    referrerPolicy={
+                        isBilibiliCoverUrl(src) ? "no-referrer" : undefined
+                    }
  loading={eager ? "eager" : "lazy"}
  fetchPriority={eager ? "high" : "auto"}
                     decoding="async"
@@ -85,7 +105,7 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
             ) : (
                 <div
                     aria-hidden
- className="flex size-full items-center justify-center text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-slate-300"
+                    className="flex size-full items-center justify-center text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-slate-300"
                 >
                     MS
                 </div>

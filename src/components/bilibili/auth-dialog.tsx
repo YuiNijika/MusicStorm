@@ -533,7 +533,7 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
  <DialogHeader>
  <DialogTitle>B站账号</DialogTitle>
  <DialogDescription>
-登录后可以在资料库中查看自己的收藏夹
+登录后可以查看自己的收藏夹
  </DialogDescription>
  </DialogHeader>
  <div className="flex min-w-0 items-center gap-3 py-2">

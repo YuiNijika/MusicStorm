@@ -3,7 +3,7 @@ import type { Track } from "@/lib/types"
 //分享落地页固定指向 MusicStorm网站的播放器
 const WEB_PLAYER_URL = "https://music.miomoe.cn/player.html"
 
-// 自定义协议：`musicstorm://play?id=<id>`，用于浏览器探测/打开本机已安装的 MusicStorm 应用
+//自定义协议支持网易云 id与 B站 BV号
 const APP_PROTOCOL = "musicstorm"
 
 export type SharePlatformId =
@@ -44,7 +44,6 @@ function buildPlayLink(track: Track): string | null {
     if (!isShareableTrack(track)) {
         return null
     }
-    // 网页版直接在当前地址上拼接，保证域名跟随部署环境
 if (track.source === "bilibili" && track.bvid) {
 return `${WEB_PLAYER_URL}#play?source=bilibili&bvid=${encodeURIComponent(track.bvid)}`
 }

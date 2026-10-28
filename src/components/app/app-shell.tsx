@@ -9,6 +9,8 @@ import {
 
 import { DownloadBanner } from "@/components/app/download-banner"
 import { CloseConfirmDialog } from "@/components/app/close-confirm-dialog"
+import { FirstModeDialog } from "@/components/app/first-mode-dialog"
+import { useFrontendMode } from "@/components/app/frontend-mode-provider"
 import { TitleBar, type TitleBarStyle } from "@/components/app/title-bar"
 import { FullPlayer } from "@/components/layout/full-player"
 import { MobileNavBar } from "@/components/layout/mobile-nav-bar"
@@ -29,6 +31,7 @@ import { isNativeMacOS } from "@/lib/platform"
 import { isWebMode } from "@/lib/web-mode"
 import { buildAppLink } from "@/lib/share/share"
 import { probeMusicStormApp } from "@/lib/app/protocol-detect"
+import { hasSelectedFrontendMode } from "@/lib/frontend-mode"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -58,6 +61,10 @@ function AppShell({
     onOpenUpdate,
 }: AppShellProps) {
     const [fullPlayerOpen, setFullPlayerOpen] = useState(false)
+    const [modeSetupOpen, setModeSetupOpen] = useState(
+        () => !hasSelectedFrontendMode(),
+    )
+    const { mode, setMode } = useFrontendMode()
     const { detail, back } = useMusicNavigation()
     const mainRef = useRef<HTMLElement>(null)
     const contentRef = useRef<HTMLDivElement>(null)
@@ -219,6 +226,16 @@ function AppShell({
                 onConfirm={(action, noAsk) => void confirmClose(action, noAsk)}
                 onCancel={cancelClose}
             />
+
+            {modeSetupOpen ? (
+                <FirstModeDialog
+                    mode={mode}
+                    onSelect={(nextMode) => {
+                        setMode(nextMode)
+                        setModeSetupOpen(false)
+                    }}
+                />
+            ) : null}
 
             {/* 网页深层检测到已装 MusicStorm 应用：提示用应用直接打开 */}
             {appOpenTrack ? (

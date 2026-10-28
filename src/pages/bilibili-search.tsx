@@ -20,7 +20,6 @@ import {
  removeSearchHistory,
 } from "@/lib/search-history"
 import type { Track } from "@/lib/types"
-import { isWebMode } from "@/lib/web-mode"
 
 function SearchSkeleton() {
  return (
@@ -78,13 +77,6 @@ function BilibiliSearchPage() {
  setLoading(false)
  return
  }
- if (isWebMode()) {
- setTracks([])
- setLoading(false)
- setError("B站模式暂时只支持客户端")
- return
- }
-
  let cancelled = false
  setLoading(true)
  setError(null)
@@ -234,11 +226,7 @@ function BilibiliSearchPage() {
  <StateHero
  variant="error"
  title="搜索失败"
- description={
- isWebMode()
- ? error
- : `${error}。检查网络后重试`
- }
+ description={`${error}。检查网络后重试`}
  action={
  <HeroRetryButton
  onClick={() =>

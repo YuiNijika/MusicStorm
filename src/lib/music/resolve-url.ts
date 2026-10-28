@@ -130,8 +130,10 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
                     const audio = await resolveBilibiliAudio(fallback)
                     return {
                         ok: true,
-                        url: convertFileSrc(audio.path),
-                        filePath: audio.path,
+ url: audio.path
+ ? convertFileSrc(audio.path)
+ : audio.url ?? "",
+ filePath: audio.path,
                         track: {
                             ...track,
                             bvid: audio.track.bvid,
@@ -165,8 +167,10 @@ async function resolvePlayableUrl(track: Track): Promise<ResolvePlayableResult> 
             const resolved = await resolveBilibiliAudio(track)
             return {
                 ok: true,
-                url: convertFileSrc(resolved.path),
-                filePath: resolved.path,
+ url: resolved.path
+ ? convertFileSrc(resolved.path)
+ : resolved.url ?? "",
+ filePath: resolved.path,
                 track: resolved.track,
             }
         } catch (error) {

@@ -1,7 +1,12 @@
 import { cacheCoverUrl } from "@/lib/local/cover"
-import { getLyricOverride, setLyricOverride } from "@/lib/lyric/overrides"
+import {
+    getLyricOverride,
+    hasLyricTranslationOverride,
+    setLyricOverride,
+    setLyricTranslationOverride,
+} from "@/lib/lyric/overrides"
 import { getCoverOverride, setCoverOverride } from "@/lib/music/cover-overrides"
-import { fetchLyricText } from "@/lib/netease/lyric"
+import { fetchLyricBundle } from "@/lib/netease/lyric"
 import { searchNeteaseTracks } from "@/lib/netease/search"
 import type { Track } from "@/lib/types"
 
@@ -82,7 +87,9 @@ function needsNeteaseMetadata(track: Track): boolean {
     const hasLyric = Boolean(
         track.lyricText || track.lrcPath || getLyricOverride(track.id),
     )
-    return !hasCover || !hasLyric
+    const hasTranslation =
+        !getLyricOverride(track.id) || hasLyricTranslationOverride(track.id)
+    return !hasCover || !hasLyric || !hasTranslation
 }
 
 async function applyNeteaseMetadata(
@@ -93,7 +100,10 @@ async function applyNeteaseMetadata(
     const needsCover = !onlyMissing || (!track.coverUrl && !getCoverOverride(track.id))
     const needsLyric =
         !onlyMissing ||
-        (!track.lyricText && !track.lrcPath && !getLyricOverride(track.id))
+        (!track.lyricText &&
+            !track.lrcPath &&
+            !getLyricOverride(track.id)) ||
+        !hasLyricTranslationOverride(track.id)
 
     if (!needsCover && !needsLyric) {
         return { matched: null, coverApplied: false, lyricApplied: false }
@@ -108,18 +118,24 @@ async function applyNeteaseMetadata(
         needsCover && matched.coverUrl
             ? cacheCoverUrl(matched.coverUrl).then((cached) => cached)
             : Promise.reject(new Error("no cover")),
-        needsLyric ? fetchLyricText(matched.id) : Promise.reject(new Error("no lyric")),
+        needsLyric
+            ? fetchLyricBundle(matched.id)
+            : Promise.reject(new Error("no lyric")),
     ])
 
     const cover = coverResult.status === "fulfilled" ? coverResult.value : null
-    const lyric = lyricResult.status === "fulfilled" ? lyricResult.value : ""
+    const lyricBundle =
+        lyricResult.status === "fulfilled"
+            ? lyricResult.value
+            : { lyricText: "", translationText: "" }
     let coverApplied = false
     let lyricApplied = false
 
     // 两种元数据独立提交；封面 base64 触发 quota 时不能阻断歌词
-    if (lyric) {
+    if (lyricBundle.lyricText) {
         try {
-            setLyricOverride(track.id, lyric)
+            setLyricOverride(track.id, lyricBundle.lyricText)
+            setLyricTranslationOverride(track.id, lyricBundle.translationText)
             lyricApplied = true
         } catch {
             lyricApplied = false

@@ -118,6 +118,7 @@ type PlayerContextValue = Omit<PlayerSnapshot, "positionMs" | "durationMs"> & {
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null)
+const PLAYABLE_URL_REFRESH_DELAY_MS = 2 * 60 * 1000
 
 function formatInvokeError(error: unknown): string {
     if (error instanceof Error) {
@@ -280,6 +281,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         restored && restored.positionMs > 0 ? restored.positionMs : null,
     )
     const lastSessionWriteRef = useRef(0)
+    const pausedAtRef = useRef<number | null>(null)
 
     const fadeRef = useRef(
         createFadeGainController({
@@ -530,6 +532,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         (next: boolean | ((prev: boolean) => boolean)) => {
             const prev = isPlayingRef.current
             const value = typeof next === "function" ? next(prev) : next
+            const track = queueRef.current[indexRef.current]
+            const pausedAt = pausedAtRef.current
+            if (!value) {
+                pausedAtRef.current = Date.now()
+            } else if (
+                !prev &&
+                track &&
+                track.source !== "local" &&
+                pausedAt != null &&
+                Date.now() - pausedAt >= PLAYABLE_URL_REFRESH_DELAY_MS
+            ) {
+                pendingSeekMsRef.current = positionRef.current
+                loadedTrackIdRef.current = null
+                mediaReadyRef.current = false
+                setReloadNonce((nonce) => nonce + 1)
+                pausedAtRef.current = null
+            }
             isPlayingRef.current = value
             if (!value) {
                 hardStopEngines()
@@ -795,6 +814,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             onError: (message) => {
                 console.warn("[player] engine error", message)
                 isPlayingRef.current = false
+                loadedTrackIdRef.current = null
+                mediaReadyRef.current = false
                 hardStopEngines()
                 setIsPlaying(false)
             },

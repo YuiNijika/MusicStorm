@@ -98,8 +98,8 @@ export const WORKSPACE_MODULES: Record<
  },
  {
  id: "library",
- label: "资料库",
- description: "B站收藏夹",
+ label: "收藏夹",
+ description: "登录账号的B站收藏夹",
  },
  {
  id: "local",
@@ -126,6 +126,7 @@ export const DEFAULT_WORKSPACE_LAYOUTS: WorkspaceLayouts = {
 }
 
 const MODE_STORAGE_KEY = "musicstorm-frontend-mode"
+const MODE_SETUP_STORAGE_KEY = "musicstorm-frontend-mode-setup"
 const LAYOUT_STORAGE_KEY = "musicstorm-workspace-layouts"
 const MODE_EVENT = "musicstorm:frontend-mode"
 
@@ -199,12 +200,24 @@ function writeFrontendMode(mode: FrontendMode): void {
     applyFrontendModeToDom(mode)
     try {
         window.localStorage.setItem(MODE_STORAGE_KEY, mode)
+        window.localStorage.setItem(MODE_SETUP_STORAGE_KEY, "1")
     } catch {
         // Keep the current session usable when storage is unavailable
     }
     window.dispatchEvent(
         new CustomEvent<FrontendMode>(MODE_EVENT, { detail: mode }),
     )
+}
+
+function hasSelectedFrontendMode(): boolean {
+    if (typeof window === "undefined") {
+        return true
+    }
+    try {
+        return window.localStorage.getItem(MODE_SETUP_STORAGE_KEY) === "1"
+    } catch {
+        return false
+    }
 }
 
 function readWorkspaceLayouts(): WorkspaceLayouts {
@@ -256,6 +269,7 @@ function resolveModeHome(mode: FrontendMode): WorkspaceModuleId {
 export {
     applyFrontendModeToDom,
     getWorkspaceModule,
+    hasSelectedFrontendMode,
     normalizeLayout,
     readFrontendMode,
     readWorkspaceLayouts,

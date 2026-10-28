@@ -8,8 +8,15 @@ import {
     parseLyricText,
     type LyricLine,
 } from "@/lib/lyric/parse"
-import { getLyricOverride, LYRIC_OVERRIDE_EVENT } from "@/lib/lyric/overrides"
-import { fetchLyricLines } from "@/lib/netease/lyric"
+import {
+    getLyricOverride,
+    getLyricTranslationOverride,
+    LYRIC_OVERRIDE_EVENT,
+} from "@/lib/lyric/overrides"
+import {
+    fetchLyricLines,
+    mergeTranslatedLyrics,
+} from "@/lib/netease/lyric"
 import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { PLAYER_PREFS_EVENT, getPlayerPreferences } from "@/lib/player/playback-prefs"
 import type { Track } from "@/lib/types"
@@ -236,7 +243,13 @@ function LyricsView({
             try {
                 const override = getLyricOverride(currentTrack.id)
                 if (override) {
-                    const result = parseLyricText(override)
+                    const translation = getLyricTranslationOverride(
+                        currentTrack.id,
+                    )
+                    const result = mergeTranslatedLyrics(
+                        parseLyricText(override),
+                        translation ? parseLyricText(translation) : [],
+                    )
                     if (cancelled) {
                         return
                     }
@@ -313,7 +326,7 @@ function LyricsView({
         const node = listRef.current.querySelector<HTMLElement>(
             `[data-lyric-index="${activeIndex}"]`,
         )
-        node?.scrollIntoView({ block: "center", behavior: "smooth" })
+        node?.scrollIntoView({ block: "center", behavior: "auto" })
     }, [activeIndex, active, timedLyrics])
 
     const showSkeleton = Boolean(currentTrack) && status === "loading"

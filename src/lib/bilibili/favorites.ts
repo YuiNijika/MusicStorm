@@ -4,6 +4,7 @@ import type { Track } from "@/lib/types"
 type FavoriteFolderRaw = {
  id?: number
  fid?: number
+ media_id?: number
  mid?: number
  title?: string
  media_count?: number
@@ -15,7 +16,12 @@ type FavoriteFolderRaw = {
 }
 
 type FavoriteFoldersData = {
- list?: FavoriteFolderRaw[]
+ list?: FavoriteFolderRaw[] | null
+ items?: FavoriteFolderRaw[] | null
+}
+
+type FavoriteFolderInfoRaw = FavoriteFolderRaw & {
+ cover?: string
 }
 
 type FavoriteResourceRaw = {
@@ -39,7 +45,7 @@ type FavoriteItemsData = {
  cover?: string
  intro?: string
  }
- medias?: FavoriteResourceRaw[]
+ medias?: FavoriteResourceRaw[] | null
  has_more?: boolean
 }
 
@@ -61,6 +67,7 @@ export type BilibiliFavoritePage = {
 const PAGE_SIZE =20
 const MAX_FOLDER_PAGE_SIZE =20
 const FOLDER_LIST_LIMIT =100
+const FOLDER_PAGE_SIZE =100
 const MUSIC_TYPE_ID =12
 
 function normalizeUrl(value: string | undefined): string {
@@ -98,7 +105,7 @@ function stripHtml(value: string): string {
 }
 
 function mapFolder(item: FavoriteFolderRaw): BilibiliFavoriteFolder | null {
- const id = item.id ?? item.fid
+ const id = item.id ?? item.fid ?? item.media_id
  if (!id) {
  return null
  }
@@ -141,7 +148,7 @@ function mapTrack(item: FavoriteResourceRaw): Track | null {
 async function fetchBilibiliFavoriteFolders(
  mid: number,
 ): Promise<BilibiliFavoriteFolder[]> {
- const data = await bilibiliRequest<FavoriteFoldersData>({
+ const allFolders = await bilibiliRequest<FavoriteFoldersData | null>({
  path: "/x/v3/fav/folder/created/list-all",
  params: {
  up_mid: mid,
@@ -149,10 +156,48 @@ async function fetchBilibiliFavoriteFolders(
  },
  wbi: false,
  })
- return (data.list ?? [])
- .slice(0, FOLDER_LIST_LIMIT)
- .map(mapFolder)
- .filter((item): item is BilibiliFavoriteFolder => item != null)
+ let rawFolders = allFolders?.list ?? allFolders?.items
+ if (!Array.isArray(rawFolders) || rawFolders.length ===0) {
+ const page = await bilibiliRequest<FavoriteFoldersData | null>({
+ path: "/x/v3/fav/folder/created/list",
+ params: {
+ pn:1,
+ ps:FOLDER_PAGE_SIZE,
+ up_mid: mid,
+ },
+ wbi: false,
+ })
+ rawFolders = page?.list ?? page?.items
+ }
+ if (!Array.isArray(rawFolders)) {
+ return []
+ }
+
+ const limitedFolders = rawFolders.slice(0, FOLDER_LIST_LIMIT)
+ const detailedFolders = await Promise.all(
+ limitedFolders.map(async (raw) => {
+ const mapped = mapFolder(raw)
+ if (!mapped) {
+ return null
+ }
+ try {
+ const detail = await bilibiliRequest<FavoriteFolderInfoRaw | null>({
+ path: "/x/v3/fav/folder/info",
+ params: {
+ media_id: mapped.id,
+ },
+ wbi: false,
+ })
+ const coverUrl = normalizeUrl(detail?.cover)
+ return coverUrl ? { ...mapped, coverUrl } : mapped
+ } catch {
+ return mapped
+ }
+ }),
+ )
+ return detailedFolders.filter(
+ (item): item is BilibiliFavoriteFolder => item != null,
+ )
 }
 
 async function fetchBilibiliFavoritePage(input: {
@@ -160,7 +205,7 @@ async function fetchBilibiliFavoritePage(input: {
  page?: number
 }): Promise<BilibiliFavoritePage> {
  const page = Math.max(1, input.page ??1)
- const data = await bilibiliRequest<FavoriteItemsData>({
+ const data = await bilibiliRequest<FavoriteItemsData | null>({
  path: "/x/v3/fav/resource/list",
  params: {
  media_id: input.mediaId,
@@ -174,18 +219,18 @@ async function fetchBilibiliFavoritePage(input: {
  wbi: false,
  })
  const folder: BilibiliFavoriteFolder = {
- id: String(data.info?.id ?? input.mediaId),
- title: data.info?.title?.trim() || "收藏夹",
+ id: String(data?.info?.id ?? input.mediaId),
+ title: data?.info?.title?.trim() || "收藏夹",
  coverUrl: normalizeUrl(
- data.info?.cover ??
- data.medias?.[0]?.cover ??
- data.medias?.[0]?.pic,
+ data?.info?.cover ??
+ data?.medias?.[0]?.cover ??
+ data?.medias?.[0]?.pic,
  ),
- description: data.info?.intro?.trim() || undefined,
- count: data.info?.media_count ??0,
+ description: data?.info?.intro?.trim() || undefined,
+ count: data?.info?.media_count ??0,
  isPublic: true,
  }
- const tracks = (data.medias ?? [])
+ const tracks = (data?.medias ?? [])
  .filter(
  (item) =>
  item.type == null ||
@@ -200,7 +245,7 @@ async function fetchBilibiliFavoritePage(input: {
  return {
  folder,
  tracks,
- hasMore: Boolean(data.has_more),
+ hasMore: Boolean(data?.has_more),
  }
 }
 

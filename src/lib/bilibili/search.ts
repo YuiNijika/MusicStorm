@@ -38,8 +38,10 @@ type BilibiliFeaturedPlaylist = {
  description?: string
  count?: number
  mid: number
- seasonId: number
+ collectionId: number
  webUrl: string
+ kind: "season" | "series" | "search"
+ tracks?: Track[]
 }
 
 type BilibiliUpCollectionKind = "season" | "series"
@@ -111,8 +113,9 @@ const FEATURED_UP_MIDS = [
 ] as const
 
 const FEATURED_SHELF_LIMIT =16
+const POPULAR_SHELF_LIMIT =17
+const FEATURED_COLLECTION_LIMIT =24
 
-const FEATURED_PLAYLIST_MID =296465852
 const FEATURED_PLAYLIST_SEASONS = [2152368,2382541,2065308] as const
 
 const MUSIC_SEARCH_TYPE_IDS = new Set([
@@ -223,43 +226,61 @@ async function fetchBilibiliFeaturedUps(): Promise<BilibiliFeaturedUp[]> {
 async function fetchBilibiliFeaturedPlaylists(): Promise<
  BilibiliFeaturedPlaylist[]
 > {
- const data = await fetchBilibiliSeasonSeries({
- mid: FEATURED_PLAYLIST_MID,
- page:1,
- pageSize:20,
+ const collectionPages = await Promise.all(
+  FEATURED_UP_MIDS.map((mid) =>
+   fetchBilibiliSeasonSeries({
+    mid,
+    page:1,
+    pageSize:20,
+   }).catch(() => null),
+  ),
+ )
+ const collections = collectionPages.flatMap((data, index) => {
+  if (!data) {
+   return []
+  }
+  const mid = FEATURED_UP_MIDS[index]
+  if (!mid) {
+   return []
+  }
+  return mapBilibiliUpCollections(data, mid)
  })
- const seasons = new Map<number, NonNullable<
- NonNullable<typeof data.items_lists>["seasons_list"]
- >[number]["meta"]>()
- for (const item of data.items_lists?.seasons_list ?? []) {
- const seasonId = item.meta?.season_id
- if (seasonId) {
- seasons.set(seasonId, item.meta)
- }
- }
- for (const item of data.items_lists?.series_list ?? []) {
- const seriesId = item.meta?.series_id
- if (seriesId) {
- seasons.set(seriesId, {
- ...item.meta,
- season_id: seriesId,
+ const collectionByKey = new Map(
+  collections.map((collection) => [
+   `${collection.kind}:${collection.mid}:${collection.collectionId}`,
+   collection,
+  ]),
+ )
+ const pinnedCollections = FEATURED_PLAYLIST_SEASONS.flatMap((collectionId) => {
+  const collection = collectionByKey.get(
+   `season:296465852:${collectionId}`,
+  )
+  if (!collection) {
+   return []
+  }
+  collectionByKey.delete(
+   `season:296465852:${collectionId}`,
+  )
+  return [collection]
  })
- }
- }
- return FEATURED_PLAYLIST_SEASONS.flatMap((seasonId) => {
- const meta = seasons.get(seasonId)
- return [{
- id: `bilibili-season:${seasonId}`,
- title: meta?.name?.trim() || meta?.title?.trim() || `精选歌单 ${seasonId}`,
- coverUrl: normalizeImageUrl(meta?.cover) || "",
- description: meta?.description?.trim() || undefined,
- count: meta?.total,
- mid: FEATURED_PLAYLIST_MID,
- seasonId,
- webUrl:
- `https://space.bilibili.com/${FEATURED_PLAYLIST_MID}/lists/${seasonId}?type=season`,
- }]
- })
+ const featuredCollections = [
+  ...pinnedCollections,
+  ...[...collectionByKey.values()].slice(
+   0,
+   FEATURED_COLLECTION_LIMIT - pinnedCollections.length,
+  ),
+ ].map((collection) => ({
+  id: collection.id,
+  title: collection.title,
+  coverUrl: collection.coverUrl,
+  description: collection.description,
+  count: collection.count,
+  mid: collection.mid,
+  collectionId: collection.collectionId,
+  webUrl: collection.webUrl,
+  kind: collection.kind,
+ }))
+ return featuredCollections
 }
 
 function mapBilibiliUpCollections(
@@ -504,13 +525,12 @@ async function fetchBilibiliMusicRanking(): Promise<
  const popularTracks = new Map<string, Track>()
  for (const track of [...popularResult, ...musicRanking]) {
  popularTracks.set(track.id, track)
- if (popularTracks.size >=16) {
+ if (popularTracks.size >=POPULAR_SHELF_LIMIT) {
  break
  }
  }
  const shelves: BilibiliMusicShelf[] = []
- const popularItems = [...popularTracks.values()].slice(0,16)
- const popularIds = new Set(popularItems.map((track) => track.id))
+ const popularItems = [...popularTracks.values()].slice(0,POPULAR_SHELF_LIMIT)
  if (popularItems.length >0) {
  shelves.push({
  id: "popular",
@@ -523,9 +543,7 @@ async function fetchBilibiliMusicRanking(): Promise<
  if (!definition) {
  return
  }
- const tracks = items
- .filter((track) => !popularIds.has(track.id))
- .slice(0, FEATURED_SHELF_LIMIT)
+ const tracks = items.slice(0, FEATURED_SHELF_LIMIT)
  if (tracks.length >0) {
  shelves.push({
  id: definition.id,

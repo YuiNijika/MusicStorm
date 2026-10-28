@@ -6,6 +6,7 @@ use reqwest::redirect::{Attempt, Policy};
 use reqwest::Url;
 use serde::Serialize;
 use serde_json::Value;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -22,10 +23,10 @@ const USER_AGENT_VALUE: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleW
 const LOGIN_USER_AGENT_VALUE: &str = "Mozilla/5.0 BiliDroid/2.0.1 (bbcallen@gmail.com) os/android model/android_hd mobi_app/android_hd build/2001100 channel/master innerVer/2001100 osVer/15 network/2";
 const LOGIN_TRACE_ID: &str = "11111111111111111111111111111111:1111111111111111:0:0";
 const MAX_JSON_BYTES: u64 = 8 * 1024 * 1024;
-const MAX_AUDIO_BYTES: u64 = 200 * 1024 * 1024;
+const MAX_AUDIO_BYTES: u64 = 1024 * 1024 * 1024;
 const CONNECT_TIMEOUT_SECONDS: u64 = 12;
 const JSON_TIMEOUT_SECONDS: u64 = 15;
-const REQUEST_TIMEOUT_SECONDS: u64 =180;
+const REQUEST_TIMEOUT_SECONDS: u64 =900;
 const COOKIE_VERSION: &str = "v1";
 const PASSPORT_HOST: &str = "passport.bilibili.com";
 
@@ -51,6 +52,7 @@ fn api_path_allowed(path: &str) -> bool {
  | "/x/series/archives"
             | "/x/player/wbi/playurl"
  | "/x/v3/fav/folder/created/list-all"
+ | "/x/v3/fav/folder/created/list"
  | "/x/v3/fav/folder/info"
  | "/x/v3/fav/resource/list"
     )
@@ -244,6 +246,9 @@ fn bilibili_headers(
         .header(REFERER, BILIBILI_REFERER)
         .header("Origin", BILIBILI_ORIGIN)
         .header(USER_AGENT, USER_AGENT_VALUE)
+        .header("env", "prod")
+        .header("app-key", "android64")
+        .header("x-bili-aurora-zone", "sh001")
 }
 
 fn login_headers(
@@ -278,6 +283,30 @@ fn request_cookie(
         .or_else(|| read_cookie(app))
 }
 
+fn cookie_value(cookie: &str, name: &str) -> Option<String> {
+    cookie.split(';').find_map(|part| {
+        let (key, value) = part.trim().split_once('=')?;
+        if key == name && !value.is_empty() {
+            Some(value.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn aurora_eid(mid: &str) -> Option<String> {
+    if mid.is_empty() || !mid.bytes().all(|value| value.is_ascii_digit()) {
+        return None;
+    }
+    let key = b"ad1va46a7lza";
+    let encoded = mid
+        .bytes()
+        .enumerate()
+        .map(|(index, value)| value ^ key[index % key.len()])
+        .collect::<Vec<_>>();
+    Some(STANDARD_NO_PAD.encode(encoded))
+}
+
 #[tauri::command]
 pub async fn bilibili_get_json(
     app: AppHandle,
@@ -289,12 +318,26 @@ pub async fn bilibili_get_json(
         let target = validate_api_url(&url)?;
         let client = json_client()?;
         let is_passport = target.host_str() == Some(PASSPORT_HOST);
+        let cookie = request_cookie(&app, cookie);
+        let account_mid = cookie
+            .as_deref()
+            .and_then(|value| cookie_value(value, "DedeUserID"));
         let request = if is_passport {
             login_headers(client.get(target), buvid.as_deref())
         } else {
-            bilibili_headers(client.get(target))
+            let request = bilibili_headers(client.get(target));
+            match account_mid.as_deref() {
+                Some(mid) if !mid.is_empty() => {
+                    let request = request.header("x-bili-mid", mid);
+                    match aurora_eid(mid) {
+                        Some(eid) => request.header("x-bili-aurora-eid", eid),
+                        None => request,
+                    }
+                }
+                _ => request,
+            }
         };
-        let request = if let Some(cookie) = request_cookie(&app, cookie) {
+        let request = if let Some(cookie) = cookie {
             request.header(COOKIE, cookie)
         } else {
             request

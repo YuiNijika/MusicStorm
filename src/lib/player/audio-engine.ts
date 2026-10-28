@@ -34,9 +34,8 @@ function createHtml5Engine(handlers: AudioEngineHandlers = {}): AudioEngine {
     audio.setAttribute("playsinline", "")
     // 移动端（Android WebView / iOS WKWebView）需要允许内联播放，
     // 否则 play() 会被系统拦截仅允许全屏
-    // 均衡器经 createMediaElementSource 接管输出，需 CORS 干净的媒体源，
-    // 否则跨域音频被 Web Audio 判为污染而静音；本地 asset/blob 同源不受影响
-    audio.crossOrigin = "anonymous"
+ //网易云等跨域媒体需要 CORS模式，B站代理地址与本地媒体保持同源或可跨域
+ audio.crossOrigin = "anonymous"
 
     // 加载完成后 resolve 的 Promise；切曲时取消等待避免卡死
     let readyPromise: Promise<void> | null = null

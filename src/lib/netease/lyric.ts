@@ -7,6 +7,11 @@ type LyricApiData = {
     code?: number
 }
 
+type LyricBundle = {
+    lyricText: string
+    translationText: string
+}
+
 // 网易云无歌词/纯音乐时返回的占位文案，命中即视为无歌词而非真实歌词
 const NO_LYRIC_PATTERNS = ["暂无歌词", "无歌词", "没有填词", "纯音乐"]
 
@@ -26,9 +31,14 @@ function toNeteaseSongId(songId: string): string | null {
 }
 
 async function fetchLyricText(songId: string): Promise<string> {
+    const bundle = await fetchLyricBundle(songId)
+    return bundle.lyricText
+}
+
+async function fetchLyricBundle(songId: string): Promise<LyricBundle> {
     const numericId = toNeteaseSongId(songId)
     if (!numericId) {
-        return ""
+        return { lyricText: "", translationText: "" }
     }
 
     const data = await neteaseRequest<LyricApiData>({
@@ -37,16 +47,30 @@ async function fetchLyricText(songId: string): Promise<string> {
     })
 
     const text = data.lrc?.lyric?.trim() ?? ""
+    const translationText = data.tlyric?.lyric?.trim() ?? ""
     // 占位文案当空处理，避免把「暂无歌词」当成歌词文本
-    return isNoLyricPlaceholder(parseLyricText(text)) ? "" : text
+    return {
+        lyricText: isNoLyricPlaceholder(parseLyricText(text)) ? "" : text,
+        translationText,
+    }
 }
 
 /** 原文行与翻译行按时间戳就近配对（容差内），每行最多配一句翻译 */
 function mergeTranslatedLyrics(
     lrc: LyricLine[],
     tlyric: LyricLine[],
-    toleranceMs = 100,
+    toleranceMs = 500,
 ): LyricLine[] {
+    const plainTranslation = tlyric.filter((line) => Boolean(line.text.trim()))
+    if (
+        plainTranslation.length === lrc.length &&
+        plainTranslation.every((line) => line.timeMs <= 0)
+    ) {
+        return lrc.map((line, index) => ({
+            ...line,
+            translation: plainTranslation[index]?.text,
+        }))
+    }
     const translation = tlyric
         .filter((line) => line.timeMs > 0 && Boolean(line.text.trim()))
         .sort((a, b) => a.timeMs - b.timeMs)
@@ -118,4 +142,9 @@ async function fetchLyricLines(
     return mergeTranslatedLyrics(lines, translated)
 }
 
-export { fetchLyricLines, fetchLyricText, mergeTranslatedLyrics }
+export {
+    fetchLyricBundle,
+    fetchLyricLines,
+    fetchLyricText,
+    mergeTranslatedLyrics,
+}

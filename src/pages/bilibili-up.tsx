@@ -1,4 +1,4 @@
-import { ExternalLink, Play, Radio } from "lucide-react"
+import { ExternalLink, Play } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { AccountAvatar } from "@/components/bilibili/account-avatar"
@@ -16,8 +16,6 @@ import {
 import { openExternalUrl } from "@/lib/open-external"
 import { formatError } from "@/lib/notify"
 import { cn } from "@/lib/utils"
-
-type BilibiliUpTab = "collections" | "series" | "about"
 
 type BilibiliUpPageProps = {
  mid: string
@@ -73,7 +71,7 @@ eager
  : ""}
  </p>
  {profile.description ? (
- <p className="mx-auto line-clamp-2 max-w-[560px] text-[13px] leading-relaxed text-muted-foreground sm:mx-0">
+ <p className="mx-auto max-w-[560px] text-[13px] leading-relaxed text-muted-foreground sm:mx-0">
  {profile.description}
  </p>
  ) : null}
@@ -100,40 +98,6 @@ eager
  )
 }
 
-function CollectionCard({
- item,
- onSelect,
-}: {
- item: BilibiliUpCollection
- onSelect: () => void
-}) {
- return (
- <button
- type="button"
- onClick={onSelect}
- className={cn(
-"group flex w-full cursor-pointer flex-col gap-2 rounded-[14px] text-left transition-[transform,box-shadow] focus-visible:outline-2 focus-visible:outline-ring",
- )}
- >
- <Cover
- src={item.coverUrl}
- alt={item.title}
- size="xl"
- className="transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.02]"
- />
- <span className="w-full min-w-0 px-0.5">
- <span className="line-clamp-2 text-[13px] leading-[1.35] font-semibold">
- {item.title}
- </span>
- <span className="mt-1 block truncate text-[12px] text-muted-foreground">
- {item.kind === "season" ? "合集" : "系列"}
- {item.count != null ? ` · ${item.count}个视频` : ""}
- </span>
- </span>
- </button>
- )
-}
-
 function CollectionGrid({
  items,
  onOpen,
@@ -153,45 +117,31 @@ function CollectionGrid({
  return (
  <div className="grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 xl:grid-cols-4">
  {items.map((item) => (
- <CollectionCard
+ <button
  key={item.id}
- item={item}
- onSelect={() => onOpen(item)}
+ type="button"
+ onClick={() => onOpen(item)}
+ className={cn(
+  "group flex w-full cursor-pointer flex-col gap-2 rounded-[14px] text-left transition-[transform,box-shadow] focus-visible:outline-2 focus-visible:outline-ring",
+ )}
+ >
+ <Cover
+ src={item.coverUrl}
+ alt={item.title}
+ size="xl"
+ className="transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.02]"
  />
- ))}
- </div>
- )
-}
-
-function AboutPanel({ profile }: { profile: BilibiliUpProfile }) {
- return (
- <div className="material-panel space-y-5 rounded-[22px] px-5 py-4">
- <div className="flex items-start gap-3">
- <Radio
- className="mt-0.5 size-4 shrink-0 text-muted-foreground"
- aria-hidden="true"
- />
- <div className="min-w-0 space-y-1.5">
- <p className="text-[12px] font-medium tracking-[0.04em] text-muted-foreground uppercase">
-简介
- </p>
- <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-foreground/90">
- {profile.description || "这位 UP主还没有填写简介"}
- </p>
- </div>
- </div>
- <div className="grid gap-2 border-t border-black/[0.06] pt-4 text-[13px] dark:border-white/[0.08] sm:grid-cols-2">
- <p className="text-muted-foreground">
-粉丝
- <span className="ml-2 text-foreground">
- {formatFans(profile.fans)}
+ <span className="min-w-0 flex-1">
+ <span className="block line-clamp-2 text-[13px] font-semibold leading-[1.35]">
+ {item.title}
  </span>
- </p>
- <p className="text-muted-foreground">
- UID
- <span className="ml-2 text-foreground">{profile.mid}</span>
- </p>
- </div>
+ <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+ {item.kind === "season" ? "合集" : "系列"}
+ {item.count != null ? ` · ${item.count}个视频` : ""}
+ </span>
+ </span>
+ </button>
+ ))}
  </div>
  )
 }
@@ -203,7 +153,6 @@ function BilibiliUpPage({ mid, onBack }: BilibiliUpPageProps) {
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState("")
  const [revision, setRevision] = useState(0)
- const [tab, setTab] = useState<BilibiliUpTab>("collections")
 
  useEffect(() => {
  if (!Number.isSafeInteger(numericMid) || numericMid <=0) {
@@ -283,16 +232,6 @@ function BilibiliUpPage({ mid, onBack }: BilibiliUpPageProps) {
 onPlay={handlePlayCollection}
  />
  <Tabs
- value={tab}
- onValueChange={(value) => {
- if (
- value === "collections" ||
- value === "series" ||
- value === "about"
- ) {
- setTab(value)
- }
- }}
  className="gap-4"
  >
  <TabsList
@@ -304,9 +243,6 @@ onPlay={handlePlayCollection}
  </TabsTrigger>
  <TabsTrigger value="series" className="px-3">
 系列
- </TabsTrigger>
- <TabsTrigger value="about" className="px-3">
-简介
  </TabsTrigger>
  </TabsList>
  <TabsContent value="collections" className="outline-none">
@@ -332,9 +268,6 @@ onPlay={handlePlayCollection}
  })
  }
  />
- </TabsContent>
- <TabsContent value="about" className="outline-none">
- <AboutPanel profile={profile} />
  </TabsContent>
  </Tabs>
  </>

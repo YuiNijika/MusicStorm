@@ -16,12 +16,11 @@ import {
  fetchBilibiliMusicRanking,
  type BilibiliFeaturedPlaylist,
  type BilibiliFeaturedUp,
-type BilibiliMusicShelf,
+ type BilibiliMusicShelf,
 } from "@/lib/bilibili/search"
 import type { AppRoute } from "@/lib/routes"
 import type { Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { isWebMode } from "@/lib/web-mode"
 
 type TrackPlayerProps = {
  currentTrackId?: string
@@ -208,7 +207,7 @@ function FeaturedUps({
  }
  return (
  <Section
- title="MS精选UP"
+ title="精选UP主"
  description="持续整理音乐内容"
  variant="listen"
  >
@@ -244,52 +243,52 @@ eager
  )
 }
 
-function FeaturedPlaylists({
+function FeaturedCollections({
  items,
-onOpen,
+ onOpen,
 }: {
  items: BilibiliFeaturedPlaylist[]
-onOpen: (playlist: BilibiliFeaturedPlaylist) => void
+ onOpen: (collection: BilibiliFeaturedPlaylist) => void
 }) {
- if (items.length ===0) {
- return null
+ if (items.length === 0) {
+  return null
  }
 
  return (
- <Section
- title="MS精选歌单"
- description="UP主合集与系列"
- variant="listen"
- >
- <CardsRail cardWidthClassName="w-[168px]">
- {items.map((item) => (
- <button
- key={item.id}
- type="button"
-onClick={() => onOpen(item)}
- className={cn(
- "group flex w-full cursor-pointer flex-col gap-2 text-left",
- "rounded-[14px] focus-visible:outline-2 focus-visible:outline-ring",
- )}
- >
- <Cover
- src={item.coverUrl}
- alt={item.title}
- size="xl"
- className="transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.02]"
- />
- <span className="w-full min-w-0 px-0.5">
- <span className="block truncate text-[13px] font-semibold">
- {item.title}
- </span>
- <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
- {item.count != null ? `${item.count}首` : "精选合集"}
- </span>
- </span>
- </button>
- ))}
- </CardsRail>
- </Section>
+  <Section
+   title="合集"
+   description="UP主整理的音乐合集与系列"
+   variant="listen"
+  >
+   <CardsRail cardWidthClassName="w-[168px]">
+    {items.map((item) => (
+     <button
+      key={item.id}
+      type="button"
+      onClick={() => onOpen(item)}
+      className={cn(
+       "group flex w-full cursor-pointer flex-col gap-2 text-left",
+       "rounded-[14px] focus-visible:outline-2 focus-visible:outline-ring",
+      )}
+     >
+      <Cover
+       src={item.coverUrl}
+       alt={item.title}
+       size="xl"
+       className="transition-transform duration-[var(--duration-hover)] group-hover:scale-[1.02]"
+      />
+      <span className="w-full min-w-0 px-0.5">
+       <span className="block truncate text-[13px] font-semibold">
+        {item.title}
+       </span>
+       <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+        {item.count != null ? `${item.count}首` : "UP主合集"}
+       </span>
+      </span>
+     </button>
+    ))}
+   </CardsRail>
+  </Section>
  )
 }
 
@@ -298,7 +297,7 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
  const { openBilibiliCollection, openBilibiliUp } = useMusicNavigation()
  const [shelves, setShelves] = useState<BilibiliMusicShelf[]>([])
  const [featuredUps, setFeaturedUps] = useState<BilibiliFeaturedUp[]>([])
- const [featuredPlaylists, setFeaturedPlaylists] =
+ const [featuredCollections, setFeaturedCollections] =
  useState<BilibiliFeaturedPlaylist[]>([])
  const [homeLoading, setHomeLoading] = useState(true)
  const [playlistLoading, setPlaylistLoading] = useState(true)
@@ -307,13 +306,6 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
 
  useEffect(() => {
  let active = true
- if (isWebMode()) {
- setHomeLoading(false)
- setPlaylistLoading(false)
- setShelves([])
- setError("B站模式暂时只支持客户端")
- return
- }
  setHomeLoading(true)
  setPlaylistLoading(true)
  setError(null)
@@ -342,10 +334,10 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
  })
  void fetchBilibiliFeaturedPlaylists()
  .then((items) => {
- if (active) setFeaturedPlaylists(items)
+ if (active) setFeaturedCollections(items)
  })
  .catch(() => {
- if (active) setFeaturedPlaylists([])
+ if (active) setFeaturedCollections([])
  })
  .finally(() => {
  if (active) setPlaylistLoading(false)
@@ -407,11 +399,7 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
  <StateHero
  variant="error"
  title="音乐内容暂时不可用"
- description={
- isWebMode()
- ? error
- : `${error}。检查网络后重试`
- }
+ description={`${error}。检查网络后重试`}
  action={
  <HeroRetryButton onClick={refresh}>
 重新加载
@@ -446,11 +434,26 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
  onOpenUp={openBilibiliUp}
  />
 
+ <FeaturedCollections
+ items={featuredCollections}
+ onOpen={(collection) =>
+ openBilibiliCollection({
+  mid: String(collection.mid),
+  collectionId: String(collection.collectionId),
+  kind: collection.kind === "series" ? "series" : "season",
+ })
+ }
+ />
+
  {shelves.map((shelf) => (
  <Section
  key={shelf.id}
  title={shelf.title}
- description={`${shelf.tracks.length}首`}
+ description={`${
+ shelf.id === "popular" && featuredTrack
+ ? shelf.tracks.filter((track) => track.id !== featuredTrack.id).length
+ : shelf.tracks.length
+ }首`}
  variant="listen"
  >
  <TrackColumns
@@ -468,16 +471,6 @@ function BilibiliPage({ onNavigate }: BilibiliPageProps) {
  </Section>
  ))}
 
- <FeaturedPlaylists
- items={featuredPlaylists}
-onOpen={(playlist) =>
- openBilibiliCollection({
- mid: String(playlist.mid),
- collectionId: String(playlist.seasonId),
- kind: "season",
- })
- }
- />
  </>
  )}
  </div>

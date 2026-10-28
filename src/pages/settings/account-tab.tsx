@@ -352,7 +352,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                 <div className="space-y-3">
                     <SettingsGroup
                         title="哔哩哔哩账号"
-                        description="登录后可将收藏夹作为资料库使用"
+                        description="登录后可查看账号收藏夹"
                     >
                         {bilibiliAccount ? (
                             <div className="flex min-h-11 flex-wrap items-center gap-3">
@@ -378,7 +378,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground">
-                                当前未登录，登录后可以在资料库查看收藏夹。
+                                当前未登录，登录后可以查看账号收藏夹。
                             </p>
                         )}
                         {bilibiliAccount ? null : (
@@ -393,8 +393,8 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                         )}
                     </SettingsGroup>
                     <SettingsGroup
-                        title="资料库"
-                        description="登录后，B站收藏夹会显示在B站模式的资料库中"
+                        title="收藏夹"
+                        description="登录后，账号收藏夹会显示在B站模式中"
                     >
  {bilibiliAccount ? (
  <p className="text-sm text-muted-foreground">
@@ -402,7 +402,7 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
  </p>
  ) : (
  <p className="text-sm text-muted-foreground">
-登录后，收藏夹会自动出现在B站模式的资料库中。
+登录后，账号收藏夹会显示在B站模式中。
  </p>
  )}
                     </SettingsGroup>

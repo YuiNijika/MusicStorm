@@ -42,6 +42,7 @@ const ROUTE_MAP: Record<string, string> = {
     "/x/player/wbi/playurl": "/player",
     "/audio/music-service-c/web/song/info": "/audio/info",
     "/audio/music-service-c/url": "/audio/url",
+    "/x/v3/fav/folder/created/list": "/favorites/folders",
     "/x/v3/fav/folder/created/list-all": "/favorites/folders",
     "/x/v3/fav/folder/info": "/favorites/folder/info",
     "/x/v3/fav/resource/list": "/favorites/resources",
@@ -109,7 +110,7 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
                 url: input.url,
                 body: input.body ?? null,
                 refererUrl: input.referer ?? null,
-                cookie: input.cookie ?? null,
+                cookie: input.cookie ?? (readCookieHeader() || null),
                 buvid: input.buvid ?? null,
             })
         }
@@ -118,7 +119,7 @@ async function bilibiliProxyRequest(input: ProxyInput): Promise<unknown> {
         }
         return invoke<unknown>("bilibili_get_json", {
             url: input.url,
-            cookie: input.cookie ?? null,
+            cookie: input.cookie ?? (readCookieHeader() || null),
             buvid: input.buvid ?? null,
         })
     }

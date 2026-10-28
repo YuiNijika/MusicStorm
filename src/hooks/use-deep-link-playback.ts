@@ -8,7 +8,7 @@ import type { Track } from "@/lib/types"
 
 /**
  *从输入里解析网易云歌曲 id或 B站 BV号，支持网页站 hash与应用协议两种入口。
-*/
+ */
 type PlayDeepLink = {
  id: string
  source: "netease" | "bilibili"

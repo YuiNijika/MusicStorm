@@ -3,8 +3,15 @@ import { useEffect, useRef, useState } from "react"
 import { usePlayer } from "./use-player"
 import { usePlaybackTick } from "@/lib/player/playback-tick"
 import { parseLyricText } from "@/lib/lyric/parse"
-import { getLyricOverride, LYRIC_OVERRIDE_EVENT } from "@/lib/lyric/overrides"
-import { fetchLyricLines } from "@/lib/netease/lyric"
+import {
+    getLyricOverride,
+    getLyricTranslationOverride,
+    LYRIC_OVERRIDE_EVENT,
+} from "@/lib/lyric/overrides"
+import {
+    fetchLyricLines,
+    mergeTranslatedLyrics,
+} from "@/lib/netease/lyric"
 import { getPlayerPreferences, PLAYER_PREFS_EVENT } from "@/lib/player/playback-prefs"
 import type { LyricLine } from "@/lib/lyric/parse"
 
@@ -22,6 +29,7 @@ export function useDesktopLyricSync() {
     // 所以用 state 计数驱动 effect，可见性走事件同步
     const [overrideTick, setOverrideTick] = useState(0)
     const [prefsTick, setPrefsTick] = useState(0)
+    const [linesTick, setLinesTick] = useState(0)
     const isVisibleRef = useRef(false)
 
     // Check if desktop lyric is visible
@@ -70,38 +78,48 @@ export function useDesktopLyricSync() {
     useEffect(() => {
         if (!currentTrack) {
             linesRef.current = []
+            setLinesTick((value) => value + 1)
             return
         }
 
         let cancelled = false
+        const updateLines = (lines: LyricLine[]) => {
+            if (cancelled) {
+                return
+            }
+            linesRef.current = lines
+            setLinesTick((value) => value + 1)
+        }
 
         const loadLyrics = async () => {
             try {
                 // Check override first
                 const override = getLyricOverride(currentTrack.id)
                 if (override) {
-                    const lines = parseLyricText(override)
-                    if (!cancelled) {
-                        linesRef.current = lines
-                    }
+                    const translation = getLyricTranslationOverride(
+                        currentTrack.id,
+                    )
+                    const lines = mergeTranslatedLyrics(
+                        parseLyricText(override),
+                        translation ? parseLyricText(translation) : [],
+                    )
+                    updateLines(lines)
                     return
                 }
 
- if (currentTrack.source === "bilibili") {
- linesRef.current = []
- return
- }
+                if (currentTrack.source === "bilibili") {
+                    updateLines([])
+                    return
+                }
 
- // Local track
- if (currentTrack.source === "local") {
+                // Local track
+                if (currentTrack.source === "local") {
                     if (currentTrack.lyricText?.trim()) {
                         const lines = parseLyricText(currentTrack.lyricText)
-                        if (!cancelled) {
-                            linesRef.current = lines
-                        }
+                        updateLines(lines)
                         return
                     }
-                    linesRef.current = []
+                    updateLines([])
                     return
                 }
 
@@ -114,17 +132,13 @@ export function useDesktopLyricSync() {
                     const lines = remote.length > 0
                         ? remote
                         : parseLyricText(currentTrack.lyricText ?? "")
-                    if (!cancelled) {
-                        linesRef.current = lines
-                    }
+                    updateLines(lines)
                     return
                 }
 
-                linesRef.current = []
+                updateLines([])
             } catch {
-                if (!cancelled) {
-                    linesRef.current = []
-                }
+                updateLines([])
             }
         }
 
@@ -133,7 +147,13 @@ export function useDesktopLyricSync() {
         return () => {
             cancelled = true
         }
-    }, [currentTrack?.id, currentTrack?.source, currentTrack?.lyricText, overrideTick, prefsTick])
+    }, [
+        currentTrack?.id,
+        currentTrack?.source,
+        currentTrack?.lyricText,
+        overrideTick,
+        prefsTick,
+    ])
 
     // Update desktop lyric when position or lines change
     useEffect(() => {
@@ -155,5 +175,5 @@ export function useDesktopLyricSync() {
         invoke("update_desktop_lyric", { state }).catch(() => {
             // Ignore errors when window is not visible
         })
-    }, [positionMs, currentTrack?.title, currentTrack?.artist])
+    }, [positionMs, currentTrack?.title, currentTrack?.artist, linesTick])
 }

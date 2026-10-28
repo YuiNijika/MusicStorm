@@ -25,19 +25,8 @@ type BilibiliCollectionPageProps = {
 }
 
 const PAGE_SIZE =20
-const TRACK_COLUMNS =2
 
-function splitIntoColumns<T>(items: T[]): T[][] {
- if (items.length ===0) {
- return Array.from({ length: TRACK_COLUMNS }, () => [])
- }
- const size = Math.ceil(items.length / TRACK_COLUMNS)
- return Array.from({ length: TRACK_COLUMNS }, (_, index) =>
- items.slice(index * size, index * size + size),
- )
-}
-
-function TrackColumns({
+function TrackList({
  tracks,
  currentTrackId,
  isPlaying,
@@ -48,21 +37,13 @@ function TrackColumns({
  isPlaying: boolean
  onPlay: (track: Track) => void
 }) {
- const columns = splitIntoColumns(tracks)
  return (
- <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
- {columns.map((column, columnIndex) => (
- <div key={columnIndex} className="apple-list-surface min-w-0 p-1.5">
- {column.map((track, index) => {
- const globalIndex =
- columns
- .slice(0, columnIndex)
- .reduce((sum, item) => sum + item.length,0) + index
- return (
+ <div className="apple-list-surface min-w-0 p-1.5">
+ {tracks.map((track, index) => (
  <TrackRow
  key={track.id}
  track={track}
- index={globalIndex}
+ index={index}
  isActive={currentTrackId === track.id}
  isPlaying={currentTrackId === track.id && isPlaying}
  showSource={false}
@@ -72,9 +53,6 @@ function TrackColumns({
  dense
  onPlay={onPlay}
  />
- )
- })}
- </div>
  ))}
  </div>
  )
@@ -287,7 +265,7 @@ setPage(1)
  {displayTracks.length ===0 ? (
  <StateHero variant="empty" title="暂无视频" />
  ) : (
- <TrackColumns
+ <TrackList
  tracks={displayTracks}
  currentTrackId={currentTrack?.id}
  isPlaying={isPlaying}
