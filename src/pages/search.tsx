@@ -200,7 +200,7 @@ function SearchPage() {
         return () => {
             cancelled = true
         }
- }, [mode, submittedQuery])
+    }, [mode, submittedQuery])
 
     function runSearch() {
         const keyword = query.trim()
@@ -273,9 +273,9 @@ function SearchPage() {
             <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                     <ModeChip
- active={mode === "online"}
- label={onlineLabel}
- onClick={() => handleModeChange("online")}
+                        active={mode === "online"}
+                        label={onlineLabel}
+                        onClick={() => handleModeChange("online")}
                     />
                     <ModeChip
                         active={mode === "local"}
@@ -285,109 +285,109 @@ function SearchPage() {
                 </div>
 
                 <div className="relative">
-                <div className="flex gap-2">
-                    <label className="material-field flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-3.5">
-                        <SearchIcon
-                            aria-hidden="true"
-                            className="size-4 shrink-0 text-muted-foreground"
-                        />
-                        <input
-                            value={query}
-                            type="search"
-                            name="search"
-                            aria-label="搜索关键词"
-                            enterKeyHint="search"
-                            autoComplete="off"
-                            spellCheck={false}
-                            onFocus={() => setInputFocused(true)}
-                            onBlur={() =>
-                                window.setTimeout(
-                                    () => setInputFocused(false),
-                                    120,
-                                )
-                            }
-                            onChange={(event) => setQuery(event.currentTarget.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault()
-                                    runSearch()
+                    <div className="flex gap-2">
+                        <label className="material-field flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-3.5">
+                            <SearchIcon
+                                aria-hidden="true"
+                                className="size-4 shrink-0 text-muted-foreground"
+                            />
+                            <input
+                                value={query}
+                                type="search"
+                                name="search"
+                                aria-label="搜索关键词"
+                                enterKeyHint="search"
+                                autoComplete="off"
+                                spellCheck={false}
+                                onFocus={() => setInputFocused(true)}
+                                onBlur={() =>
+                                    window.setTimeout(
+                                        () => setInputFocused(false),
+                                        120,
+                                    )
                                 }
-                            }}
-                            placeholder={
-                                mode === "online"
-                                    ? "歌曲、艺人、专辑、歌单、播客"
-                                    : "歌曲、艺人、专辑"
-                            }
-                            className="h-full w-full bg-transparent text-[14px] outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                        />
-                    </label>
-                    <button
-                        type="button"
-                        onClick={runSearch}
-                        disabled={
- mode === "online"
-                                ? !query.trim() || isLoading
-                                : false
-                        }
-                        className={cn(
-                            "apple-primary-action h-11 shrink-0 cursor-pointer rounded-2xl px-4 text-[13px] font-medium",
-                            "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
-                            "focus-visible:outline-2 focus-visible:outline-ring",
-                        )}
-                    >
-                        {mode === "online" && isLoading ? "搜索中…" : "搜索"}
-                    </button>
-                </div>
-
-                {inputFocused && !query.trim() && history.length > 0 ? (
-                    <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.16)] ring-1 ring-foreground/10 backdrop-blur-2xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-[var(--duration-enter)] ease-[var(--ease-enter)]">
-                        <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                            最近搜索
-                        </p>
-                        {history.map((item) => (
-                            <div
-                                key={item}
-                                className="flex w-full items-center rounded-xl transition-colors hover:bg-[var(--surface-fill)]"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => runHistorySearch(item)}
-                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
-                                >
-                                    <HistoryIcon
-                                        aria-hidden="true"
-                                        className="size-4 shrink-0 text-muted-foreground/50"
-                                    />
-                                    <span className="min-w-0 flex-1 truncate text-[13px]">
-                                        {item}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    aria-label={`删除 ${item}`}
-                                    onClick={() => removeSearchHistory(item)}
-                                    className="relative mr-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-60 transition-[opacity,background-color] after:absolute after:-inset-2 after:content-[''] hover:bg-[var(--surface-fill-hover)] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring"
-                                >
-                                    <X
-                                        aria-hidden="true"
-                                        className="size-3.5"
-                                    />
-                                </button>
-                            </div>
-                        ))}
+                                onChange={(event) => setQuery(event.currentTarget.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.preventDefault()
+                                        runSearch()
+                                    }
+                                }}
+                                placeholder={
+                                    mode === "online"
+                                        ? "歌曲、艺人、专辑、歌单、播客"
+                                        : "歌曲、艺人、专辑"
+                                }
+                                className="h-full w-full bg-transparent text-[14px] outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                            />
+                        </label>
                         <button
                             type="button"
-                            onClick={clearSearchHistory}
-                            className="w-full cursor-pointer py-1.5 text-center text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                            onClick={runSearch}
+                            disabled={
+                                mode === "online"
+                                    ? !query.trim() || isLoading
+                                    : false
+                            }
+                            className={cn(
+                                "apple-primary-action h-11 shrink-0 cursor-pointer rounded-2xl px-4 text-[13px] font-medium",
+                                "transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-40",
+                                "focus-visible:outline-2 focus-visible:outline-ring",
+                            )}
                         >
-                            清空搜索记录
+                            {mode === "online" && isLoading ? "搜索中…" : "搜索"}
                         </button>
                     </div>
-                ) : null}
+
+                    {inputFocused && !query.trim() && history.length > 0 ? (
+                        <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.16)] ring-1 ring-foreground/10 backdrop-blur-2xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-[var(--duration-enter)] ease-[var(--ease-enter)]">
+                            <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                                最近搜索
+                            </p>
+                            {history.map((item) => (
+                                <div
+                                    key={item}
+                                    className="flex w-full items-center rounded-xl transition-colors hover:bg-[var(--surface-fill)]"
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => runHistorySearch(item)}
+                                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
+                                    >
+                                        <HistoryIcon
+                                            aria-hidden="true"
+                                            className="size-4 shrink-0 text-muted-foreground/50"
+                                        />
+                                        <span className="min-w-0 flex-1 truncate text-[13px]">
+                                            {item}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`删除 ${item}`}
+                                        onClick={() => removeSearchHistory(item)}
+                                        className="relative mr-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 opacity-60 transition-[opacity,background-color] after:absolute after:-inset-2 after:content-[''] hover:bg-[var(--surface-fill-hover)] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring"
+                                    >
+                                        <X
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={clearSearchHistory}
+                                className="w-full cursor-pointer py-1.5 text-center text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                                清空搜索记录
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
- {mode === "online" ? (
+            {mode === "online" ? (
                 isLoading ? (
                     <SearchResultsSkeleton />
                 ) : errorText ? (
@@ -411,29 +411,29 @@ function SearchPage() {
                 ) : (
                     <div className="space-y-8">
                         {remote.tracks.length > 0 ? (
- <Section title="歌曲" description={`${remote.tracks.length}首`} variant="listen">
- <div className="apple-list-surface p-1.5">
- <VirtualList
- items={remote.tracks}
- itemHeight={58}
- getItemKey={(track) => `${track.source}-${track.id}`}
- renderItem={(track, index) => (
- <TrackRow
- track={track}
- index={index}
- showSource={true}
- isActive={currentTrack?.id === track.id}
- isPlaying={currentTrack?.id === track.id && isPlaying}
- onPlay={(item) => playOrToggle(item, remote.tracks)}
- />
- )}
- />
- </div>
- </Section>
- ) : null}
- {remote.artists.length >0 ? (
- <Section
- title="艺人"
+                            <Section title="歌曲" description={`${remote.tracks.length}首`} variant="listen">
+                                <div className="apple-list-surface p-1.5">
+                                    <VirtualList
+                                        items={remote.tracks}
+                                        itemHeight={58}
+                                        getItemKey={(track) => `${track.source}-${track.id}`}
+                                        renderItem={(track, index) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                showSource={true}
+                                                isActive={currentTrack?.id === track.id}
+                                                isPlaying={currentTrack?.id === track.id && isPlaying}
+                                                onPlay={(item) => playOrToggle(item, remote.tracks)}
+                                            />
+                                        )}
+                                    />
+                                </div>
+                            </Section>
+                        ) : null}
+                        {remote.artists.length > 0 ? (
+                            <Section
+                                title="艺人"
                                 description={`${remote.artists.length}`}
                                 variant="listen"
                                 action={<RailControls api={artistRail.api} />}
@@ -553,8 +553,8 @@ function SearchPage() {
                     />
                 </Section>
             ) : localResults.length === 0 &&
-              localArtists.length === 0 &&
-              localAlbums.length === 0 ? (
+                localArtists.length === 0 &&
+                localAlbums.length === 0 ? (
                 <StateHero
                     variant="search"
                     title="没有匹配的内容"

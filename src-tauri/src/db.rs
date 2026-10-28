@@ -329,7 +329,11 @@ fn legacy_db_candidates(app: &AppHandle) -> Vec<PathBuf> {
                 .join("com.musicstorm.app")
                 .join("musicstorm.db"),
         );
-        out.push(PathBuf::from(&local).join("music-storm").join("musicstorm.db"));
+        out.push(
+            PathBuf::from(&local)
+                .join("music-storm")
+                .join("musicstorm.db"),
+        );
     }
     if let Ok(roaming) = std::env::var("APPDATA") {
         out.push(
@@ -891,10 +895,7 @@ pub fn db_start_play_session(
 }
 
 #[tauri::command]
-pub fn db_end_play_session(
-    state: State<'_, DbState>,
-    input: PlaySessionEnd,
-) -> Result<(), String> {
+pub fn db_end_play_session(state: State<'_, DbState>, input: PlaySessionEnd) -> Result<(), String> {
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     let completed = if input.completed { 1 } else { 0 };
     conn.execute(
@@ -1241,11 +1242,7 @@ pub fn db_get_setting(state: State<'_, DbState>, key: String) -> Result<Option<S
 }
 
 #[tauri::command]
-pub fn db_set_setting(
-    state: State<'_, DbState>,
-    key: String,
-    value: String,
-) -> Result<(), String> {
+pub fn db_set_setting(state: State<'_, DbState>, key: String, value: String) -> Result<(), String> {
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     conn.execute(
         "INSERT INTO app_setting (key, value) VALUES (?1, ?2)
@@ -1378,10 +1375,7 @@ pub fn purge_expired_api_cache(app: &AppHandle, conn: &Connection) -> Result<u64
 }
 
 #[tauri::command]
-pub fn api_cache_purge_expired(
-    app: AppHandle,
-    state: State<'_, DbState>,
-) -> Result<u64, String> {
+pub fn api_cache_purge_expired(app: AppHandle, state: State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|_| "db lock".to_string())?;
     purge_expired_api_cache(&app, &conn)
 }

@@ -1,12 +1,10 @@
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use reqwest::blocking::Client;
-use reqwest::header::{
-    ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT,
-};
+use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT};
 use reqwest::redirect::{Attempt, Policy};
 use reqwest::Url;
 use serde::Serialize;
 use serde_json::Value;
-use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -26,7 +24,7 @@ const MAX_JSON_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES: u64 = 1024 * 1024 * 1024;
 const CONNECT_TIMEOUT_SECONDS: u64 = 12;
 const JSON_TIMEOUT_SECONDS: u64 = 15;
-const REQUEST_TIMEOUT_SECONDS: u64 =900;
+const REQUEST_TIMEOUT_SECONDS: u64 = 900;
 const COOKIE_VERSION: &str = "v1";
 const PASSPORT_HOST: &str = "passport.bilibili.com";
 
@@ -44,33 +42,33 @@ fn api_path_allowed(path: &str) -> bool {
             | "/x/member/web/account"
             | "/x/web-interface/wbi/search/type"
             | "/x/web-interface/popular"
- | "/x/web-interface/card"
+            | "/x/web-interface/card"
             | "/x/web-interface/view"
- | "/x/web-interface/ranking/v2"
- | "/x/polymer/web-space/seasons_series_list"
- | "/x/polymer/web-space/seasons_archives_list"
- | "/x/series/archives"
+            | "/x/web-interface/ranking/v2"
+            | "/x/polymer/web-space/seasons_series_list"
+            | "/x/polymer/web-space/seasons_archives_list"
+            | "/x/series/archives"
             | "/x/player/wbi/playurl"
- | "/x/v3/fav/folder/created/list-all"
- | "/x/v3/fav/folder/created/list"
- | "/x/v3/fav/folder/info"
- | "/x/v3/fav/resource/list"
+            | "/x/v3/fav/folder/created/list-all"
+            | "/x/v3/fav/folder/created/list"
+            | "/x/v3/fav/folder/info"
+            | "/x/v3/fav/resource/list"
     )
 }
 
 fn validate_api_url(raw: &str) -> Result<Url, String> {
- let url = Url::parse(raw.trim()).map_err(|_| "哔哩哔哩接口地址无效".to_string())?;
- let host = url.host_str().unwrap_or_default();
- if url.scheme() != "https"
- || (host != "api.bilibili.com" && host != PASSPORT_HOST)
- || (host == "api.bilibili.com" && !api_path_allowed(url.path()))
- || (host == PASSPORT_HOST && !passport_path_allowed(url.path()))
- || !url.username().is_empty()
- || url.password().is_some()
- {
- return Err("哔哩哔哩接口地址不受信任".into());
- }
- Ok(url)
+    let url = Url::parse(raw.trim()).map_err(|_| "哔哩哔哩接口地址无效".to_string())?;
+    let host = url.host_str().unwrap_or_default();
+    if url.scheme() != "https"
+        || (host != "api.bilibili.com" && host != PASSPORT_HOST)
+        || (host == "api.bilibili.com" && !api_path_allowed(url.path()))
+        || (host == PASSPORT_HOST && !passport_path_allowed(url.path()))
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("哔哩哔哩接口地址不受信任".into());
+    }
+    Ok(url)
 }
 
 fn passport_path_allowed(path: &str) -> bool {
@@ -107,57 +105,57 @@ fn validate_risk_referer(raw: Option<&str>) -> Result<Option<Url>, String> {
 }
 
 fn cookie_path(app: &AppHandle) -> Result<PathBuf, String> {
- let paths = ensure_storage_paths(app)?;
- Ok(paths.config_dir.join("bilibili-cookie.bin"))
+    let paths = ensure_storage_paths(app)?;
+    Ok(paths.config_dir.join("bilibili-cookie.bin"))
 }
 
 fn xor_cookie(bytes: &[u8], seed: u8) -> Vec<u8> {
- bytes
- .iter()
- .enumerate()
- .map(|(index, byte)| byte ^ seed.rotate_left((index %8) as u32))
- .collect()
+    bytes
+        .iter()
+        .enumerate()
+        .map(|(index, byte)| byte ^ seed.rotate_left((index % 8) as u32))
+        .collect()
 }
 
 fn read_cookie(app: &AppHandle) -> Option<String> {
- let path = cookie_path(app).ok()?;
- let encoded = fs::read(path).ok()?;
- if encoded.len() <5 || &encoded[..3] != COOKIE_VERSION.as_bytes() {
- return None;
- }
- let seed = encoded[3];
- let plain = xor_cookie(&encoded[4..], seed);
- String::from_utf8(plain)
- .ok()
- .filter(|value| !value.trim().is_empty())
+    let path = cookie_path(app).ok()?;
+    let encoded = fs::read(path).ok()?;
+    if encoded.len() < 5 || &encoded[..3] != COOKIE_VERSION.as_bytes() {
+        return None;
+    }
+    let seed = encoded[3];
+    let plain = xor_cookie(&encoded[4..], seed);
+    String::from_utf8(plain)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn write_cookie(app: &AppHandle, cookie: &str) -> Result<(), String> {
- let path = cookie_path(app)?;
- let seed = SystemTime::now()
- .duration_since(UNIX_EPOCH)
- .map(|value| value.subsec_nanos() as u8)
- .unwrap_or(0x5a);
- let mut encoded = Vec::with_capacity(4 + cookie.len());
- encoded.extend_from_slice(COOKIE_VERSION.as_bytes());
- encoded.push(seed);
- encoded.extend_from_slice(&xor_cookie(cookie.as_bytes(), seed));
- fs::write(path, encoded).map_err(|error| format!("保存B站登录状态失败 {error}"))
+    let path = cookie_path(app)?;
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.subsec_nanos() as u8)
+        .unwrap_or(0x5a);
+    let mut encoded = Vec::with_capacity(4 + cookie.len());
+    encoded.extend_from_slice(COOKIE_VERSION.as_bytes());
+    encoded.push(seed);
+    encoded.extend_from_slice(&xor_cookie(cookie.as_bytes(), seed));
+    fs::write(path, encoded).map_err(|error| format!("保存B站登录状态失败 {error}"))
 }
 
 #[tauri::command]
 pub fn bilibili_set_cookie(app: AppHandle, cookie: String) -> Result<(), String> {
- if cookie.trim().is_empty() {
- return Err("登录信息为空".into());
- }
- write_cookie(&app, cookie.trim())
+    if cookie.trim().is_empty() {
+        return Err("登录信息为空".into());
+    }
+    write_cookie(&app, cookie.trim())
 }
 
 #[tauri::command]
 pub fn bilibili_clear_cookie(app: AppHandle) -> Result<(), String> {
- let path = cookie_path(&app)?;
- let _ = fs::remove_file(path);
- Ok(())
+    let path = cookie_path(&app)?;
+    let _ = fs::remove_file(path);
+    Ok(())
 }
 
 fn media_host_allowed(host: &str) -> bool {
@@ -175,22 +173,19 @@ fn media_host_allowed(host: &str) -> bool {
 
 fn validate_media_url(raw: &str) -> Result<Url, String> {
     let url = Url::parse(raw.trim()).map_err(|_| "音频地址无效".to_string())?;
-    if url.scheme() != "https"
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
+    if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
         return Err("音频地址不受信任".into());
     }
-    let host = url.host_str().ok_or_else(|| "音频地址缺少主机名".to_string())?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| "音频地址缺少主机名".to_string())?;
     if !media_host_allowed(host) {
         return Err("音频地址不在哔哩哔哩媒体域名内".into());
     }
     Ok(url)
 }
 
-fn redirect_policy_for(
-    validator: fn(&str) -> Result<Url, String>,
-) -> Policy {
+fn redirect_policy_for(validator: fn(&str) -> Result<Url, String>) -> Policy {
     Policy::custom(move |attempt: Attempt| {
         if attempt.previous().len() >= 4 {
             return attempt.stop();
@@ -218,12 +213,7 @@ fn build_client(
 fn json_client() -> Result<Client, String> {
     static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
     CLIENT
-        .get_or_init(|| {
-            build_client(
-                validate_api_url,
-                Duration::from_secs(JSON_TIMEOUT_SECONDS),
-            )
-        })
+        .get_or_init(|| build_client(validate_api_url, Duration::from_secs(JSON_TIMEOUT_SECONDS)))
         .clone()
 }
 
@@ -264,9 +254,9 @@ fn login_headers(
         .header("x-bili-trace-id", LOGIN_TRACE_ID)
         .header("x-bili-aurora-eid", "")
         .header("x-bili-aurora-zone", "")
- .header("bili-http-engine", "cronet")
- .header("Sec-Fetch-Site", "same-site")
- .header("Sec-Fetch-Mode", "cors");
+        .header("bili-http-engine", "cronet")
+        .header("Sec-Fetch-Site", "same-site")
+        .header("Sec-Fetch-Mode", "cors");
     if let Some(value) = buvid.filter(|value| !value.trim().is_empty()) {
         request.header("buvid", value)
     } else {
@@ -274,10 +264,7 @@ fn login_headers(
     }
 }
 
-fn request_cookie(
-    app: &AppHandle,
-    explicit: Option<String>,
-) -> Option<String> {
+fn request_cookie(app: &AppHandle, explicit: Option<String>) -> Option<String> {
     explicit
         .filter(|value| !value.trim().is_empty())
         .or_else(|| read_cookie(app))
@@ -343,11 +330,11 @@ pub async fn bilibili_get_json(
             request
         };
         let response = request
- .header(ACCEPT, "application/json")
- .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9")
- .header("Sec-Fetch-Site", "same-site")
- .header("Sec-Fetch-Mode", "cors")
- .send()
+            .header(ACCEPT, "application/json")
+            .header(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9")
+            .header("Sec-Fetch-Site", "same-site")
+            .header("Sec-Fetch-Mode", "cors")
+            .send()
             .map_err(|error| format!("哔哩哔哩请求失败 {error}"))?;
         let status = response.status();
         if !status.is_success() {
@@ -418,10 +405,10 @@ pub async fn bilibili_post_json(
             });
         let request = if let Some(form) = form {
             request
- .header(
- CONTENT_TYPE,
- "application/x-www-form-urlencoded; charset=utf-8",
- )
+                .header(
+                    CONTENT_TYPE,
+                    "application/x-www-form-urlencoded; charset=utf-8",
+                )
                 .form(&form)
         } else {
             request
@@ -457,15 +444,15 @@ pub async fn bilibili_post_json(
 }
 
 fn download_audio_headers(
- request: reqwest::blocking::RequestBuilder,
- app: &AppHandle,
+    request: reqwest::blocking::RequestBuilder,
+    app: &AppHandle,
 ) -> reqwest::blocking::RequestBuilder {
- let request = bilibili_headers(request);
- if let Some(cookie) = read_cookie(app) {
- request.header(COOKIE, cookie)
- } else {
- request
- }
+    let request = bilibili_headers(request);
+    if let Some(cookie) = read_cookie(app) {
+        request.header(COOKIE, cookie)
+    } else {
+        request
+    }
 }
 
 fn validate_bvid(value: &str) -> Result<(), String> {
@@ -510,9 +497,9 @@ fn download_audio(
     input: &DownloadInput,
     target: &PathBuf,
     client: &Client,
- app: &AppHandle,
+    app: &AppHandle,
 ) -> Result<(), String> {
- let response = download_audio_headers(client.get(input.url.clone()), app)
+    let response = download_audio_headers(client.get(input.url.clone()), app)
         .send()
         .map_err(|error| format!("下载哔哩哔哩音频失败 {error}"))?
         .error_for_status()
@@ -535,8 +522,8 @@ fn download_audio(
     let temp = partial_path(target);
     remove_quietly(&temp);
     let mut source = response;
-    let mut file = fs::File::create(&temp)
-        .map_err(|error| format!("创建音频临时文件失败 {error}"))?;
+    let mut file =
+        fs::File::create(&temp).map_err(|error| format!("创建音频临时文件失败 {error}"))?;
     let mut total = 0u64;
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -616,10 +603,10 @@ pub async fn bilibili_cache_audio(
         }
 
         let client = media_client()?;
- let input = DownloadInput {
+        let input = DownloadInput {
             url: media_url.to_string(),
         };
- download_audio(&input, &target, &client, &app)?;
+        download_audio(&input, &target, &client, &app)?;
         Ok(BilibiliAudioCache {
             path: target.to_string_lossy().into_owned(),
             reused: false,

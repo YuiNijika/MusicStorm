@@ -8,7 +8,7 @@ type AccountAvatarProps = {
     name: string
     pixels: number
     className?: string
- eager?: boolean
+    eager?: boolean
 }
 
 function AccountAvatar({
@@ -16,7 +16,7 @@ function AccountAvatar({
     name,
     pixels,
     className,
- eager = false,
+    eager = false,
 }: AccountAvatarProps) {
     const resolved = useCachedCoverUrl(src, "thumbnail", {
         ignoreCacheLimit: true,
@@ -39,14 +39,14 @@ function AccountAvatar({
                     alt=""
                     width={pixels}
                     height={pixels}
- loading={eager ? "eager" : "lazy"}
- fetchPriority={eager ? "high" : "auto"}
+                    loading={eager ? "eager" : "lazy"}
+                    fetchPriority={eager ? "high" : "auto"}
                     decoding="async"
- className="size-full object-cover"
+                    className="size-full object-cover"
                     onError={() => setFailedSrc(resolved)}
                 />
             ) : (
- <span aria-hidden="true">{initial}</span>
+                <span aria-hidden="true">{initial}</span>
             )}
         </span>
     )

@@ -17,7 +17,7 @@ type ModeSwitchProps = {
 
 const MODE_ICONS = {
     netease: Music2,
- bilibili: AudioLines,
+    bilibili: AudioLines,
 } as const
 
 function ModeSwitch({

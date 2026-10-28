@@ -121,21 +121,21 @@ function AppRoutes({
     if (detail?.type === "artist") {
         return <Suspense fallback={artistFallback}><ArtistPage artistId={detail.id} onBack={back} /></Suspense>
     }
- if (detail?.type === "bilibili-up") {
- return <Suspense fallback={artistFallback}><BilibiliUpPage mid={detail.id} onBack={back} /></Suspense>
- }
- if (detail?.type === "bilibili-collection") {
- return (
- <Suspense fallback={playlistFallback}>
- <BilibiliCollectionPage
- mid={detail.mid}
- collectionId={detail.id}
- kind={detail.kind}
- onBack={back}
- />
- </Suspense>
- )
- }
+    if (detail?.type === "bilibili-up") {
+        return <Suspense fallback={artistFallback}><BilibiliUpPage mid={detail.id} onBack={back} /></Suspense>
+    }
+    if (detail?.type === "bilibili-collection") {
+        return (
+            <Suspense fallback={playlistFallback}>
+                <BilibiliCollectionPage
+                    mid={detail.mid}
+                    collectionId={detail.id}
+                    kind={detail.kind}
+                    onBack={back}
+                />
+            </Suspense>
+        )
+    }
     if (detail?.type === "album") {
         return <Suspense fallback={albumFallback}><AlbumPage albumId={detail.id} onBack={back} /></Suspense>
     }
@@ -172,7 +172,7 @@ function AppRoutes({
     if (route === "bilibili" || (route === "home" && mode === "bilibili")) {
         return (
             <Suspense fallback={<PlaylistGridSkeleton count={8} />}>
- <BilibiliPage onNavigate={onNavigate} />
+                <BilibiliPage onNavigate={onNavigate} />
             </Suspense>
         )
     }
@@ -203,15 +203,15 @@ function AppRoutes({
         return <Suspense fallback={<LocalPageSkeleton />}><LocalPage /></Suspense>
     }
     if (route === "library") {
- return (
- <Suspense fallback={gridFallback}>
- {mode === "bilibili" ? (
- <BilibiliLibraryPage />
- ) : (
- <LibraryPage />
- )}
- </Suspense>
- )
+        return (
+            <Suspense fallback={gridFallback}>
+                {mode === "bilibili" ? (
+                    <BilibiliLibraryPage />
+                ) : (
+                    <LibraryPage />
+                )}
+            </Suspense>
+        )
     }
     if (route === "radios") {
         return <Suspense fallback={<RadiosPageSkeleton />}><RadiosPage /></Suspense>
@@ -266,13 +266,13 @@ function App() {
     const [titleBarStyle, setTitleBarStyle] = useState<TitleBarStyle>(() =>
         readTitleBarStyle(),
     )
- const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(() =>
- readSettingsTabFromHash(),
- )
- const handleSettingsTabChange = useCallback((tab: SettingsTab) => {
- setSettingsTab(tab)
- writeSettingsTabHash(tab)
- }, [])
+    const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(() =>
+        readSettingsTabFromHash(),
+    )
+    const handleSettingsTabChange = useCallback((tab: SettingsTab) => {
+        setSettingsTab(tab)
+        writeSettingsTabHash(tab)
+    }, [])
 
     useApiCacheAutoPurge()
     useDevtoolsShortcut()
@@ -291,9 +291,9 @@ function App() {
         void invoke("purge_cover_cache_cmd", {
             maxBytes: target,
             keepHashes: collectCoverKeepHashes(),
-        }).catch(() => {})
+        }).catch(() => { })
         // 兼容旧版本遗留的死封面引用：启动时对账一次，失效条目重解析音频提取
-        void reextractLocalCovers().catch(() => {})
+        void reextractLocalCovers().catch(() => { })
     }, [])
 
     useEffect(() => {
@@ -372,7 +372,8 @@ function App() {
 
 /** 挂在 Toaster 内，保证失败 toast；同时静默迁移旧 base64 封面。
  *  冷启动优化：延迟非关键操作到首屏渲染完成后执行。 */
-function IntegratedApiBootEffect() {    useEffect(() => {
+function IntegratedApiBootEffect() {
+    useEffect(() => {
         // API 探测和旧数据迁移延迟到首帧之后，避免阻塞冷启动关键路径
         const timer = window.setTimeout(() => {
             void bootIntegratedApiProbe()
@@ -411,16 +412,16 @@ const WEB_HASH_ROUTES: Record<string, AppRoute> = {
 }
 
 const SETTINGS_HASH_TABS: Record<string, SettingsTab> = {
- appearance: "appearance",
- themes: "themes",
- layout: "layout",
- source: "source",
- playback: "playback",
- account: "account",
- update: "update",
- hotkeys: "hotkeys",
- faq: "faq",
- other: "other",
+    appearance: "appearance",
+    themes: "themes",
+    layout: "layout",
+    source: "source",
+    playback: "playback",
+    account: "account",
+    update: "update",
+    hotkeys: "hotkeys",
+    faq: "faq",
+    other: "other",
 }
 
 function webHashToRoute(hash: string): AppRoute {
@@ -451,13 +452,13 @@ function readSettingsTabFromHash(): SettingsTab | undefined {
 }
 
 function writeSettingsTabHash(tab: SettingsTab): void {
- if (!isWebMode() || webHashToRoute(window.location.hash) !== "settings") {
- return
- }
- const next = `#/settings?tab=${encodeURIComponent(tab)}`
- if (window.location.hash !== next) {
- window.history.replaceState(null, "", next)
- }
+    if (!isWebMode() || webHashToRoute(window.location.hash) !== "settings") {
+        return
+    }
+    const next = `#/settings?tab=${encodeURIComponent(tab)}`
+    if (window.location.hash !== next) {
+        window.history.replaceState(null, "", next)
+    }
 }
 
 function AppWithNav({
@@ -467,7 +468,7 @@ function AppWithNav({
     onTitleBarStyleChange,
     settingsTab,
     setSettingsTab,
-onSettingsTabChange,
+    onSettingsTabChange,
 }: {
     route: AppRoute
     setRoute: (route: AppRoute) => void
@@ -475,7 +476,7 @@ onSettingsTabChange,
     onTitleBarStyleChange: (style: TitleBarStyle) => void
     settingsTab?: SettingsTab
     setSettingsTab: (tab: SettingsTab | undefined) => void
-onSettingsTabChange: (tab: SettingsTab) => void
+    onSettingsTabChange: (tab: SettingsTab) => void
 }) {
     const { closeDetail } = useMusicNavigation()
     const { mode, setMode, visibleModules } = useFrontendMode()
@@ -529,13 +530,13 @@ onSettingsTabChange: (tab: SettingsTab) => void
         function sync() {
             const next = webHashToRoute(window.location.hash)
             closeDetail()
-setSettingsTab(
-next === "settings"
-? readSettingsTabFromHash()
-: next === "feedback"
-? undefined
-: undefined,
-)
+            setSettingsTab(
+                next === "settings"
+                    ? readSettingsTabFromHash()
+                    : next === "feedback"
+                        ? undefined
+                        : undefined,
+            )
             setRoute(next)
         }
         window.addEventListener("hashchange", sync)
@@ -596,7 +597,7 @@ next === "settings"
                 onTitleBarStyleChange={onTitleBarStyleChange}
                 settingsTab={settingsTab}
                 onNavigate={handleNavigateWeb}
- onSettingsTabChange={onSettingsTabChange}
+                onSettingsTabChange={onSettingsTabChange}
             />
         </AppShell>
     )

@@ -2,6 +2,7 @@
 // 从 GitHub Releases 下载对应平台安装包（NSIS setup.exe）到应用缓存目录，
 // 透传下载进度给前端，校验 sha256 后以静默模式启动安装并退出当前进程，
 // 由安装器接管完成安装并拉起新版本；历史安装包由新实例启动时清理。
+use crate::remote_url;
 use reqwest::blocking::Client;
 use serde_json::json;
 use std::fs::File;
@@ -9,7 +10,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
-use crate::remote_url;
 
 const DOWNLOAD_NAME: &str = "MusicStorm-setup.exe";
 // 进度发射粒度：约每 512KB 一次，8MB 安装包约 16 次更新，足够顺滑
@@ -66,7 +66,10 @@ pub async fn download_update(
             // 下载本身可能较慢（镜像源），只限制连接与重定向，不设总超时
             .connect_timeout(Duration::from_secs(15))
             .redirect(remote_url::redirect_policy())
-            .user_agent(format!("MusicStorm-update/{}", option_env!("CARGO_PKG_VERSION").unwrap_or("dev")));
+            .user_agent(format!(
+                "MusicStorm-update/{}",
+                option_env!("CARGO_PKG_VERSION").unwrap_or("dev")
+            ));
         // 直连 GitHub 失败时（如走系统代理的网络），读取代理环境变量手动接管
         let proxy_env = std::env::var("HTTPS_PROXY")
             .or_else(|_| std::env::var("https_proxy"))
@@ -104,10 +107,7 @@ pub async fn download_update(
         if total > MAX_UPDATE_BYTES {
             return Err("更新包过大".into());
         }
-        let temp = dest.with_file_name(format!(
-            ".{DOWNLOAD_NAME}.{}.part",
-            std::process::id()
-        ));
+        let temp = dest.with_file_name(format!(".{DOWNLOAD_NAME}.{}.part", std::process::id()));
         let _ = std::fs::remove_file(&temp);
         let mut file = File::create(&temp).map_err(|e| format!("创建临时缓存文件失败: {e}"))?;
 
@@ -116,20 +116,17 @@ pub async fn download_update(
         let mut buf = [0u8; 64 * 1024];
         let mut last_emit: u64 = 0;
         loop {
-            let n = stream
-                .read(&mut buf)
-                .map_err(|e| {
-                    let _ = std::fs::remove_file(&temp);
-                    format!("读取下载内容失败: {e}")
-                })?;
+            let n = stream.read(&mut buf).map_err(|e| {
+                let _ = std::fs::remove_file(&temp);
+                format!("读取下载内容失败: {e}")
+            })?;
             if n == 0 {
                 break;
             }
-            file.write_all(&buf[..n])
-                .map_err(|e| {
-                    let _ = std::fs::remove_file(&temp);
-                    format!("写入缓存文件失败: {e}")
-                })?;
+            file.write_all(&buf[..n]).map_err(|e| {
+                let _ = std::fs::remove_file(&temp);
+                format!("写入缓存文件失败: {e}")
+            })?;
             downloaded += n as u64;
             if downloaded > MAX_UPDATE_BYTES {
                 drop(file);
@@ -252,9 +249,7 @@ pub fn find_local_setup(
         return Ok(None);
     }
     if let Some(size) = expected_size {
-        let actual = std::fs::metadata(&dest)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let actual = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
         if actual != size {
             let _ = std::fs::remove_file(&dest);
             return Ok(None);

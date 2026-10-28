@@ -444,166 +444,166 @@ function LibraryPage() {
             </div>
 
             {tab === "playlists" ? (
-            <Section
-                title="我的歌单"
-                description={
-                    !ready
-                        ? "正在同步账号…"
-                        : !loggedIn
-                          ? "来自网易云"
-                          : status === "ready"
-                            ? `${sortedPlaylists.length} 个歌单`
-                            : "来自网易云账号"
-                }
-                action={
-                    <div className="flex flex-wrap items-center gap-2">
-                        {loggedIn ? (
-                            <button
-                                type="button"
-                                disabled={createBusy}
-                                onClick={() => setCreateOpen(true)}
-                                className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-60"
-                            >
-                                <Plus className="size-3.5" strokeWidth={2.4} />
-                                新建歌单
-                            </button>
-                        ) : null}
-                        <SortSelect
-                            value={playlistSort}
-                            options={PLAYLIST_SORT_OPTIONS}
-                            onChange={setPlaylistSort}
-                            label="歌单排序"
-                        />
-                        <ViewModeToggle
-                            value={playlistView}
-                            onChange={setPlaylistView}
-                            label="歌单展示"
-                        />
-                    </div>
-                }
-            >
-                {!ready || status === "loading" ? (
-                    playlistView === "card" ? (
-                        <PlaylistGridSkeleton
-                            count={skeletonCount}
-                            style={gridStyle}
-                        />
-                    ) : (
-                        <div className="apple-list-surface space-y-1 p-1.5">
-                            {Array.from({ length: 6 }).map((_, index) => (
-                                <div
-                                    key={index}
-                                    className="h-14 animate-pulse rounded-xl bg-[var(--surface-fill)]"
-                                />
-                            ))}
-                        </div>
-                    )
-                ) : !loggedIn ? (
-                    <StateHero
-                        variant="auth"
-                        title="登录后同步歌单"
-                        description="在侧栏头像菜单或设置中登录网易云"
-                    />
-                ) : status === "error" ? (
-                    <StateHero
-                        variant="error"
-                        title="歌单加载失败"
-                        description="请检查网络与 API 后重试"
-                        action={
-                            <HeroRetryButton onClick={() => setRetry((n) => n + 1)} />
-                        }
-                    />
-                ) : playlists.length === 0 ? (
-                    <StateHero
-                        variant="empty"
-                        title="暂无歌单"
-                        description="在网易云创建或收藏歌单后会出现在这里"
-                    />
-                ) : playlistView === "list" ? (
-                    <DragList
-                        items={sortedPlaylists}
-                        enabled={playlistSort === "custom"}
-                        itemHeight={PLAYLIST_ROW_HEIGHT}
-                        className="apple-list-surface p-1.5"
-                        onReorder={(next) =>
-                            setPlaylistListOrder(next.map((item) => item.id))
-                        }
-                        renderItem={(playlist, _index, handle) => {
-                            const isLikedFolder =
-                                playlist.id === likedSongPlaylistId
-                            return (
+                <Section
+                    title="我的歌单"
+                    description={
+                        !ready
+                            ? "正在同步账号…"
+                            : !loggedIn
+                                ? "来自网易云"
+                                : status === "ready"
+                                    ? `${sortedPlaylists.length} 个歌单`
+                                    : "来自网易云账号"
+                    }
+                    action={
+                        <div className="flex flex-wrap items-center gap-2">
+                            {loggedIn ? (
                                 <button
                                     type="button"
-                                    onClick={() => openPlaylist(playlist.id)}
-                                    className={cn(
-                                        "flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors",
-                                        "hover:bg-[var(--surface-fill)] active:scale-[0.995]",
-                                        isLikedFolder &&
-                                            "bg-primary/[0.06] ring-1 ring-primary/20 dark:bg-primary/[0.12]",
-                                    )}
+                                    disabled={createBusy}
+                                    onClick={() => setCreateOpen(true)}
+                                    className="apple-primary-action inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-transform duration-[var(--duration-press)] active:scale-[0.97] disabled:opacity-60"
                                 >
-                                    {handle}
-                                    <Cover
-                                        src={resolvePlaylistCover(
+                                    <Plus className="size-3.5" strokeWidth={2.4} />
+                                    新建歌单
+                                </button>
+                            ) : null}
+                            <SortSelect
+                                value={playlistSort}
+                                options={PLAYLIST_SORT_OPTIONS}
+                                onChange={setPlaylistSort}
+                                label="歌单排序"
+                            />
+                            <ViewModeToggle
+                                value={playlistView}
+                                onChange={setPlaylistView}
+                                label="歌单展示"
+                            />
+                        </div>
+                    }
+                >
+                    {!ready || status === "loading" ? (
+                        playlistView === "card" ? (
+                            <PlaylistGridSkeleton
+                                count={skeletonCount}
+                                style={gridStyle}
+                            />
+                        ) : (
+                            <div className="apple-list-surface space-y-1 p-1.5">
+                                {Array.from({ length: 6 }).map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className="h-14 animate-pulse rounded-xl bg-[var(--surface-fill)]"
+                                    />
+                                ))}
+                            </div>
+                        )
+                    ) : !loggedIn ? (
+                        <StateHero
+                            variant="auth"
+                            title="登录后同步歌单"
+                            description="在侧栏头像菜单或设置中登录网易云"
+                        />
+                    ) : status === "error" ? (
+                        <StateHero
+                            variant="error"
+                            title="歌单加载失败"
+                            description="请检查网络与 API 后重试"
+                            action={
+                                <HeroRetryButton onClick={() => setRetry((n) => n + 1)} />
+                            }
+                        />
+                    ) : playlists.length === 0 ? (
+                        <StateHero
+                            variant="empty"
+                            title="暂无歌单"
+                            description="在网易云创建或收藏歌单后会出现在这里"
+                        />
+                    ) : playlistView === "list" ? (
+                        <DragList
+                            items={sortedPlaylists}
+                            enabled={playlistSort === "custom"}
+                            itemHeight={PLAYLIST_ROW_HEIGHT}
+                            className="apple-list-surface p-1.5"
+                            onReorder={(next) =>
+                                setPlaylistListOrder(next.map((item) => item.id))
+                            }
+                            renderItem={(playlist, _index, handle) => {
+                                const isLikedFolder =
+                                    playlist.id === likedSongPlaylistId
+                                return (
+                                    <button
+                                        type="button"
+                                        onClick={() => openPlaylist(playlist.id)}
+                                        className={cn(
+                                            "flex w-full cursor-pointer items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors",
+                                            "hover:bg-[var(--surface-fill)] active:scale-[0.995]",
+                                            isLikedFolder &&
+                                            "bg-primary/[0.06] ring-1 ring-primary/20 dark:bg-primary/[0.12]",
+                                        )}
+                                    >
+                                        {handle}
+                                        <Cover
+                                            src={resolvePlaylistCover(
+                                                playlist.coverUrl,
+                                                localCovers.get(playlist.id),
+                                                headInfo.get(playlist.id),
+                                            )}
+                                            alt={playlist.title}
+                                            size="sm"
+                                            className="size-12 rounded-xl"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
+                                                {playlist.title}
+                                            </p>
+                                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                                {isLikedFolder
+                                                    ? "我喜欢的音乐"
+                                                    : playlist.trackCount
+                                                        ? `${playlist.trackCount} 首`
+                                                        : playlist.description || "歌单"}
+                                            </p>
+                                        </div>
+                                    </button>
+                                )
+                            }}
+                        />
+                    ) : (
+                        <VirtualGrid
+                            items={sortedPlaylists}
+                            columns={cols}
+                            estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                            getItemKey={(playlist) => playlist.id}
+                            renderItem={(playlist) => {
+                                const isLikedFolder =
+                                    playlist.id === likedSongPlaylistId
+                                return (
+                                    <MediaCard
+                                        key={playlist.id}
+                                        coverUrl={resolvePlaylistCover(
                                             playlist.coverUrl,
                                             localCovers.get(playlist.id),
                                             headInfo.get(playlist.id),
                                         )}
-                                        alt={playlist.title}
-                                        size="sm"
-                                        className="size-12 rounded-xl"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-[14px] font-medium tracking-[-0.01em]">
-                                            {playlist.title}
-                                        </p>
-                                        <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                            {isLikedFolder
+                                        title={playlist.title}
+                                        subtitle={
+                                            isLikedFolder
                                                 ? "我喜欢的音乐"
                                                 : playlist.trackCount
-                                                  ? `${playlist.trackCount} 首`
-                                                  : playlist.description || "歌单"}
-                                        </p>
-                                    </div>
-                                </button>
-                            )
-                        }}
-                    />
-                ) : (
-                    <VirtualGrid
-                        items={sortedPlaylists}
-                        columns={cols}
-                        estimatedRowHeight={MEDIA_ROW_HEIGHT}
-                        getItemKey={(playlist) => playlist.id}
-                        renderItem={(playlist) => {
-                            const isLikedFolder =
-                                playlist.id === likedSongPlaylistId
-                            return (
-                                <MediaCard
-                                    key={playlist.id}
-                                    coverUrl={resolvePlaylistCover(
-                                        playlist.coverUrl,
-                                        localCovers.get(playlist.id),
-                                        headInfo.get(playlist.id),
-                                    )}
-                                    title={playlist.title}
-                                    subtitle={
-                                        isLikedFolder
-                                            ? "我喜欢的音乐"
-                                            : playlist.trackCount
-                                              ? `${playlist.trackCount} 首`
-                                              : playlist.description || "歌单"
-                                    }
-                                    onClick={() => openPlaylist(playlist.id)}
-                                    active={isLikedFolder}
-                                    widthClassName="w-full"
-                                    className="w-full"
-                                />
-                            )
-                        }}
-                    />
-                )}
-            </Section>
+                                                    ? `${playlist.trackCount} 首`
+                                                    : playlist.description || "歌单"
+                                        }
+                                        onClick={() => openPlaylist(playlist.id)}
+                                        active={isLikedFolder}
+                                        widthClassName="w-full"
+                                        className="w-full"
+                                    />
+                                )
+                            }}
+                        />
+                    )}
+                </Section>
             ) : tab === "artists" ? (
                 <Section title="收藏歌手" description="关注过的歌手" variant="listen">
                     {artistStatus === "loading" ? (

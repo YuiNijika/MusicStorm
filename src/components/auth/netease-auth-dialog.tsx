@@ -354,8 +354,8 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                                     {qrState.kind === "loading"
                                         ? "生成中…"
                                         : qrState.kind === "error"
-                                          ? qrState.message
-                                          : "准备二维码"}
+                                            ? qrState.message
+                                            : "准备二维码"}
                                 </span>
                             )}
                         </div>
@@ -363,8 +363,8 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             {qrState.kind === "waiting"
                                 ? qrState.hint
                                 : qrState.kind === "error"
-                                  ? qrState.message
-                                  : "使用网易云 App 扫一扫"}
+                                    ? qrState.message
+                                    : "使用网易云 App 扫一扫"}
                         </p>
                         <button
                             type="button"

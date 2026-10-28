@@ -19,10 +19,10 @@ import {
     type TintScope,
 } from "@/lib/appearance/appearance-prefs"
 import {
- applyFontToDom,
- readFontPrefs,
- writeFontPrefs,
- type FontPrefs,
+    applyFontToDom,
+    readFontPrefs,
+    writeFontPrefs,
+    type FontPrefs,
 } from "@/lib/appearance/font-prefs"
 import { applyThemeToDom } from "@/lib/theme/apply"
 import { getThemeDefinition, isThemeStyle } from "@/lib/theme/themes"
@@ -36,10 +36,10 @@ type ThemeContextValue = {
     theme: Theme
     resolvedTheme: ResolvedTheme
     themeStyle: ThemeStyle
-fontPrefs: FontPrefs
+    fontPrefs: FontPrefs
     setTheme: (theme: Theme) => void
     setThemeStyle: (style: ThemeStyle) => void
-setFontPrefs: (prefs: FontPrefs) => void
+    setFontPrefs: (prefs: FontPrefs) => void
     toggleTheme: () => void
     appearance: AppearancePrefs
     setAccent: (accent: AccentTone) => void
@@ -171,17 +171,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const [appearance, setAppearance] = useState<AppearancePrefs>(() =>
         readAppearancePrefs(),
     )
- const [fontPrefs, setFontPrefsState] = useState<FontPrefs>(() =>
- readFontPrefs(),
- )
+    const [fontPrefs, setFontPrefsState] = useState<FontPrefs>(() =>
+        readFontPrefs(),
+    )
 
     // 外观最新值镜像：render 期同步，保证过渡闭包能取到最新外观
     const appearanceRef = useRef(appearance)
     appearanceRef.current = appearance
     const themeStyleRef = useRef(themeStyle)
     themeStyleRef.current = themeStyle
- const fontPrefsRef = useRef(fontPrefs)
- fontPrefsRef.current = fontPrefs
+    const fontPrefsRef = useRef(fontPrefs)
+    fontPrefsRef.current = fontPrefs
 
     useEffect(() => {
         const next = resolveTheme(theme)
@@ -194,11 +194,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             mode: next,
             appearance,
         })
- applyFontToDom({
- prefs: fontPrefs,
- themeFontFamily: getThemeDefinition(themeStyle).fontFamily,
- })
- }, [theme, themeStyle, appearance, fontPrefs])
+        applyFontToDom({
+            prefs: fontPrefs,
+            themeFontFamily: getThemeDefinition(themeStyle).fontFamily,
+        })
+    }, [theme, themeStyle, appearance, fontPrefs])
 
     useEffect(() => {
         if (theme !== "system") {
@@ -214,12 +214,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 mode: next,
                 appearance,
             })
- applyFontToDom({
- prefs: fontPrefsRef.current,
- themeFontFamily: getThemeDefinition(
- themeStyleRef.current,
- ).fontFamily,
- })
+            applyFontToDom({
+                prefs: fontPrefsRef.current,
+                themeFontFamily: getThemeDefinition(
+                    themeStyleRef.current,
+                ).fontFamily,
+            })
         }
         media.addEventListener("change", onChange)
         return () => media.removeEventListener("change", onChange)
@@ -238,12 +238,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 mode,
                 appearance: appearanceRef.current,
             })
- applyFontToDom({
- prefs: fontPrefsRef.current,
- themeFontFamily: getThemeDefinition(
- themeStyleRef.current,
- ).fontFamily,
- })
+            applyFontToDom({
+                prefs: fontPrefsRef.current,
+                themeFontFamily: getThemeDefinition(
+                    themeStyleRef.current,
+                ).fontFamily,
+            })
             setThemeState(next)
         })
     }, [])
@@ -258,13 +258,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 mode,
                 appearance: appearanceRef.current,
             })
- applyFontToDom({
- prefs: fontPrefsRef.current,
- themeFontFamily: definition.fontFamily,
- })
+            applyFontToDom({
+                prefs: fontPrefsRef.current,
+                themeFontFamily: definition.fontFamily,
+            })
             themeStyleRef.current = next
             window.localStorage.setItem(STYLE_STORAGE_KEY, next)
- rememberTheme(next)
+            rememberTheme(next)
             setThemeStyleState(next)
             if (!definition.capabilities.includes("glass")) {
                 document.documentElement.classList.add("glass-disabled")
@@ -283,12 +283,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                     mode: next,
                     appearance: appearanceRef.current,
                 })
- applyFontToDom({
- prefs: fontPrefsRef.current,
- themeFontFamily: getThemeDefinition(
- themeStyleRef.current,
- ).fontFamily,
- })
+                applyFontToDom({
+                    prefs: fontPrefsRef.current,
+                    themeFontFamily: getThemeDefinition(
+                        themeStyleRef.current,
+                    ).fontFamily,
+                })
                 return next
             }),
         )
@@ -390,32 +390,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
- const setFontPrefs = useCallback((next: FontPrefs) => {
- const written = writeFontPrefs(next)
- fontPrefsRef.current = written
- setFontPrefsState(written)
- applyFontToDom({
- prefs: written,
- themeFontFamily: getThemeDefinition(
- themeStyleRef.current,
- ).fontFamily,
- })
- window.dispatchEvent(
- new CustomEvent<FontPrefs>(FONT_PREFS_EVENT, {
- detail: written,
- }),
- )
- }, [])
+    const setFontPrefs = useCallback((next: FontPrefs) => {
+        const written = writeFontPrefs(next)
+        fontPrefsRef.current = written
+        setFontPrefsState(written)
+        applyFontToDom({
+            prefs: written,
+            themeFontFamily: getThemeDefinition(
+                themeStyleRef.current,
+            ).fontFamily,
+        })
+        window.dispatchEvent(
+            new CustomEvent<FontPrefs>(FONT_PREFS_EVENT, {
+                detail: written,
+            }),
+        )
+    }, [])
 
     const value = useMemo(
         () => ({
             theme,
             resolvedTheme,
             themeStyle,
- fontPrefs,
+            fontPrefs,
             setTheme,
             setThemeStyle,
- setFontPrefs,
+            setFontPrefs,
             toggleTheme,
             appearance,
             setAccent,
@@ -428,15 +428,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             setBackgroundOpacity,
             setBackgroundBlur,
             setBingWallpaper,
- }),
- [
+        }),
+        [
             theme,
             resolvedTheme,
             themeStyle,
- fontPrefs,
+            fontPrefs,
             setTheme,
             setThemeStyle,
- setFontPrefs,
+            setFontPrefs,
             toggleTheme,
             appearance,
             setAccent,

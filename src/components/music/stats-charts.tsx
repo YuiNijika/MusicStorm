@@ -29,10 +29,10 @@ const sourceConfig = {
         color: "var(--primary)",
     },
     bilibili: {
- label: "哔哩哔哩",
- color: "#fb7299",
- },
- netease: {
+        label: "哔哩哔哩",
+        color: "#fb7299",
+    },
+    netease: {
         label: "网易云",
         color: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
     },
@@ -43,8 +43,8 @@ const sourceConfig = {
 } satisfies ChartConfig
 
 const SOURCE_COLORS: Record<string, string> = {
- local: "var(--primary)",
- bilibili: "#fb7299",
+    local: "var(--primary)",
+    bilibili: "#fb7299",
     netease: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
     other: "color-mix(in oklch, var(--muted-foreground) 50%, transparent)",
 }
@@ -95,14 +95,14 @@ function barFill(day: string, tKey: string, hasToday: boolean): string {
 function sourceLabel(source: string): string {
     if (source === "local") return "本地"
     if (source === "netease") return "网易云"
- if (source === "bilibili") return "哔哩哔哩"
+    if (source === "bilibili") return "哔哩哔哩"
     return source || "其他"
 }
 
 function sourceColorKey(source: string): keyof typeof sourceConfig {
     if (source === "local") return "local"
     if (source === "netease") return "netease"
- if (source === "bilibili") return "bilibili"
+    if (source === "bilibili") return "bilibili"
     return "other"
 }
 
@@ -308,7 +308,7 @@ function StatsSourceMixChart({ rows, className }: StatsSourceMixProps) {
                                                 {formatListenDuration(
                                                     Number(
                                                         item?.payload?.totalMs ??
-                                                            0,
+                                                        0,
                                                     ),
                                                 )}
                                             </span>
@@ -333,8 +333,8 @@ function StatsSourceMixChart({ rows, className }: StatsSourceMixProps) {
                         const pct =
                             totalPlays > 0
                                 ? Math.round(
-                                      (entry.playCount / totalPlays) * 100,
-                                  )
+                                    (entry.playCount / totalPlays) * 100,
+                                )
                                 : 0
                         return (
                             <div key={entry.source} className="min-w-0">

@@ -350,47 +350,47 @@ function ProgramRow({
         >
             {leading ? <div className="ml-1 shrink-0">{leading}</div> : null}
             <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-2">
-            <button
-                type="button"
-                onClick={onPlay}
-                className="relative shrink-0 cursor-pointer rounded-lg"
-                title={isPlaying ? "暂停" : "播放"}
-            >
-                <Cover
-                    src={program.coverUrl}
-                    alt={program.title}
-                    size="sm"
-                    className="rounded-lg"
-                />
-            </button>
-            <button
-                type="button"
-                onClick={onOpen}
-                className="min-w-0 cursor-pointer rounded-lg text-left"
-            >
-                <div className="flex min-w-0 items-center gap-2">
-                    <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                        {index + 1}
-                    </span>
-                    <p
-                        className={cn(
-                            "min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em]",
-                            isActive ? "text-primary" : "text-foreground",
-                        )}
-                    >
-                        {program.title}
+                <button
+                    type="button"
+                    onClick={onPlay}
+                    className="relative shrink-0 cursor-pointer rounded-lg"
+                    title={isPlaying ? "暂停" : "播放"}
+                >
+                    <Cover
+                        src={program.coverUrl}
+                        alt={program.title}
+                        size="sm"
+                        className="rounded-lg"
+                    />
+                </button>
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    className="min-w-0 cursor-pointer rounded-lg text-left"
+                >
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                            {index + 1}
+                        </span>
+                        <p
+                            className={cn(
+                                "min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em]",
+                                isActive ? "text-primary" : "text-foreground",
+                            )}
+                        >
+                            {program.title}
+                        </p>
+                    </div>
+                    <p className="mt-0.5 truncate pl-7 text-[12px] text-muted-foreground">
+                        {program.djName || program.radioTitle || "电台节目"}
+                        {program.listenerCount != null && program.listenerCount > 0
+                            ? ` · ${formatListener(program.listenerCount)} 收听`
+                            : ""}
                     </p>
-                </div>
-                <p className="mt-0.5 truncate pl-7 text-[12px] text-muted-foreground">
-                    {program.djName || program.radioTitle || "电台节目"}
-                    {program.listenerCount != null && program.listenerCount > 0
-                        ? ` · ${formatListener(program.listenerCount)} 收听`
-                        : ""}
-                </p>
-            </button>
-            <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                {formatDuration(program.durationMs)}
-            </span>
+                </button>
+                <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                    {formatDuration(program.durationMs)}
+                </span>
             </div>
         </div>
     )

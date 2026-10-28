@@ -29,7 +29,7 @@ function FirstModeDialog({ mode, onSelect }: FirstModeDialogProps) {
     const [selectedMode, setSelectedMode] = useState<FrontendMode>(mode)
 
     return (
-        <Dialog open onOpenChange={() => {}}>
+        <Dialog open onOpenChange={() => { }}>
             <DialogContent
                 className="max-w-lg gap-6"
                 showCloseButton={false}

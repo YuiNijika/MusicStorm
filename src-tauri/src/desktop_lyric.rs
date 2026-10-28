@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{
-    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,10 +98,7 @@ pub async fn is_desktop_lyric_visible(app: AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn update_desktop_lyric(
-    app: AppHandle,
-    state: DesktopLyricState,
-) -> Result<(), String> {
+pub async fn update_desktop_lyric(app: AppHandle, state: DesktopLyricState) -> Result<(), String> {
     let wrapper = app.state::<DesktopLyricStateWrapper>();
     if let Ok(mut current) = wrapper.0.lock() {
         *current = state.clone();

@@ -14,12 +14,12 @@ type MusicNavigationValue = {
     detail: MusicDetail | null
     openPlaylist: (id: string) => void
     openArtist: (id: string) => void
- openBilibiliUp: (id: string) => void
- openBilibiliCollection: (input: {
- mid: string
- collectionId: string
- kind: "season" | "series"
- }) => void
+    openBilibiliUp: (id: string) => void
+    openBilibiliCollection: (input: {
+        mid: string
+        collectionId: string
+        kind: "season" | "series"
+    }) => void
     openAlbum: (id: string) => void
     openRadio: (id: string) => void
     openRadioProgram: (programId: string, radioId?: string) => void
@@ -45,12 +45,12 @@ function sameDetail(a: MusicDetail, b: MusicDetail): boolean {
     if (a.type === "radio-program" && b.type === "radio-program") {
         return (a.radioId ?? "") === (b.radioId ?? "")
     }
- if (
- a.type === "bilibili-collection" &&
- b.type === "bilibili-collection"
- ) {
- return a.mid === b.mid && a.kind === b.kind
- }
+    if (
+        a.type === "bilibili-collection" &&
+        b.type === "bilibili-collection"
+    ) {
+        return a.mid === b.mid && a.kind === b.kind
+    }
     return true
 }
 
@@ -89,36 +89,36 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
         [pushDetail],
     )
 
- const openBilibiliUp = useCallback(
- (id: string) => {
- const next = id.trim()
- if (!next || !/^\d+$/.test(next)) {
- return
- }
- pushDetail({ type: "bilibili-up", id: next })
- },
- [pushDetail],
- )
+    const openBilibiliUp = useCallback(
+        (id: string) => {
+            const next = id.trim()
+            if (!next || !/^\d+$/.test(next)) {
+                return
+            }
+            pushDetail({ type: "bilibili-up", id: next })
+        },
+        [pushDetail],
+    )
 
- const openBilibiliCollection = useCallback(
- (input: { mid: string; collectionId: string; kind: "season" | "series" }) => {
- const mid = input.mid.trim()
- const collectionId = input.collectionId.trim()
- if (!/^\d+$/.test(mid) || !/^\d+$/.test(collectionId)) {
- return
- }
- if (input.kind !== "season" && input.kind !== "series") {
- return
- }
- pushDetail({
- type: "bilibili-collection",
- id: collectionId,
- mid,
- kind: input.kind,
- })
- },
- [pushDetail],
- )
+    const openBilibiliCollection = useCallback(
+        (input: { mid: string; collectionId: string; kind: "season" | "series" }) => {
+            const mid = input.mid.trim()
+            const collectionId = input.collectionId.trim()
+            if (!/^\d+$/.test(mid) || !/^\d+$/.test(collectionId)) {
+                return
+            }
+            if (input.kind !== "season" && input.kind !== "series") {
+                return
+            }
+            pushDetail({
+                type: "bilibili-collection",
+                id: collectionId,
+                mid,
+                kind: input.kind,
+            })
+        },
+        [pushDetail],
+    )
 
     const openAlbum = useCallback(
         (id: string) => {
@@ -201,8 +201,8 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             detail,
             openPlaylist,
             openArtist,
- openBilibiliUp,
- openBilibiliCollection,
+            openBilibiliUp,
+            openBilibiliCollection,
             openAlbum,
             openRadio,
             openRadioProgram,
@@ -215,8 +215,8 @@ function MusicNavigationProvider({ children }: { children: ReactNode }) {
             detail,
             openPlaylist,
             openArtist,
- openBilibiliUp,
- openBilibiliCollection,
+            openBilibiliUp,
+            openBilibiliCollection,
             openAlbum,
             openRadio,
             openRadioProgram,

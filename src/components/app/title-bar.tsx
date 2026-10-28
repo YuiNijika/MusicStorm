@@ -481,8 +481,8 @@ function TrafficLight({
         tone === "close"
             ? "bg-[#ff5f57] ring-[#e0443e]/35"
             : tone === "minimize"
-              ? "bg-[#febc2e] ring-[#d7a025]/35"
-              : "bg-[#28c840] ring-[#20a834]/35"
+                ? "bg-[#febc2e] ring-[#d7a025]/35"
+                : "bg-[#28c840] ring-[#20a834]/35"
 
     return (
         <button
@@ -519,7 +519,7 @@ function WindowAction({
                 "flex h-8 w-11 cursor-pointer items-center justify-center text-foreground/70 transition-colors",
                 "hover:bg-black/[0.06] active:bg-black/[0.1] dark:hover:bg-white/[0.08] dark:active:bg-white/[0.12]",
                 danger &&
-                    "hover:bg-[#e81123] hover:text-white active:bg-[#c50f1f] dark:hover:bg-[#e81123]",
+                "hover:bg-[#e81123] hover:text-white active:bg-[#c50f1f] dark:hover:bg-[#e81123]",
             )}
         >
             {children}

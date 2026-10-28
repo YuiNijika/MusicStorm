@@ -43,7 +43,8 @@ pub fn macos_minimum_system_version(conf: &Value) -> Option<&str> {
 
 /// Return true when the macOS DMG layout block is present under bundle.macOS.
 pub fn has_macos_dmg_config(conf: &Value) -> bool {
-    conf.pointer("/bundle/macOS/dmg").is_some_and(Value::is_object)
+    conf.pointer("/bundle/macOS/dmg")
+        .is_some_and(Value::is_object)
 }
 
 /// Validate the shipped configuration requirements for this packaging step.
@@ -140,8 +141,8 @@ mod tests {
     #[test]
     fn macos_ci_builds_universal_app_and_dmg() {
         // Workflow lives at repo root; CARGO_MANIFEST_DIR is src-tauri/.
-        let workflow = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../.github/workflows/macos.yml");
+        let workflow =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/macos.yml");
         let raw = std::fs::read_to_string(&workflow)
             .unwrap_or_else(|e| panic!("read {}: {e}", workflow.display()));
         assert!(

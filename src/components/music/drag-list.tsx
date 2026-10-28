@@ -145,7 +145,7 @@ function DragList<T extends { id: string }>({
                                 "text-muted-foreground touch-none active:cursor-grabbing",
                                 "transition-colors hover:bg-[var(--surface-fill)]",
                                 dragId === item.id &&
-                                    "cursor-grabbing text-foreground",
+                                "cursor-grabbing text-foreground",
                             )}
                             onKeyDown={(event) =>
                                 onHandleKeyDown(event, item.id)
@@ -168,11 +168,11 @@ function DragList<T extends { id: string }>({
                                 // 被拖行压低并留虚线占位，目标行用主色示线标出落点
                                 "h-full transition-[transform,opacity,box-shadow] duration-[var(--duration-control)]",
                                 dragId === item.id &&
-                                    "scale-[0.97] opacity-40 shadow-[var(--shadow-float)] outline-1 outline-dashed outline-foreground/25",
+                                "scale-[0.97] opacity-40 shadow-[var(--shadow-float)] outline-1 outline-dashed outline-foreground/25",
                                 overId === item.id &&
-                                    dragId &&
-                                    dragId !== item.id &&
-                                    "ring-1 ring-primary/50",
+                                dragId &&
+                                dragId !== item.id &&
+                                "ring-1 ring-primary/50",
                             )}
                         >
                             {renderItem(item, index, handle)}

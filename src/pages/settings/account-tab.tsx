@@ -84,8 +84,8 @@ function NeteaseAccountContent({ onLogin }: { onLogin: () => void }) {
                         entry.state === "failed"
                             ? "签到未完成"
                             : entry.state === "already"
-                              ? "今日已签到"
-                              : "签到完成",
+                                ? "今日已签到"
+                                : "签到完成",
                     description: entry.message,
                 }),
                 error: (error) => ({
@@ -193,7 +193,7 @@ function NeteaseAccountContent({ onLogin }: { onLogin: () => void }) {
                     {loggedIn && signinEntry ? (
                         <p className="text-sm text-muted-foreground">
                             {signinEntry.day ===
-                            new Date().toLocaleDateString("sv")
+                                new Date().toLocaleDateString("sv")
                                 ? signinEntry.ok
                                     ? `今日已签到 · ${signinEntry.message}`
                                     : `今日签到未完成 · ${signinEntry.message}`
@@ -266,8 +266,8 @@ function NeteaseAccountContent({ onLogin }: { onLogin: () => void }) {
                                                 {busy && !isActive
                                                     ? "切换中"
                                                     : isActive
-                                                      ? "当前"
-                                                      : "切换"}
+                                                        ? "当前"
+                                                        : "切换"}
                                             </button>
                                             <button
                                                 type="button"
@@ -396,15 +396,15 @@ function AccountTab({ onLogin }: { onLogin: () => void }) {
                         title="收藏夹"
                         description="登录后，账号收藏夹会显示在B站模式中"
                     >
- {bilibiliAccount ? (
- <p className="text-sm text-muted-foreground">
-收藏夹中的音乐会按收藏夹分组显示，可以直接加入播放队列。
- </p>
- ) : (
- <p className="text-sm text-muted-foreground">
-登录后，账号收藏夹会显示在B站模式中。
- </p>
- )}
+                        {bilibiliAccount ? (
+                            <p className="text-sm text-muted-foreground">
+                                收藏夹中的音乐会按收藏夹分组显示，可以直接加入播放队列。
+                            </p>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                登录后，账号收藏夹会显示在B站模式中。
+                            </p>
+                        )}
                     </SettingsGroup>
                 </div>
             )}

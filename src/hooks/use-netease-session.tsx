@@ -124,11 +124,11 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                     loggedIn: isNeteaseLoggedIn(),
                     profile: cached
                         ? {
-                              userId: cached.userId,
-                              nickname: cached.nickname,
-                              avatarUrl: cached.avatarUrl,
-                              vipType: cached.vipType ?? 0,
-                          }
+                            userId: cached.userId,
+                            nickname: cached.nickname,
+                            avatarUrl: cached.avatarUrl,
+                            vipType: cached.vipType ?? 0,
+                        }
                         : stateRef.current.profile,
                     error: cached ? "资料未刷新，稍后自动重试" : "账号资料暂不可用",
                     accounts,
@@ -169,16 +169,16 @@ function NeteaseSessionProvider({ children }: { children: ReactNode }) {
                     const cached =
                         activeUserId != null
                             ? listNeteaseAccounts().find(
-                                  (a) => a.userId === activeUserId,
-                              )
+                                (a) => a.userId === activeUserId,
+                            )
                             : null
                     return cached
                         ? {
-                              userId: cached.userId,
-                              nickname: cached.nickname,
-                              avatarUrl: cached.avatarUrl,
-                              vipType: cached.vipType ?? 0,
-                          }
+                            userId: cached.userId,
+                            nickname: cached.nickname,
+                            avatarUrl: cached.avatarUrl,
+                            vipType: cached.vipType ?? 0,
+                        }
                         : stateRef.current.profile
                 })(),
                 error: "无法获取账号信息",

@@ -1,11 +1,11 @@
 import {
- Download,
- Heart,
- Library,
- ListMinus,
- Pencil,
- Sparkles,
- Trash2,
+    Download,
+    Heart,
+    Library,
+    ListMinus,
+    Pencil,
+    Sparkles,
+    Trash2,
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
@@ -59,10 +59,10 @@ import {
     resolveTrackCoverUrl,
 } from "@/lib/music/cover-overrides"
 import {
- canBatchDownload,
- chooseDownloadDirectory,
- downloadPlaylistTracks,
- type PlaylistDownloadProgress,
+    canBatchDownload,
+    chooseDownloadDirectory,
+    downloadPlaylistTracks,
+    type PlaylistDownloadProgress,
 } from "@/lib/music/batch-download"
 import { fetchIntelligencePlaylist } from "@/lib/netease/fm"
 import {
@@ -72,11 +72,11 @@ import {
     updatePlaylistName,
 } from "@/lib/netease/playlist"
 import {
- formatError,
- notifyFromError,
- notifyLoading,
- notifySuccess,
- notifyUpdate,
+    formatError,
+    notifyFromError,
+    notifyLoading,
+    notifySuccess,
+    notifyUpdate,
 } from "@/lib/notify"
 import type { Playlist, Track } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -397,10 +397,10 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
             setPlaylist((prev) =>
                 prev
                     ? {
-                          ...prev,
-                          title: nameChanged ? name : prev.title,
-                          description: descChanged ? desc : prev.description,
-                      }
+                        ...prev,
+                        title: nameChanged ? name : prev.title,
+                        description: descChanged ? desc : prev.description,
+                    }
                     : prev,
             )
             notifySuccess("歌单已保存", { description: name })
@@ -487,17 +487,16 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                     result.failed > 0
                         ? "warning"
                         : result.succeeded > 0
-                          ? "success"
-                          : "info",
+                            ? "success"
+                            : "info",
                 title:
                     result.failed > 0
                         ? "歌单下载完成，部分失败"
                         : "歌单下载完成",
-                description: `成功 ${result.succeeded} 首 · 跳过 ${result.skipped} 首 · 失败 ${result.failed} 首${
-                    firstFailure
+                description: `成功 ${result.succeeded} 首 · 跳过 ${result.skipped} 首 · 失败 ${result.failed} 首${firstFailure
                         ? ` · ${firstFailure.title} ${firstFailure.reason}`
                         : ""
-                }`,
+                    }`,
                 timeout: result.failed > 0 ? 5200 : 3600,
             })
         } catch (error) {
@@ -555,7 +554,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                 <span className="text-[12px] text-muted-foreground">
                                     {playlist.trackCount != null
                                         ? playlist.trackCount +
-                                          localRows.length
+                                        localRows.length
                                         : sortedTracks.length}{" "}
                                     首
                                 </span>
@@ -589,10 +588,10 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                     </button>
                                 ) : null}
                                 {canBatchDownload() &&
-                                sortedTracks.some(
-                                    (track) =>
-                                        track.source === "netease",
-                                ) ? (
+                                    sortedTracks.some(
+                                        (track) =>
+                                            track.source === "netease",
+                                    ) ? (
                                     <button
                                         type="button"
                                         disabled={batchBusy}
@@ -669,9 +668,8 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
 
                     <Section
                         title="歌曲"
-                        description={`${sortedTracks.length} 首${
-                            dragEnabled ? " · 拖动手柄排序" : ""
-                        }`}
+                        description={`${sortedTracks.length} 首${dragEnabled ? " · 拖动手柄排序" : ""
+                            }`}
                         action={
                             <div className="flex flex-wrap items-center gap-2">
                                 <SortSelect
@@ -767,7 +765,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 showAlbumColumn
                                                 playlistId={
                                                     track.source === "netease" &&
-                                                    !isOwnLiked
+                                                        !isOwnLiked
                                                         ? playlistId
                                                         : undefined
                                                 }
@@ -775,9 +773,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 onLocalRemove={
                                                     track.source === "local"
                                                         ? () =>
-                                                              void handleRemoveLocalTrack(
-                                                                  track.id,
-                                                              )
+                                                            void handleRemoveLocalTrack(
+                                                                track.id,
+                                                            )
                                                         : undefined
                                                 }
                                                 onPlay={handleRowPlay}
@@ -804,7 +802,7 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 showAlbumColumn
                                                 playlistId={
                                                     track.source === "netease" &&
-                                                    !isOwnLiked
+                                                        !isOwnLiked
                                                         ? playlistId
                                                         : undefined
                                                 }
@@ -812,9 +810,9 @@ function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
                                                 onLocalRemove={
                                                     track.source === "local"
                                                         ? () =>
-                                                              void handleRemoveLocalTrack(
-                                                                  track.id,
-                                                              )
+                                                            void handleRemoveLocalTrack(
+                                                                track.id,
+                                                            )
                                                         : undefined
                                                 }
                                                 onPlay={handleRowPlay}

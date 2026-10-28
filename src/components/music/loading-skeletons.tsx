@@ -82,8 +82,8 @@ function TrackListSkeleton({
                                 index % 3 === 0
                                     ? "w-[72%]"
                                     : index % 3 === 1
-                                      ? "w-[58%]"
-                                      : "w-[66%]",
+                                        ? "w-[58%]"
+                                        : "w-[66%]",
                             )}
                         />
                         <Skeleton
@@ -211,11 +211,11 @@ function StatsPageSkeleton() {
                             className={cn(
                                 "px-6 py-4 sm:px-8 sm:py-5",
                                 i === 1 &&
-                                    "border-l border-[var(--separator)]",
+                                "border-l border-[var(--separator)]",
                                 i === 2 &&
-                                    "border-t border-[var(--separator)] sm:border-t-0 sm:border-l",
+                                "border-t border-[var(--separator)] sm:border-t-0 sm:border-l",
                                 i === 3 &&
-                                    "border-l border-t border-[var(--separator)] sm:border-t-0",
+                                "border-l border-t border-[var(--separator)] sm:border-t-0",
                             )}
                         >
                             <Skeleton className="h-3 w-11 rounded-full" />

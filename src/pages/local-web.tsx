@@ -767,7 +767,7 @@ function LocalWebPage() {
                                             album={album}
                                             overlay
                                             onEdit={openEditAlbum}
-                                            onRescan={() => {}}
+                                            onRescan={() => { }}
                                             onDelete={openRemoveAlbum}
                                         />
                                     </div>
@@ -776,7 +776,7 @@ function LocalWebPage() {
                         />
                     </Section>
                 )}
-            {confirmDialogs}
+                {confirmDialogs}
             </div>
         )
     }
@@ -881,7 +881,7 @@ function LocalWebPage() {
                         />
                     </div>
                 )}
-            {confirmDialogs}
+                {confirmDialogs}
             </div>
         )
     }
@@ -964,7 +964,7 @@ function LocalWebPage() {
                         />
                     </div>
                 )}
-            {confirmDialogs}
+                {confirmDialogs}
             </div>
         )
     }
@@ -1145,7 +1145,7 @@ function LocalWebPage() {
                                                 album={album}
                                                 overlay
                                                 onEdit={openEditAlbum}
-                                                onRescan={() => {}}
+                                                onRescan={() => { }}
                                                 onDelete={openRemoveAlbum}
                                             />
                                         </div>

@@ -1,6 +1,6 @@
 import {
     BarChart3,
- AudioLines,
+    AudioLines,
     Compass,
     FolderOpen,
     Home,
@@ -32,7 +32,7 @@ import {
 
 const MODULE_ICONS: Record<WorkspaceModuleId, LucideIcon> = {
     home: Home,
- bilibili: AudioLines,
+    bilibili: AudioLines,
     discover: Compass,
     search: Search,
     local: FolderOpen,
@@ -43,7 +43,7 @@ const MODULE_ICONS: Record<WorkspaceModuleId, LucideIcon> = {
 
 const MODE_ICONS = {
     netease: Music2,
- bilibili: AudioLines,
+    bilibili: AudioLines,
 } as const
 
 type LayoutRow = WorkspaceLayoutItem & WorkspaceModule
@@ -121,15 +121,15 @@ function LayoutTab() {
                                     "transition-[border-color,background-color,transform]",
                                     "active:scale-[0.99] active:duration-[var(--duration-press)]",
                                     "focus-visible:outline-2 focus-visible:outline-ring",
- active
- ? "border-primary bg-[var(--surface-fill-hover)]"
+                                    active
+                                        ? "border-primary bg-[var(--surface-fill-hover)]"
                                         : "border-[var(--border)] bg-[var(--surface-fill)] hover:bg-[var(--surface-fill-hover)]",
                                 )}
                             >
                                 <span
                                     className={cn(
                                         "flex size-9 shrink-0 items-center justify-center rounded-xl",
- "bg-primary/10 text-primary",
+                                        "bg-primary/10 text-primary",
                                     )}
                                 >
                                     <Icon

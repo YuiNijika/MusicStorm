@@ -333,8 +333,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                 combo === shortcuts.lyricsScaleUp
                     ? LYRICS_SCALE_STEP
                     : combo === shortcuts.lyricsScaleDown
-                      ? -LYRICS_SCALE_STEP
-                      : 0
+                        ? -LYRICS_SCALE_STEP
+                        : 0
             if (step === 0) {
                 return
             }
@@ -388,18 +388,18 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
     const artistLabel =
         displayTrack.source === "bilibili"
             ? displayTrack.artist?.trim() ||
-              displayTrack.artists
-                  ?.map((artist) => artist.name.trim())
-                  .filter(Boolean)
-                  .join(" / ") ||
-              "未知作者"
+            displayTrack.artists
+                ?.map((artist) => artist.name.trim())
+                .filter(Boolean)
+                .join(" / ") ||
+            "未知作者"
             : displayTrack.artist || "未知艺人"
     const secondaryMeta =
         displayTrack.source === "bilibili"
             ? displayTrack.tname?.trim()
             : displayTrack.album
- const showQuality =
- displayTrack.source === "netease" || displayTrack.source === "bilibili"
+    const showQuality =
+        displayTrack.source === "netease" || displayTrack.source === "bilibili"
     const liked = isTrackLiked(displayTrack.id)
     const primaryArtist = displayTrack.artists?.find((item) => item.id)
     const canOpenArtist =
@@ -414,8 +414,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         phase === "exiting"
             ? "translateY(100%)"
             : phase === "open"
-              ? "translateY(0)"
-              : "translateY(100%)"
+                ? "translateY(0)"
+                : "translateY(100%)"
     const sheetTransform =
         dragDy > 0
             ? `translateY(${Math.min(dragDy, window.innerHeight)}px)`
@@ -428,8 +428,8 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
         phase === "exiting"
             ? "full-player-scrim-exit"
             : phase === "open"
-              ? "opacity-100"
-              : "opacity-0"
+                ? "opacity-100"
+                : "opacity-0"
 
     function navigateArtist() {
         if (!primaryArtist?.id) {
@@ -716,234 +716,234 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                             startDragging(event)
                         }}
                     >
-                    <div className="flex flex-1 justify-start">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            onPointerDown={(event) => event.stopPropagation()}
-                            className={cn(
-                                // 移动端触控目标放大到 40px
-                                "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
-                                "max-md:h-10",
-                                "text-[13px] font-medium text-foreground/70",
-                                "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
-                                "active:scale-[0.97] active:duration-[var(--duration-press)]",
-                            )}
-                        >
-                            <ChevronDown className="size-4" />
-                            收起
-                        </button>
-                    </div>
-
-                    <div className="flex flex-1 justify-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger
+                        <div className="flex flex-1 justify-start">
+                            <button
+                                type="button"
+                                onClick={onClose}
                                 onPointerDown={(event) => event.stopPropagation()}
                                 className={cn(
-                                    "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
-                                    "text-[12px] font-medium text-foreground/70 outline-none",
+                                    // 移动端触控目标放大到 40px
+                                    "flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5",
+                                    "max-md:h-10",
+                                    "text-[13px] font-medium text-foreground/70",
                                     "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
                                     "active:scale-[0.97] active:duration-[var(--duration-press)]",
                                 )}
-                                title="播放样式"
                             >
-                                <LayoutTemplate className="size-3.5" />
-                                {availableLayouts.find((item) => item.id === effectiveLayout)
-                                    ?.label ?? "样式"}
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="center" className="w-60 p-3">
-                                <div className="space-y-0.5">
-                                    {availableLayouts.map((item) => (
-                                        <DropdownMenuItem
-                                            key={item.id}
-                                            className="cursor-pointer flex-col items-start gap-0.5"
-                                            onClick={() => handleLayoutChange(item.id)}
-                                        >
-                                            <span className="text-[13px] font-medium">
-                                                {item.label}
-                                                {effectiveLayout === item.id ? " · 当前" : ""}
-                                            </span>
-                                            <span className="text-[11px] text-muted-foreground">
-                                                {item.description}
-                                            </span>
-                                        </DropdownMenuItem>
-                                    ))}
-                                </div>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-
-                    <div className="flex flex-1 justify-end" aria-hidden />
-                </div>
-
-                <div
-                    className={cn(
-                        "flex min-h-0 flex-1 flex-col",
-                        !isMobile && layoutFade && "full-player-layout-in",
-                    )}
-                    onAnimationEnd={(event) => {
-                        // 封面呼吸等子元素动画结束后会向上冒泡，只有布局淡入自身结束才允许复位
-                        if (
-                            event.target === event.currentTarget &&
-                            event.animationName === "full-player-layout-in"
-                        ) {
-                            setLayoutFade(false)
-                        }
-                    }}
-                >
-                {effectiveLayout === "classic" ? (
-                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
-                        <div className="flex min-h-0 flex-col items-center justify-center gap-6">
-                            <div className="w-full max-w-[min(400px,78vw)]">
-                                <Cover
-                                    src={displayCover}
-                                    alt={displayTrack.title}
-                                    size="xl"
-                                    className={cn(
-                                        "rounded-[28px] shadow-[0_24px_64px_rgba(15,23,42,0.28)]",
-                                        "ring-1 ring-white/20 dark:shadow-[0_24px_64px_rgba(0,0,0,0.55)] dark:ring-white/10",
-                                        isPlaying &&
-                                            "animate-[cover-breathe_6s_ease-in-out_infinite]",
-                                    )}
-                                />
-                            </div>
-                            <div className="w-full max-w-[min(400px,78vw)] space-y-3">
-                                {meta}
-                            </div>
+                                <ChevronDown className="size-4" />
+                                收起
+                            </button>
                         </div>
-                        {lyricsActive ? (
-                            <Suspense fallback={<LyricsSkeleton />}>
-                                <LyricsView
-                                    variant="full"
-                                    active={lyricsActive}
-                                    scale={chrome.lyricsScale}
-                                    className="min-h-0 flex-1"
-                                    listClassName="h-full"
-                                />
-                            </Suspense>
-                        ) : null}
-                    </div>
-                ) : null}
 
-                {isMobile ? (
-                    <div className="relative min-h-0 flex-1 overflow-hidden">
-                        <div
-                            className="flex h-full min-h-0"
-                            style={{
-                                transform: `translateX(calc(${-page * 100}% + ${pageOffset}px))`,
-                                transition:
-                                    pageOffset !== 0
-                                        ? "none"
-                                        : `transform ${DRAWER_MS}ms var(--ease-enter)`,
-                            }}
-                        >
-                            <div className="flex w-full min-h-0 shrink-0 flex-col items-center overflow-hidden px-6 pb-4">
-                                <div className="my-auto flex min-h-0 w-full max-w-[min(440px,82vw)] flex-col items-center gap-5">
-                                    <div className="w-full">
-                                        <button
-                                            type="button"
-                                            aria-label="切换为歌词"
-                                            onClick={() =>
-                                                handleLayoutChange("lyrics")
-                                            }
-                                            className="block w-full cursor-pointer"
-                                        >
+                        <div className="flex flex-1 justify-center">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger
+                                    onPointerDown={(event) => event.stopPropagation()}
+                                    className={cn(
+                                        "flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-2.5",
+                                        "text-[12px] font-medium text-foreground/70 outline-none",
+                                        "transition-[color,background-color,transform] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                        "active:scale-[0.97] active:duration-[var(--duration-press)]",
+                                    )}
+                                    title="播放样式"
+                                >
+                                    <LayoutTemplate className="size-3.5" />
+                                    {availableLayouts.find((item) => item.id === effectiveLayout)
+                                        ?.label ?? "样式"}
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="center" className="w-60 p-3">
+                                    <div className="space-y-0.5">
+                                        {availableLayouts.map((item) => (
+                                            <DropdownMenuItem
+                                                key={item.id}
+                                                className="cursor-pointer flex-col items-start gap-0.5"
+                                                onClick={() => handleLayoutChange(item.id)}
+                                            >
+                                                <span className="text-[13px] font-medium">
+                                                    {item.label}
+                                                    {effectiveLayout === item.id ? " · 当前" : ""}
+                                                </span>
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    {item.description}
+                                                </span>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        <div className="flex flex-1 justify-end" aria-hidden />
+                    </div>
+
+                    <div
+                        className={cn(
+                            "flex min-h-0 flex-1 flex-col",
+                            !isMobile && layoutFade && "full-player-layout-in",
+                        )}
+                        onAnimationEnd={(event) => {
+                            // 封面呼吸等子元素动画结束后会向上冒泡，只有布局淡入自身结束才允许复位
+                            if (
+                                event.target === event.currentTarget &&
+                                event.animationName === "full-player-layout-in"
+                            ) {
+                                setLayoutFade(false)
+                            }
+                        }}
+                    >
+                        {effectiveLayout === "classic" ? (
+                            <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-6 pb-3 pt-2 lg:grid-cols-2 lg:gap-10 lg:px-12">
+                                <div className="flex min-h-0 flex-col items-center justify-center gap-6">
+                                    <div className="w-full max-w-[min(400px,78vw)]">
                                         <Cover
                                             src={displayCover}
                                             alt={displayTrack.title}
                                             size="xl"
                                             className={cn(
-                                                "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
-                                                "ring-1 ring-white/20 dark:ring-white/10",
+                                                "rounded-[28px] shadow-[0_24px_64px_rgba(15,23,42,0.28)]",
+                                                "ring-1 ring-white/20 dark:shadow-[0_24px_64px_rgba(0,0,0,0.55)] dark:ring-white/10",
                                                 isPlaying &&
-                                                    "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                                "animate-[cover-breathe_6s_ease-in-out_infinite]",
                                             )}
                                         />
-                                        </button>
                                     </div>
-                                    <div className="w-full space-y-2">
+                                    <div className="w-full max-w-[min(400px,78vw)] space-y-3">
                                         {meta}
                                     </div>
                                 </div>
-                            </div>
-                            <div className="flex w-full min-h-0 shrink-0 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-8">
-                                {lyricsMounted ? (
-                                    <Suspense fallback={<LyricsSkeleton />}>
-                                        <LyricsView
-                                            variant="full"
-                                            active={lyricsActive && page === 1}
-                                            align={chrome.lyricsAlign}
-                                            scale={chrome.lyricsScale}
-                                            className="h-full min-h-0 flex-1"
-                                            listClassName="h-full py-2"
-                                        />
-                                    </Suspense>
-                                ) : null}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {effectiveLayout === "cover" ? (
-                            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
-                                <div className="w-full max-w-[min(440px,82vw)]">
-                                    <Cover
-                                        src={displayCover}
-                                        alt={displayTrack.title}
-                                        size="xl"
-                                        className={cn(
-                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
-                                            "ring-1 ring-white/20 dark:ring-white/10",
-                                            isPlaying &&
-                                                "animate-[cover-breathe_6s_ease-in-out_infinite]",
-                                        )}
-                                    />
-                                </div>
-                                <div className="w-full max-w-[min(440px,82vw)] space-y-2">{meta}</div>
-                            </div>
-                        ) : null}
-
-                        {effectiveLayout === "lyrics" ? (
-                            <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
                                 {lyricsActive ? (
                                     <Suspense fallback={<LyricsSkeleton />}>
                                         <LyricsView
                                             variant="full"
                                             active={lyricsActive}
-                                            align={chrome.lyricsAlign}
                                             scale={chrome.lyricsScale}
-                                            className="h-full min-h-0 flex-1"
-                                            listClassName="h-full py-2"
+                                            className="min-h-0 flex-1"
+                                            listClassName="h-full"
                                         />
                                     </Suspense>
                                 ) : null}
                             </div>
                         ) : null}
-                    </>
-                )}
-                </div>
 
-                <div
-                    className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"
-                    style={{
-                        // iOS 底部安全区：控制条贴在手势条上方
-                        paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)",
-                    }}
-                >
-                    <div className="flex w-full flex-col gap-2.5">
-                        {progressRow}
-                        {transport}
+                        {isMobile ? (
+                            <div className="relative min-h-0 flex-1 overflow-hidden">
+                                <div
+                                    className="flex h-full min-h-0"
+                                    style={{
+                                        transform: `translateX(calc(${-page * 100}% + ${pageOffset}px))`,
+                                        transition:
+                                            pageOffset !== 0
+                                                ? "none"
+                                                : `transform ${DRAWER_MS}ms var(--ease-enter)`,
+                                    }}
+                                >
+                                    <div className="flex w-full min-h-0 shrink-0 flex-col items-center overflow-hidden px-6 pb-4">
+                                        <div className="my-auto flex min-h-0 w-full max-w-[min(440px,82vw)] flex-col items-center gap-5">
+                                            <div className="w-full">
+                                                <button
+                                                    type="button"
+                                                    aria-label="切换为歌词"
+                                                    onClick={() =>
+                                                        handleLayoutChange("lyrics")
+                                                    }
+                                                    className="block w-full cursor-pointer"
+                                                >
+                                                    <Cover
+                                                        src={displayCover}
+                                                        alt={displayTrack.title}
+                                                        size="xl"
+                                                        className={cn(
+                                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                                            "ring-1 ring-white/20 dark:ring-white/10",
+                                                            isPlaying &&
+                                                            "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                                        )}
+                                                    />
+                                                </button>
+                                            </div>
+                                            <div className="w-full space-y-2">
+                                                {meta}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex w-full min-h-0 shrink-0 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-8">
+                                        {lyricsMounted ? (
+                                            <Suspense fallback={<LyricsSkeleton />}>
+                                                <LyricsView
+                                                    variant="full"
+                                                    active={lyricsActive && page === 1}
+                                                    align={chrome.lyricsAlign}
+                                                    scale={chrome.lyricsScale}
+                                                    className="h-full min-h-0 flex-1"
+                                                    listClassName="h-full py-2"
+                                                />
+                                            </Suspense>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {effectiveLayout === "cover" ? (
+                                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-6 pb-3">
+                                        <div className="w-full max-w-[min(440px,82vw)]">
+                                            <Cover
+                                                src={displayCover}
+                                                alt={displayTrack.title}
+                                                size="xl"
+                                                className={cn(
+                                                    "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                                    "ring-1 ring-white/20 dark:ring-white/10",
+                                                    isPlaying &&
+                                                    "animate-[cover-breathe_6s_ease-in-out_infinite]",
+                                                )}
+                                            />
+                                        </div>
+                                        <div className="w-full max-w-[min(440px,82vw)] space-y-2">{meta}</div>
+                                    </div>
+                                ) : null}
+
+                                {effectiveLayout === "lyrics" ? (
+                                    <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-1 sm:px-8">
+                                        {lyricsActive ? (
+                                            <Suspense fallback={<LyricsSkeleton />}>
+                                                <LyricsView
+                                                    variant="full"
+                                                    active={lyricsActive}
+                                                    align={chrome.lyricsAlign}
+                                                    scale={chrome.lyricsScale}
+                                                    className="h-full min-h-0 flex-1"
+                                                    listClassName="h-full py-2"
+                                                />
+                                            </Suspense>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </>
+                        )}
+                    </div>
+
+                    <div
+                        className="relative z-[1] shrink-0 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08] sm:px-8"
+                        style={{
+                            // iOS 底部安全区：控制条贴在手势条上方
+                            paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)",
+                        }}
+                    >
+                        <div className="flex w-full flex-col gap-2.5">
+                            {progressRow}
+                            {transport}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <ShareSheet
-                open={shareOpen}
-                onOpenChange={setShareOpen}
-                track={displayTrack}
-            />
+                <ShareSheet
+                    open={shareOpen}
+                    onOpenChange={setShareOpen}
+                    track={displayTrack}
+                />
+            </div>
         </div>
-    </div>
     )
 }
 
@@ -1026,10 +1026,10 @@ const TransportBar = memo(function TransportBar({
                             </span>
                         ) : null}
                     </>
- ) : source === "local" || source === "bilibili" ? (
+                ) : source === "local" || source === "bilibili" ? (
                     // 本地曲目无喜欢：来源徽章补到这个空位，保持布局平衡
                     <span className="flex size-10 items-center">
- <SourceBadge source={source} />
+                        <SourceBadge source={source} />
                     </span>
                 ) : (
                     <span className="size-10" aria-hidden />
@@ -1065,10 +1065,10 @@ const TransportBar = memo(function TransportBar({
                         shuffle
                             ? "随机播放"
                             : repeat === "one"
-                              ? "循环：单曲"
-                              : repeat === "all"
-                                ? "循环：列表"
-                                : "顺序播放"
+                                ? "循环：单曲"
+                                : repeat === "all"
+                                    ? "循环：列表"
+                                    : "顺序播放"
                     }
                     active={shuffle || repeat !== "off"}
                     onClick={onCyclePlayMode}
@@ -1086,27 +1086,113 @@ const TransportBar = memo(function TransportBar({
             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                 {isMobile ? (
                     <>
-                    {/* 移动端队列管理入口：放在「更多」左侧 */}
-                    <QueuePanel />
-                    <Popover>
-                        <PopoverTrigger
-                            className={cn(
-                                "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                                "text-muted-foreground transition-[color,background-color,transform]",
-                                "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
-                                "active:duration-[var(--duration-press)]",
-                            )}
-                            title="更多"
-                            aria-label="更多"
-                        >
-                            <MoreHorizontal className="size-5" />
-                        </PopoverTrigger>
-                        <PopoverContent
-                            side="top"
-                            align="end"
-                            className="w-[min(88vw,340px)] max-h-[70dvh] gap-3 overflow-y-auto p-3.5"
-                        >
-                            <div className="space-y-4">
+                        {/* 移动端队列管理入口：放在「更多」左侧 */}
+                        <QueuePanel />
+                        <Popover>
+                            <PopoverTrigger
+                                className={cn(
+                                    "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                    "text-muted-foreground transition-[color,background-color,transform]",
+                                    "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                    "active:duration-[var(--duration-press)]",
+                                )}
+                                title="更多"
+                                aria-label="更多"
+                            >
+                                <MoreHorizontal className="size-5" />
+                            </PopoverTrigger>
+                            <PopoverContent
+                                side="top"
+                                align="end"
+                                className="w-[min(88vw,340px)] max-h-[70dvh] gap-3 overflow-y-auto p-3.5"
+                            >
+                                <div className="space-y-4">
+                                    <VolumeElasticSlider
+                                        volume={volume}
+                                        muted={isMuted}
+                                        onVolume={onVolume}
+                                        onToggleMute={onToggleMute}
+                                        showValue
+                                        showIcons
+                                        fluid
+                                    />
+                                    {showQuality ? (
+                                        <div>
+                                            <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                                音质
+                                            </p>
+                                            <div className="flex flex-col gap-1">
+                                                {QUALITY_OPTIONS.map((option) => (
+                                                    <button
+                                                        key={option.br}
+                                                        type="button"
+                                                        onClick={() => onQuality(option.br)}
+                                                        className={cn(
+                                                            "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
+                                                            qualityBr === option.br
+                                                                ? "bg-foreground text-background"
+                                                                : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                        )}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                    <div>
+                                        <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                            播放速度
+                                        </p>
+                                        <div className="flex justify-start">
+                                            <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
+                                        </div>
+                                    </div>
+                                    <EqEditor compact trackId={trackId} />
+                                    {showQuality ? (
+                                        <button
+                                            type="button"
+                                            onClick={onOpenComments}
+                                            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
+                                        >
+                                            <MessageCircle className="size-4" />
+                                            评论
+                                        </button>
+                                    ) : null}
+                                    {canShowShare ? (
+                                        <button
+                                            type="button"
+                                            onClick={onShare}
+                                            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
+                                        >
+                                            <Share2 className="size-4" />
+                                            分享
+                                        </button>
+                                    ) : null}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    </>
+                ) : (
+                    <>
+                        <Popover>
+                            <PopoverTrigger
+                                className={cn(
+                                    "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                    "text-muted-foreground transition-[color,background-color,transform]",
+                                    "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                    "active:duration-[var(--duration-press)]",
+                                )}
+                                title="音量"
+                                aria-label="音量"
+                            >
+                                {isMuted || volume === 0 ? (
+                                    <VolumeX className="size-4" />
+                                ) : (
+                                    <Volume2 className="size-4" />
+                                )}
+                            </PopoverTrigger>
+                            <PopoverContent side="top" className="w-56 gap-2 p-3">
                                 <VolumeElasticSlider
                                     volume={volume}
                                     muted={isMuted}
@@ -1116,158 +1202,72 @@ const TransportBar = memo(function TransportBar({
                                     showIcons
                                     fluid
                                 />
-                                {showQuality ? (
-                                    <div>
-                                        <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-                                            音质
-                                        </p>
-                                        <div className="flex flex-col gap-1">
-                                            {QUALITY_OPTIONS.map((option) => (
-                                                <button
-                                                    key={option.br}
-                                                    type="button"
-                                                    onClick={() => onQuality(option.br)}
-                                                    className={cn(
-                                                        "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
-                                                        qualityBr === option.br
-                                                            ? "bg-foreground text-background"
-                                                            : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
-                                                    )}
-                                                >
-                                                    {option.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : null}
-                                <div>
-                                    <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-                                        播放速度
-                                    </p>
-                                    <div className="flex justify-start">
-                                        <SpeedPopover rate={playbackRate} onSpeed={onSpeed} />
-                                    </div>
-                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        <Popover>
+                            <PopoverTrigger
+                                className={cn(
+                                    "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                    "text-muted-foreground transition-[color,background-color,transform]",
+                                    "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                    "active:duration-[var(--duration-press)]",
+                                )}
+                                title="均衡器"
+                                aria-label="均衡器"
+                            >
+                                <SlidersHorizontal className="size-4" />
+                            </PopoverTrigger>
+                            <PopoverContent side="top" className="w-[min(92vw,380px)] p-3.5">
                                 <EqEditor compact trackId={trackId} />
-                                {showQuality ? (
-                                    <button
-                                        type="button"
-                                        onClick={onOpenComments}
-                                        className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
-                                    >
-                                        <MessageCircle className="size-4" />
-                                        评论
-                                    </button>
-                                ) : null}
-                                {canShowShare ? (
-                                    <button
-                                        type="button"
-                                        onClick={onShare}
-                                        className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground"
-                                    >
-                                        <Share2 className="size-4" />
-                                        分享
-                                    </button>
-                                ) : null}
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                    </>
-                ) : (
-                    <>
-                <Popover>
-                    <PopoverTrigger
-                        className={cn(
-                            "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                            "text-muted-foreground transition-[color,background-color,transform]",
-                            "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
-                            "active:duration-[var(--duration-press)]",
-                        )}
-                        title="音量"
-                        aria-label="音量"
-                    >
-                        {isMuted || volume === 0 ? (
-                            <VolumeX className="size-4" />
-                        ) : (
-                            <Volume2 className="size-4" />
-                        )}
-                    </PopoverTrigger>
-                    <PopoverContent side="top" className="w-56 gap-2 p-3">
-                        <VolumeElasticSlider
-                            volume={volume}
-                            muted={isMuted}
-                            onVolume={onVolume}
-                            onToggleMute={onToggleMute}
-                            showValue
-                            showIcons
-                            fluid
-                        />
-                    </PopoverContent>
-                </Popover>
+                            </PopoverContent>
+                        </Popover>
 
-                <Popover>
-                    <PopoverTrigger
-                        className={cn(
-                            "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                            "text-muted-foreground transition-[color,background-color,transform]",
-                            "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
-                            "active:duration-[var(--duration-press)]",
-                        )}
-                        title="均衡器"
-                        aria-label="均衡器"
-                    >
-                        <SlidersHorizontal className="size-4" />
-                    </PopoverTrigger>
-                    <PopoverContent side="top" className="w-[min(92vw,380px)] p-3.5">
-                        <EqEditor compact trackId={trackId} />
-                    </PopoverContent>
-                </Popover>
-
-                {showQuality ? (
-                    <Popover>
-                        <PopoverTrigger
-                            className={cn(
-                                "flex size-10 cursor-pointer items-center justify-center rounded-full",
-                                "text-muted-foreground transition-[color,background-color,transform]",
-                                "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
-                                "active:duration-[var(--duration-press)]",
-                            )}
-                            title={`音质 · ${labelForQualityBr(qualityBr)}`}
-                            aria-label={`音质 · ${labelForQualityBr(qualityBr)}`}
-                        >
-                            <AudioLines className="size-4" />
-                        </PopoverTrigger>
-                        <PopoverContent side="top" className="w-44 gap-1 p-1.5">
-                            {QUALITY_OPTIONS.map((option) => (
-                                <button
-                                    key={option.br}
-                                    type="button"
-                                    onClick={() => onQuality(option.br)}
+                        {showQuality ? (
+                            <Popover>
+                                <PopoverTrigger
                                     className={cn(
-                                        "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
-                                        qualityBr === option.br
-                                            ? "bg-foreground text-background"
-                                            : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                        "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                        "text-muted-foreground transition-[color,background-color,transform]",
+                                        "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
+                                        "active:duration-[var(--duration-press)]",
                                     )}
+                                    title={`音质 · ${labelForQualityBr(qualityBr)}`}
+                                    aria-label={`音质 · ${labelForQualityBr(qualityBr)}`}
                                 >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </PopoverContent>
-                    </Popover>
-                ) : null}
+                                    <AudioLines className="size-4" />
+                                </PopoverTrigger>
+                                <PopoverContent side="top" className="w-44 gap-1 p-1.5">
+                                    {QUALITY_OPTIONS.map((option) => (
+                                        <button
+                                            key={option.br}
+                                            type="button"
+                                            onClick={() => onQuality(option.br)}
+                                            className={cn(
+                                                "w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-[12px] font-medium",
+                                                qualityBr === option.br
+                                                    ? "bg-foreground text-background"
+                                                    : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                            )}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
+                        ) : null}
 
-                {canShowShare ? (
-                    <IconBtn title="分享" onClick={onShare}>
-                        <Share2 className="size-4" />
-                    </IconBtn>
-                ) : null}
+                        {canShowShare ? (
+                            <IconBtn title="分享" onClick={onShare}>
+                                <Share2 className="size-4" />
+                            </IconBtn>
+                        ) : null}
 
-                {showQuality ? (
-                    <IconBtn title="评论" onClick={onOpenComments}>
-                        <MessageCircle className="size-4" />
-                    </IconBtn>
-                ) : null}
+                        {showQuality ? (
+                            <IconBtn title="评论" onClick={onOpenComments}>
+                                <MessageCircle className="size-4" />
+                            </IconBtn>
+                        ) : null}
                     </>
                 )}
             </div>
@@ -1311,9 +1311,9 @@ function CachedBackdropImage({ src }: { src: string }) {
     // 解码位图与合成纹理都小一个量级
     const kind = isAndroid() ? "thumbnail" : "original"
     const resolved = useCachedCoverUrl(src, kind)
- if (!resolved) {
- return null
- }
+    if (!resolved) {
+        return null
+    }
     return (
         <img
             src={resolved}

@@ -1,6 +1,6 @@
 import {
     BarChart3,
- AudioLines,
+    AudioLines,
     Compass,
     FolderOpen,
     Home,
@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils"
 const ICONS: Record<AppRoute, LucideIcon> = {
     feedback: Settings2,
     home: Home,
- bilibili: AudioLines,
+    bilibili: AudioLines,
     discover: Compass,
     library: Library,
     radios: Podcast,
@@ -372,76 +372,76 @@ function MobileNavBar({ activeRoute, onNavigate, showActive = true }: MobileNavB
                     </DropdownMenu>
 
                     {/* 账号入口 */}
- {mode === "netease" ? (
+                    {mode === "netease" ? (
                         <DropdownMenu>
-                    <DropdownMenuTrigger
-                        aria-label="账号菜单"
-                        className={cn(
-                            "ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full",
-                            "transition-[color,background-color,transform] active:scale-[0.95] active:duration-[var(--duration-press)]",
-                            "hover:bg-[var(--surface-fill)]",
-                        )}
-                    >
-                        {!ready ? (
-                            <div className="size-6 animate-pulse rounded-full bg-[var(--surface-fill)]" />
-                        ) : loggedIn && profile?.avatarUrl ? (
-                            <img
-                                src={profile.avatarUrl}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                className="size-6 rounded-full object-cover"
-                            />
-                        ) : (
-                            <User className="size-5 opacity-60" />
-                        )}
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="bottom" align="end" className="min-w-[160px]">
-                        {loggedIn ? (
-                            <>
-                                <div className="px-2 py-1.5">
-                                    <p className="truncate text-[13px] font-medium">
-                                        {profile?.nickname ?? "已登录"}
-                                    </p>
-                                </div>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => logout()}
-                                    className="cursor-pointer gap-2"
-                                >
-                                    <LogOut className="size-3.5" />
-                                    退出
-                                </DropdownMenuItem>
-                            </>
-                        ) : (
-                            <>
-                                <DropdownMenuItem
-                                    onClick={() => setAuthOpen(true)}
-                                    className="cursor-pointer gap-2"
-                                >
-                                    <LogIn className="size-3.5" />
-                                    登录
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => void openNeteaseRegister()}
-                                    className="cursor-pointer gap-2"
-                                >
-                                    <UserPlus className="size-3.5" />
-                                    注册
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                    </DropdownMenuContent>
+                            <DropdownMenuTrigger
+                                aria-label="账号菜单"
+                                className={cn(
+                                    "ml-1 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full",
+                                    "transition-[color,background-color,transform] active:scale-[0.95] active:duration-[var(--duration-press)]",
+                                    "hover:bg-[var(--surface-fill)]",
+                                )}
+                            >
+                                {!ready ? (
+                                    <div className="size-6 animate-pulse rounded-full bg-[var(--surface-fill)]" />
+                                ) : loggedIn && profile?.avatarUrl ? (
+                                    <img
+                                        src={profile.avatarUrl}
+                                        alt=""
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="size-6 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <User className="size-5 opacity-60" />
+                                )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="bottom" align="end" className="min-w-[160px]">
+                                {loggedIn ? (
+                                    <>
+                                        <div className="px-2 py-1.5">
+                                            <p className="truncate text-[13px] font-medium">
+                                                {profile?.nickname ?? "已登录"}
+                                            </p>
+                                        </div>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onClick={() => logout()}
+                                            className="cursor-pointer gap-2"
+                                        >
+                                            <LogOut className="size-3.5" />
+                                            退出
+                                        </DropdownMenuItem>
+                                    </>
+                                ) : (
+                                    <>
+                                        <DropdownMenuItem
+                                            onClick={() => setAuthOpen(true)}
+                                            className="cursor-pointer gap-2"
+                                        >
+                                            <LogIn className="size-3.5" />
+                                            登录
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => void openNeteaseRegister()}
+                                            className="cursor-pointer gap-2"
+                                        >
+                                            <UserPlus className="size-3.5" />
+                                            注册
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
                         </DropdownMenu>
- ) : (
- <BilibiliAccountMenu
- variant="compact"
- side="bottom"
- align="end"
- avatarPixels={24}
- className="ml-1 size-10"
- />
- )}
+                    ) : (
+                        <BilibiliAccountMenu
+                            variant="compact"
+                            side="bottom"
+                            align="end"
+                            avatarPixels={24}
+                            className="ml-1 size-10"
+                        />
+                    )}
                 </div>
             </div>
 

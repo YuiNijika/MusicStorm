@@ -9,10 +9,10 @@ mod db;
 mod desktop_lyric;
 mod ffmpeg;
 mod local_meta;
-#[cfg(not(target_os = "android"))]
-mod mini_player;
 #[cfg(target_os = "macos")]
 mod macos_now_playing;
+#[cfg(not(target_os = "android"))]
+mod mini_player;
 mod netease_proxy;
 mod remote_url;
 #[cfg(not(target_os = "android"))]
@@ -24,19 +24,18 @@ mod updater;
 use audio::{
     audio_get_output_mode, audio_list_devices, audio_load, audio_pause, audio_play, audio_probe,
     audio_seek, audio_set_device, audio_set_eq, audio_set_exclusive, audio_set_speed,
-    audio_set_volume, audio_stop,
-    AudioState,
-};
-use cover_cache::{
-cache_cover_data_url, cache_cover_url, clear_cover_cache, cover_paths_exist,
-purge_cover_cache_cmd,
+    audio_set_volume, audio_stop, AudioState,
 };
 use bilibili::{
- bilibili_cache_audio, bilibili_clear_cookie, bilibili_get_json, bilibili_post_json,
- bilibili_set_cookie,
+    bilibili_cache_audio, bilibili_clear_cookie, bilibili_get_json, bilibili_post_json,
+    bilibili_set_cookie,
 };
 #[cfg(not(target_os = "android"))]
 use cover_cache::pick_cover_image;
+use cover_cache::{
+    cache_cover_data_url, cache_cover_url, clear_cover_cache, cover_paths_exist,
+    purge_cover_cache_cmd,
+};
 use db::{
     api_cache_clear, api_cache_get, api_cache_purge_expired, api_cache_set, db_end_play_session,
     db_get_listen_stats, db_get_setting, db_list_listen_stats, db_list_top_tracks,
@@ -45,10 +44,10 @@ use db::{
     db_upsert_folder, db_upsert_tracks, ensure_storage_paths, get_storage_paths, open_db,
     purge_expired_api_cache, DbState,
 };
-use netease_proxy::netease_http_post;
-use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate};
 #[cfg(not(target_os = "android"))]
 use ffmpeg::pick_ffmpeg_executable;
+use ffmpeg::{ffmpeg_detect, ffmpeg_set_path, ffmpeg_validate};
+use netease_proxy::netease_http_post;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -59,11 +58,9 @@ use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager};
 
 const AUDIO_EXTS: &[&str] = &[
-    "mp3", "wav", "aac", "m4a", "flac", "ogg", "wma",
-    "aif", "aiff", "ape", "alac", "wv", "dsf", "dff", "diff", "tta",
-    "mp2", "mp1", "ra", "rm", "ram", "m4p", "opus",
-    "mid", "midi", "mod", "xm", "s3m", "it",
-    "au", "voc", "cda", "amr", "gsm", "raw", "pcm", "mpga", "3gp", "3g2",
+    "mp3", "wav", "aac", "m4a", "flac", "ogg", "wma", "aif", "aiff", "ape", "alac", "wv", "dsf",
+    "dff", "diff", "tta", "mp2", "mp1", "ra", "rm", "ram", "m4p", "opus", "mid", "midi", "mod",
+    "xm", "s3m", "it", "au", "voc", "cda", "amr", "gsm", "raw", "pcm", "mpga", "3gp", "3g2",
 ];
 const MAX_TRACKS: usize = 2_000;
 const MAX_DEPTH: usize = 8;
@@ -186,13 +183,7 @@ fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>,
     let url = remote_url::validate_remote_url(&url)?;
     let safe_name = default_name
         .chars()
-        .map(|c| {
-            if r#"<>:"/\|?*"#.contains(c) {
-                '_'
-            } else {
-                c
-            }
-        })
+        .map(|c| if r#"<>:"/\|?*"#.contains(c) { '_' } else { c })
         .collect::<String>();
     let safe_name = safe_name.trim().trim_matches('.').to_string();
     let mut name = if safe_name.is_empty() {
@@ -201,9 +192,9 @@ fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>,
         safe_name.chars().take(180).collect::<String>()
     };
     const RESERVED: &[&str] = &[
-        "con", "prn", "aux", "nul", "clock$",
-        "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-        "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+        "con", "prn", "aux", "nul", "clock$", "com1", "com2", "com3", "com4", "com5", "com6",
+        "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8",
+        "lpt9",
     ];
     if RESERVED.iter().any(|item| {
         name.split('.')
@@ -241,22 +232,23 @@ fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>,
     {
         return Err("远程地址返回了网页而不是音频文件".into());
     }
-    if response.content_length().is_some_and(|size| size > 200 * 1024 * 1024) {
+    if response
+        .content_length()
+        .is_some_and(|size| size > 200 * 1024 * 1024)
+    {
         return Err("文件过大".into());
     }
     let mut stream = response;
     let temp = path.with_file_name(format!(".{name}.musicstorm-part"));
     let _ = std::fs::remove_file(&temp);
-    let mut file = std::fs::File::create(&temp)
-        .map_err(|e| format!("创建临时文件失败: {e}"))?;
+    let mut file = std::fs::File::create(&temp).map_err(|e| format!("创建临时文件失败: {e}"))?;
     let mut total = 0usize;
     let mut buffer = [0u8; 64 * 1024];
     loop {
-        let read = std::io::Read::read(&mut stream, &mut buffer)
-            .map_err(|e| {
-                let _ = std::fs::remove_file(&temp);
-                format!("读取失败: {e}")
-            })?;
+        let read = std::io::Read::read(&mut stream, &mut buffer).map_err(|e| {
+            let _ = std::fs::remove_file(&temp);
+            format!("读取失败: {e}")
+        })?;
         if read == 0 {
             break;
         }
@@ -266,11 +258,10 @@ fn save_url_to_file(url: String, default_name: String) -> Result<Option<String>,
             let _ = std::fs::remove_file(&temp);
             return Err("文件过大".into());
         }
-        std::io::Write::write_all(&mut file, &buffer[..read])
-            .map_err(|e| {
-                let _ = std::fs::remove_file(&temp);
-                format!("写入失败: {e}")
-            })?;
+        std::io::Write::write_all(&mut file, &buffer[..read]).map_err(|e| {
+            let _ = std::fs::remove_file(&temp);
+            format!("写入失败: {e}")
+        })?;
     }
     if total == 0 {
         drop(file);
@@ -308,9 +299,9 @@ fn safe_download_name(default_name: &str) -> String {
         safe_name.chars().take(180).collect::<String>()
     };
     const RESERVED: &[&str] = &[
-        "con", "prn", "aux", "nul", "clock$",
-        "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-        "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+        "con", "prn", "aux", "nul", "clock$", "com1", "com2", "com3", "com4", "com5", "com6",
+        "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8",
+        "lpt9",
     ];
     if RESERVED.iter().any(|item| {
         name.split('.')
@@ -349,8 +340,7 @@ fn unique_download_path(directory: &Path, name: &str) -> PathBuf {
 
 #[cfg(not(target_os = "android"))]
 fn download_client() -> Result<reqwest::blocking::Client, String> {
-    static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> =
-        OnceLock::new();
+    static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
     CLIENT
         .get_or_init(|| {
             reqwest::blocking::Client::builder()
@@ -368,10 +358,7 @@ fn write_download_to_path(url: reqwest::Url, path: &Path) -> Result<(), String> 
     let client = download_client()?;
     let response = client
         .get(url)
-        .header(
-            reqwest::header::USER_AGENT,
-            "Mozilla/5.0 MusicStorm/1.0",
-        )
+        .header(reqwest::header::USER_AGENT, "Mozilla/5.0 MusicStorm/1.0")
         .header(reqwest::header::REFERER, "https://music.163.com/")
         .send()
         .map_err(|error| format!("下载失败: {error}"))?
@@ -400,8 +387,8 @@ fn write_download_to_path(url: reqwest::Url, path: &Path) -> Result<(), String> 
     ));
     let _ = std::fs::remove_file(&temp);
     let mut reader = response;
-    let mut file = std::fs::File::create(&temp)
-        .map_err(|error| format!("创建临时文件失败: {error}"))?;
+    let mut file =
+        std::fs::File::create(&temp).map_err(|error| format!("创建临时文件失败: {error}"))?;
     let mut total = 0usize;
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -463,8 +450,7 @@ fn copy_local_audio(source: &Path, target: &Path) -> Result<(), String> {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&temp);
-    std::fs::copy(source, &temp)
-        .map_err(|error| format!("复制音频失败: {error}"))?;
+    std::fs::copy(source, &temp).map_err(|error| format!("复制音频失败: {error}"))?;
     std::fs::rename(&temp, target).map_err(|error| {
         let _ = std::fs::remove_file(&temp);
         format!("保存文件失败: {error}")
@@ -542,10 +528,7 @@ fn read_text_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn scan_music_folder(
-    app: AppHandle,
-    path: String,
-) -> Result<Vec<LocalScanTrack>, String> {
+async fn scan_music_folder(app: AppHandle, path: String) -> Result<Vec<LocalScanTrack>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let root = PathBuf::from(path.trim());
         if !root.is_dir() {
@@ -626,8 +609,7 @@ async fn scan_music_artist_folder(
         let mut all_files: Vec<PathBuf> = Vec::new();
         let mut group_folders: Vec<String> = Vec::new();
 
-        let entries =
-            std::fs::read_dir(&root).map_err(|error| format!("无法读取目录: {error}"))?;
+        let entries = std::fs::read_dir(&root).map_err(|error| format!("无法读取目录: {error}"))?;
         for entry in entries.flatten() {
             let item = entry.path();
             let name = item
@@ -650,12 +632,7 @@ async fn scan_music_artist_folder(
             }
         }
 
-        let tracks = scan_audio_paths_with_parents(
-            all_files,
-            &covers_dir,
-            &lyrics_dir,
-            Some(&app),
-        );
+        let tracks = scan_audio_paths_with_parents(all_files, &covers_dir, &lyrics_dir, Some(&app));
         let display_name = root
             .file_name()
             .and_then(|value| value.to_str())
@@ -751,12 +728,7 @@ where
                         let current = done.fetch_add(1, Ordering::Relaxed) + 1;
                         if let Some(ref handle) = app_owned {
                             if current % emit_every == 0 || current == total {
-                                emit_scan_progress(
-                                    handle,
-                                    current,
-                                    total,
-                                    &path.to_string_lossy(),
-                                );
+                                emit_scan_progress(handle, current, total, &path.to_string_lossy());
                             }
                         }
                         result
@@ -787,11 +759,7 @@ fn sort_scan_tracks(tracks: &mut [LocalScanTrack]) {
     });
 }
 
-fn collect_audio_paths(
-    dir: &Path,
-    out: &mut Vec<PathBuf>,
-    depth: usize,
-) -> Result<(), String> {
+fn collect_audio_paths(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) -> Result<(), String> {
     if depth > MAX_DEPTH || out.len() >= MAX_TRACKS {
         return Ok(());
     }
@@ -950,10 +918,7 @@ fn purge_webview_caches_on_upgrade(app: &AppHandle) -> Result<u64, String> {
     )
     .map_err(|e| e.to_string())?;
 
-    let local_data = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
+    let local_data = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
     let ebwebview = local_data.join("EBWebView");
     if !ebwebview.exists() {
         return Ok(0);

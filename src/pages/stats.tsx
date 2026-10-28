@@ -44,10 +44,10 @@ const PERIODS: {
     days: number | null
     chartDays: number
 }[] = [
-    { id: "7", label: "7 天", days: 7, chartDays: 7 },
-    { id: "30", label: "30 天", days: 30, chartDays: 30 },
-    { id: "all", label: "全部", days: null, chartDays: 30 },
-]
+        { id: "7", label: "7 天", days: 7, chartDays: 7 },
+        { id: "30", label: "30 天", days: 30, chartDays: 30 },
+        { id: "all", label: "全部", days: null, chartDays: 30 },
+    ]
 
 // 后端统计窗口上限，全部时段的日均与活跃天数按此口径
 const ALL_PERIOD_WINDOW_DAYS = 90
@@ -259,8 +259,8 @@ function StatsPage() {
                 isCustom
                     ? listListenStats(90, from, to)
                     : topDays
-                      ? listListenStats(topDays)
-                      : listListenStats(90),
+                        ? listListenStats(topDays)
+                        : listListenStats(90),
                 listTopTrackClusters(100, topDays, from, to),
                 listListenSourceBreakdown(topDays, from, to),
             ])
@@ -428,10 +428,10 @@ function StatsPage() {
                                             "active:scale-[0.97] active:duration-[var(--duration-press)]",
                                             period === "custom"
                                                 ? cn(
-                                                      "bg-background text-foreground",
-                                                      "shadow-[0_1px_3px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.04)]",
-                                                      "dark:bg-[#2c2c2e] dark:shadow-none",
-                                                  )
+                                                    "bg-background text-foreground",
+                                                    "shadow-[0_1px_3px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.04)]",
+                                                    "dark:bg-[#2c2c2e] dark:shadow-none",
+                                                )
                                                 : "bg-[var(--surface-fill)] text-foreground/70 hover:bg-[var(--surface-fill-hover)] hover:text-foreground",
                                         )}
                                     >
@@ -515,11 +515,11 @@ function StatsPage() {
                                     className={cn(
                                         "px-6 py-4 sm:px-8 sm:py-5",
                                         index === 1 &&
-                                            "border-l border-[var(--separator)]",
+                                        "border-l border-[var(--separator)]",
                                         index === 2 &&
-                                            "border-t border-[var(--separator)] sm:border-t-0 sm:border-l",
+                                        "border-t border-[var(--separator)] sm:border-t-0 sm:border-l",
                                         index === 3 &&
-                                            "border-l border-t border-[var(--separator)] sm:border-t-0",
+                                        "border-l border-t border-[var(--separator)] sm:border-t-0",
                                     )}
                                 >
                                     <p className="text-[12px] font-medium text-muted-foreground">
@@ -771,7 +771,7 @@ function StatsPage() {
                                                                     <p className="truncate text-[13px] font-medium text-foreground/90">
                                                                         {stripExtension(
                                                                             member.fileName ||
-                                                                                member.title,
+                                                                            member.title,
                                                                         )}
                                                                     </p>
                                                                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground/75">
@@ -885,10 +885,10 @@ function Segmented<T extends string>({
                             "active:scale-[0.97] active:duration-[var(--duration-press)]",
                             active
                                 ? cn(
-                                      "bg-background text-foreground",
-                                      "shadow-[0_1px_3px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.04)]",
-                                      "dark:bg-[#2c2c2e] dark:shadow-none",
-                                  )
+                                    "bg-background text-foreground",
+                                    "shadow-[0_1px_3px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.04)]",
+                                    "dark:bg-[#2c2c2e] dark:shadow-none",
+                                )
                                 : "text-muted-foreground hover:text-foreground",
                         )}
                     >

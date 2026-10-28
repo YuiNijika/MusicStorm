@@ -1,7 +1,9 @@
 //! 网易云 HTTP 代理：前端完成 weapi/eapi 加密，Rust 负责无 CORS 的 POST
 
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT};
+use reqwest::header::{
+    HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT,
+};
 use serde::Serialize;
 use std::time::Duration;
 
@@ -113,9 +115,7 @@ fn post_blocking(
         }
     }
 
-    let body = response
-        .text()
-        .map_err(|e| format!("读取响应失败: {e}"))?;
+    let body = response.text().map_err(|e| format!("读取响应失败: {e}"))?;
 
     if body.len() > 8 * 1024 * 1024 {
         return Err("响应过大".into());

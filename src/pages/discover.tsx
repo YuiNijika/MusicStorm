@@ -441,22 +441,21 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                 estimatedRowHeight={MEDIA_ROW_HEIGHT}
                                 getItemKey={(album) => album.id}
                                 renderItem={(album) => (
-                                <MediaCard
-                                    coverUrl={album.coverUrl}
-                                    title={album.title}
-                                    subtitle={
-                                        album.artistName
-                                            ? `${album.artistName}${
-                                                  album.trackCount != null
-                                                      ? ` · ${album.trackCount} 首`
-                                                      : ""
-                                              }`
-                                            : "专辑"
-                                    }
-                                    onClick={() => onOpenAlbum(album.id)}
-                                    widthClassName="w-full"
-                                    className="w-full"
-                                />
+                                    <MediaCard
+                                        coverUrl={album.coverUrl}
+                                        title={album.title}
+                                        subtitle={
+                                            album.artistName
+                                                ? `${album.artistName}${album.trackCount != null
+                                                    ? ` · ${album.trackCount} 首`
+                                                    : ""
+                                                }`
+                                                : "专辑"
+                                        }
+                                        onClick={() => onOpenAlbum(album.id)}
+                                        widthClassName="w-full"
+                                        className="w-full"
+                                    />
                                 )}
                             />
                             <LoadMoreButton
@@ -512,20 +511,20 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                 className="apple-list-surface p-1.5"
                                 getItemKey={(track) => track.id}
                                 renderItem={(track, index) => (
-                                <TrackRow
-                                    track={track}
-                                    index={index}
-                                    isActive={currentTrack?.id === track.id}
-                                    isPlaying={
-                                        currentTrack?.id === track.id &&
-                                        isPlaying
-                                    }
-                                    showSource={false}
-                                    showAlbumColumn
-                                    onPlay={(item) =>
-                                        playOrToggle(item, songs)
-                                    }
-                                />
+                                    <TrackRow
+                                        track={track}
+                                        index={index}
+                                        isActive={currentTrack?.id === track.id}
+                                        isPlaying={
+                                            currentTrack?.id === track.id &&
+                                            isPlaying
+                                        }
+                                        showSource={false}
+                                        showAlbumColumn
+                                        onPlay={(item) =>
+                                            playOrToggle(item, songs)
+                                        }
+                                    />
                                 )}
                             />
                             <LoadMoreButton
@@ -582,18 +581,18 @@ function DiscoverPage({ onOpenPlaylist, onOpenAlbum }: DiscoverPageProps) {
                                 estimatedRowHeight={MEDIA_ROW_HEIGHT}
                                 getItemKey={(playlist) => playlist.id}
                                 renderItem={(playlist) => (
-                                <MediaCard
-                                    coverUrl={playlist.coverUrl}
-                                    title={playlist.title}
-                                    subtitle={
-                                        playlist.trackCount != null
-                                            ? `${playlist.trackCount} 首`
-                                            : "歌单"
-                                    }
-                                    onClick={() => onOpenPlaylist(playlist.id)}
-                                    widthClassName="w-full"
-                                    className="w-full"
-                                />
+                                    <MediaCard
+                                        coverUrl={playlist.coverUrl}
+                                        title={playlist.title}
+                                        subtitle={
+                                            playlist.trackCount != null
+                                                ? `${playlist.trackCount} 首`
+                                                : "歌单"
+                                        }
+                                        onClick={() => onOpenPlaylist(playlist.id)}
+                                        widthClassName="w-full"
+                                        className="w-full"
+                                    />
                                 )}
                             />
                             <LoadMoreButton

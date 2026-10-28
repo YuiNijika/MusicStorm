@@ -93,216 +93,216 @@ const QueuePanel = memo(function QueuePanel() {
 
     return (
         <>
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger
-                title="播放队列"
-                aria-label="播放队列"
-                className={cn(
-                    "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
-                    // 移动端（全屏播放器内）触控目标放大
-                    "max-md:size-10",
-                    "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
-                    "disabled:pointer-events-none disabled:opacity-40",
-                )}
-            >
-                <ListMusic className="size-4" />
-            </PopoverTrigger>
-            <PopoverContent
-                align="end"
-                side="top"
-                sideOffset={12}
-                // 小屏宽度自适应，避免固定 340px 溢出 360px 屏幕
-                className="w-[min(92vw,340px)] overflow-hidden p-0"
-            >
-                <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
-                    <div className="flex items-baseline gap-2">
-                        <h3 className="text-[13px] font-semibold tracking-[-0.01em]">
-                            接下来播放
-                        </h3>
-                        <span className="text-[11px] tabular-nums text-muted-foreground">
-                            {count} 首
-                        </span>
-                    </div>
-                    {count > 0 ? (
-                        <button
-                            type="button"
-                            onClick={clearQueue}
-                            className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-destructive"
-                        >
-                            <Trash2 className="size-3" />
-                            清空
-                        </button>
-                    ) : null}
-                </div>
-
-                {count === 0 ? (
-                    <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-                        <div className="flex size-10 items-center justify-center rounded-full bg-[var(--surface-fill)]">
-                            <ListMusic className="size-4 text-muted-foreground" />
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger
+                    title="播放队列"
+                    aria-label="播放队列"
+                    className={cn(
+                        "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
+                        // 移动端（全屏播放器内）触控目标放大
+                        "max-md:size-10",
+                        "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
+                        "disabled:pointer-events-none disabled:opacity-40",
+                    )}
+                >
+                    <ListMusic className="size-4" />
+                </PopoverTrigger>
+                <PopoverContent
+                    align="end"
+                    side="top"
+                    sideOffset={12}
+                    // 小屏宽度自适应，避免固定 340px 溢出 360px 屏幕
+                    className="w-[min(92vw,340px)] overflow-hidden p-0"
+                >
+                    <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
+                        <div className="flex items-baseline gap-2">
+                            <h3 className="text-[13px] font-semibold tracking-[-0.01em]">
+                                接下来播放
+                            </h3>
+                            <span className="text-[11px] tabular-nums text-muted-foreground">
+                                {count} 首
+                            </span>
                         </div>
-                        <p className="text-[12px] text-muted-foreground">
-                            队列为空，从歌曲菜单选择「加入队列」
-                        </p>
+                        {count > 0 ? (
+                            <button
+                                type="button"
+                                onClick={clearQueue}
+                                className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-destructive"
+                            >
+                                <Trash2 className="size-3" />
+                                清空
+                            </button>
+                        ) : null}
                     </div>
-                ) : (
-                    <div
-                        ref={scrollRef}
-                        className="max-h-[min(52vh,420px)] overflow-y-auto p-2"
-                    >
-                        <DragList
-                            items={queue}
-                            enabled={count > 1}
-                            itemHeight={QUEUE_ROW_HEIGHT}
-                            onReorder={handleReorder}
-                            renderItem={(track, index, handle) => {
-                                const active = index === currentIndex
-                                return (
-                                    <div
-                                        data-queue-index={index}
-                                        className={cn(
-                                            "group flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5",
-                                            active
-                                                ? "bg-[var(--surface-fill-hover)]"
-                                                : "hover:bg-[var(--surface-fill)]",
-                                        )}
-                                    >
-                                        {count > 1 ? (
-                                            <span
-                                                className="shrink-0 cursor-grab text-muted-foreground/40 active:cursor-grabbing"
-                                                title="拖动排序"
-                                            >
-                                                {handle}
-                                            </span>
-                                        ) : (
-                                            <span className="w-[18px] shrink-0" />
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => jumpTo(index)}
-                                            className="relative shrink-0"
-                                            title={active ? "当前播放" : "播放这首"}
+
+                    {count === 0 ? (
+                        <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-[var(--surface-fill)]">
+                                <ListMusic className="size-4 text-muted-foreground" />
+                            </div>
+                            <p className="text-[12px] text-muted-foreground">
+                                队列为空，从歌曲菜单选择「加入队列」
+                            </p>
+                        </div>
+                    ) : (
+                        <div
+                            ref={scrollRef}
+                            className="max-h-[min(52vh,420px)] overflow-y-auto p-2"
+                        >
+                            <DragList
+                                items={queue}
+                                enabled={count > 1}
+                                itemHeight={QUEUE_ROW_HEIGHT}
+                                onReorder={handleReorder}
+                                renderItem={(track, index, handle) => {
+                                    const active = index === currentIndex
+                                    return (
+                                        <div
+                                            data-queue-index={index}
+                                            className={cn(
+                                                "group flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5",
+                                                active
+                                                    ? "bg-[var(--surface-fill-hover)]"
+                                                    : "hover:bg-[var(--surface-fill)]",
+                                            )}
                                         >
-                                            <Cover
-                                                src={resolveTrackCoverUrl(
-                                                    track.id,
-                                                    track.coverUrl,
-                                                    "thumbnail",
-                                                )}
-                                                alt={track.title}
-                                                size="xs"
-                                            />
-                                            <span
-                                                className={cn(
-                                                    "pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-black/35 text-white",
-                                                    active && isPlaying
-                                                        ? "opacity-100"
-                                                        : "opacity-0 group-hover:opacity-100",
-                                                )}
+                                            {count > 1 ? (
+                                                <span
+                                                    className="shrink-0 cursor-grab text-muted-foreground/40 active:cursor-grabbing"
+                                                    title="拖动排序"
+                                                >
+                                                    {handle}
+                                                </span>
+                                            ) : (
+                                                <span className="w-[18px] shrink-0" />
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => jumpTo(index)}
+                                                className="relative shrink-0"
+                                                title={active ? "当前播放" : "播放这首"}
                                             >
-                                                {active && isPlaying ? (
-                                                    <Pause className="size-3 fill-current" />
-                                                ) : (
-                                                    <Play className="size-3 fill-current" />
-                                                )}
-                                            </span>
-                                        </button>
-                                        <div className="min-w-0 flex-1 text-left">
-                                            <p
-                                                className={cn(
-                                                    "truncate text-[12px] font-medium",
-                                                    active
-                                                        ? "text-primary"
-                                                        : "text-foreground",
-                                                )}
-                                            >
-                                                {track.title}
-                                            </p>
-                                            <p className="truncate text-[11px] text-muted-foreground">
-                                                {track.artist}
-                                            </p>
-                                        </div>
-                                        <div className="flex shrink-0 items-center gap-0.5">
- {track.source === "netease" ||
- track.source === "local" ? (
-                                                <button
-                                                    type="button"
-                                                    title="添加到歌单"
-                                                    aria-label={`将 ${track.title} 添加到歌单`}
-                                                    onClick={() =>
-                                                        setAddToPlaylistTrack(
-                                                            track,
-                                                        )
-                                                    }
+                                                <Cover
+                                                    src={resolveTrackCoverUrl(
+                                                        track.id,
+                                                        track.coverUrl,
+                                                        "thumbnail",
+                                                    )}
+                                                    alt={track.title}
+                                                    size="xs"
+                                                />
+                                                <span
                                                     className={cn(
-                                                        "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground",
-                                                        // 触控端没有 hover：操作常显，否则按钮永远不可见
-                                                        isMobile
+                                                        "pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-black/35 text-white",
+                                                        active && isPlaying
                                                             ? "opacity-100"
                                                             : "opacity-0 group-hover:opacity-100",
                                                     )}
                                                 >
-                                                    <Library className="size-3.5" />
-                                                </button>
-                                            ) : null}
-                                            {active ? (
-                                                <span className="text-[11px] font-medium text-muted-foreground">
-                                                    播放中
+                                                    {active && isPlaying ? (
+                                                        <Pause className="size-3 fill-current" />
+                                                    ) : (
+                                                        <Play className="size-3 fill-current" />
+                                                    )}
                                                 </span>
-                                            ) : (
-                                                <>
+                                            </button>
+                                            <div className="min-w-0 flex-1 text-left">
+                                                <p
+                                                    className={cn(
+                                                        "truncate text-[12px] font-medium",
+                                                        active
+                                                            ? "text-primary"
+                                                            : "text-foreground",
+                                                    )}
+                                                >
+                                                    {track.title}
+                                                </p>
+                                                <p className="truncate text-[11px] text-muted-foreground">
+                                                    {track.artist}
+                                                </p>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-0.5">
+                                                {track.source === "netease" ||
+                                                    track.source === "local" ? (
                                                     <button
                                                         type="button"
+                                                        title="添加到歌单"
+                                                        aria-label={`将 ${track.title} 添加到歌单`}
                                                         onClick={() =>
-                                                            moveToNext(index)
+                                                            setAddToPlaylistTrack(
+                                                                track,
+                                                            )
                                                         }
-                                                        title="下一首播放"
-                                                        aria-label={`将 ${track.title} 移到下一首播放`}
                                                         className={cn(
                                                             "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                            // 触控端没有 hover：操作常显，否则按钮永远不可见
                                                             isMobile
                                                                 ? "opacity-100"
                                                                 : "opacity-0 group-hover:opacity-100",
                                                         )}
                                                     >
-                                                        <ListStart className="size-3.5" />
+                                                        <Library className="size-3.5" />
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            removeFromQueue(index)
-                                                        }
-                                                        title="从队列移除"
-                                                        aria-label={`移除 ${track.title}`}
-                                                        className={cn(
-                                                            "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive",
-                                                            isMobile
-                                                                ? "opacity-100"
-                                                                : "opacity-0 group-hover:opacity-100",
-                                                        )}
-                                                    >
-                                                        <X className="size-3.5" />
-                                                    </button>
-                                                </>
-                                            )}
+                                                ) : null}
+                                                {active ? (
+                                                    <span className="text-[11px] font-medium text-muted-foreground">
+                                                        播放中
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                moveToNext(index)
+                                                            }
+                                                            title="下一首播放"
+                                                            aria-label={`将 ${track.title} 移到下一首播放`}
+                                                            className={cn(
+                                                                "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-foreground",
+                                                                isMobile
+                                                                    ? "opacity-100"
+                                                                    : "opacity-0 group-hover:opacity-100",
+                                                            )}
+                                                        >
+                                                            <ListStart className="size-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                removeFromQueue(index)
+                                                            }
+                                                            title="从队列移除"
+                                                            aria-label={`移除 ${track.title}`}
+                                                            className={cn(
+                                                                "flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground/50 transition-[opacity,color,background-color] hover:bg-[var(--surface-fill)] hover:text-destructive",
+                                                                isMobile
+                                                                    ? "opacity-100"
+                                                                    : "opacity-0 group-hover:opacity-100",
+                                                            )}
+                                                        >
+                                                            <X className="size-3.5" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )
-                            }}
-                        />
-                    </div>
-                )}
-            </PopoverContent>
-        </Popover>
+                                    )
+                                }}
+                            />
+                        </div>
+                    )}
+                </PopoverContent>
+            </Popover>
 
-        <AddToPlaylistDialog
-            track={addToPlaylistTrack}
-            open={addToPlaylistTrack !== null}
-            onOpenChange={(open) => {
-                if (!open) {
-                    setAddToPlaylistTrack(null)
-                }
-            }}
-        />
+            <AddToPlaylistDialog
+                track={addToPlaylistTrack}
+                open={addToPlaylistTrack !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setAddToPlaylistTrack(null)
+                    }
+                }}
+            />
         </>
     )
 })

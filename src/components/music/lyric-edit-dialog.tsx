@@ -34,12 +34,12 @@ function LyricEditDialog({ track, open, onOpenChange }: LyricEditDialogProps) {
         if (!open || !track) {
             return
         }
- if (track.source === "bilibili") {
- setText("")
- setHasOverride(false)
- setLoading(false)
- return
- }
+        if (track.source === "bilibili") {
+            setText("")
+            setHasOverride(false)
+            setLoading(false)
+            return
+        }
         let cancelled = false
         setLoading(true)
         const override = getLyricOverride(track.id)

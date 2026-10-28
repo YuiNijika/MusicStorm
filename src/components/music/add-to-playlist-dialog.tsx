@@ -71,23 +71,23 @@ function AddToPlaylistDialog({
         if (items.length === 0 || busyId) {
             return
         }
- const addableItems = items.filter(
- (item) => item.source !== "bilibili",
- )
- if (addableItems.length ===0) {
- return
- }
- setBusyId(playlist.id)
+        const addableItems = items.filter(
+            (item) => item.source !== "bilibili",
+        )
+        if (addableItems.length === 0) {
+            return
+        }
+        setBusyId(playlist.id)
         try {
             // 本地与网易云曲目分开投递：本地写本地 DB，网易云走网易云接口
- const localIds = addableItems
+            const localIds = addableItems
                 .filter((item) => item.source === "local")
                 .map((item) => item.id)
- const neteaseIds = addableItems
- .filter(
- (item) =>
- item.source === "netease",
- )
+            const neteaseIds = addableItems
+                .filter(
+                    (item) =>
+                        item.source === "netease",
+                )
                 .map((item) => item.id)
             let existingCloudIds: string[] = []
             if (neteaseIds.length > 0) {

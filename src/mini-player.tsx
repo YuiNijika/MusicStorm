@@ -23,7 +23,7 @@ function sendPlayerCommand(
 ): void {
   const payload =
     typeof positionMs === "number" ? { action, positionMs } : action
-  void emit("musicstorm:player-command", payload).catch(() => {})
+  void emit("musicstorm:player-command", payload).catch(() => { })
 }
 
 function formatTime(ms: number): string {
@@ -71,14 +71,14 @@ function MiniPlayerApp() {
     // Windows 上以 visible(false) 创建的 WebView2 偶发不触发首帧渲染，
     // 透明窗口表现为完全不可见；挂载后重走一次 hide→show 强制上屏
     const win = getCurrentWindow()
-    win.hide().then(() => win.show()).catch(() => {})
+    win.hide().then(() => win.show()).catch(() => { })
   }, [])
 
   useEffect(() => {
     // 刚打开时先拉 Rust 侧缓存的最近状态，避免等下一拍 tick 才有内容
     invoke<MiniPlayerState>("get_mini_player_state")
       .then(setState)
-      .catch(() => {})
+      .catch(() => { })
 
     const unlisten = listen<MiniPlayerState>(
       "musicstorm:mini-player-state",
@@ -278,7 +278,7 @@ function MiniPlayerApp() {
           type="button"
           aria-label="关闭小播放器"
           onClick={() => {
-            void invoke("hide_mini_player").catch(() => {})
+            void invoke("hide_mini_player").catch(() => { })
           }}
           style={{ ...controlButtonStyle, width: "20px", height: "20px" }}
         >

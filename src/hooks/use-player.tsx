@@ -207,8 +207,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         () =>
             Boolean(
                 !isWebMode() &&
-                    playerPrefs.autoPlayOnStartup &&
-                    restored?.queue.length,
+                playerPrefs.autoPlayOnStartup &&
+                restored?.queue.length,
             ),
     )
     const [positionMs, setPositionMs] = useState(
@@ -595,7 +595,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 const completed =
                     duration > 0
                         ? positionRef.current / duration >= 0.8 ||
-                          sessionListenedRef.current >= duration * 0.8
+                        sessionListenedRef.current >= duration * 0.8
                         : false
                 flushSession(completed)
             }

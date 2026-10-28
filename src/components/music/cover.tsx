@@ -16,8 +16,8 @@ type CoverProps = {
     alt: string
     size?: "xs" | "sm" | "md" | "lg" | "xl"
     className?: string
- /** Above-the-fold artwork should bypass lazy loading */
- eager?: boolean
+    /** Above-the-fold artwork should bypass lazy loading */
+    eager?: boolean
 }
 
 const SIZE_CLASS = {
@@ -38,7 +38,7 @@ const SIZE_PX = {
 
 // memo：src/alt/size/className 均为稳定字符串 props，父组件高频重渲（如播放条 200ms tick）时整棵跳过
 const Cover = memo(function Cover({ src, alt, size = "md", className, eager = false }: CoverProps) {
- const [failed, setFailed] = useState(false)
+    const [failed, setFailed] = useState(false)
     const [fallbackSrc, setFallbackSrc] = useState<string | null>(null)
     // 远程封面透明升级为本地缓存（xs/sm/md 用缩略图，lg/xl 用原图）
     const kind = size === "lg" || size === "xl" ? "original" : "thumbnail"
@@ -50,7 +50,7 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
         setFallbackSrc(null)
     }, [src, resolvedSrc])
     const imageSrc = fallbackSrc ?? resolvedSrc
- const showImage = Boolean(src && imageSrc) && !failed
+    const showImage = Boolean(src && imageSrc) && !failed
     const px = SIZE_PX[size]
 
     // 本地缓存文件被清理后索引残留失效路径会在这里炸出 404：
@@ -73,7 +73,7 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
             return
         }
         if (src.startsWith("asset") || src.includes("/covers/")) {
-            void reextractLocalCovers().catch(() => {})
+            void reextractLocalCovers().catch(() => { })
         }
     }
 
@@ -96,10 +96,10 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
                     referrerPolicy={
                         isBilibiliCoverUrl(src) ? "no-referrer" : undefined
                     }
- loading={eager ? "eager" : "lazy"}
- fetchPriority={eager ? "high" : "auto"}
+                    loading={eager ? "eager" : "lazy"}
+                    fetchPriority={eager ? "high" : "auto"}
                     decoding="async"
- className="size-full object-cover"
+                    className="size-full object-cover"
                     onError={handleImageError}
                 />
             ) : (

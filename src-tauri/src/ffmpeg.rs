@@ -77,7 +77,9 @@ fn executable_candidates() -> Vec<PathBuf> {
 }
 
 fn executable_file(path: &Path) -> bool {
-    fs::metadata(path).map(|metadata| metadata.is_file()).unwrap_or(false)
+    fs::metadata(path)
+        .map(|metadata| metadata.is_file())
+        .unwrap_or(false)
 }
 
 fn version_line(path: &Path) -> Result<String, String> {
@@ -187,9 +189,7 @@ pub fn ffmpeg_detect(state: State<'_, DbState>) -> Result<FfmpegStatus, String> 
         path: None,
         version: None,
         source: "missing".into(),
-        error: Some(configured_error.unwrap_or_else(|| {
-            "未在环境变量或 PATH 中发现 FFmpeg".into()
-        })),
+        error: Some(configured_error.unwrap_or_else(|| "未在环境变量或 PATH 中发现 FFmpeg".into())),
     })
 }
 
@@ -231,7 +231,10 @@ pub fn ffmpeg_set_path(
     save_ffmpeg_path(state, selected.as_deref())
 }
 
-fn save_ffmpeg_path(state: State<'_, DbState>, path: Option<&Path>) -> Result<FfmpegStatus, String> {
+fn save_ffmpeg_path(
+    state: State<'_, DbState>,
+    path: Option<&Path>,
+) -> Result<FfmpegStatus, String> {
     if let Some(path) = path {
         version_line(path)?;
     }

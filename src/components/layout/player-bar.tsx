@@ -71,24 +71,24 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     const playModeTitle = shuffle
         ? "随机播放"
         : repeat === "one"
-          ? "循环：单曲"
-          : repeat === "all"
-            ? "循环：列表"
-            : "顺序播放"
+            ? "循环：单曲"
+            : repeat === "all"
+                ? "循环：列表"
+                : "顺序播放"
     const primaryArtist = currentTrack?.artists?.find((item) => item.id)
     const artistLabel =
         currentTrack?.source === "bilibili"
             ? currentTrack.artist?.trim() ||
-              currentTrack.artists
-                  ?.map((artist) => artist.name.trim())
-                  .filter(Boolean)
-                  .join(" / ") ||
-              "未知作者"
+            currentTrack.artists
+                ?.map((artist) => artist.name.trim())
+                .filter(Boolean)
+                .join(" / ") ||
+            "未知作者"
             : currentTrack?.artist || "未知艺人"
     const canOpenArtist =
- currentTrack?.source === "netease" && Boolean(primaryArtist?.id)
+        currentTrack?.source === "netease" && Boolean(primaryArtist?.id)
     const canOpenAlbum =
- currentTrack?.source === "netease" && Boolean(currentTrack.albumId)
+        currentTrack?.source === "netease" && Boolean(currentTrack.albumId)
     const secondaryMeta =
         currentTrack?.source === "bilibili"
             ? currentTrack.tname?.trim()
@@ -264,253 +264,253 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
 
     return (
         <>
-        <div
-            className="grid shrink-0 transition-[grid-template-rows] duration-[var(--duration-enter)] ease-[var(--ease-enter)]"
-            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
-        >
-            <div className="min-h-0 overflow-hidden">
-        <footer
-            ref={footerRef}
-            className="material-player border-t border-black/[0.06] dark:border-white/[0.06]"
-            style={{
-                // iOS 底部安全区：播放条贴在手势条上方（移动端 Tab 已含自身 safe-area）
-                paddingBottom: "env(safe-area-inset-bottom)",
-                transform: footerTransform,
-                transition: footerTransition,
-            }}
-            onPointerDown={handleFooterPointerDown}
-            onPointerMove={handleFooterPointerMove}
-            onPointerUp={handleFooterPointerUp}
-            onPointerCancel={handleFooterPointerCancel}
-        >
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2 md:h-[84px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center md:gap-4 md:px-4 md:py-0">
-                <div className="flex min-w-0 items-center gap-3 md:col-span-1">
-                    {currentTrack ? (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => onOpenFullPlayer?.()}
-                                title="全屏播放"
-                                aria-label="打开全屏播放"
-                                className={cn(
-                                    "group shrink-0 cursor-pointer rounded-xl",
-                                    "transition-transform duration-[var(--duration-hover)]",
-                                    "hover:scale-[1.03] active:scale-[0.97] active:duration-[var(--duration-press)]",
-                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                                )}
-                            >
-                                <Cover
-                                    src={resolveTrackCoverUrl(
-                                        currentTrack.id,
-                                        currentTrack.coverUrl,
-                                    )}
-                                    alt={currentTrack.title}
-                                    size="md"
-                                    className="shadow-[0_6px_16px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] transition-[box-shadow] group-hover:shadow-[0_10px_24px_rgba(15,23,42,0.22)] dark:ring-white/[0.08]"
-                                />
- </button>
-                            <div className="min-w-0 flex-1">
-                                <button
-                                    type="button"
-                                    onClick={() => onOpenFullPlayer?.()}
-                                    className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 text-left active:opacity-80"
-                                    title="全屏播放"
-                                >
-                                    <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
-                                        {currentTrack.title}
-                                    </p>
-                                    <span className="flex shrink-0 items-center">
-                                        <SourceBadge source={currentTrack.source} />
-                                    </span>
-                                </button>
-                                <p className="mt-0.5 min-w-0 truncate text-[13px] text-muted-foreground md:text-[12px]">
-                                    {canOpenArtist ? (
+            <div
+                className="grid shrink-0 transition-[grid-template-rows] duration-[var(--duration-enter)] ease-[var(--ease-enter)]"
+                style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+            >
+                <div className="min-h-0 overflow-hidden">
+                    <footer
+                        ref={footerRef}
+                        className="material-player border-t border-black/[0.06] dark:border-white/[0.06]"
+                        style={{
+                            // iOS 底部安全区：播放条贴在手势条上方（移动端 Tab 已含自身 safe-area）
+                            paddingBottom: "env(safe-area-inset-bottom)",
+                            transform: footerTransform,
+                            transition: footerTransition,
+                        }}
+                        onPointerDown={handleFooterPointerDown}
+                        onPointerMove={handleFooterPointerMove}
+                        onPointerUp={handleFooterPointerUp}
+                        onPointerCancel={handleFooterPointerCancel}
+                    >
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2 md:h-[84px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center md:gap-4 md:px-4 md:py-0">
+                            <div className="flex min-w-0 items-center gap-3 md:col-span-1">
+                                {currentTrack ? (
+                                    <>
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                openArtist(primaryArtist!.id)
-                                            }
-                                            className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                            title={artistLabel}
-                                        >
-                                            {artistLabel}
-                                        </button>
-                                    ) : (
-                                        <span>{artistLabel}</span>
-                                    )}
-                                    {secondaryMeta ? (
-                                        <>
-                                            <span className="mx-1 text-muted-foreground/50">
-                                                ·
-                                            </span>
-                                            {canOpenAlbum ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openAlbum(
-                                                            currentTrack.albumId!,
-                                                        )
-                                                    }
-                                                    className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                                                    title={secondaryMeta}
-                                                >
-                                                    {secondaryMeta}
-                                                </button>
-                                            ) : (
-                                                <span>{secondaryMeta}</span>
+                                            onClick={() => onOpenFullPlayer?.()}
+                                            title="全屏播放"
+                                            aria-label="打开全屏播放"
+                                            className={cn(
+                                                "group shrink-0 cursor-pointer rounded-xl",
+                                                "transition-transform duration-[var(--duration-hover)]",
+                                                "hover:scale-[1.03] active:scale-[0.97] active:duration-[var(--duration-press)]",
+                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                                             )}
-                                        </>
- ) : null}
-                                </p>
+                                        >
+                                            <Cover
+                                                src={resolveTrackCoverUrl(
+                                                    currentTrack.id,
+                                                    currentTrack.coverUrl,
+                                                )}
+                                                alt={currentTrack.title}
+                                                size="md"
+                                                className="shadow-[0_6px_16px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.04] transition-[box-shadow] group-hover:shadow-[0_10px_24px_rgba(15,23,42,0.22)] dark:ring-white/[0.08]"
+                                            />
+                                        </button>
+                                        <div className="min-w-0 flex-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenFullPlayer?.()}
+                                                className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 text-left active:opacity-80"
+                                                title="全屏播放"
+                                            >
+                                                <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] md:text-[13px]">
+                                                    {currentTrack.title}
+                                                </p>
+                                                <span className="flex shrink-0 items-center">
+                                                    <SourceBadge source={currentTrack.source} />
+                                                </span>
+                                            </button>
+                                            <p className="mt-0.5 min-w-0 truncate text-[13px] text-muted-foreground md:text-[12px]">
+                                                {canOpenArtist ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openArtist(primaryArtist!.id)
+                                                        }
+                                                        className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                                        title={artistLabel}
+                                                    >
+                                                        {artistLabel}
+                                                    </button>
+                                                ) : (
+                                                    <span>{artistLabel}</span>
+                                                )}
+                                                {secondaryMeta ? (
+                                                    <>
+                                                        <span className="mx-1 text-muted-foreground/50">
+                                                            ·
+                                                        </span>
+                                                        {canOpenAlbum ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openAlbum(
+                                                                        currentTrack.albumId!,
+                                                                    )
+                                                                }
+                                                                className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
+                                                                title={secondaryMeta}
+                                                            >
+                                                                {secondaryMeta}
+                                                            </button>
+                                                        ) : (
+                                                            <span>{secondaryMeta}</span>
+                                                        )}
+                                                    </>
+                                                ) : null}
+                                            </p>
+                                        </div>
+                                        {canLike ? (
+                                            <ControlButton
+                                                title={liked ? "取消喜欢" : "喜欢"}
+                                                active={liked}
+                                                onClick={() => void handleToggleLike()}
+                                            >
+                                                <Heart
+                                                    className={cn(
+                                                        "size-3.5",
+                                                        liked && "fill-current",
+                                                    )}
+                                                />
+                                            </ControlButton>
+                                        ) : null}
+                                    </>
+                                ) : (
+                                    <div className="min-w-0 pl-1">
+                                        <p className="text-[13px] font-medium text-foreground">未在播放</p>
+                                        <p className="text-[12px] text-muted-foreground">
+                                            从列表点选一首开始
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                            {canLike ? (
-                                <ControlButton
-                                    title={liked ? "取消喜欢" : "喜欢"}
-                                    active={liked}
-                                    onClick={() => void handleToggleLike()}
-                                >
-                                    <Heart
-                                        className={cn(
-                                            "size-3.5",
-                                            liked && "fill-current",
+
+                            <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
+                                <div className="flex items-center gap-1">
+                                    {/* 速度按钮窄屏价值低（全屏播放器已有），隐藏给核心控制让空间 */}
+                                    <span className="hidden md:inline-flex">
+                                        <SpeedPopover
+                                            rate={playbackRate}
+                                            onSpeed={setPlaybackRate}
+                                            compact
+                                        />
+                                    </span>
+                                    <ControlButton
+                                        title="上一首"
+                                        onClick={previous}
+                                        disabled={!currentTrack}
+                                    >
+                                        <SkipBack className="size-4 fill-current" />
+                                    </ControlButton>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        className="size-9 max-md:size-11 cursor-pointer rounded-full active:scale-[0.96]"
+                                        onClick={togglePlay}
+                                        disabled={!currentTrack}
+                                        title={isPlaying ? "暂停" : "播放"}
+                                        aria-label={isPlaying ? "暂停" : "播放"}
+                                    >
+                                        {isPlaying ? (
+                                            <Pause className="size-4 fill-current" />
+                                        ) : (
+                                            <Play className="size-4 fill-current" />
                                         )}
+                                    </Button>
+                                    <ControlButton title="下一首" onClick={next} disabled={!currentTrack}>
+                                        <SkipForward className="size-4 fill-current" />
+                                    </ControlButton>
+                                    <ControlButton
+                                        title={playModeTitle}
+                                        active={shuffle || repeat !== "off"}
+                                        onClick={cyclePlayMode}
+                                        disabled={!currentTrack}
+                                    >
+                                        {shuffle ? (
+                                            <Shuffle className="size-3.5" />
+                                        ) : repeat === "one" ? (
+                                            <Repeat1 className="size-3.5" />
+                                        ) : (
+                                            <Repeat className="size-3.5" />
+                                        )}
+                                    </ControlButton>
+                                </div>
+
+                                <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+                                    <SeekElasticSlider
+                                        positionMs={positionMs}
+                                        durationMs={totalMs}
+                                        onSeek={seek}
+                                        disabled={!currentTrack}
                                     />
-                                </ControlButton>
-                            ) : null}
-                        </>
-                    ) : (
-                        <div className="min-w-0 pl-1">
-                            <p className="text-[13px] font-medium text-foreground">未在播放</p>
-                            <p className="text-[12px] text-muted-foreground">
-                                从列表点选一首开始
-                            </p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1 md:flex-col md:gap-1.5">
-                    <div className="flex items-center gap-1">
-                        {/* 速度按钮窄屏价值低（全屏播放器已有），隐藏给核心控制让空间 */}
-                        <span className="hidden md:inline-flex">
-                            <SpeedPopover
-                                rate={playbackRate}
-                                onSpeed={setPlaybackRate}
-                                compact
-                            />
-                        </span>
-                        <ControlButton
-                            title="上一首"
-                            onClick={previous}
-                            disabled={!currentTrack}
-                        >
-                            <SkipBack className="size-4 fill-current" />
-                        </ControlButton>
-                        <Button
-                            type="button"
-                            size="icon"
-                            className="size-9 max-md:size-11 cursor-pointer rounded-full active:scale-[0.96]"
-                            onClick={togglePlay}
-                            disabled={!currentTrack}
-                            title={isPlaying ? "暂停" : "播放"}
-                            aria-label={isPlaying ? "暂停" : "播放"}
-                        >
-                            {isPlaying ? (
-                                <Pause className="size-4 fill-current" />
-                            ) : (
-                                <Play className="size-4 fill-current" />
-                            )}
-                        </Button>
-                        <ControlButton title="下一首" onClick={next} disabled={!currentTrack}>
-                            <SkipForward className="size-4 fill-current" />
-                        </ControlButton>
-                        <ControlButton
-                            title={playModeTitle}
-                            active={shuffle || repeat !== "off"}
-                            onClick={cyclePlayMode}
-                            disabled={!currentTrack}
-                        >
-                            {shuffle ? (
-                                <Shuffle className="size-3.5" />
-                            ) : repeat === "one" ? (
-                                <Repeat1 className="size-3.5" />
-                            ) : (
-                                <Repeat className="size-3.5" />
-                            )}
-                        </ControlButton>
-                    </div>
-
-                    <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
-                        <SeekElasticSlider
-                            positionMs={positionMs}
-                            durationMs={totalMs}
-                            onSeek={seek}
-                            disabled={!currentTrack}
-                        />
-                    </div>
-                    {/* 中列是 md:flex-col items-center（子项收缩到内容宽），
+                                </div>
+                                {/* 中列是 md:flex-col items-center（子项收缩到内容宽），
                         轨道必须 w-full 撑满，flex-1 + min-w-0 会塌缩成 0 宽 */}
-                    <div className="hidden w-full min-w-0 items-center gap-2 md:flex">
-                        <SeekElasticSlider
-                            positionMs={positionMs}
-                            durationMs={totalMs}
-                            onSeek={seek}
-                            disabled={!currentTrack}
-                        />
-                    </div>
-                </div>
+                                <div className="hidden w-full min-w-0 items-center gap-2 md:flex">
+                                    <SeekElasticSlider
+                                        positionMs={positionMs}
+                                        durationMs={totalMs}
+                                        onSeek={seek}
+                                        disabled={!currentTrack}
+                                    />
+                                </div>
+                            </div>
 
-                <div className="hidden items-center justify-end gap-1 md:flex">
- {currentTrack?.source === "netease" && currentTrack.id ? (
-                        <ControlButton
-                            title="评论"
-                            onClick={() =>
-                                openComments({
-                                    id: currentTrack.id,
-                                    title: currentTrack.title,
-                                    subtitle: currentTrack.artist,
-                                })
-                            }
-                            disabled={!currentTrack}
-                        >
-                            <MessageCircle className="size-3.5" />
-                        </ControlButton>
-                    ) : null}
-                    <QueuePanel />
-                    <VolumeElasticSlider
-                        volume={volume}
-                        muted={isMuted}
-                        onVolume={setVolume}
-                        onToggleMute={toggleMute}
-                        compact
-                        showIcons
-                    />
+                            <div className="hidden items-center justify-end gap-1 md:flex">
+                                {currentTrack?.source === "netease" && currentTrack.id ? (
+                                    <ControlButton
+                                        title="评论"
+                                        onClick={() =>
+                                            openComments({
+                                                id: currentTrack.id,
+                                                title: currentTrack.title,
+                                                subtitle: currentTrack.artist,
+                                            })
+                                        }
+                                        disabled={!currentTrack}
+                                    >
+                                        <MessageCircle className="size-3.5" />
+                                    </ControlButton>
+                                ) : null}
+                                <QueuePanel />
+                                <VolumeElasticSlider
+                                    volume={volume}
+                                    muted={isMuted}
+                                    onVolume={setVolume}
+                                    onToggleMute={toggleMute}
+                                    compact
+                                    showIcons
+                                />
+                            </div>
+                        </div>
+                    </footer>
                 </div>
             </div>
-        </footer>
-            </div>
-        </div>
-        {collapsed ? (
-            <div
-                role="button"
-                title="显示播放条"
-                aria-label="显示播放条"
-                className="flex shrink-0 cursor-pointer items-center justify-center"
-                style={{
-                    // 隐藏态细条仍贴安全区上方，留出拇指上滑热区
-                    height: "calc(1.25rem + env(safe-area-inset-bottom))",
-                    paddingTop: "0.5rem",
-                    transform: stripTransform,
-                    transition: stripTransition,
-                }}
-                onClick={() => setCollapsed(false)}
-                onPointerDown={handleStripPointerDown}
-                onPointerMove={handleStripPointerMove}
-                onPointerUp={handleStripPointerUp}
-                onPointerCancel={handleStripPointerCancel}
-            >
-                <div className="h-1 w-12 rounded-full bg-foreground/20" />
-            </div>
-        ) : null}
+            {collapsed ? (
+                <div
+                    role="button"
+                    title="显示播放条"
+                    aria-label="显示播放条"
+                    className="flex shrink-0 cursor-pointer items-center justify-center"
+                    style={{
+                        // 隐藏态细条仍贴安全区上方，留出拇指上滑热区
+                        height: "calc(1.25rem + env(safe-area-inset-bottom))",
+                        paddingTop: "0.5rem",
+                        transform: stripTransform,
+                        transition: stripTransition,
+                    }}
+                    onClick={() => setCollapsed(false)}
+                    onPointerDown={handleStripPointerDown}
+                    onPointerMove={handleStripPointerMove}
+                    onPointerUp={handleStripPointerUp}
+                    onPointerCancel={handleStripPointerCancel}
+                >
+                    <div className="h-1 w-12 rounded-full bg-foreground/20" />
+                </div>
+            ) : null}
         </>
     )
 }

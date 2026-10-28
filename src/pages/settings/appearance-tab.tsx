@@ -82,7 +82,7 @@ function AppearanceTab({
     const {
         theme,
         themeStyle,
- resolvedTheme,
+        resolvedTheme,
         setTheme,
         setThemeStyle,
         appearance,
@@ -125,12 +125,12 @@ function AppearanceTab({
     const supportsBackground =
         activeTheme.capabilities.includes("backgroundImage")
     const supportsBing = activeTheme.capabilities.includes("bingWallpaper")
- const recentThemes = readRecentThemes()
- .map((id) => THEME_DEFINITIONS.find((item) => item.id === id))
- .filter(
- (item): item is (typeof THEME_DEFINITIONS)[number] =>
- Boolean(item),
- )
+    const recentThemes = readRecentThemes()
+        .map((id) => THEME_DEFINITIONS.find((item) => item.id === id))
+        .filter(
+            (item): item is (typeof THEME_DEFINITIONS)[number] =>
+                Boolean(item),
+        )
     const visibleThemes = [
         activeTheme,
         ...recentThemes.filter((item) => item.id !== activeTheme.id),
@@ -272,32 +272,32 @@ function AppearanceTab({
 
     return (
         <div className="space-y-3">
- <TabHeader
- title="外观"
- description="最近主题、字体、色调、材质与全屏播放模板"
- />
- <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
- <SettingsGroup
- className="lg:col-span-2"
- title="最近主题"
- description={activeTheme.description}
- >
- <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
- {visibleThemes.map((item) => (
- <ThemeCard
- key={item.id}
- theme={item}
- mode={resolvedTheme}
- active={themeStyle === item.id}
- compact
- onSelect={() => setThemeStyle(item.id)}
- />
- ))}
- </div>
- <p className="text-[13px] text-muted-foreground">
-这里保留最近使用的四个主题，更多风格请前往设置中的主题
- </p>
- </SettingsGroup>
+            <TabHeader
+                title="外观"
+                description="最近主题、字体、色调、材质与全屏播放模板"
+            />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <SettingsGroup
+                    className="lg:col-span-2"
+                    title="最近主题"
+                    description={activeTheme.description}
+                >
+                    <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+                        {visibleThemes.map((item) => (
+                            <ThemeCard
+                                key={item.id}
+                                theme={item}
+                                mode={resolvedTheme}
+                                active={themeStyle === item.id}
+                                compact
+                                onSelect={() => setThemeStyle(item.id)}
+                            />
+                        ))}
+                    </div>
+                    <p className="text-[13px] text-muted-foreground">
+                        这里保留最近使用的四个主题，更多风格请前往设置中的主题
+                    </p>
+                </SettingsGroup>
 
                 <SettingsGroup
                     className="lg:col-span-2"
@@ -353,10 +353,10 @@ function AppearanceTab({
                     />
                 </SettingsGroup>
 
- <SettingsGroup
- title="明暗与色调"
- description="明暗模式与强调色"
- >
+                <SettingsGroup
+                    title="明暗与色调"
+                    description="明暗模式与强调色"
+                >
                     <ChipRow>
                         <ChoiceChip
                             active={theme === "system"}
@@ -584,13 +584,13 @@ function AppearanceTab({
                     />
                 </SettingsGroup>
 
- <SettingsGroup
- className="lg:col-span-2"
- title="字体"
- description="主题字体跟随外观，也可以使用本机字体文件"
- >
- <FontSettings />
- </SettingsGroup>
+                <SettingsGroup
+                    className="lg:col-span-2"
+                    title="字体"
+                    description="主题字体跟随外观，也可以使用本机字体文件"
+                >
+                    <FontSettings />
+                </SettingsGroup>
 
                 <SettingsGroup
                     className="lg:col-span-2"
@@ -656,8 +656,8 @@ function AppearanceTab({
                                     {appearance.bingWallpaper
                                         ? "必应每日壁纸"
                                         : appearance.backgroundUrl
-                                          ? "自定义图片"
-                                          : "未设置，使用默认背景"}
+                                            ? "自定义图片"
+                                            : "未设置，使用默认背景"}
                                 </p>
                             </div>
                         </div>
