@@ -1,0 +1,94 @@
+{
+  "$schema": "https://raw.githubusercontent.com/YuiNijika/Kasumi/main/protocol/kasumi.config.schema.json",
+  "icons": {
+    "window": "icons/icon.ico",
+    "tray": "icons/icon.ico",
+    "installer": "icons/icon.ico",
+    "android": "icons/android.png"
+  },
+  "extensions": [
+    {
+      "id": "musicstorm",
+      "manifest": "extensions/musicstorm.extension.json",
+      "platforms": ["windows", "android"]
+    }
+  ],
+  "windows": {
+    "packageName": "music-storm",
+    "version": "26.11.7",
+    "commands": "all",
+    "permissions": "all",
+    "decorations": false,
+    "http": {
+      "allowedOrigins": [
+        "https://api.github.com",
+        "https://gh-proxy.com",
+        "https://api.miomoe.cn",
+        "https://music.163.com",
+        "https://interface.music.163.com",
+        "https://interface3.music.163.com",
+        "https://interfacepc.music.163.com",
+        "https://api.bilibili.com",
+        "https://passport.bilibili.com",
+        "https://api.geetest.com",
+        "https://static.geetest.com",
+        "https://api.qrserver.com",
+        "https://i0.hdslb.com",
+        "https://i1.hdslb.com",
+        "https://i2.hdslb.com",
+        "https://i3.hdslb.com",
+        "https://p1.music.126.net",
+        "https://p2.music.126.net",
+        "https://p3.music.126.net",
+        "https://p4.music.126.net"
+      ]
+    }
+  },
+  "android": {
+    "packageName": "dev.kasumi.music_storm",
+    "version": "26.11.7",
+    "commands": "all",
+    "permissions": "all",
+    "http": {
+      "allowedOrigins": [
+        "https://api.github.com",
+        "https://gh-proxy.com",
+        "https://api.miomoe.cn",
+        "https://music.163.com",
+        "https://interface.music.163.com",
+        "https://interface3.music.163.com",
+        "https://interfacepc.music.163.com",
+        "https://api.bilibili.com",
+        "https://passport.bilibili.com",
+        "https://api.geetest.com",
+        "https://static.geetest.com",
+        "https://api.qrserver.com",
+        "https://i0.hdslb.com",
+        "https://i1.hdslb.com",
+        "https://i2.hdslb.com",
+        "https://i3.hdslb.com",
+        "https://p1.music.126.net",
+        "https://p2.music.126.net",
+        "https://p3.music.126.net",
+        "https://p4.music.126.net"
+      ]
+    },
+    "webview": {
+      "productionEntry": "https://app.local/index.html",
+      "developmentEntries": [
+        "http://localhost:5173/index.html",
+        "http://localhost:5173/",
+        "http://localhost:5173",
+        "http://localhost:5173/mini-player.html",
+        "http://localhost:5173/desktop-lyric.html",
+        "http://localhost:5173/player.html"
+      ],
+      "supportedHtmlFiles": [
+        "index.html",
+        "mini-player.html",
+        "desktop-lyric.html",
+        "player.html"
+      ]
+    }
+  }
+}

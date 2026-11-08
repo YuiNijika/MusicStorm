@@ -1,0 +1,38 @@
+{
+  "id": "musicstorm",
+  "commands": [
+    {
+      "name": "app.musicstorm.command",
+      "platforms": ["windows", "android"],
+      "permissions": ["app.musicstorm"],
+      "args": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "args": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["command", "args"],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "app.musicstorm.event",
+      "platforms": ["windows", "android"],
+      "payload": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string" },
+          "payload": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["event", "payload"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

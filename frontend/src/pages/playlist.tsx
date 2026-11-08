@@ -1,0 +1,915 @@
+import {
+    Download,
+    Heart,
+    Library,
+    ListMinus,
+    Pencil,
+    Sparkles,
+    Trash2,
+} from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+
+import { ViewModeToggle } from "@/components/music/view-mode-toggle"
+import { AddToPlaylistDialog } from "@/components/music/add-to-playlist-dialog"
+import { BackButton } from "@/components/music/back-button"
+import { Cover } from "@/components/music/cover"
+import { DragList } from "@/components/music/drag-list"
+import { PlaylistDetailSkeleton } from "@/components/music/loading-skeletons"
+import { MediaCard } from "@/components/music/media-card"
+import { Section } from "@/components/music/section"
+import { SortSelect } from "@/components/music/sort-select"
+import { SourceBadge } from "@/components/music/source-badge"
+import { HeroRetryButton, StateHero } from "@/components/music/state-hero"
+import { TrackRow } from "@/components/music/track-row"
+import { VirtualList } from "@/components/music/virtual-list"
+import { VirtualGrid } from "@/components/music/virtual-grid"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { useLibraryLayout } from "@/hooks/use-library-layout"
+import { useLiked } from "@/hooks/use-liked"
+import { useNeteaseSession } from "@/hooks/use-netease-session"
+import { usePlayer } from "@/hooks/use-player"
+import { usePlaylistGrid } from "@/hooks/use-playlist-grid"
+import {
+    setPlaylistTracksView,
+    setTrackSort,
+} from "@/lib/library/layout-prefs"
+import { normalizeCloudTrackOrder } from "@/lib/library/playlist-order"
+import { sortTracks, TRACK_SORT_OPTIONS } from "@/lib/library/sort"
+import {
+    listLocalTracksForPlaylist,
+    removeLocalTracksFromPlaylist,
+    type LocalPlaylistTrackRow,
+} from "@/lib/local/local-playlist"
+import {
+    ORDER_EVENT,
+    getPlaylistTrackOrder,
+    setPlaylistTrackOrder,
+} from "@/lib/library/track-order"
+import {
+    getCoverOverride,
+    resolveTrackCoverUrl,
+} from "@/lib/music/cover-overrides"
+import {
+    canBatchDownload,
+    chooseDownloadDirectory,
+    downloadPlaylistTracks,
+    type PlaylistDownloadProgress,
+} from "@/lib/music/batch-download"
+import { fetchIntelligencePlaylist } from "@/lib/netease/fm"
+import {
+    deletePlaylist,
+    fetchPlaylistDetail,
+    updatePlaylistDesc,
+    updatePlaylistName,
+} from "@/lib/netease/playlist"
+import {
+    formatError,
+    notifyFromError,
+    notifyLoading,
+    notifySuccess,
+    notifyUpdate,
+} from "@/lib/notify"
+import type { Playlist, Track } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+const TRACK_ROW_HEIGHT = 58
+const MEDIA_ROW_HEIGHT = 236
+
+type PlaylistPageProps = {
+    playlistId: string
+    onBack: () => void
+}
+
+// 本地附加条目转可播 Track，供歌单详情合并展示
+function localRowToTrack(row: LocalPlaylistTrackRow): Track {
+    return {
+        id: row.id,
+        title: row.title,
+        artist: row.artist,
+        album: row.album,
+        durationMs: row.durationMs,
+        coverUrl: row.coverUrl ?? "",
+        filePath: row.filePath ?? undefined,
+        source: "local",
+    }
+}
+
+// 本地条目插在添加时记录的云端锚点之前，保持新增项目置前的顺序。
+function mergePlaylistTracks(
+    cloudTracks: Track[],
+    rows: LocalPlaylistTrackRow[],
+): Track[] {
+    if (rows.length === 0) {
+        return cloudTracks
+    }
+    const cloudIds = new Set(cloudTracks.map((item) => item.id))
+    const byAnchor = new Map<string, LocalPlaylistTrackRow[]>()
+    const unanchoredRows: LocalPlaylistTrackRow[] = []
+    for (const row of rows) {
+        const anchor = row.anchorTrackId ?? null
+        if (anchor && cloudIds.has(anchor)) {
+            const list = byAnchor.get(anchor) ?? []
+            list.push(row)
+            byAnchor.set(anchor, list)
+        } else {
+            unanchoredRows.push(row)
+        }
+    }
+    const byAddedDesc = (
+        a: LocalPlaylistTrackRow,
+        b: LocalPlaylistTrackRow,
+    ) => b.addedAt - a.addedAt
+    for (const list of byAnchor.values()) {
+        list.sort(byAddedDesc)
+    }
+    unanchoredRows.sort(byAddedDesc)
+
+    const out: Track[] = []
+    for (let i = 0; i < cloudTracks.length; i += 1) {
+        const cloudTrack = cloudTracks[i]!
+        const group = byAnchor.get(cloudTrack.id)
+        if (group) {
+            out.push(...group.map(localRowToTrack))
+        }
+        out.push(cloudTrack)
+    }
+    out.push(...unanchoredRows.map(localRowToTrack))
+    return out
+}
+
+function PlaylistPage({ playlistId, onBack }: PlaylistPageProps) {
+    const { playTrack, playOrToggle, currentTrack, isPlaying } = usePlayer()
+    const { loggedIn, profile } = useNeteaseSession()
+    const { playlistTracksView, trackSort } = useLibraryLayout()
+    const { cols, gridRef } = usePlaylistGrid()
+    const {
+        likedSongPlaylistId,
+        isPlaylistSubscribed,
+        togglePlaylistSubscribed,
+    } = useLiked()
+    const [playlist, setPlaylist] = useState<Playlist | null>(null)
+    const [tracks, setTracks] = useState<Track[]>([])
+    // 合并进本歌单的本地条目（含锚点），独立于网易云歌单存储
+    const [localRows, setLocalRows] = useState<LocalPlaylistTrackRow[]>([])
+    // 本地条目查询完成标记：未完成前封面保持占位，避免云端封面抢跑再被本地替换（无缝）
+    const [localRowsReady, setLocalRowsReady] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+    const [errorText, setErrorText] = useState<string | null>(null)
+    const [subBusy, setSubBusy] = useState(false)
+    const [retry, setRetry] = useState(0)
+    const [orderTick, setOrderTick] = useState(0)
+    const [editOpen, setEditOpen] = useState(false)
+    const [editName, setEditName] = useState("")
+    const [editDesc, setEditDesc] = useState("")
+    const [editBusy, setEditBusy] = useState(false)
+    const [intelBusy, setIntelBusy] = useState(false)
+    const [deleteBusy, setDeleteBusy] = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
+    const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
+        null,
+    )
+    const [batchBusy, setBatchBusy] = useState(false)
+    const [batchProgress, setBatchProgress] =
+        useState<PlaylistDownloadProgress | null>(null)
+
+    const isOwnLiked = playlistId === likedSongPlaylistId
+    const isOwnPlaylist =
+        playlist?.creator?.id != null &&
+        profile != null &&
+        playlist.creator.id === String(profile.userId)
+    const subscribed = isPlaylistSubscribed(playlistId) || isOwnLiked
+    const customOrder = useMemo(() => {
+        void orderTick
+        return getPlaylistTrackOrder(playlistId)
+    }, [playlistId, orderTick])
+
+    // 云端曲目与本地附加曲目按锚点合并成同一份歌单列表，还原添加时间序
+    const displayTracks = useMemo(
+        () => mergePlaylistTracks(tracks, localRows),
+        [tracks, localRows],
+    )
+
+    const sortedTracks = useMemo(
+        () => sortTracks(displayTracks, trackSort, customOrder),
+        [displayTracks, trackSort, customOrder],
+    )
+
+    // 歌单封面优先级：用户覆盖 > 混排后的首曲 > 官方歌单封面。
+    const heroCover = useMemo(() => {
+        // 1. 歌单内任一曲目设置过自定义封面：以它为准，用户设置意图最强
+        const overridden = displayTracks.find((track) => getCoverOverride(track.id))
+        if (overridden) {
+            return resolveTrackCoverUrl(overridden.id, overridden.coverUrl)
+        }
+        // 本地条目未查完前保持占位：不让云端封面先显示再被本地替换（无缝切换）
+        if (!localRowsReady) {
+            return ""
+        }
+        // 混排顺序决定封面，云端新增歌曲或本地插入都会即时反映
+        for (const track of displayTracks) {
+            const url = resolveTrackCoverUrl(track.id, track.coverUrl)
+            if (url) {
+                return url
+            }
+        }
+        if (playlist?.coverUrl) {
+            return playlist.coverUrl
+        }
+        return ""
+    }, [displayTracks, localRowsReady, playlist])
+
+    const dragEnabled =
+        trackSort === "custom" && playlistTracksView === "list"
+
+    useEffect(() => {
+        function onOrder() {
+            setOrderTick((n) => n + 1)
+        }
+        window.addEventListener(ORDER_EVENT, onOrder)
+        return () => window.removeEventListener(ORDER_EVENT, onOrder)
+    }, [])
+
+    useEffect(() => {
+        let cancelled = false
+        setIsLoading(true)
+        setErrorText(null)
+        // 本地条目查询与云端详情并行：本地 DB 通常更快，先就绪时封面直接是本地，
+        // 不会被云端封面临时占位（合并展示仍等两者都到）
+        setLocalRowsReady(false)
+        setLocalRows([])
+        setTracks([])
+        setPlaylist(null)
+        void listLocalTracksForPlaylist(playlistId)
+            .then((rows) => {
+                if (!cancelled) {
+                    setLocalRows(rows)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setLocalRows([])
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLocalRowsReady(true)
+                }
+            })
+
+        void fetchPlaylistDetail(playlistId)
+            .then((result) => {
+                if (cancelled) {
+                    return
+                }
+                setPlaylist(result.playlist)
+                setTracks(
+                    normalizeCloudTrackOrder(playlistId, result.tracks),
+                )
+                setIsLoading(false)
+            })
+            .catch((error: unknown) => {
+                if (cancelled) {
+                    return
+                }
+                setPlaylist(null)
+                setTracks([])
+                setIsLoading(false)
+                const message =
+                    formatError(error) || "歌单加载失败，请确认网易云接口可用"
+                setErrorText(message)
+                notifyFromError("歌单加载失败", error)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [playlistId, retry])
+
+    async function handleToggleSubscribe() {
+        if (!loggedIn || isOwnLiked || subBusy) {
+            return
+        }
+        setSubBusy(true)
+        try {
+            await togglePlaylistSubscribed(playlistId)
+        } catch {
+            // 乐观回滚已在 store
+        } finally {
+            setSubBusy(false)
+        }
+    }
+
+    // 心动模式：随机取一首云端曲目做种子，生成智能推荐队列并接管播放
+    async function handleIntelligence() {
+        if (tracks.length === 0 || intelBusy) {
+            return
+        }
+        setIntelBusy(true)
+        try {
+            const seed = tracks[Math.floor(Math.random() * tracks.length)]
+            if (!seed) {
+                return
+            }
+            const queue = await fetchIntelligencePlaylist(seed.id, playlistId)
+            if (queue.length === 0) {
+                notifySuccess("心动模式暂无可播歌曲", {
+                    description: "稍后再试试",
+                })
+                return
+            }
+            playTrack(queue[0]!, queue)
+        } catch (error) {
+            notifyFromError("心动模式失败", error)
+        } finally {
+            setIntelBusy(false)
+        }
+    }
+
+    function openEditDialog() {
+        setEditName(playlist?.title ?? "")
+        setEditDesc(playlist?.description ?? "")
+        setEditOpen(true)
+    }
+
+    // 移除附加到本歌单的本地曲目（只删本地关联记录，不动文件）
+    const handleRemoveLocalTrack = useCallback(
+        async (trackId: string) => {
+            try {
+                await removeLocalTracksFromPlaylist(playlistId, [trackId])
+                setLocalRows((prev) => prev.filter((item) => item.id !== trackId))
+                notifySuccess("已从歌单移除")
+            } catch (error) {
+                notifyFromError("移除失败", error)
+            }
+        },
+        [playlistId],
+    )
+
+    async function handleDelete() {
+        if (deleteBusy || !playlist) {
+            return
+        }
+        setDeleteBusy(true)
+        try {
+            await deletePlaylist(playlistId)
+            notifySuccess("歌单已删除")
+            onBack()
+        } catch (error) {
+            notifyFromError("删除歌单失败", error)
+        } finally {
+            setDeleteBusy(false)
+        }
+    }
+
+    async function handleSubmitEdit() {
+        if (editBusy || !playlist) {
+            return
+        }
+        const name = editName.trim()
+        const desc = editDesc.trim()
+        if (!name) {
+            setEditOpen(false)
+            return
+        }
+        const nameChanged = name !== playlist.title
+        const descChanged = desc !== (playlist.description ?? "")
+        if (!nameChanged && !descChanged) {
+            setEditOpen(false)
+            return
+        }
+        setEditBusy(true)
+        try {
+            if (nameChanged) {
+                await updatePlaylistName(playlistId, name)
+            }
+            if (descChanged) {
+                await updatePlaylistDesc(playlistId, desc)
+            }
+            setPlaylist((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        title: nameChanged ? name : prev.title,
+                        description: descChanged ? desc : prev.description,
+                    }
+                    : prev,
+            )
+            notifySuccess("歌单已保存", { description: name })
+            setEditOpen(false)
+        } catch (error) {
+            notifyFromError("保存失败", error)
+        } finally {
+            setEditBusy(false)
+        }
+    }
+
+    function handleReorder(next: Track[]) {
+        setPlaylistTrackOrder(
+            playlistId,
+            next.map((item) => item.id),
+        )
+    }
+
+    async function handleDownloadAll() {
+        if (batchBusy || sortedTracks.length === 0) {
+            return
+        }
+        let directory: string | null = null
+        try {
+            directory = await chooseDownloadDirectory()
+        } catch (error) {
+            notifyFromError("无法选择下载目录", error)
+            return
+        }
+        if (!directory) {
+            return
+        }
+        const cloudCount = new Set(
+            sortedTracks
+                .filter((track) => track.source === "netease")
+                .map((track) => track.id),
+        ).size
+        if (cloudCount === 0) {
+            notifySuccess("没有需要下载的在线歌曲", {
+                description: "本地歌曲已保存在原位置",
+            })
+            return
+        }
+
+        setBatchBusy(true)
+        setBatchProgress({
+            total: cloudCount,
+            completed: 0,
+            succeeded: 0,
+            failed: 0,
+            skipped: sortedTracks.length - cloudCount,
+        })
+        const toastId = notifyLoading("正在下载歌单…", {
+            description: `准备下载 ${cloudCount} 首`,
+            timeout: 0,
+        })
+        let lastUpdatedAt = 0
+        try {
+            const result = await downloadPlaylistTracks({
+                tracks: sortedTracks,
+                directory,
+                onProgress: (progress) => {
+                    const now = Date.now()
+                    if (
+                        progress.completed !== progress.total &&
+                        now - lastUpdatedAt < 120
+                    ) {
+                        return
+                    }
+                    lastUpdatedAt = now
+                    setBatchProgress(progress)
+                    notifyUpdate(toastId, {
+                        type: "loading",
+                        title: "正在下载歌单…",
+                        description: `${progress.completed}/${progress.total} · 成功 ${progress.succeeded} · 失败 ${progress.failed}`,
+                        timeout: 0,
+                    })
+                },
+            })
+            setBatchProgress(result)
+            const firstFailure = result.failures[0]
+            notifyUpdate(toastId, {
+                type:
+                    result.failed > 0
+                        ? "warning"
+                        : result.succeeded > 0
+                            ? "success"
+                            : "info",
+                title:
+                    result.failed > 0
+                        ? "歌单下载完成，部分失败"
+                        : "歌单下载完成",
+                description: `成功 ${result.succeeded} 首 · 跳过 ${result.skipped} 首 · 失败 ${result.failed} 首${firstFailure
+                        ? ` · ${firstFailure.title} ${firstFailure.reason}`
+                        : ""
+                    }`,
+                timeout: result.failed > 0 ? 5200 : 3600,
+            })
+        } catch (error) {
+            notifyUpdate(toastId, {
+                type: "error",
+                title: "歌单下载失败",
+                description: formatError(error),
+                timeout: 4800,
+            })
+        } finally {
+            setBatchBusy(false)
+            setBatchProgress(null)
+        }
+    }
+
+    // 稳定回调供 TrackRow 复用：TrackRow 已 memo，引用稳定时窗口内
+    // 重叠行在滚动重渲时直接跳过，避免快速滚动每帧重建整窗
+    const handleRowPlay = useCallback(
+        (item: Track) => {
+            playOrToggle(item, sortedTracks)
+        },
+        [playOrToggle, sortedTracks],
+    )
+    const handleRowRemoved = useCallback((id: string) => {
+        setTracks((prev) => prev.filter((item) => item.id !== id))
+    }, [])
+
+    return (
+        <div ref={gridRef} className="space-y-6">
+            <BackButton onClick={onBack} />
+
+            {isLoading ? (
+                <PlaylistDetailSkeleton />
+            ) : errorText ? (
+                <StateHero
+                    variant="error"
+                    title="歌单加载失败"
+                    description={errorText}
+                    action={
+                        <HeroRetryButton onClick={() => setRetry((n) => n + 1)} />
+                    }
+                />
+            ) : playlist ? (
+                <>
+                    <header className="flex items-start gap-4 sm:flex-row sm:items-end sm:gap-5">
+                        <Cover
+                            src={heroCover}
+                            alt={playlist.title}
+                            size="lg"
+                            className="size-28 shrink-0 rounded-[20px] shadow-[var(--shadow-card)] ring-1 ring-foreground/10 sm:size-36 sm:rounded-[24px]"
+                        />
+                        <div className="min-w-0 flex-1 space-y-1.5 pb-1 sm:space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <SourceBadge source={playlist.source} />
+                                <span className="text-[12px] text-muted-foreground">
+                                    {playlist.trackCount != null
+                                        ? playlist.trackCount +
+                                        localRows.length
+                                        : sortedTracks.length}{" "}
+                                    首
+                                </span>
+                                {playlist.creator ? (
+                                    <span className="text-[12px] text-muted-foreground">
+                                        创建者 · {playlist.creator.name || "未知"}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <h1 className="line-clamp-2 break-words text-[20px] font-bold leading-tight tracking-[-0.03em] sm:text-[28px] sm:leading-[1.15] sm:tracking-[-0.04em] md:font-semibold">
+                                {playlist.title}
+                            </h1>
+                            {playlist.description ? (
+                                <p className="line-clamp-2 max-w-2xl text-[12px] leading-relaxed text-muted-foreground sm:line-clamp-3 sm:text-[13px]">
+                                    {playlist.description}
+                                </p>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {sortedTracks[0] ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const first = sortedTracks[0]
+                                            if (first) {
+                                                playTrack(first, sortedTracks)
+                                            }
+                                        }}
+                                        className="h-9 cursor-pointer rounded-[10px] apple-primary-action px-5 text-[13px] font-medium transition-transform duration-[var(--duration-press)] active:scale-[0.98]"
+                                    >
+                                        播放全部
+                                    </button>
+                                ) : null}
+                                {canBatchDownload() &&
+                                    sortedTracks.some(
+                                        (track) =>
+                                            track.source === "netease",
+                                    ) ? (
+                                    <button
+                                        type="button"
+                                        disabled={batchBusy}
+                                        aria-busy={batchBusy}
+                                        onClick={() =>
+                                            void handleDownloadAll()
+                                        }
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium tabular-nums transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <Download
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                        {batchBusy && batchProgress
+                                            ? `下载中 ${batchProgress.completed}/${batchProgress.total}…`
+                                            : "下载全部"}
+                                    </button>
+                                ) : null}
+                                {sortedTracks.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        disabled={intelBusy}
+                                        onClick={() => void handleIntelligence()}
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                                    >
+                                        <Sparkles className="size-3.5" />
+                                        心动模式
+                                    </button>
+                                ) : null}
+                                {isOwnPlaylist ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={openEditDialog}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                                        >
+                                            <Pencil className="size-3.5" />
+                                            编辑
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={deleteBusy}
+                                            onClick={() => setDeleteOpen(true)}
+                                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium text-destructive transition-[color,background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                            删除
+                                        </button>
+                                    </>
+                                ) : loggedIn && !isOwnLiked ? (
+                                    <button
+                                        type="button"
+                                        disabled={subBusy}
+                                        onClick={() => void handleToggleSubscribe()}
+                                        className={cn(
+                                            "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
+                                            subscribed
+                                                ? "bg-primary/15 text-primary"
+                                                : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
+                                        )}
+                                    >
+                                        <Heart
+                                            className={cn(
+                                                "size-3.5",
+                                                subscribed && "fill-current",
+                                            )}
+                                        />
+                                        {subscribed ? "已收藏" : "收藏歌单"}
+                                    </button>
+                                ) : null}
+                            </div>
+                        </div>
+                    </header>
+
+                    <Section
+                        title="歌曲"
+                        description={`${sortedTracks.length} 首${dragEnabled ? " · 拖动手柄排序" : ""
+                            }`}
+                        action={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <SortSelect
+                                    value={trackSort}
+                                    options={TRACK_SORT_OPTIONS}
+                                    onChange={setTrackSort}
+                                    label="歌曲排序"
+                                />
+                                <ViewModeToggle
+                                    value={playlistTracksView}
+                                    onChange={setPlaylistTracksView}
+                                    label="歌曲展示"
+                                />
+                            </div>
+                        }
+                    >
+                        {sortedTracks.length === 0 ? (
+                            <StateHero variant="empty" title="暂无歌曲" />
+                        ) : playlistTracksView === "card" ? (
+                            <VirtualGrid
+                                items={sortedTracks}
+                                columns={cols}
+                                estimatedRowHeight={MEDIA_ROW_HEIGHT}
+                                getItemKey={(track) => track.id}
+                                renderItem={(track) => (
+                                    <MediaCard
+                                        coverUrl={resolveTrackCoverUrl(
+                                            track.id,
+                                            track.coverUrl,
+                                        )}
+                                        title={track.title}
+                                        subtitle={track.artist}
+                                        widthClassName="w-full"
+                                        active={currentTrack?.id === track.id}
+                                        onClick={() =>
+                                            playOrToggle(track, sortedTracks)
+                                        }
+                                        overlay={
+                                            track.source === "local" ? (
+                                                <div
+                                                    role="button"
+                                                    title="从歌单移除"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleRemoveLocalTrack(
+                                                            track.id,
+                                                        )
+                                                    }}
+                                                    className="absolute bottom-2 right-2 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/60 group-hover:opacity-100"
+                                                >
+                                                    <ListMinus className="size-4" />
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    role="button"
+                                                    title="添加到歌单"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        setAddToPlaylistTrack(
+                                                            track,
+                                                        )
+                                                    }}
+                                                    className="absolute bottom-2 right-2 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/60 group-hover:opacity-100"
+                                                >
+                                                    <Library className="size-4" />
+                                                </div>
+                                            )
+                                        }
+                                    />
+                                )}
+                            />
+                        ) : (
+                            <div className="apple-list-surface p-1.5">
+                                {dragEnabled ? (
+                                    <DragList
+                                        items={sortedTracks}
+                                        enabled
+                                        itemHeight={TRACK_ROW_HEIGHT}
+                                        onReorder={handleReorder}
+                                        renderItem={(track, index, handle) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                leading={handle}
+                                                isActive={currentTrack?.id === track.id}
+                                                isPlaying={
+                                                    currentTrack?.id === track.id &&
+                                                    isPlaying
+                                                }
+                                                // 只给本地曲目标来源，网易云不加 tag
+                                                showSource={track.source === "local"}
+                                                // 本地曲目的专辑列与网易云对齐
+                                                showAlbumColumn
+                                                playlistId={
+                                                    track.source === "netease" &&
+                                                        !isOwnLiked
+                                                        ? playlistId
+                                                        : undefined
+                                                }
+                                                onRemoved={handleRowRemoved}
+                                                onLocalRemove={
+                                                    track.source === "local"
+                                                        ? () =>
+                                                            void handleRemoveLocalTrack(
+                                                                track.id,
+                                                            )
+                                                        : undefined
+                                                }
+                                                onPlay={handleRowPlay}
+                                            />
+                                        )}
+                                    />
+                                ) : (
+                                    <VirtualList
+                                        items={sortedTracks}
+                                        itemHeight={TRACK_ROW_HEIGHT}
+                                        getItemKey={(track) => track.id}
+                                        renderItem={(track, index) => (
+                                            <TrackRow
+                                                track={track}
+                                                index={index}
+                                                isActive={currentTrack?.id === track.id}
+                                                isPlaying={
+                                                    currentTrack?.id === track.id &&
+                                                    isPlaying
+                                                }
+                                                // 只给本地曲目标来源，网易云不加 tag
+                                                showSource={track.source === "local"}
+                                                // 本地曲目的专辑列与网易云对齐
+                                                showAlbumColumn
+                                                playlistId={
+                                                    track.source === "netease" &&
+                                                        !isOwnLiked
+                                                        ? playlistId
+                                                        : undefined
+                                                }
+                                                onRemoved={handleRowRemoved}
+                                                onLocalRemove={
+                                                    track.source === "local"
+                                                        ? () =>
+                                                            void handleRemoveLocalTrack(
+                                                                track.id,
+                                                            )
+                                                        : undefined
+                                                }
+                                                onPlay={handleRowPlay}
+                                            />
+                                        )}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </Section>
+                </>
+            ) : null}
+
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>编辑歌单</DialogTitle>
+                        <DialogDescription>修改歌单名称与介绍</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 px-1 py-2">
+                        <Input
+                            value={editName}
+                            onChange={(event) =>
+                                setEditName(event.currentTarget.value)
+                            }
+                            placeholder="歌单名称"
+                            className="h-10 rounded-xl"
+                        />
+                        <Textarea
+                            value={editDesc}
+                            onChange={(event) =>
+                                setEditDesc(event.currentTarget.value)
+                            }
+                            placeholder="歌单介绍"
+                            rows={3}
+                            className="rounded-xl resize-none"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setEditOpen(false)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            disabled={editBusy}
+                            onClick={() => void handleSubmitEdit()}
+                            className="h-9 cursor-pointer rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {editBusy ? "保存中…" : "保存"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>删除歌单</DialogTitle>
+                        <DialogDescription>
+                            将删除「{playlist?.title}」，此操作不可撤销
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setDeleteOpen(false)}
+                            className="h-9 cursor-pointer rounded-full bg-[var(--surface-fill)] px-4 text-[13px] font-medium transition-[background-color,transform] hover:bg-[var(--surface-fill-hover)] active:scale-[0.97] active:duration-[var(--duration-press)]"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            disabled={deleteBusy}
+                            onClick={() => void handleDelete()}
+                            className="h-9 cursor-pointer rounded-full bg-destructive/10 px-4 text-[13px] font-medium text-destructive transition-[background-color,transform] hover:bg-destructive/20 active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50"
+                        >
+                            {deleteBusy ? "删除中…" : "删除"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <AddToPlaylistDialog
+                track={addToPlaylistTrack}
+                open={addToPlaylistTrack !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setAddToPlaylistTrack(null)
+                    }
+                }}
+            />
+        </div>
+    )
+}
+
+export { PlaylistPage }

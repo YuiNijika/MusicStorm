@@ -1,0 +1,135 @@
+/* 主应用全局样式基座：只负责基础 reset 与跨主题 token，视觉风格由 App.css / Style.css / theme-styles.css 共同驱动 */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./App.css";
+@import "./Style.css";
+@import "./lib/theme/theme-styles.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-heading);
+    --font-sans: var(--font-sans);
+    --font-mono: var(--font-mono);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* Tailwind transition-* 默认时长/缓动改挂 motion token，组件不再各自写死 150ms/ease-out */
+    --default-transition-duration: var(--duration-control);
+    --default-transition-timing-function: var(--ease-press);
+}
+
+/* 只有品牌色才允许局部硬编码，长期主题色请通过 /themes/ 或 --* 变量维护 */
+:root {
+    color-scheme: light;
+    --font-heading: "SF Pro Display", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-sans: "Inter", "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", "Liberation Mono", monospace;
+    --font-display: var(--font-heading);
+    --font-body: var(--font-sans);
+    --brand-bilibili: #fb7299;
+    --brand-bilibili-strong: #c43d69;
+    --brand-bilibili-soft: #ff9cba;
+    line-height: 1.6;
+}
+
+html {
+    min-width: 320px;
+    min-height: 100%;
+    scroll-behavior: smooth;
+}
+
+body {
+    min-width: 320px;
+    min-height: 100svh;
+    margin: 0;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+a {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+button {
+    font: inherit;
+}
+
+code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+}
+
+.skip-link {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: 16px;
+    z-index: 10;
+    padding: 10px 14px;
+    border: 1px solid var(--foreground);
+    border-radius: 10px;
+    color: var(--background);
+    background: var(--foreground);
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-decoration: none;
+    transform: translateY(calc(-100% - 24px));
+    transition: transform var(--duration-control) var(--ease-press);
+}
+
+.skip-link:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 3px;
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    .skip-link {
+        transition: none;
+    }
+}

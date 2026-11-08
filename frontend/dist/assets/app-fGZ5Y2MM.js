@@ -1,0 +1,1 @@
+import{n as e,r as t}from"./runtime-Cna9E4Oi.js";async function n(){return e()?(await t.app.getInfo()).version:`0.0.0`}export{n as getVersion};

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@tauri-apps/api/core": ["./src/lib/tauri/core.ts"],
+      "@tauri-apps/api/event": ["./src/lib/tauri/event.ts"],
+      "@tauri-apps/api/window": ["./src/lib/tauri/window.ts"],
+      "@tauri-apps/api/app": ["./src/lib/tauri/app.ts"],
+      "@tauri-apps/plugin-opener": ["./src/lib/tauri/opener.ts"]
+    }
+  },
+  "include": ["src"]
+}
