@@ -1,1 +1,0 @@
-import{n as e,r as t}from"./runtime-Cna9E4Oi.js";async function n(n){e()?await t.shell.openExternal({url:n}):window.open(n,`_blank`,`noopener,noreferrer`)}async function r(n){e()&&await t.shell.showInFolder({path:n})}export{n as openUrl,r as revealItemInDir};

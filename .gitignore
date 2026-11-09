@@ -10,6 +10,7 @@ $null
 .tmp/
 /.ksm/
 /dist/
+frontend/dist/
 website/dist/
 /release/
 KasumiData/
