@@ -214,6 +214,10 @@ public:
         bool enabled
     ) override;
     bool StartWindowDrag(const std::string& window_id) override;
+    bool StartWindowResize(
+        const std::string& window_id,
+        const std::string& direction
+    ) override;
     std::optional<KSMWindowState> GetWindowState(
         const std::string& window_id
     ) const override;

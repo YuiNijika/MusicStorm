@@ -589,6 +589,14 @@ public:
         (void)window_id;
         return false;
     }
+    virtual bool StartWindowResize(
+        const std::string& window_id,
+        const std::string& direction
+    ) {
+        (void)window_id;
+        (void)direction;
+        return false;
+    }
     virtual std::optional<KSMWindowState> GetWindowState(
         const std::string& window_id
     ) const {

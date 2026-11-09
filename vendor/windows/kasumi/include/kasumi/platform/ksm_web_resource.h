@@ -10,6 +10,17 @@ struct KSMWebResource {
   std::vector<std::uint8_t> data;
 };
 
+enum class KSMWebLocalFileStatus {
+  Ok,
+  BadRequest,
+  Forbidden,
+};
+
+struct KSMWebLocalFileRequest {
+  KSMWebLocalFileStatus status = KSMWebLocalFileStatus::BadRequest;
+  std::string path;
+};
+
 class KSMWebResourceProvider {
 public:
   virtual ~KSMWebResourceProvider() = default;
@@ -23,4 +34,5 @@ public:
 class KSMWebResourcePath {
 public:
   static std::optional<std::string> FromAppLocalUrl(const std::string &url);
+  static KSMWebLocalFileRequest FromLocalFileUrl(const std::string &url);
 };

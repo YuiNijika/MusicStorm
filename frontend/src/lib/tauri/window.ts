@@ -1,4 +1,8 @@
-import { KSM, type KSMJsonValue } from "kasumi-bridge"
+import {
+    KSM,
+    type KSMJsonValue,
+    type KSMWindowResizeDirection,
+} from "kasumi-bridge"
 
 import { isAndroid } from "@/lib/platform"
 
@@ -85,6 +89,16 @@ class KasumiWindow {
         }
         await this.appWindowCommand("window_start_dragging", {
             windowId: currentKasumiWindowId(),
+        }).catch(() => undefined)
+    }
+
+    async startResizing(direction: KSMWindowResizeDirection): Promise<void> {
+        if (!initializeKasumiBridge() || isAndroid()) {
+            return
+        }
+        await KSM.window.startResizing({
+            direction,
+            ...this.target(),
         }).catch(() => undefined)
     }
 

@@ -1112,7 +1112,12 @@ inline Json MusicStormPlugin::Dispatch(
             : context.host_services->MaximizeWindow();
         const auto next = context.host_services->GetWindowState("");
         return Json{
-            {"maximized", next ? next->maximized : (updated ? !was_maximized : was_maximized)},
+            {
+                "maximized",
+                next
+                    ? next->maximized
+                    : (updated ? !was_maximized : was_maximized)
+            },
             {"updated", updated}
         };
     }

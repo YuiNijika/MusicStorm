@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window"
+import type { KSMWindowResizeDirection } from "kasumi-bridge"
 
 import { getTitleBarDoubleClickAction } from "@/lib/app/title-bar-prefs"
 import {
@@ -11,6 +12,46 @@ import {
 } from "react"
 
 const DOUBLE_CLICK_MS = 300
+const WINDOW_RESIZE_EDGE = 8
+
+function resolveResizeDirection(
+    event: ReactPointerEvent<HTMLElement>,
+    maximized: boolean,
+): KSMWindowResizeDirection | null {
+    if (maximized || typeof window === "undefined") {
+        return null
+    }
+    const edge = WINDOW_RESIZE_EDGE
+    const nearLeft = event.clientX <= edge
+    const nearRight = event.clientX >= window.innerWidth - edge
+    const nearTop = event.clientY <= edge
+    const nearBottom = event.clientY >= window.innerHeight - edge
+    if (nearTop && nearLeft) {
+        return "topLeft"
+    }
+    if (nearTop && nearRight) {
+        return "topRight"
+    }
+    if (nearBottom && nearLeft) {
+        return "bottomLeft"
+    }
+    if (nearBottom && nearRight) {
+        return "bottomRight"
+    }
+    if (nearTop) {
+        return "top"
+    }
+    if (nearBottom) {
+        return "bottom"
+    }
+    if (nearLeft) {
+        return "left"
+    }
+    if (nearRight) {
+        return "right"
+    }
+    return null
+}
 
 export function useWindowControls() {
     // 移动端/浏览器预览无桌面窗口：getCurrentWindow 可能抛错，用兜底空窗口
@@ -91,9 +132,16 @@ export function useWindowControls() {
             }
             lastPressAtRef.current = now
             event.preventDefault()
+            const resizeDirection = resolveResizeDirection(event, isMaximized)
+            if (resizeDirection) {
+                void appWindow
+                    .startResizing(resizeDirection)
+                    .catch(() => undefined)
+                return
+            }
             void appWindow.startDragging().catch(() => undefined)
         },
-        [appWindow, toggleMaximize],
+        [appWindow, isMaximized, toggleMaximize],
     )
 
     return {

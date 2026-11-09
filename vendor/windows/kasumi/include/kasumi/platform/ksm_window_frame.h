@@ -2,6 +2,17 @@
 
 #include <windows.h>
 
+enum class KSMWindowResizeDirection {
+  Top,
+  Bottom,
+  Left,
+  Right,
+  TopLeft,
+  TopRight,
+  BottomLeft,
+  BottomRight
+};
+
 class KSMWindowFrame final {
 public:
   KSMWindowFrame() = delete;
@@ -15,6 +26,10 @@ public:
   );
   static bool IsFrameless(HWND window);
   static bool StartDrag(HWND window);
+  static bool StartResize(
+      HWND window,
+      KSMWindowResizeDirection direction
+  );
   static void RefreshResizeHitTesting(HWND window);
 
 private:
