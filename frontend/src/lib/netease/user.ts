@@ -87,7 +87,7 @@ async function fetchUserAccount(): Promise<NeteaseProfile | null> {
     return {
         userId: profile.userId,
         nickname: profile.nickname ?? "网易云用户",
-        avatarUrl: profile.avatarUrl ?? "",
+        avatarUrl: neteaseCoverUrl(profile.avatarUrl, 200),
         vipType: profile.vipType ?? 0,
     }
 }

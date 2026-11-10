@@ -3,6 +3,9 @@
 // 网易云 http 媒体地址，其余域名原样保留，避免误改不支持 TLS 的第三方地址。
 
 function upgradeNeteaseUrl(url: string): string {
+    if (url.startsWith("//")) {
+        return `https:${url}`
+    }
     if (!url.startsWith("http://")) {
         return url
     }

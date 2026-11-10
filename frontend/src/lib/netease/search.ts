@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import type { Radio, Track } from "@/lib/types"
 
@@ -143,7 +144,7 @@ async function searchNeteaseAlbums(
                 id: String(item.id),
                 title: item.name?.trim() || "未知专辑",
                 artistName,
-                coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
+                coverUrl: neteaseCoverUrl(item.picUrl, 480),
                 trackCount: item.size,
                 year: item.publishTime
                     ? new Date(item.publishTime).getFullYear()
@@ -181,7 +182,7 @@ async function searchNeteaseArtists(
             return {
                 id: String(item.id),
                 name: item.name?.trim() || "未知艺人",
-                coverUrl: pic ? `${pic}?param=400y400` : "",
+                coverUrl: neteaseCoverUrl(pic, 400),
                 albumSize: item.albumSize,
                 musicSize: item.musicSize,
             }
@@ -216,9 +217,7 @@ async function searchNeteasePlaylists(
             return {
                 id: String(item.id),
                 title: item.name?.trim() || "未知歌单",
-                coverUrl: item.coverImgUrl
-                    ? `${item.coverImgUrl}?param=480y480`
-                    : "",
+                coverUrl: neteaseCoverUrl(item.coverImgUrl, 480),
                 trackCount: item.trackCount,
                 creatorName: item.creator?.nickname,
             }
@@ -253,7 +252,7 @@ async function searchNeteaseRadios(
             return {
                 id: String(item.id),
                 title: item.name?.trim() || "未知电台",
-                coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
+                coverUrl: neteaseCoverUrl(item.picUrl, 480),
                 description: item.desc,
                 programCount: item.programCount,
                 djName: item.dj?.nickname,

@@ -1,5 +1,6 @@
 import type { AlbumCard } from "@/lib/netease/album"
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import type { Track } from "@/lib/types"
 
@@ -34,7 +35,7 @@ async function fetchNewAlbums(
             return {
                 id: String(item.id),
                 title: item.name?.trim() || "未知专辑",
-                coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
+                coverUrl: neteaseCoverUrl(item.picUrl, 480),
                 artistName:
                     artists
                         .map((a) => a.name)

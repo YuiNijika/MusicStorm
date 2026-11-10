@@ -51,7 +51,8 @@ public:
                   bool decorations = true,
                   std::vector<std::shared_ptr<KSMPlugin>> plugins = {},
                   std::vector<std::string> allowed_permissions = {},
-                  std::vector<std::string> allowed_http_origins = {});
+                  std::vector<std::string> allowed_http_origins = {},
+                  std::string background_color = {});
   ~KSMWebView2Host();
 
   KSMWebView2Host(const KSMWebView2Host &) = delete;
@@ -94,6 +95,7 @@ public:
   bool SetBounds(const RECT &bounds);
   bool FillParent();
   bool SetVisible(bool visible);
+  void PrepareParentResize(int width, int height);
   void Focus();
   bool Navigate(const std::wstring &url);
   bool Reload();

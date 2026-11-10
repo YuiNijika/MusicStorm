@@ -101,6 +101,13 @@ ID `102`，未提供时托盘回退到资源 `101`，再回退到系统默认图
 `decorations` 默认是 `true`。设置为 `false` 后，Win32 宿主保留可缩放边框、最小尺寸和
 工作区约束，只隐藏系统标题栏。Kasumi 不会自动绘制窗口按钮，页面需要自行实现标题栏：
 
+无边框窗口默认使用 12 DIP 圆角。Windows 11 通过 DWM 原生圆角，Windows 10 使用窗口区域
+回退；最大化或最小化时自动恢复直角。圆角由宿主处理，页面不需要额外 CSS，也不需要开启
+窗口透明。
+
+顶层 HWND 仍然存在，用于 DWM、任务栏、缩放和命中测试。Kasumi 拦截 `WM_ERASEBKGND`
+并把窗口类背景刷设为空，客户区由 WebView2 子窗口独占绘制，不会先绘制一块原生白色窗口。
+
 ```tsx
 import { KSM } from "kasumi-bridge";
 
@@ -488,6 +495,13 @@ View。尺寸边界会夹取到父窗口客户区；创建参数和 `SetBounds()
 `window.setSize` 接受逻辑外框像素，最小 `320 × 240`。实现使用 `GetDpiForWindow`、
 `MulDiv`、`MonitorFromWindow`、`GetMonitorInfo` 和 `SetWindowPos`；最大化、最小化和
 全屏返回 `NOT_SUPPORTED`。`window.resized` 仍使用物理内容区尺寸。
+
+`window.startDragging` 进入系统 `HTCAPTION` 移动循环；`window.startResizing` 接受
+`top` / `bottom` / `left` / `right` / `topLeft` / `topRight` / `bottomLeft` /
+`bottomRight`，进入系统缩放循环。无边框窗口按 8 DIP 边缘处理 `WM_NCHITTEST`；
+WebView2 的 Chromium 输入窗口可能位于独立线程，跨线程子类化不生效，因此框架会在窗口
+前台时轮询鼠标边角并作为原生兜底。自定义标题栏在边缘 8px 内应先调用
+`window.startResizing`，否则标题栏 JS 拖动会先于原生缩放执行。
 
 ## 测试
 

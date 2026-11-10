@@ -39,7 +39,6 @@ async function mountApp(): Promise<void> {
             </React.StrictMode>,
         )
     } catch (error) {
-        // 兜底：App 代码包加载失败（chunk 404/网络中断等），React 还没接管
         console.error("[boot] App 加载失败", error)
         document.getElementById("boot-loading")?.remove()
         const root = document.getElementById("root")

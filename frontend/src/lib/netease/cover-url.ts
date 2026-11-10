@@ -19,25 +19,29 @@ function neteaseCoverUrl(
     if (!raw) {
         return ""
     }
+    const absolute = raw.startsWith("//") ? `https:${raw}` : raw
     let parsed: URL
     try {
-        parsed = new URL(raw)
+        parsed = new URL(absolute)
     } catch {
-        return raw
+        return absolute
     }
     if (!isNeteaseCoverHost(parsed.hostname)) {
-        return raw
+        return absolute
+    }
+    if (parsed.protocol === "http:") {
+        parsed.protocol = "https:"
     }
     const param = parsed.searchParams.get("param")
     if (param) {
         const match = /^(\d+)y(\d+)$/.exec(param)
         if (!match) {
-            return raw
+            return parsed.toString()
         }
         const width = Number(match[1])
         const height = Number(match[2])
         if (width <= maxWidth && height <= maxHeight) {
-            return raw
+            return parsed.toString()
         }
     }
     parsed.searchParams.set("param", `${maxWidth}y${maxHeight}`)

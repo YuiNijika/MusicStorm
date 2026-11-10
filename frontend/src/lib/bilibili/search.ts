@@ -215,7 +215,7 @@ async function fetchBilibiliFeaturedUps(): Promise<BilibiliFeaturedUp[]> {
  return [{
  id: String(mid),
  name: card.name?.trim() || `UP ${mid}`,
- avatarUrl: card.face?.trim() || "",
+        avatarUrl: normalizeImageUrl(card.face),
  description: card.sign?.trim() || undefined,
  fans: card.fans,
  webUrl: `https://space.bilibili.com/${mid}`,

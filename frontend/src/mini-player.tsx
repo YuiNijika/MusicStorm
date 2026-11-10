@@ -4,8 +4,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react"
 import { createRoot } from "react-dom/client"
 
+import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
 import { formatDuration } from "@/lib/format"
-import { bilibiliImageReferrerPolicy } from "@/lib/bilibili/image"
+import {
+    bilibiliImageReferrerPolicy,
+    isBilibiliImageUrl,
+} from "@/lib/bilibili/image"
+import { invalidateRemoteCover } from "@/lib/music/remote-cover-cache"
 import { initializeKasumiBridge } from "@/lib/tauri/runtime"
 
 initializeKasumiBridge()
@@ -69,6 +74,7 @@ function MiniPlayerApp() {
     positionMs: 0,
     durationMs: 0,
   })
+  const [coverFailed, setCoverFailed] = useState(false)
   const barRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -123,6 +129,10 @@ function MiniPlayerApp() {
     state.durationMs > 0
       ? Math.min(100, (state.positionMs / state.durationMs) * 100)
       : 0
+  const coverSrc = useCachedCoverUrl(state.coverUrl ?? "", "thumbnail")
+  useEffect(() => {
+    setCoverFailed(false)
+  }, [coverSrc])
 
   return (
     <div
@@ -137,12 +147,18 @@ function MiniPlayerApp() {
       }}
     >
       <div data-tauri-drag-region style={{ flexShrink: 0 }}>
-        {state.coverUrl ? (
+        {coverSrc && !coverFailed ? (
           <img
-            src={state.coverUrl}
+            src={coverSrc}
             alt=""
-            referrerPolicy={bilibiliImageReferrerPolicy(state.coverUrl)}
+            referrerPolicy={bilibiliImageReferrerPolicy(state.coverUrl ?? "")}
             draggable={false}
+            onError={() => {
+              setCoverFailed(true)
+              if (state.coverUrl && isBilibiliImageUrl(state.coverUrl)) {
+                void invalidateRemoteCover(state.coverUrl)
+              }
+            }}
             style={{
               width: "72px",
               height: "72px",

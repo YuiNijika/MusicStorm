@@ -1,7 +1,11 @@
 import { useState } from "react"
 
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
-import { bilibiliImageReferrerPolicy } from "@/lib/bilibili/image"
+import {
+    bilibiliImageReferrerPolicy,
+    isBilibiliImageUrl,
+} from "@/lib/bilibili/image"
+import { invalidateRemoteCover } from "@/lib/music/remote-cover-cache"
 import { cn } from "@/lib/utils"
 
 type AccountAvatarProps = {
@@ -45,7 +49,12 @@ function AccountAvatar({
                     referrerPolicy={bilibiliImageReferrerPolicy(src)}
                     decoding="async"
                     className="size-full object-cover"
-                    onError={() => setFailedSrc(resolved)}
+                    onError={() => {
+                        setFailedSrc(resolved)
+                        if (isBilibiliImageUrl(src)) {
+                            void invalidateRemoteCover(src)
+                        }
+                    }}
                 />
             ) : (
                 <span aria-hidden="true">{initial}</span>

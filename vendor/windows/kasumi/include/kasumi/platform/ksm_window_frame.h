@@ -22,7 +22,9 @@ public:
       bool decorations,
       bool resizable = true,
       int min_width = 320,
-      int min_height = 240
+      int min_height = 240,
+      int max_width = 0,
+      int max_height = 0
   );
   static bool IsFrameless(HWND window);
   static bool StartDrag(HWND window);

@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import type { Track } from "@/lib/types"
 
@@ -60,7 +61,7 @@ async function fetchAlbumDetail(albumId: string): Promise<AlbumDetailResult> {
     const profile: AlbumProfile = {
         id,
         title: album.name ?? "未知专辑",
-        coverUrl: album.picUrl ? `${album.picUrl}?param=480y480` : "",
+        coverUrl: neteaseCoverUrl(album.picUrl, 480),
         description: album.description?.trim() || "",
         trackCount: album.size,
         year: album.publishTime
@@ -110,7 +111,7 @@ async function fetchAlbumSublist(limit = 1000, offset = 0): Promise<AlbumCard[]>
             const card: AlbumCard = {
                 id: String(item.id),
                 title: item.name?.trim() || "未知专辑",
-                coverUrl: item.picUrl ? `${item.picUrl}?param=480y480` : "",
+                coverUrl: neteaseCoverUrl(item.picUrl, 480),
                 artistName:
                     artists
                         .map((a) => a.name)

@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import type { Track } from "@/lib/types"
 
@@ -140,7 +141,7 @@ async function fetchArtistDetail(artistId: string): Promise<ArtistDetailResult> 
     const profile: ArtistProfile = {
         id,
         name: a.name ?? "未知艺人",
-        coverUrl: a.picUrl ? `${a.picUrl}?param=480y480` : "",
+        coverUrl: neteaseCoverUrl(a.picUrl, 480),
         brief: a.briefDesc?.trim() || "",
         albumCount: a.albumSize,
         songCount: a.musicSize,
@@ -152,7 +153,7 @@ async function fetchArtistDetail(artistId: string): Promise<ArtistDetailResult> 
         .map((item) => ({
             id: String(item.id),
             title: item.name ?? "未知专辑",
-            coverUrl: item.picUrl ? `${item.picUrl}?param=400y400` : "",
+            coverUrl: neteaseCoverUrl(item.picUrl, 400),
             trackCount: item.size,
             year: item.publishTime
                 ? new Date(item.publishTime).getFullYear()
@@ -178,7 +179,7 @@ async function fetchArtistAlbumsPage(
         .map((item) => ({
             id: String(item.id),
             title: item.name ?? "未知专辑",
-            coverUrl: item.picUrl ? `${item.picUrl}?param=400y400` : "",
+            coverUrl: neteaseCoverUrl(item.picUrl, 400),
             trackCount: item.size,
             year: item.publishTime
                 ? new Date(item.publishTime).getFullYear()
@@ -199,7 +200,7 @@ async function fetchArtistMvs(artistId: string): Promise<ArtistMvCard[]> {
             return {
                 id: String(item.id),
                 title: item.name ?? "未知 MV",
-                coverUrl: cover ? `${cover}?param=480y270` : "",
+                coverUrl: neteaseCoverUrl(cover, 480, 270),
                 playCount: item.playCount,
                 durationMs: item.duration,
                 artistName: item.artistName,
@@ -238,7 +239,7 @@ async function fetchSimiArtists(artistId: string): Promise<SimiArtistCard[]> {
             return {
                 id: String(item.id),
                 name: item.name ?? "未知艺人",
-                coverUrl: pic ? `${pic}?param=400y400` : "",
+                coverUrl: neteaseCoverUrl(pic, 400),
                 albumCount: item.albumSize,
             }
         })
@@ -269,7 +270,7 @@ async function fetchArtistSublist(limit = 50): Promise<SimiArtistCard[]> {
         .map((item) => ({
             id: String(item.id),
             name: item.name?.trim() || "未知歌手",
-            coverUrl: item.picUrl ? `${item.picUrl}?param=400y400` : "",
+            coverUrl: neteaseCoverUrl(item.picUrl, 400),
             albumCount: item.albumSize,
         }))
 }

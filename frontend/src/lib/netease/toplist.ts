@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 
 export type ToplistItem = {
     id: string
@@ -27,9 +28,7 @@ async function fetchToplists(): Promise<ToplistItem[]> {
         .map((item) => ({
             id: String(item.id),
             title: item.name?.trim() || "未知榜单",
-            coverUrl: item.coverImgUrl
-                ? `${item.coverImgUrl}?param=300y300`
-                : "",
+            coverUrl: neteaseCoverUrl(item.coverImgUrl, 300),
             description: item.description?.trim() || undefined,
         }))
 }

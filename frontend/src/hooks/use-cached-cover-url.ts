@@ -5,21 +5,8 @@ import { getCoverCacheLimitBytes } from "@/lib/music/cover-cache-prefs"
 import {
     ensureRemoteCoverCached,
     getCachedRemoteCover,
-    isBilibiliCoverUrl,
     REMOTE_COVER_EVENT,
 } from "@/lib/music/remote-cover-cache"
-
-const BILIBILI_COVER_REFRESH_MS =10 *60 *1000
-const bilibiliCoverRefreshAt = new Map<string, number>()
-
-function createProtectedRemoteFallback(src: string): string {
- const lastRefresh = bilibiliCoverRefreshAt.get(src) ??0
- if (Date.now() - lastRefresh >= BILIBILI_COVER_REFRESH_MS) {
- bilibiliCoverRefreshAt.set(src, Date.now())
- return src
- }
- return ""
-}
 
 function resolveAssetUrl(
     path: string | null | undefined,
@@ -33,7 +20,8 @@ function isRemoteUrl(url: string): boolean {
         return false
     }
     try {
-        return new URL(url).hostname !== "asset.localhost"
+        const host = new URL(url).hostname
+        return host !== "asset.localhost" && host !== "app.local"
     } catch {
         return false
     }
@@ -49,19 +37,14 @@ function useCachedCoverUrl(
         tauri &&
         !options.ignoreCacheLimit &&
         getCoverCacheLimitBytes() === 0
-    const protectedRemote =
-        tauri && isRemoteUrl(src) && isBilibiliCoverUrl(src)
+    const remote = isRemoteUrl(src)
     const [resolved, setResolved] = useState<string>(() => {
-        if (!tauri || !isRemoteUrl(src)) {
+        if (!tauri || !remote) {
             return src
         }
         const cached = getCachedRemoteCover(src)
         if (!cached) {
- return disabled
- ? src
- : protectedRemote
- ? createProtectedRemoteFallback(src)
- : src
+            return src
         }
         return resolveAssetUrl(
             kind === "thumbnail"
@@ -75,7 +58,7 @@ function useCachedCoverUrl(
         if (!tauri) {
             return
         }
-        if (!isRemoteUrl(src)) {
+        if (!remote) {
             setResolved(src)
             return
         }
@@ -93,19 +76,17 @@ function useCachedCoverUrl(
             return
         }
 
- setResolved(
- disabled
- ? src
- : protectedRemote
- ? createProtectedRemoteFallback(src)
- : src,
- )
+        // 缓存未命中时保留远程地址，让图片立即可见；后台缓存完成后再透明切换。
+        // 之前这里对 B 站图片返回空字符串，会在首帧请求已经发出后卸载 <img>，
+        // 表现为网络面板有资源但页面仍空白。
+        setResolved(src)
         if (disabled) {
             return
         }
 
+        let cancelled = false
         void ensureRemoteCoverCached(src).then((next) => {
-            if (!next) {
+            if (cancelled || !next) {
                 return
             }
             setResolved(
@@ -135,17 +116,16 @@ function useCachedCoverUrl(
                 )
                 return
             }
- setResolved(
- protectedRemote
- ? createProtectedRemoteFallback(src)
- : src,
- )
+            setResolved(src)
             void ensureRemoteCoverCached(src)
         }
 
         window.addEventListener(REMOTE_COVER_EVENT, onReady)
-        return () => window.removeEventListener(REMOTE_COVER_EVENT, onReady)
-    }, [src, kind, tauri, disabled, protectedRemote])
+        return () => {
+            cancelled = true
+            window.removeEventListener(REMOTE_COVER_EVENT, onReady)
+        }
+    }, [src, kind, tauri, disabled, remote])
 
     return resolved
 }

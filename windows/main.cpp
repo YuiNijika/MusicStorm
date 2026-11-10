@@ -26,13 +26,16 @@ namespace {
 
 constexpr wchar_t kWindowClass[] = L"KasumiApplicationWindow";
 constexpr wchar_t kWindowTitle[] = L"Music Storm";
-constexpr int kWindowWidth = 1080;
-constexpr int kWindowHeight = 720;
 constexpr int kApplicationIconResource = 101;
 #if defined(KASUMI_WINDOW_DECORATIONS)
 constexpr bool kWindowDecorations = KASUMI_WINDOW_DECORATIONS != 0;
 #else
 constexpr bool kWindowDecorations = true;
+#endif
+#if defined(KASUMI_WINDOW_RESIZABLE)
+constexpr bool kWindowResizable = KASUMI_WINDOW_RESIZABLE != 0;
+#else
+constexpr bool kWindowResizable = true;
 #endif
 
 HICON LoadApplicationIcon(HINSTANCE instance, int width, int height) {
@@ -155,6 +158,62 @@ std::vector<std::string> ConfiguredHttpOrigins() {
   return ConfiguredValues(KASUMI_HTTP_ALLOWED_ORIGINS);
 }
 
+std::string ConfiguredWindowBackgroundColor() {
+#if defined(KASUMI_WINDOW_BACKGROUND_COLOR)
+  return "#" KASUMI_WINDOW_BACKGROUND_COLOR;
+#else
+  return {};
+#endif
+}
+
+int ConfiguredWindowWidth() {
+#if defined(KASUMI_WINDOW_WIDTH)
+  return KASUMI_WINDOW_WIDTH > 0 ? KASUMI_WINDOW_WIDTH : 1080;
+#else
+  return 1080;
+#endif
+}
+
+int ConfiguredWindowHeight() {
+#if defined(KASUMI_WINDOW_HEIGHT)
+  return KASUMI_WINDOW_HEIGHT > 0 ? KASUMI_WINDOW_HEIGHT : 720;
+#else
+  return 720;
+#endif
+}
+
+int ConfiguredWindowMinWidth() {
+#if defined(KASUMI_WINDOW_MIN_WIDTH)
+  return KASUMI_WINDOW_MIN_WIDTH > 0 ? KASUMI_WINDOW_MIN_WIDTH : 320;
+#else
+  return 320;
+#endif
+}
+
+int ConfiguredWindowMinHeight() {
+#if defined(KASUMI_WINDOW_MIN_HEIGHT)
+  return KASUMI_WINDOW_MIN_HEIGHT > 0 ? KASUMI_WINDOW_MIN_HEIGHT : 240;
+#else
+  return 240;
+#endif
+}
+
+int ConfiguredWindowMaxWidth() {
+#if defined(KASUMI_WINDOW_MAX_WIDTH)
+  return KASUMI_WINDOW_MAX_WIDTH;
+#else
+  return 0;
+#endif
+}
+
+int ConfiguredWindowMaxHeight() {
+#if defined(KASUMI_WINDOW_MAX_HEIGHT)
+  return KASUMI_WINDOW_MAX_HEIGHT;
+#else
+  return 0;
+#endif
+}
+
 void ShowRuntimePrompt(HWND owner) {
   MessageBoxW(owner,
               L"Music Storm needs the Microsoft Edge WebView2 Evergreen "
@@ -168,12 +227,8 @@ void ShowRuntimePrompt(HWND owner) {
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam,
                             LPARAM lparam) {
   switch (message) {
-  case WM_GETMINMAXINFO: {
-    auto *info = reinterpret_cast<MINMAXINFO *>(lparam);
-    info->ptMinTrackSize.x = 320;
-    info->ptMinTrackSize.y = 240;
-    return 0;
-  }
+  case WM_ERASEBKGND:
+    return 1;
   case WM_CLOSE:
     DestroyWindow(window);
     return 0;
@@ -219,7 +274,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
   window_class.lpfnWndProc = WindowProc;
   window_class.lpszClassName = kWindowClass;
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  window_class.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+  window_class.hbrBackground = nullptr;
   window_class.hIcon =
       LoadApplicationIcon(instance, GetSystemMetrics(SM_CXICON),
                           GetSystemMetrics(SM_CYICON));
@@ -232,7 +287,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
 
   HWND window =
       CreateWindowExW(0, kWindowClass, kWindowTitle, WS_OVERLAPPEDWINDOW,
-                      CW_USEDEFAULT, CW_USEDEFAULT, kWindowWidth, kWindowHeight,
+                      CW_USEDEFAULT, CW_USEDEFAULT, ConfiguredWindowWidth(),
+                      ConfiguredWindowHeight(),
                       nullptr, nullptr, instance, nullptr);
   if (!window) {
     return 1;
@@ -241,7 +297,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
                reinterpret_cast<LPARAM>(window_class.hIcon));
   SendMessageW(window, WM_SETICON, ICON_SMALL,
                reinterpret_cast<LPARAM>(window_class.hIconSm));
-  if (!KSMWindowFrame::Configure(window, kWindowDecorations)) {
+  if (!KSMWindowFrame::Configure(
+          window,
+          kWindowDecorations,
+          kWindowResizable,
+          ConfiguredWindowMinWidth(),
+          ConfiguredWindowMinHeight(),
+          ConfiguredWindowMaxWidth(),
+          ConfiguredWindowMaxHeight()
+      )) {
     MessageBoxW(window, L"The application window frame could not be configured.",
                 kWindowTitle, MB_OK | MB_ICONERROR);
     DestroyWindow(window);
@@ -338,7 +402,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
  web_root, webview_data, smoke_test, web_resources, start_url, dev_mode,
  KASUMI_APP_VERSION, ConfiguredCommands(), kWindowDecorations,
  std::vector<std::shared_ptr<KSMPlugin>>{std::make_shared<MusicStormPlugin>()},
- ConfiguredPermissions(), ConfiguredHttpOrigins()));
+ ConfiguredPermissions(), ConfiguredHttpOrigins(),
+ ConfiguredWindowBackgroundColor()));
 
   if (!host->Initialize(
           [window, smoke_test](bool success, const std::string &error) {

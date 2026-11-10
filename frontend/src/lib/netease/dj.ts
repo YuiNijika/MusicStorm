@@ -1,4 +1,5 @@
 import { NETEASE_PATHS, neteaseRequest } from "@/lib/netease/client"
+import { neteaseCoverUrl } from "@/lib/netease/cover-url"
 import { mapNeteaseSongToTrack, type NeteaseSong } from "@/lib/netease/map-track"
 import type { Radio, RadioProgram, Track } from "@/lib/types"
 
@@ -68,11 +69,10 @@ function mapRadio(item: DjRadioRaw): Radio | null {
     if (item.id == null) {
         return null
     }
-    const cover = item.picUrl ? `${item.picUrl}?param=480y480` : ""
     return {
         id: String(item.id),
         title: item.name?.trim() || "未知电台",
-        coverUrl: cover,
+        coverUrl: neteaseCoverUrl(item.picUrl, 480),
         description: item.desc?.trim() || item.lastProgramName,
         programCount: item.programCount,
         djName: item.dj?.nickname || item.dj?.brand,
@@ -87,7 +87,7 @@ function programCover(program: DjProgramRaw): string {
         program.radio?.picUrl ||
         program.mainSong?.album?.picUrl ||
         ""
-    return cover ? `${cover}?param=480y480` : ""
+    return neteaseCoverUrl(cover, 480)
 }
 
 function mapProgramToTrack(

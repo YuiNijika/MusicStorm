@@ -19,6 +19,15 @@
     "commands": "all",
     "permissions": "all",
     "decorations": false,
+    "window": {
+      "width": 1280,
+      "height": 800,
+      "minWidth": 0,
+      "minHeight": 0,
+      "maxWidth": 0,
+      "maxHeight": 0,
+      "backgroundColor": "#0B0B0D"
+    },
     "http": {
       "allowedOrigins": [
         "https://api.github.com",
@@ -37,10 +46,20 @@
         "https://i1.hdslb.com",
         "https://i2.hdslb.com",
         "https://i3.hdslb.com",
+        "https://i4.hdslb.com",
+        "https://archive.biliimg.com",
+        "https://i0.biliimg.com",
+        "https://i1.biliimg.com",
+        "https://i2.biliimg.com",
+        "https://i3.biliimg.com",
         "https://p1.music.126.net",
         "https://p2.music.126.net",
         "https://p3.music.126.net",
-        "https://p4.music.126.net"
+        "https://p4.music.126.net",
+        "https://p5.music.126.net",
+        "https://p6.music.126.net",
+        "https://p7.music.126.net",
+        "https://p8.music.126.net"
       ]
     }
   },
@@ -67,10 +86,20 @@
         "https://i1.hdslb.com",
         "https://i2.hdslb.com",
         "https://i3.hdslb.com",
+        "https://i4.hdslb.com",
+        "https://archive.biliimg.com",
+        "https://i0.biliimg.com",
+        "https://i1.biliimg.com",
+        "https://i2.biliimg.com",
+        "https://i3.biliimg.com",
         "https://p1.music.126.net",
         "https://p2.music.126.net",
         "https://p3.music.126.net",
-        "https://p4.music.126.net"
+        "https://p4.music.126.net",
+        "https://p5.music.126.net",
+        "https://p6.music.126.net",
+        "https://p7.music.126.net",
+        "https://p8.music.126.net"
       ]
     },
     "webview": {
