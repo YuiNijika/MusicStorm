@@ -108,7 +108,7 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
             className={cn(
                 "group/toast pointer-events-auto relative w-full origin-bottom",
                 "rounded-2xl border border-foreground/10 bg-popover text-popover-foreground shadow-lg outline-none",
-                "backdrop-blur-xl",
+                "backdrop-blur-[var(--glass-blur)]",
                 // 入场/退场动画在 Style.css：[data-slot="toast"] 材质化入场，
                 // data-limited 走对称退场，由 Base UI 等 transition 结束再卸载
                 className,
@@ -203,11 +203,11 @@ function ToastIcon({ type }: { type: string | undefined }) {
     let icon: React.ReactNode = null
 
     if (type === "success") {
-        icon = <CircleCheckIcon className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+        icon = <CircleCheckIcon className="text-success" aria-hidden="true" />
     } else if (type === "info") {
-        icon = <InfoIcon className="text-sky-600 dark:text-sky-400" aria-hidden="true" />
+        icon = <InfoIcon className="text-info" aria-hidden="true" />
     } else if (type === "warning") {
-        icon = <TriangleAlertIcon className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        icon = <TriangleAlertIcon className="text-warning" aria-hidden="true" />
     } else if (type === "error") {
         icon = <OctagonXIcon className="text-destructive" aria-hidden="true" />
     } else if (type === "loading") {
@@ -216,7 +216,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
 
     if (!icon) {
         // 未指定类型时回退 info 图标，避免呈现成无图标的 Default 观感
-        icon = <InfoIcon className="text-sky-600 dark:text-sky-400" aria-hidden="true" />
+        icon = <InfoIcon className="text-info" aria-hidden="true" />
     }
 
     return (

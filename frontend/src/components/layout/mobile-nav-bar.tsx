@@ -498,7 +498,7 @@ function SegmentedTabs({
                         className={cn(
                             // min-h-10 保证触控热区 ≥40px
                             "relative z-[1] flex min-h-10 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 sm:gap-1.5 sm:px-3",
-                            "text-[12px] font-medium transition-colors duration-200 sm:text-[13px]",
+                            "text-[12px] font-medium transition-colors duration-(--duration-hover) sm:text-[13px]",
                             isActive
                                 ? "text-foreground"
                                 : "text-foreground/55 hover:text-foreground/75",

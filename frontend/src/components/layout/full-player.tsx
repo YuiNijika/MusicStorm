@@ -1,11 +1,13 @@
 import {
     AudioLines,
+    Captions,
     ChevronDown,
     Heart,
     LayoutTemplate,
     MessageCircle,
     MoreHorizontal,
     Pause,
+    PictureInPicture2,
     Play,
     Repeat,
     Repeat1,
@@ -31,6 +33,7 @@ import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { bilibiliImageReferrerPolicy } from "@/lib/bilibili/image"
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
+import { useDesktopLyric } from "@/hooks/use-desktop-lyric"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
     DropdownMenu,
@@ -44,6 +47,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { useLiked } from "@/hooks/use-liked"
+import { useMiniPlayer } from "@/hooks/use-mini-player"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
@@ -82,7 +86,7 @@ import {
     recordPointerSample,
     type PointerSample,
 } from "@/lib/motion/gesture-spring"
-import { isAndroid } from "@/lib/platform"
+import { isAndroid, isTauriRuntime } from "@/lib/platform"
 import { isShareableTrack } from "@/lib/share/share"
 import type { MusicSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -957,7 +961,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                                         alt={displayTrack.title}
                                                         size="xl"
                                                         className={cn(
-                                                            "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                                            "rounded-[32px] shadow-[var(--shadow-cover)]",
                                                             "ring-1 ring-white/20 dark:ring-white/10",
                                                             isPlaying &&
                                                             "animate-[cover-breathe_6s_ease-in-out_infinite]",
@@ -996,7 +1000,7 @@ function FullPlayer({ open, onClose }: FullPlayerProps) {
                                                 alt={displayTrack.title}
                                                 size="xl"
                                                 className={cn(
-                                                    "rounded-[32px] shadow-[0_28px_72px_rgba(15,23,42,0.3)]",
+                                                    "rounded-[32px] shadow-[var(--shadow-cover)]",
                                                     "ring-1 ring-white/20 dark:ring-white/10",
                                                     isPlaying &&
                                                     "animate-[cover-breathe_6s_ease-in-out_infinite]",
@@ -1108,6 +1112,9 @@ const TransportBar = memo(function TransportBar({
     canShowShare: boolean
 }) {
     const isMobile = useIsMobile()
+    const miniPlayer = useMiniPlayer()
+    const desktopLyric = useDesktopLyric()
+    const canUseDesktopWindows = isTauriRuntime() && !isAndroid()
     return (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="flex items-center justify-start">
@@ -1116,6 +1123,8 @@ const TransportBar = memo(function TransportBar({
                         <IconBtn
                             title={liked ? "取消喜欢" : "喜欢"}
                             active={liked}
+                            activeClassName="text-destructive"
+                            pressed={liked}
                             onClick={onToggleLike}
                         >
                             <Heart
@@ -1195,7 +1204,7 @@ const TransportBar = memo(function TransportBar({
                         <Popover>
                             <PopoverTrigger
                                 className={cn(
-                                    "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                                    "flex size-10 max-md:size-11 cursor-pointer items-center justify-center rounded-full",
                                     "text-muted-foreground transition-[color,background-color,transform]",
                                     "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
                                     "active:duration-[var(--duration-press)]",
@@ -1211,6 +1220,25 @@ const TransportBar = memo(function TransportBar({
                                 className="w-[min(88vw,340px)] max-h-[70dvh] gap-3 overflow-y-auto p-3.5"
                             >
                                 <div className="space-y-4">
+                                    {canUseDesktopWindows ? (
+                                        <div className="space-y-1">
+                                            <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                                桌面窗口
+                                            </p>
+                                            <DesktopWindowToggle
+                                                title="桌面小播放器"
+                                                icon={<PictureInPicture2 className="size-4" />}
+                                                active={miniPlayer.isVisible}
+                                                onClick={() => void miniPlayer.toggle()}
+                                            />
+                                            <DesktopWindowToggle
+                                                title="桌面歌词"
+                                                icon={<Captions className="size-4" />}
+                                                active={desktopLyric.isVisible}
+                                                onClick={() => void desktopLyric.toggle()}
+                                            />
+                                        </div>
+                                    ) : null}
                                     <VolumeElasticSlider
                                         volume={volume}
                                         muted={isMuted}
@@ -1279,6 +1307,34 @@ const TransportBar = memo(function TransportBar({
                     </>
                 ) : (
                     <>
+                        {canUseDesktopWindows ? (
+                            <>
+                                <IconBtn
+                                    title={
+                                        miniPlayer.isVisible
+                                            ? "关闭桌面小播放器"
+                                            : "打开桌面小播放器"
+                                    }
+                                    active={miniPlayer.isVisible}
+                                    pressed={miniPlayer.isVisible}
+                                    onClick={() => void miniPlayer.toggle()}
+                                >
+                                    <PictureInPicture2 className="size-4" />
+                                </IconBtn>
+                                <IconBtn
+                                    title={
+                                        desktopLyric.isVisible
+                                            ? "关闭桌面歌词"
+                                            : "打开桌面歌词"
+                                    }
+                                    active={desktopLyric.isVisible}
+                                    pressed={desktopLyric.isVisible}
+                                    onClick={() => void desktopLyric.toggle()}
+                                >
+                                    <Captions className="size-4" />
+                                </IconBtn>
+                            </>
+                        ) : null}
                         <Popover>
                             <PopoverTrigger
                                 className={cn(
@@ -1384,27 +1440,78 @@ function IconBtn({
     title,
     onClick,
     active = false,
+    activeClassName = "bg-[var(--surface-fill)] text-primary",
+    pressed,
 }: {
     children: ReactNode
     title: string
     onClick: () => void
     active?: boolean
+    activeClassName?: string
+    pressed?: boolean
 }) {
     return (
         <button
             type="button"
             title={title}
             aria-label={title}
+            aria-pressed={pressed}
             onClick={onClick}
             className={cn(
-                "flex size-10 cursor-pointer items-center justify-center rounded-full",
+                "flex size-10 max-md:size-11 cursor-pointer items-center justify-center rounded-full",
                 "text-muted-foreground transition-[color,background-color,transform]",
                 "hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96]",
                 "active:duration-[var(--duration-press)]",
-                active && "text-rose-600 dark:text-rose-300",
+                active && activeClassName,
             )}
         >
             {children}
+        </button>
+    )
+}
+
+function DesktopWindowToggle({
+    title,
+    icon,
+    active,
+    onClick,
+}: {
+    title: string
+    icon: ReactNode
+    active: boolean
+    onClick: () => void
+}) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            className={cn(
+                "flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium transition-colors",
+                active
+                    ? "bg-[var(--surface-fill)] text-foreground"
+                    : "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
+            )}
+            aria-checked={active}
+            onClick={onClick}
+        >
+            <span className="flex items-center gap-2">
+                {icon}
+                {title}
+            </span>
+            <span
+                className={cn(
+                    "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                    active ? "bg-primary" : "bg-foreground/15",
+                )}
+                aria-hidden
+            >
+                <span
+                    className={cn(
+                        "absolute top-0.5 size-4 rounded-full bg-background shadow-sm transition-transform",
+                        active ? "translate-x-[18px]" : "translate-x-0.5",
+                    )}
+                />
+            </span>
         </button>
     )
 }

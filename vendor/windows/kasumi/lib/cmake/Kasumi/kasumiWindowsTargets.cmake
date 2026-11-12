@@ -62,7 +62,7 @@ set_target_properties(Kasumi::kasumi_windows_bridge PROPERTIES
   INTERFACE_COMPILE_DEFINITIONS "UNICODE;_UNICODE;KASUMI_ENABLE_SMOKE_TEST=\$<BOOL:OFF>"
   INTERFACE_COMPILE_FEATURES "cxx_std_20"
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/include"
-  INTERFACE_LINK_LIBRARIES "nlohmann_json::nlohmann_json;unofficial::sqlite3::sqlite3;comdlg32;comctl32;odbc32;ole32;shell32;shlwapi;user32;winmm;winhttp;dnsapi;unofficial::webview2::webview2"
+  INTERFACE_LINK_LIBRARIES "nlohmann_json::nlohmann_json;unofficial::sqlite3::sqlite3;comdlg32;comctl32;gdi32;msimg32;odbc32;ole32;shell32;shlwapi;user32;winmm;winhttp;dnsapi;unofficial::webview2::webview2"
 )
 
 # Load information for each installed configuration.

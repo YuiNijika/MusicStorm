@@ -91,7 +91,7 @@ function SegmentedControl({
                         onClick={() => onChange(item.id)}
                         className={cn(
                             "relative z-[1] cursor-pointer whitespace-nowrap rounded-full px-3.5 py-1.5",
-                            "text-[13px] font-medium transition-colors duration-150",
+                            "text-[13px] font-medium transition-colors duration-(--duration-control)",
                             "active:scale-[0.97]",
                             active
                                 ? "text-foreground"

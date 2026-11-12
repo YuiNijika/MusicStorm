@@ -21,10 +21,10 @@ const SourceBadge = memo(function SourceBadge({ source, className }: SourceBadge
             className={cn(
                 "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
                 source === "netease"
-                    ? "bg-rose-500/12 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300"
+                    ? "bg-[color-mix(in_srgb,var(--brand-netease)_14%,transparent)] text-[var(--brand-netease-strong)] dark:bg-[color-mix(in_srgb,var(--brand-netease)_18%,transparent)] dark:text-[var(--brand-netease-soft)]"
                     : source === "bilibili"
                         ? "bg-[color-mix(in_srgb,var(--brand-bilibili)_14%,transparent)] text-[var(--brand-bilibili-strong)] dark:bg-[color-mix(in_srgb,var(--brand-bilibili)_18%,transparent)] dark:text-[var(--brand-bilibili-soft)]"
-                        : "bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
+                        : "bg-muted text-muted-foreground",
                 className,
             )}
         >

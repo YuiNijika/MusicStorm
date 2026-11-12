@@ -394,9 +394,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
   }
 #endif
 
-  ShowWindow(window, smoke_test ? SW_SHOWNOACTIVATE : show_command);
-  UpdateWindow(window);
-
  auto host = std::unique_ptr<KSMWebView2Host>(new KSMWebView2Host(
  window, file_system, ConfiguredShellOrigins(),
  web_root, webview_data, smoke_test, web_resources, start_url, dev_mode,
@@ -405,8 +402,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
  ConfiguredPermissions(), ConfiguredHttpOrigins(),
  ConfiguredWindowBackgroundColor()));
 
+  KSMWebView2Host *host_pointer = host.get();
   if (!host->Initialize(
-          [window, smoke_test](bool success, const std::string &error) {
+          [window, smoke_test, show_command, host_pointer](
+              bool success,
+              const std::string &error
+          ) {
             if (success) {
               if (smoke_test) {
                 ShowWindow(window, SW_HIDE);
@@ -417,15 +418,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
               PostQuitMessage(1);
               return;
             }
-            const std::wstring message = ToWide(error);
+            ShowWindow(window, show_command);
+            UpdateWindow(window);
+            std::wstring message = ToWide(error);
+            const std::wstring log_path =
+                ToWide(host_pointer->last_log_path());
+            if (!log_path.empty()) {
+              message += L"\n\n日志文件:\n" + log_path;
+            }
             MessageBoxW(window, message.c_str(), kWindowTitle,
                         MB_OK | MB_ICONERROR);
-            PostMessageW(window, WM_CLOSE, 0, 0);
           })) {
-    host.reset();
-    DestroyWindow(window);
-    return 1;
+    if (!smoke_test) {
+      ShowWindow(window, show_command);
+      UpdateWindow(window);
+    } else {
+      host.reset();
+      DestroyWindow(window);
+      return 1;
+    }
   }
+
+  ShowWindow(window, smoke_test ? SW_SHOWNOACTIVATE : show_command);
+  UpdateWindow(window);
 
   MSG message{};
   while (GetMessageW(&message, nullptr, 0, 0) > 0) {

@@ -247,7 +247,7 @@ function FeedbackForm({ replyTo, onCancelReply, onCreated }: {
                     <CircleAlert className="size-4 shrink-0" aria-hidden="true" />{error}
                 </p> : null}
                 {notice ? <p>
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />{notice}
+                    <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true" />{notice}
                 </p> : null}
             </div>
         </form>

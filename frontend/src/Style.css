@@ -6,6 +6,7 @@
     --separator: rgb(60 60 67 / 18%);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 5%), 0 8px 24px rgb(0 0 0 / 8%);
     --shadow-float: 0 12px 36px rgb(0 0 0 / 14%), 0 2px 8px rgb(0 0 0 / 8%);
+    --shadow-cover: 0 24px 64px rgb(15 23 42 / 26%);
     --glass-bg: color-mix(in oklab, white 66%, transparent);
     --glass-bg-strong: color-mix(in oklab, white 82%, transparent);
     --glass-border: rgb(255 255 255 / 46%);
@@ -14,6 +15,14 @@
     --glass-blur: 24px;
     --glass-opacity: 0.66;
     --accent-hue: 250;
+    --overlay: rgb(0 0 0 / 36%);
+    --overlay-soft: rgb(0 0 0 / 18%);
+    --touch-target: 2.75rem;
+    --success: oklch(0.58 0.16 155);
+    --success-foreground: oklch(0.99 0 0);
+    --info: oklch(0.58 0.15 245);
+    --warning: oklch(0.66 0.15 72);
+    --warning-foreground: oklch(0.2 0.03 72);
     --scrollbar-thumb: rgb(60 60 67 / 24%);
     --scrollbar-thumb-hover: rgb(60 60 67 / 40%);
 
@@ -39,12 +48,22 @@
     --separator: rgb(84 84 88 / 65%);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 26%);
     --shadow-float: 0 16px 44px rgb(0 0 0 / 48%), 0 2px 10px rgb(0 0 0 / 30%);
+    --shadow-cover: 0 28px 72px rgb(0 0 0 / 48%);
     --glass-bg: color-mix(in oklab, oklch(0.22 0.005 260) 68%, transparent);
     --glass-bg-strong: color-mix(in oklab, oklch(0.25 0.005 260) 82%, transparent);
     --glass-border: rgb(255 255 255 / 10%);
     --glass-highlight: rgb(255 255 255 / 9%);
     --glass-shadow: 0 12px 38px rgb(0 0 0 / 34%), 0 1px 0 rgb(255 255 255 / 8%) inset;
     --glass-surface: oklch(0.235 0.005 260 / 72%);
+    --brand-netease-strong: #ff8c8c;
+    --brand-netease-soft: #ffb3b3;
+    --overlay: rgb(0 0 0 / 58%);
+    --overlay-soft: rgb(0 0 0 / 34%);
+    --success: oklch(0.76 0.15 155);
+    --success-foreground: oklch(0.18 0.04 155);
+    --info: oklch(0.76 0.13 245);
+    --warning: oklch(0.8 0.15 78);
+    --warning-foreground: oklch(0.22 0.04 78);
     --scrollbar-thumb: rgb(235 235 245 / 24%);
     --scrollbar-thumb-hover: rgb(235 235 245 / 40%);
 }
@@ -52,8 +71,11 @@
 @layer base {
     html {
         font-family: var(--font-sans), sans-serif;
+        accent-color: var(--primary);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        text-size-adjust: 100%;
+        -webkit-text-size-adjust: 100%;
         scrollbar-width: thin;
         scrollbar-color: var(--scrollbar-thumb) transparent;
     }
@@ -71,6 +93,7 @@
             radial-gradient(120% 90% at 100% 110%, var(--theme-glow-secondary), transparent 56%),
             var(--background);
         font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+        font-optical-sizing: auto;
         text-rendering: optimizeLegibility;
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
@@ -137,12 +160,24 @@
     }
 
     :where(button, a, input, textarea, select, [role="button"]):focus-visible {
-        outline: 3px solid color-mix(in oklab, var(--ring) 34%, transparent);
-        outline-offset: 2px;
+        outline: 2px solid var(--ring);
+        outline-offset: 3px;
     }
 
     #root {
         min-height: 100vh;
+    }
+
+    :where(h1, h2, h3) {
+        text-wrap: balance;
+    }
+
+    :where(p, li) {
+        text-wrap: pretty;
+    }
+
+    :where(input, textarea) {
+        caret-color: var(--primary);
     }
 
     button,
@@ -1188,5 +1223,78 @@ html.glass-disabled .material-segmented {
     }
     to {
         transform: translateX(-50%);
+    }
+}
+
+/* shadcn/Base UI 浮层统一材质降级：减少透明度时不保留每帧 backdrop 重采样 */
+@media (prefers-reduced-transparency: reduce) {
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="popover-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="context-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="toast"] {
+        background: var(--popover) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    [data-slot="dialog-overlay"],
+    [data-slot="alert-dialog-overlay"],
+    [data-slot="sheet-overlay"],
+    [data-slot="drawer-overlay"] {
+        background: var(--overlay) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+}
+
+/* 粗指针设备：菜单项与关闭按钮补足可触控热区，视觉尺寸不变 */
+@media (pointer: coarse) {
+    [data-slot="dropdown-menu-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="select-item"] {
+        min-height: var(--touch-target);
+    }
+
+    [data-slot="dialog-close"],
+    [data-slot="sheet-close"],
+    [data-slot="toast-close"] {
+        min-width: var(--touch-target);
+        min-height: var(--touch-target);
+    }
+
+    .ms-elastic-slider__root {
+        padding-block: 1.15rem;
+    }
+}
+
+/* 高对比度偏好：不提升整体饱和度，只强化焦点、边界和浮层分隔 */
+@media (prefers-contrast: more) {
+    :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+        outline-width: 3px;
+    }
+
+    :where(
+        [data-slot="dialog-content"],
+        [data-slot="alert-dialog-content"],
+        [data-slot="sheet-content"],
+        [data-slot="popover-content"],
+        [data-slot="dropdown-menu-content"],
+        [data-slot="context-menu-content"],
+        [data-slot="select-content"]
+    ) {
+        border-color: color-mix(in oklab, var(--foreground) 48%, var(--border));
+    }
+
+    :where(
+        [data-slot="dropdown-menu-item"],
+        [data-slot="context-menu-item"],
+        [data-slot="select-item"]
+    ):focus {
+        outline: 2px solid var(--ring);
+        outline-offset: -2px;
     }
 }

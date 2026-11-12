@@ -945,7 +945,7 @@ function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                         </div>
                     )}
                     {cookieError ? (
-                        <p role="alert" aria-live="polite" className="text-[12px] text-rose-600 dark:text-rose-300">
+                        <p role="alert" aria-live="polite" className="text-[12px] text-destructive">
                             {cookieError}
                         </p>
                     ) : null}

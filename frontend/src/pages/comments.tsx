@@ -457,7 +457,7 @@ function CommentsPage({ trackId, title, subtitle, onBack }: CommentsPageProps) {
                     ) : null}
                     {stats && stats.likedCount > 0 ? (
                         <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
-                            <Heart className="size-3 text-rose-500" />
+                            <Heart className="size-3 text-destructive" />
                             收藏 {formatCount(stats.likedCount)}
                         </span>
                     ) : null}

@@ -280,7 +280,7 @@ function NeteaseAccountContent({ onLogin }: { onLogin: () => void }) {
                                                         account.userId,
                                                     )
                                                 }
-                                                className="h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium text-rose-600 hover:bg-rose-500/10 disabled:opacity-40 dark:text-rose-300"
+                                                className="h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium text-destructive hover:bg-destructive/10 disabled:opacity-40"
                                             >
                                                 移除
                                             </button>

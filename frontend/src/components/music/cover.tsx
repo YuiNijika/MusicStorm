@@ -67,7 +67,7 @@ const Cover = memo(function Cover({ src, alt, size = "md", className, eager = fa
     return (
         <div
             className={cn(
-                "apple-card-shadow relative shrink-0 overflow-hidden bg-gradient-to-br from-neutral-200 to-neutral-300 ring-1 ring-foreground/10 dark:from-neutral-700 dark:to-neutral-900",
+                "apple-card-shadow relative shrink-0 overflow-hidden bg-gradient-to-br from-muted to-secondary ring-1 ring-border",
                 SIZE_CLASS[size],
                 className,
             )}

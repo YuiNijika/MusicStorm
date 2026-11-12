@@ -1526,7 +1526,7 @@ function BulkActionBar({
                     type="button"
                     disabled={count === 0}
                     onClick={onDelete}
-                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     <Trash2 className="size-3.5" />
                     删除
@@ -1534,7 +1534,7 @@ function BulkActionBar({
                 <button
                     type="button"
                     onClick={onDone}
-                    className="h-8 cursor-pointer rounded-full bg-foreground px-3.5 text-[12px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.97] active:duration-[var(--duration-press)]"
+                    className="h-8 cursor-pointer rounded-full bg-primary px-3.5 text-[12px] font-medium text-primary-foreground transition-[transform,opacity] hover:bg-primary/90 active:scale-[0.97] active:duration-[var(--duration-press)]"
                 >
                     完成
                 </button>

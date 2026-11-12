@@ -99,8 +99,8 @@ const QueuePanel = memo(function QueuePanel() {
                     aria-label="播放队列"
                     className={cn(
                         "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
-                        // 移动端（全屏播放器内）触控目标放大
-                        "max-md:size-10",
+                        // 移动端（全屏播放器内）触控目标满足 44px
+                        "max-md:size-11",
                         "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                         "disabled:pointer-events-none disabled:opacity-40",
                     )}

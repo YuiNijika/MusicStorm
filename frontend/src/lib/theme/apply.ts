@@ -77,6 +77,7 @@ function setPalette(input: {
     set("--accent", palette.accent)
     set("--accent-foreground", palette.foreground)
     set("--destructive", palette.destructive)
+    set("--destructive-foreground", palette.destructiveForeground)
     set("--border", palette.border)
     set("--input", palette.input)
     set("--ring", ring)

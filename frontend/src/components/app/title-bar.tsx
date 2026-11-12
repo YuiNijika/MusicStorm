@@ -452,9 +452,9 @@ function TitleText({
                         }}
                         className={cn(
                             "shrink-0 cursor-pointer rounded-full px-1.5 py-px",
-                            "bg-rose-500/90 text-[10px] font-semibold uppercase tracking-[0.04em] text-white",
+                            "bg-primary text-[10px] font-semibold uppercase tracking-[0.04em] text-primary-foreground",
                             "shadow-sm transition-transform duration-[var(--duration-press)] active:scale-[0.96]",
-                            "hover:bg-rose-500",
+                            "hover:bg-primary/90",
                         )}
                     >
                         new

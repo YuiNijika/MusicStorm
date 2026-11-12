@@ -75,9 +75,9 @@ const FONT_PRESETS: FontPreset[] = [
 ]
 
 const DEFAULT_FONT_PREFS: FontPrefs = {
- customFamily: "MusicStorm PingFang",
- fontUrl: "/fonts/PingFang-Medium-SC.ttf",
- followThemeFont: false,
+ customFamily: "",
+ fontUrl: "",
+ followThemeFont: true,
 }
 
 function sanitizeFamily(value: string): string {
@@ -173,6 +173,9 @@ function applyFontToDom(input: {
  const root = document.documentElement
  const family = resolveFontFamily(input.prefs, input.themeFontFamily)
  root.style.setProperty("--font-sans", family)
+ root.style.setProperty("--font-heading", family)
+ root.style.setProperty("--font-display", family)
+ root.style.setProperty("--font-body", family)
 
  const customFamily = sanitizeFamily(input.prefs.customFamily)
  const fontUrl = sanitizeFontUrl(input.prefs.fontUrl)

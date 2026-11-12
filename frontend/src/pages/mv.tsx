@@ -203,7 +203,7 @@ function MvPage({ mvId, onBack }: MvPageProps) {
                     <div
                         className={cn(
                             "relative overflow-hidden rounded-[22px]",
-                            "bg-black shadow-[0_20px_48px_rgba(0,0,0,0.35)]",
+                            "bg-black shadow-[var(--shadow-cover)]",
                             "ring-1 ring-white/10",
                         )}
                     >

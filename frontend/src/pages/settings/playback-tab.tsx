@@ -370,7 +370,7 @@ function PlaybackTab() {
                             className={cn(
                                 "rounded-full px-2.5 py-1 text-[13px] font-medium",
                                 ffmpegStatus?.available
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                    ? "bg-success/10 text-success"
                                     : "bg-[var(--surface-fill)] text-muted-foreground",
                             )}
                         >

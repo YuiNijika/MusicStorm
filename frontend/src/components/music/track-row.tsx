@@ -603,7 +603,7 @@ const isBilibili = track.source === "bilibili"
                         "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full",
                         "text-muted-foreground opacity-70 transition-opacity hover:opacity-100",
                         "group-hover:opacity-100",
-                        liked && "text-rose-500 opacity-100",
+                        liked && "text-destructive opacity-100",
                     )}
                 >
                     <Heart
@@ -831,7 +831,7 @@ const isBilibili = track.source === "bilibili"
                     <ContextMenuItem onClick={(event) => void handleLike(event)}>
                         <Heart
                             className={cn(
-                                liked && "fill-current text-rose-500",
+                                liked && "fill-current text-destructive",
                             )}
                         />
                         {liked ? "取消喜欢" : "喜欢"}

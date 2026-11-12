@@ -1,7 +1,9 @@
 import {
+    Captions,
     Heart,
     MessageCircle,
     Pause,
+    PictureInPicture2,
     Play,
     Repeat,
     Repeat1,
@@ -19,12 +21,15 @@ import { SpeedPopover } from "@/components/music/speed-popover"
 import { VolumeElasticSlider } from "@/components/music/volume-elastic-slider"
 import { Button } from "@/components/ui/button"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useDesktopLyric } from "@/hooks/use-desktop-lyric"
 import { useLiked } from "@/hooks/use-liked"
+import { useMiniPlayer } from "@/hooks/use-mini-player"
 import { useMusicNavigation } from "@/hooks/use-music-navigation"
 import { SourceBadge } from "@/components/music/source-badge"
 import { useNeteaseSession } from "@/hooks/use-netease-session"
 import { usePlayer } from "@/hooks/use-player"
 import { resolveTrackCoverUrl } from "@/lib/music/cover-overrides"
+import { isAndroid, isTauriRuntime } from "@/lib/platform"
 import {
     createGestureSpring,
     readPointerVelocity,
@@ -69,6 +74,9 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
     const { loggedIn } = useNeteaseSession()
     const { isTrackLiked, toggleTrackLiked } = useLiked()
     const { openArtist, openAlbum, openComments } = useMusicNavigation()
+    const miniPlayer = useMiniPlayer()
+    const desktopLyric = useDesktopLyric()
+    const canUseDesktopWindows = isTauriRuntime() && !isAndroid()
 
     const totalMs =
         durationMs > 0 ? durationMs : (currentTrack?.durationMs ?? 0)
@@ -413,6 +421,8 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                                             <ControlButton
                                                 title={liked ? "取消喜欢" : "喜欢"}
                                                 active={liked}
+                                                activeClassName="text-destructive"
+                                                pressed={liked}
                                                 onClick={() => void handleToggleLike()}
                                             >
                                                 <Heart
@@ -506,6 +516,34 @@ function PlayerBar({ onOpenFullPlayer }: PlayerBarProps) {
                             </div>
 
                             <div className="hidden items-center justify-end gap-1 md:flex">
+                                {canUseDesktopWindows ? (
+                                    <>
+                                        <ControlButton
+                                            title={
+                                                miniPlayer.isVisible
+                                                    ? "关闭桌面小播放器"
+                                                    : "打开桌面小播放器"
+                                            }
+                                            active={miniPlayer.isVisible}
+                                            pressed={miniPlayer.isVisible}
+                                            onClick={() => void miniPlayer.toggle()}
+                                        >
+                                            <PictureInPicture2 className="size-3.5" />
+                                        </ControlButton>
+                                        <ControlButton
+                                            title={
+                                                desktopLyric.isVisible
+                                                    ? "关闭桌面歌词"
+                                                    : "打开桌面歌词"
+                                            }
+                                            active={desktopLyric.isVisible}
+                                            pressed={desktopLyric.isVisible}
+                                            onClick={() => void desktopLyric.toggle()}
+                                        >
+                                            <Captions className="size-3.5" />
+                                        </ControlButton>
+                                    </>
+                                ) : null}
                                 {currentTrack?.source === "netease" && currentTrack.id ? (
                                     <ControlButton
                                         title="评论"
@@ -566,6 +604,8 @@ function ControlButton({
     title,
     onClick,
     active = false,
+    activeClassName = "bg-[var(--surface-fill)] text-primary",
+    pressed,
     disabled = false,
     className,
 }: {
@@ -573,6 +613,8 @@ function ControlButton({
     title: string
     onClick: () => void
     active?: boolean
+    activeClassName?: string
+    pressed?: boolean
     disabled?: boolean
     className?: string
 }) {
@@ -581,15 +623,16 @@ function ControlButton({
             type="button"
             title={title}
             aria-label={title}
+            aria-pressed={pressed}
             disabled={disabled}
             onClick={onClick}
             className={cn(
-                // 移动端触控目标放大到 40px，桌面保持紧凑 32px
+                // 移动端触控目标满足 44px，桌面保持紧凑 32px
                 "flex size-8 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform]",
-                "max-md:size-10",
+                "max-md:size-11",
                 "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground active:scale-[0.96] active:duration-[var(--duration-press)]",
                 "disabled:pointer-events-none disabled:opacity-40",
-                active && "text-rose-600 dark:text-rose-300",
+                active && activeClassName,
                 className,
             )}
         >

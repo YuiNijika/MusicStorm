@@ -340,7 +340,7 @@ function SearchPage() {
                     </div>
 
                     {inputFocused && !query.trim() && history.length > 0 ? (
-                        <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl border bg-popover p-1.5 shadow-md backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-(--duration-enter) ease-(--ease-enter)">
+                        <div className="absolute inset-x-0 top-full z-40 mt-2 origin-top overflow-hidden rounded-2xl border bg-popover p-1.5 shadow-md backdrop-blur-[var(--glass-blur)] animate-in fade-in-0 slide-in-from-top-1.5 zoom-in-98 duration-(--duration-enter) ease-(--ease-enter)">
                             <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                                 最近搜索
                             </p>

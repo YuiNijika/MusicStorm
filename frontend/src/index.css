@@ -29,6 +29,12 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-info: var(--info);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -67,6 +73,9 @@
     --brand-bilibili: #fb7299;
     --brand-bilibili-strong: #c43d69;
     --brand-bilibili-soft: #ff9cba;
+    --brand-netease: #ec4141;
+    --brand-netease-strong: #b82424;
+    --brand-netease-soft: #ff8c8c;
     line-height: 1.6;
 }
 

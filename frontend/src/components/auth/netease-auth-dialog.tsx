@@ -253,16 +253,24 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                         <input
                             value={phone}
                             onChange={(event) => setPhone(event.currentTarget.value)}
-                            placeholder="手机号"
+                            name="netease-phone"
+                            aria-label="网易云手机号"
+                            placeholder="手机号…"
                             inputMode="numeric"
+                            autoComplete="tel"
+                            spellCheck={false}
                             className="material-field h-10 w-full rounded-xl px-3 text-[13px] outline-none"
                         />
                         <div className="flex gap-2">
                             <input
                                 value={captcha}
                                 onChange={(event) => setCaptcha(event.currentTarget.value)}
-                                placeholder="验证码"
+                                name="netease-sms-code"
+                                aria-label="短信验证码"
+                                placeholder="验证码…"
                                 inputMode="numeric"
+                                autoComplete="one-time-code"
+                                spellCheck={false}
                                 className="material-field h-10 min-w-0 flex-1 rounded-xl px-3 text-[13px] outline-none"
                             />
                             <button
@@ -278,7 +286,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             type="button"
                             disabled={loggingIn}
                             onClick={() => void handleLogin()}
-                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
+                            className="h-10 w-full cursor-pointer rounded-full bg-primary text-[13px] font-medium text-primary-foreground transition-[transform,opacity] hover:bg-primary/90 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {loggingIn ? "登录中…" : "登录"}
                         </button>
@@ -288,15 +296,20 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                         <input
                             value={email}
                             onChange={(event) => setEmail(event.currentTarget.value)}
-                            placeholder="邮箱"
+                            name="netease-email"
+                            aria-label="网易云邮箱"
+                            placeholder="邮箱…"
                             inputMode="email"
                             autoComplete="email"
+                            spellCheck={false}
                             className="material-field h-10 w-full rounded-xl px-3 text-[13px] outline-none"
                         />
                         <input
                             value={password}
                             onChange={(event) => setPassword(event.currentTarget.value)}
-                            placeholder="密码"
+                            name="netease-password"
+                            aria-label="网易云密码"
+                            placeholder="密码…"
                             type="password"
                             autoComplete="current-password"
                             className="material-field h-10 w-full rounded-xl px-3 text-[13px] outline-none"
@@ -305,7 +318,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                             type="button"
                             disabled={loggingIn}
                             onClick={() => void handleEmailLogin()}
-                            className="h-10 w-full cursor-pointer rounded-full bg-foreground text-[13px] font-medium text-background transition-[transform,opacity] hover:opacity-92 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
+                            className="h-10 w-full cursor-pointer rounded-full bg-primary text-[13px] font-medium text-primary-foreground transition-[transform,opacity] hover:bg-primary/90 active:scale-[0.98] active:duration-[var(--duration-press)] disabled:opacity-50"
                         >
                             {loggingIn ? "登录中…" : "登录"}
                         </button>
@@ -377,7 +390,7 @@ function NeteaseAuthDialog({ open, onOpenChange }: NeteaseAuthDialogProps) {
                 )}
 
                 {error ? (
-                    <p className="text-[12px] text-rose-600 dark:text-rose-300">{error}</p>
+                    <p className="text-[12px] text-destructive">{error}</p>
                 ) : null}
 
                 <button

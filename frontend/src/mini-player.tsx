@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core"
 import { emit, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react"
 import { createRoot } from "react-dom/client"
 
 import { useCachedCoverUrl } from "@/hooks/use-cached-cover-url"
@@ -125,6 +132,30 @@ function MiniPlayerApp() {
     sendPlayerCommand("seek-to", Math.round(ratio * state.durationMs))
   }
 
+  function handleSeekKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (state.durationMs <= 0) {
+      return
+    }
+    const step = 5_000
+    let next = state.positionMs
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+      next -= step
+    } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+      next += step
+    } else if (event.key === "Home") {
+      next = 0
+    } else if (event.key === "End") {
+      next = state.durationMs
+    } else {
+      return
+    }
+    event.preventDefault()
+    sendPlayerCommand(
+      "seek-to",
+      Math.min(state.durationMs, Math.max(0, next)),
+    )
+  }
+
   const progress =
     state.durationMs > 0
       ? Math.min(100, (state.positionMs / state.durationMs) * 100)
@@ -150,7 +181,9 @@ function MiniPlayerApp() {
         {coverSrc && !coverFailed ? (
           <img
             src={coverSrc}
-            alt=""
+            alt={state.title ? `${state.title} 封面` : ""}
+            width="72"
+            height="72"
             referrerPolicy={bilibiliImageReferrerPolicy(state.coverUrl ?? "")}
             draggable={false}
             onError={() => {
@@ -221,7 +254,15 @@ function MiniPlayerApp() {
           </span>
           <div
             ref={barRef}
+            role="slider"
+            tabIndex={state.durationMs > 0 ? 0 : -1}
+            aria-label="播放进度"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(state.durationMs)}
+            aria-valuenow={Math.round(state.positionMs)}
+            aria-valuetext={`${formatTime(state.positionMs)} / ${formatTime(state.durationMs)}`}
             onClick={handleSeek}
+            onKeyDown={handleSeekKeyDown}
             style={{
               flex: 1,
               height: "12px",
@@ -314,7 +355,7 @@ function MiniPlayerApp() {
           onClick={() => {
             void invoke("hide_mini_player").catch(() => { })
           }}
-          style={{ ...controlButtonStyle, width: "20px", height: "20px" }}
+          style={{ ...controlButtonStyle, width: "24px", height: "24px" }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="rgba(255, 255, 255, 0.6)">
             <path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z" />

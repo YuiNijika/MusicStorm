@@ -312,7 +312,7 @@ function EqEditor({ compact = false, trackId = null }: EqEditorProps) {
                                     type="button"
                                     disabled={!eq.enabled}
                                     onClick={handleDelete}
-                                    className="h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-rose-600 disabled:opacity-40"
+                                    className="h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-fill)] hover:text-destructive disabled:opacity-40"
                                 >
                                     删除
                                 </button>

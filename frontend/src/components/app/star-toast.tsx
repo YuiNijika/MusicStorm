@@ -60,7 +60,7 @@ function StarToast() {
             role="status"
             className={cn(
                 "pointer-events-auto fixed bottom-8 left-1/2 z-[210] w-[min(92vw,440px)] -translate-x-1/2",
-                "rounded-2xl border border-foreground/10 bg-popover text-popover-foreground shadow-lg backdrop-blur-xl",
+                "rounded-2xl border border-border/70 bg-popover text-popover-foreground shadow-lg backdrop-blur-[var(--glass-blur)]",
                 "p-4",
             )}
         >
@@ -80,9 +80,10 @@ function StarToast() {
                 </div>
                 <button
                     type="button"
+                    data-slot="toast-close"
                     aria-label="关闭"
                     onClick={dismiss}
-                    className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-4" aria-hidden="true" />
                 </button>

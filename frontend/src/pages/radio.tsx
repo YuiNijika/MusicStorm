@@ -182,7 +182,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                             className={cn(
                                                 "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
                                                 subscribed
-                                                    ? "glass-chip text-rose-600 dark:text-rose-300"
+                                                    ? "glass-chip text-destructive"
                                                     : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                             )}
                                         >
@@ -210,7 +210,7 @@ function RadioPage({ radioId, onBack }: RadioPageProps) {
                                         className={cn(
                                             "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[color,background-color,transform] active:scale-[0.97] active:duration-[var(--duration-press)] disabled:opacity-50",
                                             subscribed
-                                                ? "glass-chip text-rose-600 dark:text-rose-300"
+                                                ? "glass-chip text-destructive"
                                                 : "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
                                         )}
                                     >

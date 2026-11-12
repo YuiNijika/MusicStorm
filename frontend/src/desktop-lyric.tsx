@@ -86,7 +86,7 @@ function DesktopLyricApp() {
         >
           {line.text}
           {line.translation && index === activeIndex && (
-            <div style={{ fontSize: "12px", marginTop: "4px", opacity: 0.7 }}>
+            <div className="lyric-translation">
               {line.translation}
             </div>
           )}

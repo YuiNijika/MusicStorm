@@ -119,12 +119,13 @@ function LyricEditDialog({ track, open, onOpenChange }: LyricEditDialogProps) {
                     onChange={(event) => setText(event.currentTarget.value)}
                     disabled={loading}
                     spellCheck={false}
+                    aria-label="歌词文本"
                     placeholder={
                         loading
                             ? "正在加载歌词…"
                             : "[00:12.00] 歌词时间轴格式\n[00:15.50] 每行一个时间点"
                     }
-                    className="h-64 w-full resize-none rounded-2xl bg-[var(--surface-fill)] p-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none ring-1 ring-foreground/10 placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+                    className="h-64 w-full resize-none rounded-2xl bg-[var(--surface-fill)] p-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none ring-1 ring-foreground/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
                 />
 
                 <p className="-mt-2 text-[11px] text-muted-foreground">

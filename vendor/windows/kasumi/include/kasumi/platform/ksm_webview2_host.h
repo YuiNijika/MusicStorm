@@ -68,6 +68,8 @@ public:
 
   std::uint64_t window_id() const noexcept;
   std::size_t view_count() const noexcept;
+  std::string last_error() const;
+  std::string last_log_path() const;
 
   static bool IsRuntimeAvailable();
   static std::string RuntimeVersion();

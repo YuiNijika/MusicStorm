@@ -188,10 +188,10 @@ type ActionButtonVariant = "default" | "primary" | "ghost" | "danger"
 const ACTION_BUTTON_VARIANTS: Record<ActionButtonVariant, string> = {
     default:
         "bg-[var(--surface-fill)] text-foreground hover:bg-[var(--surface-fill-hover)]",
-    primary: "bg-foreground text-background hover:opacity-90",
+    primary: "bg-primary text-primary-foreground hover:bg-primary/90",
     ghost: "text-muted-foreground hover:bg-[var(--surface-fill)] hover:text-foreground",
     danger:
-        "bg-red-500/12 text-red-600 hover:bg-red-500/20 dark:text-red-400",
+        "bg-destructive/10 text-destructive hover:bg-destructive/20",
 }
 
 // 统一的圆角操作按钮：普通、主操作、弱化、确认/危险态

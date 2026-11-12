@@ -271,7 +271,7 @@ function UpdateTab() {
                                     {latest}
                                 </p>
                                 {status?.hasUpdate ? (
-                                    <span className="rounded-full bg-rose-500/90 px-1.5 py-px text-[13px] font-semibold uppercase tracking-[0.04em] text-white">
+                                    <span className="rounded-full bg-primary px-1.5 py-px text-[13px] font-semibold uppercase tracking-[0.04em] text-primary-foreground">
                                         new
                                     </span>
                                 ) : status?.latestVersion ? (
@@ -310,7 +310,7 @@ function UpdateTab() {
                     </div>
 
                     {status?.error ? (
-                        <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                        <p className="rounded-xl bg-warning/10 px-3 py-2 text-sm text-warning">
                             {status.error}
                             {status.latestVersion
                                 ? "（已展示缓存结果）"

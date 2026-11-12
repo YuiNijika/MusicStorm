@@ -34,7 +34,7 @@ const sourceConfig = {
     },
     netease: {
         label: "网易云",
-        color: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
+        color: "var(--brand-netease)",
     },
     other: {
         label: "其他",
@@ -45,8 +45,8 @@ const sourceConfig = {
 const SOURCE_COLORS: Record<string, string> = {
     local: "var(--primary)",
     bilibili: "var(--brand-bilibili)",
-    netease: "color-mix(in oklch, var(--primary) 40%, oklch(0.7 0.1 250))",
-    other: "color-mix(in oklch, var(--muted-foreground) 50%, transparent)",
+    netease: "var(--brand-netease)",
+    other: "var(--chart-3)",
 }
 
 // Apple Health 式柱图配色：历史柱压灰，今日柱用主题色高亮
@@ -358,7 +358,7 @@ function StatsSourceMixChart({ rows, className }: StatsSourceMixProps) {
                                         {entry.playCount} 次
                                     </span>
                                 </div>
-                                <div className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.1]">
+                                <div className="h-1 overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
                                         style={{
