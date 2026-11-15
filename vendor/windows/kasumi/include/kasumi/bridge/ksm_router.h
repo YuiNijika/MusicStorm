@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "../plugins/ksm_framework_plugin_registry.h"
 #include "../plugins/ksm_plugin_registry.h"
 
 class KSMFileSystem;
@@ -22,13 +23,16 @@ public:
         std::vector<std::string> allowed_commands = {},
         std::vector<std::shared_ptr<KSMPlugin>> plugins = {}
     );
+    ~KSMRouter();
     KSMRouter(
         std::shared_ptr<KSMFileSystem> file_system,
         std::shared_ptr<KSMHostServices> host_services,
         std::vector<std::string> allowed_commands,
         std::vector<std::string> allowed_permissions,
         std::vector<std::shared_ptr<KSMPlugin>> plugins,
-        std::string window_id = {}
+        std::string window_id = {},
+        std::vector<std::string> framework_plugins = {},
+        std::vector<std::string> required_app_plugins = {}
     );
     void HandleMessage(const std::string& message, const ResponseSender& send_response);
     void EmitEvent(
@@ -57,9 +61,9 @@ private:
     std::shared_ptr<KSMHostServices> host_services_;
     std::vector<std::string> supported_commands_;
     std::vector<std::string> capability_commands_;
-    std::vector<std::string> plugin_ids_;
     std::vector<std::string> capability_events_;
-    KSMPluginRegistry plugin_registry_;
+    KSMFrameworkPluginRegistry framework_registry_;
+    KSMAppPluginRegistry app_plugin_registry_;
     std::string window_id_;
     mutable std::mutex state_mutex_;
     std::set<std::string> granted_permissions_;

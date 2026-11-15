@@ -1086,6 +1086,23 @@ class MusicStormPlugin : KSMPlugin {
         return pairs.joinToString("&")
     }
 
+    private fun readHttpResponseText(
+        context: KSMPluginContext,
+        response: dev.kasumi.app.bridge.KSMHttpResponse,
+        readError: String
+    ): String {
+        val file = response.file
+        if (response.body.isNotEmpty() || file.isNullOrEmpty()) {
+            return response.body
+        }
+        val fileSystem = context.fileSystem
+            ?: throw KSMHostException("IO_ERROR", readError)
+        val text = fileSystem.readText(file)
+            ?: throw KSMHostException("IO_ERROR", readError)
+        fileSystem.remove(file)
+        return text
+    }
+
     private fun performJson(
         context: KSMPluginContext,
         method: String,
@@ -1121,14 +1138,19 @@ class MusicStormPlugin : KSMPlugin {
                 "The upstream request failed with HTTP ${response.status}."
             )
         }
-        if (response.body.toByteArray(Charsets.UTF_8).size > 8 * 1024 * 1024) {
+        val responseBody = readHttpResponseText(
+            context,
+            response,
+            "B站响应文件无法读取。"
+        )
+        if (responseBody.toByteArray(Charsets.UTF_8).size > 8 * 1024 * 1024) {
             throw KSMHostException(
                 "RESOURCE_LIMIT",
                 "The upstream response is too large."
             )
         }
         return try {
-            JSONTokener(response.body).nextValue()
+            JSONTokener(responseBody).nextValue()
         } catch (_: Exception) {
             throw KSMHostException(
                 "IO_ERROR",
@@ -1440,7 +1462,12 @@ class MusicStormPlugin : KSMPlugin {
             ),
             context.requestId
         ) ?: throw KSMHostException("IO_ERROR", "网易云请求失败。")
-        if (response.body.toByteArray(Charsets.UTF_8).size > 8 * 1024 * 1024) {
+        val responseBody = readHttpResponseText(
+            context,
+            response,
+            "网易云响应文件无法读取。"
+        )
+        if (responseBody.toByteArray(Charsets.UTF_8).size > 8 * 1024 * 1024) {
             throw KSMHostException("RESOURCE_LIMIT", "响应过大。")
         }
         val cookies = JSONArray()
@@ -1452,7 +1479,7 @@ class MusicStormPlugin : KSMPlugin {
         }
         return JSONObject()
             .put("status", response.status)
-            .put("body", response.body)
+            .put("body", responseBody)
             .put("cookies", cookies)
     }
 

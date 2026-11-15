@@ -1,6 +1,6 @@
 {
   "name": "kasumi-app",
-  "version-string": "26.11.7",
+  "version-string": "26.11.15",
   "builtin-baseline": "d186940b2f0c4e8e5b4ff804af57d2a26fbfa091",
   "dependencies": [
     "nlohmann-json",

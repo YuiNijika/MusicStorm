@@ -9,7 +9,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.kasumi</groupId>
   <artifactId>kasumi</artifactId>
-  <version>26.11.7</version>
+  <version>26.11.15</version>
   <packaging>aar</packaging>
   <dependencies>
     <dependency>

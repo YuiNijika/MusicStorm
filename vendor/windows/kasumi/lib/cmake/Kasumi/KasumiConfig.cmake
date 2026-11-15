@@ -24,7 +24,7 @@ endmacro()
 
 ####################################################################################
 
-set(KASUMI_VERSION "26.11.7")
+set(KASUMI_VERSION "26.11.15")
 
 include(CMakeFindDependencyMacro)
 find_dependency(nlohmann_json CONFIG)

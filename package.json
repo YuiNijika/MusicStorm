@@ -1,7 +1,7 @@
 {
   "name": "music-storm",
   "private": true,
-  "version": "26.11.7",
+  "version": "26.11.15",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

@@ -3,5 +3,5 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
 minimumReleaseAgeExclude:
-  - kasumi-bridge@26.11.7
-  - kasumi-cli@26.11.7
+  - kasumi-bridge@26.11.15
+  - kasumi-cli@26.11.15

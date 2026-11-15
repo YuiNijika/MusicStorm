@@ -1,3 +1,3 @@
 #pragma once
 
-#define KASUMI_VERSION_STRING "26.11.7"
+#define KASUMI_VERSION_STRING "26.11.15"

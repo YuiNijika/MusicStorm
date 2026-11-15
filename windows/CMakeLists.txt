@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 set(
     KASUMI_APP_VERSION
-    "26.11.7"
+    "26.11.15"
     CACHE STRING
     "Application semantic version"
 )

@@ -617,6 +617,27 @@ void WriteSetting(
     );
 }
 
+std::string ReadHttpResponseText(
+    const KSMPluginContext& context,
+    const KSMHttpResponse& response,
+    const char* read_error
+) {
+    std::string body = response.body;
+    if (!body.empty() || !response.file) {
+        return body;
+    }
+    if (!context.file_system) {
+        throw KSMHostException("IO_ERROR", read_error);
+    }
+    const auto staged = context.file_system->ReadText(*response.file);
+    if (!staged) {
+        throw KSMHostException("IO_ERROR", read_error);
+    }
+    body = std::move(*staged);
+    context.file_system->Remove(*response.file);
+    return body;
+}
+
 Json PerformJsonRequest(
     const KSMPluginContext& context,
     const std::string& method,
@@ -661,14 +682,19 @@ Json PerformJsonRequest(
                 std::to_string(response->status) + "."
         );
     }
-    if (response->body.size() > 8 * 1024 * 1024) {
+    const std::string response_body = ReadHttpResponseText(
+        context,
+        *response,
+        "The upstream response file could not be read."
+    );
+    if (response_body.size() > 8 * 1024 * 1024) {
         throw KSMHostException(
             "RESOURCE_LIMIT",
             "The upstream response is too large."
         );
     }
     try {
-        return Json::parse(response->body);
+        return Json::parse(response_body);
     } catch (const std::exception&) {
         throw KSMHostException(
             "IO_ERROR",
@@ -1676,7 +1702,12 @@ inline Json MusicStormPlugin::Dispatch(
                 "The Netease request failed."
             );
         }
-        if (response->body.size() > 8 * 1024 * 1024) {
+        std::string response_body = ReadHttpResponseText(
+            context,
+            *response,
+            "The Netease response file could not be read."
+        );
+        if (response_body.size() > 8 * 1024 * 1024) {
             throw KSMHostException(
                 "RESOURCE_LIMIT",
                 "The response is too large."
@@ -1696,7 +1727,7 @@ inline Json MusicStormPlugin::Dispatch(
         }
         return Json{
             {"status", response->status},
-            {"body", response->body},
+            {"body", std::move(response_body)},
             {"cookies", std::move(cookies)}
         };
     }

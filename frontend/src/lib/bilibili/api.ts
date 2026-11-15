@@ -12,12 +12,15 @@ type BilibiliSearchItem = {
  pic_url?: string
     duration?: string | number
     play?: number
-    owner?: { name?: string }
+    owner?: { name?: string; uname?: string }
+    upper?: { name?: string }
     stat?: { view?: number }
     typeid?: number
     typename?: string
     tid?: number
     tname?: string
+    tnamev2?: string
+    pid_name_v2?: string
 }
 
 type BilibiliSearchData = {
@@ -103,12 +106,15 @@ type BilibiliVideoData = {
     aid?: number
     cid?: number
     title?: string
+    author?: string
     tname?: string
+    tnamev2?: string
+    pid_name_v2?: string
     pic?: string
  cover?: string
     duration?: number
  videos?: number
-    owner?: { name?: string }
+    owner?: { name?: string; uname?: string }
     pages?: BilibiliPage[]
     stat?: { view?: number }
 }

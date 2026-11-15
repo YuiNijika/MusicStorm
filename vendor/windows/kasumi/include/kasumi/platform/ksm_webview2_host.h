@@ -32,6 +32,18 @@ struct KSMWebView2ViewOptions {
   std::vector<std::string> allowed_permissions = {};
 };
 
+struct KSMWebView2ErrorPageOptions {
+  std::string background_color;
+  std::string card_color;
+  std::string border_color;
+  std::string text_color;
+  std::string muted_text_color;
+  std::string accent_color;
+  std::string error_color;
+  std::string title;
+  std::string hint;
+};
+
 std::uint64_t AllocateKSMWindowId();
 
 class KSMWebView2Host {
@@ -52,7 +64,10 @@ public:
                   std::vector<std::shared_ptr<KSMPlugin>> plugins = {},
                   std::vector<std::string> allowed_permissions = {},
                   std::vector<std::string> allowed_http_origins = {},
-                  std::string background_color = {});
+                  std::string background_color = {},
+                  KSMWebView2ErrorPageOptions error_page = {},
+                  std::vector<std::string> framework_plugins = {},
+                  std::vector<std::string> required_app_plugins = {});
   ~KSMWebView2Host();
 
   KSMWebView2Host(const KSMWebView2Host &) = delete;

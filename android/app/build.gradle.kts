@@ -21,8 +21,12 @@ val ksmPackageName = providers.gradleProperty("ksmPackageName")
     .orElse(androidConfig["packageName"] as? String ?: "dev.kasumi.music_storm")
     .get()
 val ksmVersion = providers.gradleProperty("ksmVersion")
-    .orElse(androidConfig["version"] as? String ?: "26.11.7")
+    .orElse(androidConfig["version"] as? String ?: "26.11.15")
     .get()
+val ksmVersionCode = ksmVersion
+    .split('.')
+    .take(3)
+    .fold(0) { code, part -> code * 100 + part.toInt() }
 
 fun splitCsv(value: String): List<String> =
     value
@@ -129,7 +133,7 @@ android {
         applicationId = ksmPackageName
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        versionCode = ksmVersionCode
         versionName = ksmVersion
         manifestPlaceholders["ksmLauncherIcon"] = ksmLauncherIcon
         buildConfigField(
@@ -213,6 +217,6 @@ android {
 }
 
 dependencies {
-    implementation("dev.kasumi:kasumi:26.11.7")
+    implementation("dev.kasumi:kasumi:26.11.15")
 }
 

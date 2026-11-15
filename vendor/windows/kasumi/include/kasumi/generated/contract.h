@@ -1607,6 +1607,8 @@ public:
     static const std::vector<std::string>& Plugins();
     static const nlohmann::json& PluginMetadata();
     static const nlohmann::json& PluginCommands();
+    static const nlohmann::json& PluginEvents();
+    static const nlohmann::json& EventPlugins();
     static const nlohmann::json& CommandPermissions();
     static bool ValidateArgs(const std::string& command, const nlohmann::json& args);
 };
@@ -1685,6 +1687,12 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "event.unsubscribe",
       "app.openDevtools",
       "app.deepLink.getPending"
+    ],
+    "events": [
+      "webview.navigated",
+      "webview.reloaded",
+      "app.deepLink.received",
+      "app.secondInstance.received"
     ]
   },
   "fs": {
@@ -1721,7 +1729,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "fs.stat",
       "fs.walk",
       "fs.scope.release"
-    ]
+    ],
+    "events": []
   },
   "dialog": {
     "name": "Dialog",
@@ -1745,7 +1754,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "dialog.saveFile",
       "dialog.openFolder",
       "dialog.openFiles"
-    ]
+    ],
+    "events": []
   },
   "clipboard": {
     "name": "Clipboard",
@@ -1767,7 +1777,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     "commands": [
       "clipboard.readText",
       "clipboard.writeText"
-    ]
+    ],
+    "events": []
   },
   "notification": {
     "name": "Notification",
@@ -1786,7 +1797,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     ],
     "commands": [
       "notification.show"
-    ]
+    ],
+    "events": []
   },
   "window": {
     "name": "Window",
@@ -1821,6 +1833,11 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "window.setTransparent",
       "window.getState",
       "event.emit"
+    ],
+    "events": [
+      "window.resized",
+      "window.visibilityChanged",
+      "window.stateChanged"
     ]
   },
   "http": {
@@ -1850,6 +1867,11 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "http.cookies.get",
       "http.cookies.set",
       "http.cookies.clear"
+    ],
+    "events": [
+      "http.transfer.progress",
+      "http.transfer.completed",
+      "http.transfer.failed"
     ]
   },
   "shell": {
@@ -1871,7 +1893,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "shell.openExternal",
       "shell.openPath",
       "shell.showInFolder"
-    ]
+    ],
+    "events": []
   },
   "device": {
     "name": "Device",
@@ -1889,7 +1912,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     ],
     "commands": [
       "device.getInfo"
-    ]
+    ],
+    "events": []
   },
   "sql": {
     "name": "SQL",
@@ -1912,7 +1936,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "sql.query",
       "sql.execute",
       "sql.close"
-    ]
+    ],
+    "events": []
   },
   "path": {
     "name": "Path",
@@ -1933,7 +1958,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "path.basename",
       "path.extname",
       "path.isAbsolute"
-    ]
+    ],
+    "events": []
   },
   "store": {
     "name": "Store",
@@ -1956,7 +1982,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "store.delete",
       "store.clear",
       "store.keys"
-    ]
+    ],
+    "events": []
   },
   "os": {
     "name": "OS",
@@ -1975,7 +2002,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     ],
     "commands": [
       "os.getInfo"
-    ]
+    ],
+    "events": []
   },
   "log": {
     "name": "Log",
@@ -1994,7 +2022,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     ],
     "commands": [
       "log.write"
-    ]
+    ],
+    "events": []
   },
   "appInstance": {
     "name": "App Instance",
@@ -2010,7 +2039,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     "commands": [
       "app.singleInstance.state",
       "app.singleInstance.focus"
-    ]
+    ],
+    "events": []
   },
   "updater": {
     "name": "Updater",
@@ -2033,6 +2063,10 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "updater.check",
       "updater.download",
       "updater.install"
+    ],
+    "events": [
+      "updater.progress",
+      "updater.status"
     ]
   },
   "globalShortcut": {
@@ -2052,6 +2086,9 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     "commands": [
       "globalShortcut.register",
       "globalShortcut.unregister"
+    ],
+    "events": [
+      "globalShortcut.triggered"
     ]
   },
   "tray": {
@@ -2074,6 +2111,10 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "tray.show",
       "tray.hide",
       "tray.configure"
+    ],
+    "events": [
+      "tray.action",
+      "tray.click"
     ]
   },
   "media": {
@@ -2097,7 +2138,8 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "media.ffmpeg.validate",
       "media.ffmpeg.setPath",
       "media.ffmpeg.pickExecutable"
-    ]
+    ],
+    "events": []
   },
   "audio": {
     "name": "Audio",
@@ -2131,6 +2173,12 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
       "audio.seek",
       "audio.volume.set",
       "audio.state.get"
+    ],
+    "events": [
+      "audio.tick",
+      "audio.ended",
+      "audio.stateChanged",
+      "audio.error"
     ]
   },
   "mediaSession": {
@@ -2150,6 +2198,9 @@ inline const nlohmann::json& KSMGeneratedContract::PluginMetadata() {
     "commands": [
       "mediaSession.update",
       "mediaSession.clear"
+    ],
+    "events": [
+      "mediaSession.command"
     ]
   }
 })KSMMETADATA"
@@ -2311,6 +2362,91 @@ inline const nlohmann::json& KSMGeneratedContract::PluginCommands() {
     "mediaSession.clear"
   ]
 })KSMPLUGINS"
+    );
+    return value;
+}
+
+inline const nlohmann::json& KSMGeneratedContract::PluginEvents() {
+    static const nlohmann::json value = nlohmann::json::parse(
+        R"KSMPLUGINEVENTS({
+  "core": [
+    "webview.navigated",
+    "webview.reloaded",
+    "app.deepLink.received",
+    "app.secondInstance.received"
+  ],
+  "fs": [],
+  "dialog": [],
+  "clipboard": [],
+  "notification": [],
+  "window": [
+    "window.resized",
+    "window.visibilityChanged",
+    "window.stateChanged"
+  ],
+  "http": [
+    "http.transfer.progress",
+    "http.transfer.completed",
+    "http.transfer.failed"
+  ],
+  "shell": [],
+  "device": [],
+  "sql": [],
+  "path": [],
+  "store": [],
+  "os": [],
+  "log": [],
+  "appInstance": [],
+  "updater": [
+    "updater.progress",
+    "updater.status"
+  ],
+  "globalShortcut": [
+    "globalShortcut.triggered"
+  ],
+  "tray": [
+    "tray.action",
+    "tray.click"
+  ],
+  "media": [],
+  "audio": [
+    "audio.tick",
+    "audio.ended",
+    "audio.stateChanged",
+    "audio.error"
+  ],
+  "mediaSession": [
+    "mediaSession.command"
+  ]
+})KSMPLUGINEVENTS"
+    );
+    return value;
+}
+
+inline const nlohmann::json& KSMGeneratedContract::EventPlugins() {
+    static const nlohmann::json value = nlohmann::json::parse(
+        R"KSMEVENTPLUGINS({
+  "webview.navigated": "core",
+  "webview.reloaded": "core",
+  "app.deepLink.received": "core",
+  "app.secondInstance.received": "core",
+  "window.resized": "window",
+  "window.visibilityChanged": "window",
+  "window.stateChanged": "window",
+  "http.transfer.progress": "http",
+  "http.transfer.completed": "http",
+  "http.transfer.failed": "http",
+  "updater.progress": "updater",
+  "updater.status": "updater",
+  "globalShortcut.triggered": "globalShortcut",
+  "tray.action": "tray",
+  "tray.click": "tray",
+  "audio.tick": "audio",
+  "audio.ended": "audio",
+  "audio.stateChanged": "audio",
+  "audio.error": "audio",
+  "mediaSession.command": "mediaSession"
+})KSMEVENTPLUGINS"
     );
     return value;
 }

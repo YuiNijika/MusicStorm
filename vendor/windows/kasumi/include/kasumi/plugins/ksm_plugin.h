@@ -28,6 +28,15 @@ public:
     virtual ~KSMPlugin() = default;
 
     virtual const std::string& Id() const = 0;
+    virtual std::string Name() const {
+        return Id();
+    }
+    virtual std::string Version() const {
+        return "1.0.0";
+    }
+    virtual std::string Description() const {
+        return {};
+    }
     virtual const std::vector<std::string>& Commands() const = 0;
     virtual const std::vector<std::string>& Permissions() const {
         static const std::vector<std::string> empty;
@@ -49,4 +58,19 @@ public:
         const nlohmann::json& args,
         const KSMPluginContext& context
     ) = 0;
+    virtual void Start(const KSMPluginContext& context) {
+        (void)context;
+    }
+    virtual void Stop() {}
+    virtual const std::vector<std::string>& FrameworkEvents() const {
+        static const std::vector<std::string> empty;
+        return empty;
+    }
+    virtual void OnFrameworkEvent(
+        const std::string& event,
+        const nlohmann::json& payload
+    ) {
+        (void)event;
+        (void)payload;
+    }
 };

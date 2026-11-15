@@ -59,6 +59,16 @@ function pickImageUrl(...values: Array<string | undefined>): string {
  return ""
 }
 
+function firstText(...values: Array<string | undefined>): string {
+    for (const value of values) {
+        const text = value?.trim()
+        if (text) {
+            return stripHtml(text)
+        }
+    }
+    return ""
+}
+
 function bilibiliTrackId(bvid: string | undefined, aid: number | undefined): string {
     return `bilibili:${bvid ?? (aid != null ? `av${aid}` : "")}`
 }
@@ -70,14 +80,21 @@ function mapSearchItem(item: BilibiliSearchItem): Track | null {
         return null
     }
     const id = bilibiliTrackId(bvid, aid)
-    const category = item.typename?.trim() || item.tname?.trim()
+    const category = firstText(
+        item.typename,
+        item.tname,
+        item.tnamev2,
+        item.pid_name_v2,
+    )
     return {
         id,
         title: stripHtml(item.title ?? "") || "未命名视频",
-        artist:
-            item.author?.trim() ||
-            item.owner?.name?.trim() ||
-            "未知作者",
+        artist: firstText(
+            item.owner?.name,
+            item.owner?.uname,
+            item.author,
+            item.upper?.name,
+        ) || "未知作者",
         album: category || "哔哩哔哩",
         tname: category || undefined,
  coverUrl: pickImageUrl(item.pic, item.cover, item.pic_url),
@@ -106,9 +123,13 @@ function mapVideoData(data: BilibiliVideoData): Track | null {
     return {
         id,
         title: stripHtml(data.title ?? "") || "未命名视频",
-        artist: data.owner?.name?.trim() || "未知作者",
+        artist: firstText(
+            data.owner?.name,
+            data.owner?.uname,
+            data.author,
+        ) || "未知作者",
         album: "哔哩哔哩",
-        tname: data.tname?.trim() || undefined,
+        tname: firstText(data.tname, data.tnamev2, data.pid_name_v2) || undefined,
  coverUrl: pickImageUrl(
  data.pic,
  data.cover,

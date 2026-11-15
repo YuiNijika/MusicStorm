@@ -3,7 +3,7 @@
   "component": {
     "group": "dev.kasumi",
     "module": "kasumi",
-    "version": "26.11.7",
+    "version": "26.11.15",
     "attributes": {
       "org.gradle.status": "release"
     }
@@ -82,13 +82,13 @@
       ],
       "files": [
         {
-          "name": "kasumi-26.11.7.aar",
-          "url": "kasumi-26.11.7.aar",
-          "size": 379614,
-          "sha512": "2c4799273c4f48e10494c61c7534b2888cd1df5b1066a1a3ba5ff474e44f3af1bea4891674b008fac7a72f3b5511bfac4c5b959fdb0bcd8992f97823c79e0465",
-          "sha256": "d14c45bd351f68653966af0741c3c8e3e199da54dab026e45cb906bf65f66a2f",
-          "sha1": "6b9085aca283d79189b737d488117a59d4966122",
-          "md5": "f33cb58fa2061ef06854c67cfff33ec7"
+          "name": "kasumi-26.11.15.aar",
+          "url": "kasumi-26.11.15.aar",
+          "size": 386583,
+          "sha512": "fb717d38a14a24e47d76a752e76705303fa1150857da5f89a7ab7960b10daa09172d46c187e93a445825acbfcbcf8a81224ebacb87deed068ddf185bf5763829",
+          "sha256": "d0245aa7924004671ee01deb83a914eb9af775893bcac4c66ca912e36aaa836e",
+          "sha1": "400c3d6f74027eaea3e889374fe0645ca7ca795b",
+          "md5": "625a3e7de01bd26048505210f42bfcf5"
         }
       ]
     },
@@ -160,13 +160,13 @@
       ],
       "files": [
         {
-          "name": "kasumi-26.11.7.aar",
-          "url": "kasumi-26.11.7.aar",
-          "size": 379614,
-          "sha512": "2c4799273c4f48e10494c61c7534b2888cd1df5b1066a1a3ba5ff474e44f3af1bea4891674b008fac7a72f3b5511bfac4c5b959fdb0bcd8992f97823c79e0465",
-          "sha256": "d14c45bd351f68653966af0741c3c8e3e199da54dab026e45cb906bf65f66a2f",
-          "sha1": "6b9085aca283d79189b737d488117a59d4966122",
-          "md5": "f33cb58fa2061ef06854c67cfff33ec7"
+          "name": "kasumi-26.11.15.aar",
+          "url": "kasumi-26.11.15.aar",
+          "size": 386583,
+          "sha512": "fb717d38a14a24e47d76a752e76705303fa1150857da5f89a7ab7960b10daa09172d46c187e93a445825acbfcbcf8a81224ebacb87deed068ddf185bf5763829",
+          "sha256": "d0245aa7924004671ee01deb83a914eb9af775893bcac4c66ca912e36aaa836e",
+          "sha1": "400c3d6f74027eaea3e889374fe0645ca7ca795b",
+          "md5": "625a3e7de01bd26048505210f42bfcf5"
         }
       ]
     }

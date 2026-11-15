@@ -30,7 +30,9 @@ public:
         bool allow_development_origin = false,
         std::vector<std::shared_ptr<KSMPlugin>> plugins = {},
         std::vector<std::string> allowed_permissions = {},
-        std::string window_id = {}
+        std::string window_id = {},
+        std::vector<std::string> framework_plugins = {},
+        std::vector<std::string> required_app_plugins = {}
     );
     ~KSMWebViewHost();
 

@@ -15,7 +15,7 @@
   ],
   "windows": {
     "packageName": "music-storm",
-    "version": "26.11.7",
+    "version": "26.11.15",
     "commands": "all",
     "permissions": "all",
     "decorations": false,
@@ -65,7 +65,7 @@
   },
   "android": {
     "packageName": "dev.kasumi.music_storm",
-    "version": "26.11.7",
+    "version": "26.11.15",
     "commands": "all",
     "permissions": "all",
     "http": {

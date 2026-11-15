@@ -43,8 +43,8 @@ Windows 返回 `NOT_SUPPORTED`。
 
 Windows 示例从仓库根目录 `kasumi.config.json` 读取 `windows.packageName`、
 `windows.version`、`windows.commands`、`windows.permissions`，以及可选的
-`windows.decorations`、`windows.window`、`windows.shell.allowedOrigins` 和
-`windows.http.allowedOrigins`：
+`windows.decorations`、`windows.window`、`windows.errorPage`、
+`windows.shell.allowedOrigins` 和 `windows.http.allowedOrigins`：
 
 ```json
 {
@@ -67,6 +67,17 @@ Windows 示例从仓库根目录 `kasumi.config.json` 读取 `windows.packageNam
       "maxWidth": 1920,
       "maxHeight": 1200,
       "backgroundColor": "#0B0B0D"
+    },
+    "errorPage": {
+      "backgroundColor": "#0B0B0D",
+      "cardColor": "#15171D",
+      "borderColor": "#2B2F38",
+      "textColor": "#F5F6FA",
+      "mutedTextColor": "#9CA3AF",
+      "accentColor": "#8B5CF6",
+      "errorColor": "#FF6B6B",
+      "title": "应用启动失败",
+      "hint": "请检查网络、WebView2 Runtime 或应用配置后重试"
     },
     "shell": {
       "allowedOrigins": ["https://example.com"]
@@ -107,6 +118,34 @@ Windows 示例从仓库根目录 `kasumi.config.json` 读取 `windows.packageNam
 `backgroundColor` 接受 `#RRGGBB` 或 `#AARRGGBB`，会写入 WebView2 Controller 的默认背景色。
 拖动或缩放时 WebView2 尚未重绘的区域会短暂显示该颜色，因此应与页面背景保持一致，避免
 出现白色闪边。透明窗口固定使用 `#00000000`，忽略该值。省略时 WebView2 使用不透明白色。
+
+### WebView2 初始化与错误页
+
+`windows.errorPage` 自定义原生 WebView2 初始化失败或导航失败后的错误面板。初始化加载态
+仍根据 `windows.window.backgroundColor` 使用默认浅色或深色表面；WebView2 Runtime 缺失、
+初始化失败、导航失败或 DNS 解析失败时，错误面板会显示错误原因、URL 与日志路径，并保持
+底层 WebView2 原生错误页隐藏。
+
+| 字段 | 作用 |
+| --- | --- |
+| `backgroundColor` | 表面渐变背景色 |
+| `cardColor` | 信息卡片背景色 |
+| `borderColor` | 卡片边框色 |
+| `textColor` | 主标题和错误信息颜色 |
+| `mutedTextColor` | 辅助文字、URL 和日志路径颜色 |
+| `accentColor` | 加载指示器与图标强调色 |
+| `errorColor` | 失败状态错误标记颜色 |
+| `title` | 失败面板标题，长度 1-80 |
+| `hint` | 失败面板底部提示，长度 1-240 |
+
+所有颜色字段接受 `#RRGGBB` 或 `#AARRGGBB`，原生 GDI 绘制会忽略 alpha。省略字段时沿用
+根据 `windows.window.backgroundColor` 自动选择的浅色或深色默认配色。`title` 与 `hint`
+是纯文本，不支持 HTML/CSS；为保证 CMake 宏安全，不能包含双引号、反斜杠、分号或控制字符。
+直接使用 CMake 时对应变量是 `KASUMI_ERROR_PAGE_BACKGROUND_COLOR`、
+`KASUMI_ERROR_PAGE_CARD_COLOR`、`KASUMI_ERROR_PAGE_BORDER_COLOR`、
+`KASUMI_ERROR_PAGE_TEXT_COLOR`、`KASUMI_ERROR_PAGE_MUTED_TEXT_COLOR`、
+`KASUMI_ERROR_PAGE_ACCENT_COLOR`、`KASUMI_ERROR_PAGE_ERROR_COLOR`、
+`KASUMI_ERROR_PAGE_TITLE` 与 `KASUMI_ERROR_PAGE_HINT`。
 
 ### 应用图标
 
@@ -261,11 +300,11 @@ KSM::Log::Write(
 
 ## 插件与 SQL
 
-Windows 宿主默认加载 `fs`、`dialog`、`clipboard`、`notification`、`window`、`http`、
-`shell`、`sql`、`path`、`store`、`os` 和 `log` 插件。`core` 仍由路由层实现，
-`device` 仅 Android 注册。插件接口位于
-`include/kasumi/plugins/ksm_plugin.h`，消费方可以通过 `KSMWebView2Host` 构造函数传入
-额外插件：
+Windows 宿主把框架插件和应用插件分开注册。框架插件来自 `protocol/plugins.json`，
+由 `KSMFrameworkPluginRegistry` 承载；应用插件通过 `KSMWebView2Host` 构造函数的
+`plugins` 参数注册，由 `KSMAppPluginRegistry` 承载。两者 ID、命令、权限和事件不能
+互相冲突，应用插件也不能使用同 ID 替换框架插件。插件接口位于
+`include/kasumi/plugins/ksm_plugin.h`：
 
 ```cpp
 #include <memory>
@@ -288,14 +327,21 @@ auto host = std::make_shared<KSMWebView2Host>(
     true,
     std::vector<std::shared_ptr<KSMPlugin>>{
         std::make_shared<MyPlugin>()
-    }
+    },
+    {"fs.read", "store"},
+    {"https://api.example.com"},
+    {},
+    {},
+    {"fs", "store", "appInstance"},
+    {"example.analytics"}
 );
 ```
 
-除 `core` 外的内置插件都可以用同 ID 自定义插件替换，但替换插件必须完整声明该 ID 在
-`protocol/plugins.json` 中的全部命令。自定义插件不得抢占其他生成命令。自定义命令不在
-`protocol/commands.json` 时，插件必须实现自己的参数校验。插件上下文携带请求 ID，
-下载插件用它连接 `KSMHostServices::CancelRequest`。
+`frameworkPlugins` 支持显式数组或 `"all"`；省略 `commands` 时 CLI 会按启用的框架插件
+和应用插件推导命令白名单。应用插件必须实现 `Id`、`Commands`、`Permissions`、
+`Events`、`ValidateArgs` 和 `Handle`，并通过 `FrameworkEvents` 声明要接收的框架事件。
+应用插件命令不在 `protocol/commands.json` 时，必须自行校验参数并返回协议错误码。
+插件上下文携带请求 ID，下载插件用它连接 `KSMHostServices::CancelRequest`。
 
 SQL 驱动实现 `KSMSqlDriver` 和 `KSMSqlConnection`，然后注册到宿主服务：
 
@@ -345,7 +391,9 @@ cmake --build windows/build/sdk --config Release --target install
 ```text
 windows/build/sdk/install/
 ├─ include/kasumi/
-├─ lib/kasumi_windows_bridge.lib
+├─ lib/kasumi_windows_bridge_core.lib
+├─ lib/kasumi_windows_bridge_plugins.lib
+├─ lib/kasumi_windows_bridge_runtime.lib
 ├─ lib/cmake/Kasumi/
 └─ README.md
 ```
@@ -355,6 +403,12 @@ C++ 实现文件。依赖通过 `vcpkg.json` 固定为 `nlohmann-json` 与 `webv
 默认构建使用 `x64-windows-static-md` triplet；只有启用动态 Loader 时才使用
 `x64-windows`。`cli/ksm.py` 会分别使用 `.tmp/vcpkg-installed` 和
 `.tmp/vcpkg-installed-webview2-loader`，避免两种模式互相清理依赖。
+
+MSVC 静态库需要保留完整的 COFF 符号字符串表。`nlohmann/json` 的模板实例化会让
+单个聚合库膨胀到约 65 MiB，其中约 40 MiB 是符号名，不是 WebView2 Loader、PDB
+或源码。SDK 因此按依赖方向拆为 `core`、`plugins`、`runtime` 三个静态库，并用
+`Kasumi::kasumi_windows_bridge` 聚合链接；消费者 API 和链接命令不需要变化。
+拆分后的单库约 15 / 27 / 24 MiB，均低于 GitHub 建议的 50 MiB 单文件上限。
 
 ## 独立示例
 
